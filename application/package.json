@@ -1,14 +1,14 @@
 {
-  "name": "template_application",
+  "name": "deck-service",
   "version": "0.0.1",
-  "description": "This is a Microservice template appication, meant to be forked.",
+  "description": "This service handles deck and slide management for slidewiki.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/slidewiki/Microservice-Template"
+    "url": "https://github.com/slidewiki/Deck-Service"
   },
-  "bugs": "https://github.com/slidewiki/Microservice-Template/issues",
+  "bugs": "https://github.com/slidewiki/Deck-Service/issues",
   "author": "Roy Meissner (https://rmeissn.github.io/)",
-  "license": "GPL-3.0",
+  "license": "MPL-2.0",
   "main": "server.js",
   "scripts": {
     "clean": "rm -R ./node_modules/ ./coverage/ && docker stop SlideWikiServiceTemplateMongoDB",
@@ -34,7 +34,7 @@
     "hapi": "13.0.x",
     "hapi-swagger": "4.2.x",
     "inert": "3.2.x",
-    "joi": "7.2.x",
+    "joi": "8.0.2",
     "mongodb": "2.1.x",
     "vision": "4.0.x"
   },
