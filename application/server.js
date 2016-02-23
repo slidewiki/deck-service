@@ -1,8 +1,7 @@
 'use strict';
 
-const hapi = require('hapi');
-const myRoutes = require('./routes.js');
-const co = require('./common');
+const hapi = require('hapi'),
+  co = require('./common');
 
 const server = new hapi.Server();
 let port2 = 3000;
@@ -32,9 +31,9 @@ let plugins = [
     register: require('hapi-swagger'),
     options: {
       info: {
-        title: 'Example API',
+        title: 'Deck and Slide Management API',
         description: 'Powered by node, hapi, joi, hapi-swaggered, hapi-swaggered-ui and swagger-ui',
-        version: '1.0'
+        version: '0.1.0'
       }
     }
   }
@@ -47,7 +46,7 @@ server.register(plugins, (err) => {
   } else {
     server.start(() => {
       server.log('info', 'Server started at ' + server.info.uri);
-      myRoutes(server);
+      require('./routes.js');
     });
   }
 });

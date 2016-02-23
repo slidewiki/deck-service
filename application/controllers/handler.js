@@ -1,49 +1,80 @@
 'use strict';
 
-//Boom gives us some predefined http codes and proper responses
-const boom = require('boom');
-//This is a simple database imitation that has to be exchanged in the future
-const db = require('../database/dbimitation');
+const boom = require('boom'),
+  slideDB = require('../database/slideDatabase'),
+  deckDB = require('../database/deckDatabase'),
+  server = require('../server'),
+  co = require('../common');
 
 module.exports = {
-  //Get Slide from database or return NOT FOUND
   getSlide: function(request, reply) {
-    try {
-      reply(db.get(encodeURIComponent(request.params.id)));
-    } catch (e) {
-      reply(boom.notFound());
-    }
-  },
-
-  //Create Slide with new id and payload or return INTERNAL_SERVER_ERROR
-  newSlide: function(request, reply) {
-    try {
-      let slide = request.payload;
-      slide.id = db.getNewID();
-      reply(db.insert(slide));
-    } catch (e) {
-      reply(boom.badImplementation('Something strange happend...try to contact Santa to solve the problem...'));
-    }
-  },
-
-  //Update Slide with id id and payload or return INTERNAL_SERVER_ERROR
-  updateSlide: function(request, reply) {
-    try {
-      reply(db.update(request.payload));
-    } catch (e) {
-      reply(boom.badImplementation('Something strange happend...try to contact Santa to solve the problem...'));
-    }
-  },
-
-  //Get all slides from database
-  getSlides: function(request, reply) {
-    const promise = database_helper.getAllSlides();
-    promise.then((docs) => {
-      return reply(docs);
-    })
-    .catch((error) => {
-      console.log('Error', error);
-      reply(boom.badImplementation('Something strange happend...try to contact Santa to solve the problem...'));
+    //NOTE shall the response be cleaned or enhanced with values?
+    slideDB.get(encodeURIComponent(request.params.id)).then((slide) => {
+      reply(slide);
+    }, (rejection) => {
+      //TODO validate and have a look at different http status codes for response
+      if (co.isEmpty(rejection.message)) {
+        server.log('info', rejection);
+        reply(boom.notFound());
+      } else
+        throw rejection;
+    }).catch((error) => {
+      server.log('error', error);
+      reply(boom.badImplementation());
     });
+  },
+
+  newSlide: function(request, reply) {
+    //NOTE shall the response be cleaned or enhanced with values?
+    slideDB.insert(request.payload).then((slide) => {
+      reply(slide);
+    }, (rejection) => {
+      //TODO validate and have a look at different http status codes for response
+      if (co.isEmpty(rejection.message)) {
+        server.log('info', rejection);
+        reply(boom.notFound());
+      } else
+        throw rejection;
+    }).catch((error) => {
+      server.log('error', error);
+      reply(boom.badImplementation());
+    });
+  },
+
+  updateSlide: function(request, reply) {
+    //NOTE shall the payload and/or response be cleaned or enhanced with values?
+    slideDB.update(request.payload).then((slide) => {
+      reply(slide);
+    }, (rejection) => {
+      //TODO validate and have a look at different http status codes for response
+      if (co.isEmpty(rejection.message)) {
+        server.log('info', rejection);
+        reply(boom.notFound());
+      } else
+        throw rejection;
+    }).catch((error) => {
+      server.log('error', error);
+      reply(boom.badImplementation());
+    });
+  },
+
+  getDeck: function(request, reply) {
+    deckDB.get(encodeURIComponent(request.params.id)).then((deck) => {
+      reply(deck);
+    }, (rejection) => {
+      //TODO validate and have a look at different http status codes for response
+      if (co.isEmpty(rejection.message)) {
+        server.log('info', rejection);
+        reply(boom.notFound());
+      } else
+        throw rejection;
+    }).catch((error) => {
+      server.log('error', error);
+      reply(boom.badImplementation());
+    });
+  },
+
+  getDeckTree: function(request, reply) {
+    reply(boom.notImplemented);
   }
 };
