@@ -23,7 +23,8 @@ let plugins = [
         reporter: require('good-console'),
         events: {
           response: '*',
-          log: '*'
+          log: '*',
+          request: '*'
         }
       }]
     }

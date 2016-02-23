@@ -6,22 +6,22 @@ module.exports = {
   get: function(identifier) {
     return helper.connectToDatabase()
       .then((db) => db.collection('decks'))
-      .then((coll) => coll.findONE({
-        id: identifier
+      .then((col) => col.findOne({
+        _id: identifier
       }));
   },
 
   insert: function(deck) {
     return helper.connectToDatabase()
       .then((db) => db.collection('decks'))
-      .then((coll) => coll.insertONE(deck)); //id is created and concatinated automagically
+      .then((col) => col.insertOne(deck)); //id is created and concatinated automagically
   },
 
   update: function(deck) {
     return helper.connectToDatabase()
       .then((db) => db.collection('decks'))
-      .then((coll) => coll.updateONE({
-        id: deck.id
+      .then((col) => col.findOneAndUpdate({
+        _id: deck.id
       }, deck));
   }
 };

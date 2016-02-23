@@ -3,23 +3,18 @@
 const boom = require('boom'),
   slideDB = require('../database/slideDatabase'),
   deckDB = require('../database/deckDatabase'),
-  server = require('../server'),
   co = require('../common');
 
 module.exports = {
   getSlide: function(request, reply) {
     //NOTE shall the response be cleaned or enhanced with values?
     slideDB.get(encodeURIComponent(request.params.id)).then((slide) => {
-      reply(slide);
-    }, (rejection) => {
-      //TODO validate and have a look at different http status codes for response
-      if (co.isEmpty(rejection.message)) {
-        server.log('info', rejection);
+      if (co.isEmpty(slide))
         reply(boom.notFound());
-      } else
-        throw rejection;
+      else
+        reply(co.rewriteID(slide));
     }).catch((error) => {
-      server.log('error', error);
+      request.log('error', error);
       reply(boom.badImplementation());
     });
   },
@@ -27,16 +22,18 @@ module.exports = {
   newSlide: function(request, reply) {
     //NOTE shall the response be cleaned or enhanced with values?
     slideDB.insert(request.payload).then((slide) => {
+      request.log('info',slide);
       reply(slide);
     }, (rejection) => {
       //TODO validate and have a look at different http status codes for response
+      request.log('info', rejection);
       if (co.isEmpty(rejection.message)) {
-        server.log('info', rejection);
+        request.log('info', rejection);
         reply(boom.notFound());
       } else
         throw rejection;
     }).catch((error) => {
-      server.log('error', error);
+      request.log('error', error);
       reply(boom.badImplementation());
     });
   },
@@ -48,12 +45,12 @@ module.exports = {
     }, (rejection) => {
       //TODO validate and have a look at different http status codes for response
       if (co.isEmpty(rejection.message)) {
-        server.log('info', rejection);
+        request.log('info', rejection);
         reply(boom.notFound());
       } else
         throw rejection;
     }).catch((error) => {
-      server.log('error', error);
+      request.log('error', error);
       reply(boom.badImplementation());
     });
   },
@@ -64,12 +61,12 @@ module.exports = {
     }, (rejection) => {
       //TODO validate and have a look at different http status codes for response
       if (co.isEmpty(rejection.message)) {
-        server.log('info', rejection);
+        request.log('info', rejection);
         reply(boom.notFound());
       } else
         throw rejection;
     }).catch((error) => {
-      server.log('error', error);
+      request.log('error', error);
       reply(boom.badImplementation());
     });
   },
