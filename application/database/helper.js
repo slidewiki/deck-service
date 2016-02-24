@@ -19,17 +19,19 @@ module.exports = {
         id: 1,
         data: {}
       });
-      return db
+      return db;
     });
   },
 
-  cleanDatabase: function(db, dbname) {
+  cleanDatabase: function(dbname) {
     this.connectToDatabase(dbname)
-      .then((db2) => {
+      .then((db) => {
         const DatabaseCleaner = require('database-cleaner');
         const databaseCleaner = new DatabaseCleaner('mongodb');
 
         return databaseCleaner.clean(db, resolve);
+      }).catch((error) => {
+        throw error;
       });
   },
 
