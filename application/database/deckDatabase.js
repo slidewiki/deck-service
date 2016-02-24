@@ -5,9 +5,9 @@ const helper = require('./helper');
 module.exports = {
   get: function(identifier) {
     return helper.connectToDatabase()
-      .then((db) => db.collection('decks'))
+      .then((db) => db.collection('slides'))
       .then((col) => col.findOne({
-        _id: identifier
+        _id: oid(identifier)
       }));
   },
 

@@ -21,34 +21,24 @@ module.exports = {
 
   newSlide: function(request, reply) {
     //NOTE shall the response be cleaned or enhanced with values?
-    slideDB.insert(request.payload).then((slide) => {
-      request.log('info',slide);
-      reply(slide);
-    }, (rejection) => {
-      //TODO validate and have a look at different http status codes for response
-      request.log('info', rejection);
-      if (co.isEmpty(rejection.message)) {
-        request.log('info', rejection);
-        reply(boom.notFound());
-      } else
-        throw rejection;
+    slideDB.insert(request.payload).then((inserted) => {
+      if (co.isEmpty(inserted.ops[0]))
+        throw inserted;
+      else
+        reply(co.rewriteID(inserted.ops[0]));
     }).catch((error) => {
       request.log('error', error);
       reply(boom.badImplementation());
     });
   },
 
-  updateSlide: function(request, reply) {
+  replaceSlide: function(request, reply) {
     //NOTE shall the payload and/or response be cleaned or enhanced with values?
-    slideDB.update(request.payload).then((slide) => {
-      reply(slide);
-    }, (rejection) => {
-      //TODO validate and have a look at different http status codes for response
-      if (co.isEmpty(rejection.message)) {
-        request.log('info', rejection);
-        reply(boom.notFound());
-      } else
-        throw rejection;
+    slideDB.replace(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+      if (co.isEmpty(replaced.value))
+        throw replaced;
+      else
+        reply(replaced.value);
     }).catch((error) => {
       request.log('error', error);
       reply(boom.badImplementation());
@@ -57,14 +47,10 @@ module.exports = {
 
   getDeck: function(request, reply) {
     deckDB.get(encodeURIComponent(request.params.id)).then((deck) => {
-      reply(deck);
-    }, (rejection) => {
-      //TODO validate and have a look at different http status codes for response
-      if (co.isEmpty(rejection.message)) {
-        request.log('info', rejection);
+      if (co.isEmpty(deck))
         reply(boom.notFound());
-      } else
-        throw rejection;
+      else
+        reply(co.rewriteID(deck));
     }).catch((error) => {
       request.log('error', error);
       reply(boom.badImplementation());

@@ -1,13 +1,14 @@
 'use strict';
 
-const helper = require('./helper');
+const helper = require('./helper'),
+  oid = require('mongodb').ObjectID;
 
 module.exports = {
   get: function(identifier) {
     return helper.connectToDatabase()
       .then((db) => db.collection('slides'))
       .then((col) => col.findOne({
-        _id: identifier
+        _id: oid(identifier)
       }));
   },
 
@@ -18,11 +19,11 @@ module.exports = {
       .then((col) => col.insertOne(slide)); //id is created and concatinated automagically
   },
 
-  update: function(slide) {
+  replace: function(id, slide) {
     return helper.connectToDatabase()
       .then((db) => db.collection('slides'))
-      .then((col) => col.findOneAndUpdate({
-        _id: slide.id
+      .then((col) => col.findOneAndReplace({
+        _id: oid(id)
       }, slide));
   }
 };

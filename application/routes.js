@@ -57,12 +57,14 @@ server.route({
     validate: {
       payload: Joi.object().keys({
         title: Joi.string(),
-        parent_deck_id: Joi.string().alphanum().lowercase(),
-        position: Joi.number().integer().min(0),
+        body: Joi.string(),
         user_id: Joi.string().alphanum().lowercase(),
         root_deck_id: Joi.string().alphanum().lowercase(),
+        parent_deck_id: Joi.string().alphanum().lowercase(),
+        no_new_revision: Joi.boolean(),
+        position: Joi.number().integer().min(0),
         language: Joi.string()
-      }).requiredKeys('title', 'language'),
+      }).requiredKeys('title', 'body'),
     },
     tags: ['api'],
     description: 'Create a new slide'
@@ -73,7 +75,7 @@ server.route({
 server.route({
   method: 'PUT',
   path: '/slide/{id}',
-  handler: handlers.updateSlide,
+  handler: handlers.replaceSlide,
   config: {
     validate: {
       params: {
@@ -85,10 +87,12 @@ server.route({
         user_id: Joi.string().alphanum().lowercase(),
         root_deck_id: Joi.string().alphanum().lowercase(),
         parent_deck_id: Joi.string().alphanum().lowercase(),
-        no_new_revision: Joi.boolean()
+        no_new_revision: Joi.boolean(),
+        position: Joi.number().integer().min(0),
+        language: Joi.string()
       }).requiredKeys('title', 'body'),
     },
     tags: ['api'],
-    description: 'Update a slide'
+    description: 'Replace a slide'
   }
 });
