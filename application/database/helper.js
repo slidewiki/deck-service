@@ -3,10 +3,26 @@
 const Db = require('mongodb').Db,
   Server = require('mongodb').Server,
   MongoClient = require('mongodb').MongoClient,
-  config = require('../configuration.js').MongoDB;
+  config = require('../configuration.js').MongoDB,
+  co = require('../common');
+
+let dbConnection = undefined;
 
 function testDbName(name) {
   return typeof name !== 'undefined' ? name : config.SLIDEWIKIDATABASE;
+}
+
+function testConnection(dbname) {
+  if (!co.isEmpty(dbConnection)) { //TODO test for alive
+    if (dbConnection.s.databaseName === dbname)
+      return true;
+    else {
+      dbConnection.close();
+      dbConnection = undefined;
+      return false;
+    }
+  }
+  return false;
 }
 
 module.exports = {
@@ -38,11 +54,16 @@ module.exports = {
   connectToDatabase: function(dbname) {
     dbname = testDbName(dbname);
 
-    return MongoClient.connect('mongodb://' + config.HOST + ':' + config.PORT + '/' + dbname)
-      .then((db) => {
-        if (db.s.databaseName !== dbname)
-          throw new 'Wrong Database!';
-        return db;
-      });
+    if (testConnection(dbname))
+      return Promise.resolve(dbConnection);
+    else
+      return MongoClient.connect('mongodb://' + config.HOST + ':' + config.PORT + '/' + dbname)
+        .then((db) => {
+          if (db.s.databaseName !== dbname)
+            throw new 'Wrong Database!';
+          dbConnection = db;
+          return db;
+        });
+
   }
 };
