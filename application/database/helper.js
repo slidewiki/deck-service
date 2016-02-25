@@ -40,12 +40,13 @@ module.exports = {
   },
 
   cleanDatabase: function(dbname) {
-    this.connectToDatabase(dbname)
+    dbname = testDbName(dbname);
+
+    return this.connectToDatabase(dbname)
       .then((db) => {
         const DatabaseCleaner = require('database-cleaner');
         const databaseCleaner = new DatabaseCleaner('mongodb');
-
-        return databaseCleaner.clean(db, resolve);
+        return new Promise((resolve) => databaseCleaner.clean(db, resolve));
       }).catch((error) => {
         throw error;
       });
@@ -64,6 +65,5 @@ module.exports = {
           dbConnection = db;
           return db;
         });
-
   }
 };
