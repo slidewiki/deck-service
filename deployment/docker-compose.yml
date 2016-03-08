@@ -1,5 +1,5 @@
 service:
-  image: slidewiki/microservicetemplate
+  image: slidewiki/deckservice
   restart: always
   expose:
     - "80"
