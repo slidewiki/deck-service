@@ -57,14 +57,17 @@ module.exports = function(server) {
       validate: {
         payload: Joi.object().keys({
           title: Joi.string(),
-          body: Joi.string(),
-          user_id: Joi.string().alphanum().lowercase(),
-          root_deck_id: Joi.string().alphanum().lowercase(),
-          parent_deck_id: Joi.string().alphanum().lowercase(),
-          no_new_revision: Joi.boolean(),
+          content: Joi.string(),
+          user: Joi.string().alphanum().lowercase(),
+          root_deck: Joi.string().alphanum().lowercase(),
+          parent_slide: Joi.object().keys({
+            id: Joi.string().alphanum().lowercase(),
+            revision: Joi.string().alphanum().lowercase()
+          }),
           position: Joi.number().integer().min(0),
-          language: Joi.string()
-        }).requiredKeys('title', 'body'),
+          language: Joi.string(),
+          license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+        }).requiredKeys('user', 'content', 'root_deck', 'license'),
       },
       tags: ['api'],
       description: 'Create a new slide'
@@ -75,7 +78,7 @@ module.exports = function(server) {
   server.route({
     method: 'PUT',
     path: '/slide/{id}',
-    handler: handlers.replaceSlide,
+    handler: handlers.updateSlide,
     config: {
       validate: {
         params: {
@@ -83,14 +86,17 @@ module.exports = function(server) {
         },
         payload: Joi.object().keys({
           title: Joi.string(),
-          body: Joi.string(),
-          user_id: Joi.string().alphanum().lowercase(),
-          root_deck_id: Joi.string().alphanum().lowercase(),
-          parent_deck_id: Joi.string().alphanum().lowercase(),
-          no_new_revision: Joi.boolean(),
+          content: Joi.string(),
+          user: Joi.string().alphanum().lowercase(),
+          root_deck: Joi.string().alphanum().lowercase(),
+          parent_slide: Joi.object().keys({
+            id: Joi.string().alphanum().lowercase(),
+            revision: Joi.string().alphanum().lowercase()
+          }),
           position: Joi.number().integer().min(0),
-          language: Joi.string()
-        }).requiredKeys('title', 'body'),
+          language: Joi.string(),
+          license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+        }).requiredKeys('user', 'content', 'root_deck', 'license'),
       },
       tags: ['api'],
       description: 'Replace a slide'

@@ -25,3 +25,21 @@ module.exports = {
       }, deck));
   }
 };
+
+function convertDeck(deck) {
+  let now = new Date();
+  return {
+    user: deck.user,
+    deck: deck.root_deck,
+    timestamp: now,
+    lastUpdate: now,
+    license: deck.license,
+    revisions: [{
+      title: deck.title,
+      timestamp: now,
+      user: deck.user,
+      visibility: false,
+      contentItems: deck.content_items
+    }]
+  };
+}

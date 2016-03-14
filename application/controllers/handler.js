@@ -22,7 +22,8 @@ module.exports = {
   newSlide: function(request, reply) {
     //NOTE shall the response be cleaned or enhanced with values?
     slideDB.insert(request.payload).then((inserted) => {
-      if (co.isEmpty(inserted.ops[0]))
+      //console.log('inserted: ', inserted);
+      if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
         throw inserted;
       else
         reply(co.rewriteID(inserted.ops[0]));
@@ -32,9 +33,10 @@ module.exports = {
     });
   },
 
-  replaceSlide: function(request, reply) {
+  updateSlide: function(request, reply) {
     //NOTE shall the payload and/or response be cleaned or enhanced with values?
     slideDB.replace(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+      //console.log('updated: ', replaced);
       if (co.isEmpty(replaced.value))
         throw replaced;
       else

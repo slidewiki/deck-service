@@ -23,8 +23,11 @@ describe('REST API', () => {
 
   let slide = {
     title: 'Dummy',
-    body: 'dummy',
-    language: 'en'
+    content: 'dummy',
+    language: 'en',
+    license: 'CC0',
+    user: '112233445566778899001213',
+    root_deck: '112233445566778899001214'
   };
   let options = {
     method: 'POST',
@@ -42,9 +45,9 @@ describe('REST API', () => {
         response.statusCode.should.equal(200);
         response.payload.should.be.a('string');
         let payload = JSON.parse(response.payload);
-        payload.should.be.an('object').and.contain.keys('title', 'language');
-        payload.title.should.equal('Dummy');
+        payload.should.be.an('object').and.contain.keys('language', 'timestamp', 'user');
         payload.language.should.equal('en');
+        payload.user.should.equal('112233445566778899001213');
         done();
       });
     });
