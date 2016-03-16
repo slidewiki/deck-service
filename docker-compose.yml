@@ -1,4 +1,4 @@
-service:
+deckservice:
   image: slidewiki/deckservice
   restart: always
   expose:
