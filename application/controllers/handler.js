@@ -1,3 +1,7 @@
+/*
+Handles the requests by executing stuff and replying to the client. Uses promises to get stuff done.
+*/
+
 'use strict';
 
 const boom = require('boom'),
@@ -14,6 +18,7 @@ module.exports = {
       else
         reply(co.rewriteID(slide));
     }).catch((error) => {
+      console.log('ERROR: ', error);
       request.log('error', error);
       reply(boom.badImplementation());
     });

@@ -1,8 +1,8 @@
 'use strict';
 
 //require
-var Ajv = require('ajv');
-var ajv = Ajv({
+let Ajv = require('ajv');
+let ajv = Ajv({
   verbose: true,
   allErrors: true
     //v5: true  //enable v5 proposal of JSON-schema standard

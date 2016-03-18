@@ -1,3 +1,7 @@
+/*
+Controller for handling mongodb and the data model slide while providing CRUD'ish.
+*/
+
 'use strict';
 
 const helper = require('./helper'),
@@ -56,7 +60,7 @@ module.exports = {
               if (!valid) {
                 return slideModel.errors;
               }
-              
+
               return col.findOneAndUpdate({
                 _id: oid(id)
               }, { $push: { revisions: slideWithNewRevision.revisions[0] } });

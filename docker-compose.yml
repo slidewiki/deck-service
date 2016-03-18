@@ -1,6 +1,6 @@
 deckservice:
   image: slidewiki/deckservice
-  restart: always
+  restart: on-failure:5
   expose:
     - "80"
   external_links:
