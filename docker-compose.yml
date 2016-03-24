@@ -8,4 +8,4 @@ deckservice:
   environment:
     - APPLICATION_PORT=80
     - DATABASE_PORT=27017
-    - VIRTUAL_HOST=deckservice.185.101.156.130.xip.io
+    - VIRTUAL_HOST=deckservice.185.101.156.130.xip.io,deckservice.manfredfris.ch
