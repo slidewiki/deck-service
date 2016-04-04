@@ -18,7 +18,6 @@ module.exports = {
       else
         reply(co.rewriteID(slide));
     }).catch((error) => {
-      console.log('ERROR: ', error);
       request.log('error', error);
       reply(boom.badImplementation());
     });
