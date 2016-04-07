@@ -21,7 +21,7 @@ module.exports = function(server) {
   /*TODO think about deck/slides - missing until now*/
   server.route({
     method: 'GET',
-    path: '/deck/tree/{id}',
+    path: '/decktree/{id}',
     handler: handlers.getDeckTree,
     config: {
       validate: {
