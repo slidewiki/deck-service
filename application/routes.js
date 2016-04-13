@@ -49,7 +49,7 @@ module.exports = function(server) {
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
           }),
-          position: Joi.number().integer().min(0),
+          position: Joi.string().alphanum().lowercase().min(0),
           language: Joi.string(),
           license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
         }).requiredKeys('user', 'content', 'root_deck', 'license'),
@@ -78,7 +78,7 @@ module.exports = function(server) {
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
           }),
-          position: Joi.number().integer().min(0),
+          position: Joi.string().alphanum().lowercase().min(0),
           language: Joi.string(),
           license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
         }).requiredKeys('user', 'content', 'root_deck', 'license'),
@@ -95,7 +95,7 @@ module.exports = function(server) {
     config: {
       validate: {
         params: {
-          id: Joi.number().integer()
+          id: Joi.string().alphanum().lowercase()
         }
       },
       tags: ['api'],
@@ -111,16 +111,16 @@ module.exports = function(server) {
       validate: {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
-            id: Joi.number().integer(), //id of the root deck
+            id: Joi.string().alphanum().lowercase(), //id of the root deck
             spath: Joi.string(),
             stype: Joi.string(),
-            sid: Joi.number().integer()
+            sid: Joi.string().alphanum().lowercase()
           }),
           nodeSpec: Joi.object().keys({
-            id: Joi.number().integer(), //0 means it is a new node not existing
+            id: Joi.string().alphanum().lowercase(), //0 means it is a new node not existing
             type: Joi.string()
           }),
-          user: Joi.number().integer()
+          user: Joi.string().alphanum().lowercase()
         }).requiredKeys('selector', 'user'),
       },
       tags: ['api'],
@@ -136,13 +136,13 @@ module.exports = function(server) {
       validate: {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
-            id: Joi.number().integer(), //id of the root deck
+            id: Joi.string().alphanum().lowercase(), //id of the root deck
             spath: Joi.string(),
             stype: Joi.string(),
-            sid: Joi.number().integer()
+            sid: Joi.string().alphanum().lowercase()
           }),
           name: Joi.string(),
-          user: Joi.number().integer()
+          user: Joi.string().alphanum().lowercase()
         }).requiredKeys('selector', 'user'),
       },
       tags: ['api'],
@@ -158,12 +158,12 @@ module.exports = function(server) {
       validate: {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
-            id: Joi.number().integer(), //id of the root deck
+            id: Joi.string().alphanum().lowercase(), //id of the root deck
             spath: Joi.string(),
             stype: Joi.string(),
-            sid: Joi.number().integer()
+            sid: Joi.string().alphanum().lowercase()
           }),
-          user: Joi.number().integer()
+          user: Joi.string().alphanum().lowercase()
         }).requiredKeys('selector', 'user'),
       },
       tags: ['api'],

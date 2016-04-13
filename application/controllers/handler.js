@@ -110,7 +110,7 @@ module.exports = {
     let node = {};
     let rnd = Math.round(Math.random()*800) + 1;
     if(request.payload.nodeSpec.type === 'slide'){
-      if(request.payload.nodeSpec.id){
+      if(parseInt(request.payload.nodeSpec.id)){
         //it means it is an existing node, we should retrieve the details then
         node = {title: 'Existing Slide', id: 11, type: 'slide'};
       }else{
@@ -118,7 +118,7 @@ module.exports = {
         node = {title: 'New Slide', id: rnd, type: 'slide'};
       }
     }else{
-      if(request.payload.nodeSpec.id){
+      if(parseInt(request.payload.nodeSpec.id)){
         //it means it is an existing node
         node = {title: 'Existing Deck', id: 53, type: 'deck',  children: [
                {title: 'Syntax', id: 685, type: 'slide'},
