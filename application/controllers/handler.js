@@ -67,7 +67,7 @@ module.exports = {
     //----mockup:start
     let deckTree;
     let deckTree1 = {
-      title: 'Semantic Web', id: 56, type: 'deck', children: [
+      title: 'Semantic Web', id: request.params.id, type: 'deck', children: [
           {title: 'Introduction', id: 66, type: 'slide'},
           {title: 'RDF Data Model', id: 67, type: 'deck',  children: [
               {title: 'Introduction', id: 671, type: 'slide'},
