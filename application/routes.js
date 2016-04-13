@@ -146,7 +146,7 @@ module.exports = function(server) {
         }).requiredKeys('selector', 'user'),
       },
       tags: ['api'],
-      description: 'Renames a node (slide/deck) in the deck tree'
+      description: 'Rename a node (slide/deck) in the deck tree'
     }
   });
 
@@ -167,7 +167,7 @@ module.exports = function(server) {
         }).requiredKeys('selector', 'user'),
       },
       tags: ['api'],
-      description: 'Deleted a node (slide/deck) from the deck tree'
+      description: 'Delete a node (slide/deck) from the deck tree'
     }
   });
 };
