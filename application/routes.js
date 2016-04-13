@@ -18,21 +18,6 @@ module.exports = function(server) {
       description: 'Get matadata of a deck'
     }
   });
-  /*TODO think about deck/slides - missing until now*/
-  server.route({
-    method: 'GET',
-    path: '/decktree/{id}',
-    handler: handlers.getDeckTree,
-    config: {
-      validate: {
-        params: {
-          id: Joi.string().alphanum().lowercase()
-        }
-      },
-      tags: ['api'],
-      description: 'Get the deck tree'
-    }
-  });
 
   server.route({
     method: 'GET',
@@ -100,6 +85,89 @@ module.exports = function(server) {
       },
       tags: ['api'],
       description: 'Replace a slide'
+    }
+  });
+  //------------decktree APIs----------------
+  server.route({
+    method: 'GET',
+    path: '/decktree/{id}',
+    handler: handlers.getDeckTree,
+    config: {
+      validate: {
+        params: {
+          id: Joi.number().integer()
+        }
+      },
+      tags: ['api'],
+      description: 'Get the deck tree'
+    }
+  });
+
+  server.route({
+    method: 'POST',
+    path: '/decktree/node/create',
+    handler: handlers.createDeckTreeNode,
+    config: {
+      validate: {
+        payload: Joi.object().keys({
+          selector: Joi.object().keys({
+            id: Joi.number().integer(), //id of the root deck
+            spath: Joi.string(),
+            stype: Joi.string(),
+            sid: Joi.number().integer()
+          }),
+          nodeSpec: Joi.object().keys({
+            id: Joi.number().integer(), //0 means it is a new node not existing
+            type: Joi.string()
+          }),
+          user: Joi.number().integer()
+        }).requiredKeys('selector', 'user'),
+      },
+      tags: ['api'],
+      description: 'Create a new node (slide/deck) in the deck tree'
+    }
+  });
+
+  server.route({
+    method: 'PUT',
+    path: '/decktree/node/rename',
+    handler: handlers.renameDeckTreeNode,
+    config: {
+      validate: {
+        payload: Joi.object().keys({
+          selector: Joi.object().keys({
+            id: Joi.number().integer(), //id of the root deck
+            spath: Joi.string(),
+            stype: Joi.string(),
+            sid: Joi.number().integer()
+          }),
+          name: Joi.string(),
+          user: Joi.number().integer()
+        }).requiredKeys('selector', 'user'),
+      },
+      tags: ['api'],
+      description: 'Renames a node (slide/deck) in the deck tree'
+    }
+  });
+
+  server.route({
+    method: 'DELETE',
+    path: '/decktree/node/delete',
+    handler: handlers.deleteDeckTreeNode,
+    config: {
+      validate: {
+        payload: Joi.object().keys({
+          selector: Joi.object().keys({
+            id: Joi.number().integer(), //id of the root deck
+            spath: Joi.string(),
+            stype: Joi.string(),
+            sid: Joi.number().integer()
+          }),
+          user: Joi.number().integer()
+        }).requiredKeys('selector', 'user'),
+      },
+      tags: ['api'],
+      description: 'Deleted a node (slide/deck) from the deck tree'
     }
   });
 };

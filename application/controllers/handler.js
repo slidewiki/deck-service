@@ -103,5 +103,45 @@ module.exports = {
     }
     //----mockup:end
     reply(deckTree);
+  },
+
+  createDeckTreeNode: function(request, reply) {
+    //----mockup:start
+    let node = {};
+    let rnd = Math.round(Math.random()*800) + 1;
+    if(request.payload.nodeSpec.type === 'slide'){
+      if(request.payload.nodeSpec.id){
+        //it means it is an existing node, we should retrieve the details then
+        node = {title: 'Existing Slide', id: 11, type: 'slide'};
+      }else{
+        //need to make a new slide
+        node = {title: 'New Slide', id: rnd, type: 'slide'};
+      }
+    }else{
+      if(request.payload.nodeSpec.id){
+        //it means it is an existing node
+        node = {title: 'Existing Deck', id: 53, type: 'deck',  children: [
+               {title: 'Syntax', id: 685, type: 'slide'},
+               {title: 'Slide34', id: 691, type: 'slide'}
+        ]};
+      }else{
+        //need to make a new slide
+        node = {title: 'New Deck', id: rnd, type: 'deck',  children: [
+               {title: 'New Slide', id: rnd, type: 'slide'}
+        ]};
+      }
+    }
+    //----mockup:end
+    reply(node);
+  },
+
+  renameDeckTreeNode: function(request, reply) {
+    //todo: update the name in DB
+    reply({'msg': 'node name got updated. New node name is: ' + request.payload.name});
+  },
+
+  deleteDeckTreeNode: function(request, reply) {
+    //todo: delete the node in DB
+    reply({'msg': 'node is successfully deleted...'});
   }
 };
