@@ -6,10 +6,10 @@ const hapi = require('hapi'),
 const server = new hapi.Server();
 
 let port = (!co.isEmpty(process.env.APPLICATION_PORT)) ? process.env.APPLICATION_PORT : 3000;
-let host = (!co.isEmpty(process.env.VIRTUAL_HOST)) ? process.env.VIRTUAL_HOST : server.info.host;
 server.connection({
   port: port
 });
+let host = (!co.isEmpty(process.env.VIRTUAL_HOST)) ? process.env.VIRTUAL_HOST : server.info.host;
 
 module.exports = server;
 
@@ -18,15 +18,22 @@ let plugins = [
   require('vision'), {
     register: require('good'),
     options: {
-      reporters: [{
-        reporter: require('good-console'),
-        events: {
-          request: '*',
-          response: '*',
-          log: '*',
-          request: '*'
-        }
-      }]
+      ops: {
+        interval: 1000
+      },
+      reporters: {
+        console: [{
+          module: 'good-squeeze',
+          name: 'Squeeze',
+          args: [{
+            log: '*',
+            response: '*',
+            request: '*'
+          }]
+        }, {
+          module: 'good-console'
+        }, 'stdout']
+      }
     }
   }, {
     register: require('hapi-swagger'),
