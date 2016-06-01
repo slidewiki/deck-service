@@ -5,7 +5,8 @@ Controller for handling mongodb and the data model activity while providing CRUD
 'use strict';
 
 const helper = require('./helper');
-slideModel = require('../models/deck.js'),
+//slideModel = require('../models/deck.js'),
+slideModel = require('../models/slide.js'),
 oid = require('mongodb').ObjectID,
 collectionName = 'decks';
 
