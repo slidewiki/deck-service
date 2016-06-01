@@ -11,7 +11,7 @@ const boom = require('boom'),
 
 module.exports = {
   getSlide: function(request, reply) {
-/*    //NOTE shall the response be cleaned or enhanced with values?
+   //NOTE shall the response be cleaned or enhanced with values?
     slideDB.get(encodeURIComponent(request.params.id)).then((slide) => {
       if (co.isEmpty(slide))
         reply(boom.notFound());
@@ -21,7 +21,8 @@ module.exports = {
       request.log('error', error);
       reply(boom.badImplementation());
     });
-}, */
+  },
+/* 
     //TODO - objects in slides - see discussion on JIRA -
     //for example; slide title, content, speaker notes, internal embeded objects (images, videos, sound, flash, etc..)
 
@@ -31,7 +32,7 @@ module.exports = {
         '<h1> Slide #' + request.params.id + '</h1>'};
     reply(slide);
   },
-                //----mockup:end
+        */        //----mockup:end
 
   newSlide: function(request, reply) {
     //NOTE shall the response be cleaned or enhanced with values?

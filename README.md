@@ -16,8 +16,17 @@ You want to **checkout this cool service**? Simply start the service and head ov
 You can use [Docker](https://www.docker.com/) to build, test and run your application locally. Simply edit the Dockerfile and run:
 
 ```
-docker build -t MY_IMAGE_TAG ./
-docker run -it --rm -p 8880:3000 MY_IMAGE_TAG
+docker build -t test-deck-service ./
+
+### klaas comment: needs mongoDB
+docker run -d --name mongodb mongo
+
+### use latest image from dockerhub:
+docker run -d -p 3000:3000 -e DATABASE_PORT=27017 slidewiki/deckservice
+
+### use local image:
+docker run -it --rm -p 8880:3000 test-deck-service
+docker run -d -p 3000:3000 -e DATABASE_PORT=27017 test-deck-service
 ```
 
 Alternatively you can use [docker-compose](https://docs.docker.com/compose/) to run your application in conjunction with a (local) mongodb instance. Simply execute:
