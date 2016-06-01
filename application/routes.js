@@ -36,7 +36,7 @@ module.exports = function(server) {
 
   server.route({
     method: 'GET',
-    path: '/slide/all',
+    path: '/allslide',
     handler: handlers.getAllSlides,
     config: {
       validate: {

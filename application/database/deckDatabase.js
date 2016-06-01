@@ -31,7 +31,8 @@ module.exports = {
         _id: deck.id
       }, deck));
   }
-},
+};
+
 function convertDeck(deck) {
   let now = new Date();
   return {
@@ -48,4 +49,4 @@ function convertDeck(deck) {
       contentItems: deck.content_items
     }]
   };
-};
+}
