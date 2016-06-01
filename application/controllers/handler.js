@@ -32,7 +32,7 @@ module.exports = {
       type: 'slide',
       content: '<div>'+
                 '          <p style="font-size: 1.16em;">'+
-                '              Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus. Etiam porta sem malesuada magna mollis euismod. Donec sed odio dui. Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus. Etiam porta sem malesuada magna mollis euismod. Donec sed odio dui. Donec id elit non mi porta gravida at eget metus.'+
+                '              Donec id elit non mi porta gravida at eget metus.'+
                 '          </p>'+
                 '          <ul>'+
                 '              <li>item 1 from slide ' + request.params.id + '</li>'+
@@ -40,7 +40,7 @@ module.exports = {
                 '              <li>item 3 from slide ' + request.params.id + '</li>'+
                 '          </ul>'+
                 '          <p style="font-size: 1.2em;">'+
-                '              Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus. Etiam porta sem malesuada magna mollis euismod. Donec sed odio dui.'+
+                '              Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus.'+
                 '          </p>'+
                 '          <p style="text-align:center">'+
                 '              <svg xmlns="http://www.w3.org/2000/svg"'+
@@ -55,7 +55,7 @@ module.exports = {
                 '              </svg>'+
                 '          </p>'+
                 '      </div>',
-      speakernotes: '<i>speaker notes:</i> More information on <a href="test.com">test.com</a>"'};
+      speakernotes: '<i>speaker notes:</i> More information on <a href="http://www.test.com" target="_blank">test.com</a>"'};
     reply(slide);
   },
                 //----mockup:end
