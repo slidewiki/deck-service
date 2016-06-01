@@ -1,13 +1,6 @@
-/*
-Controller for handling mongodb and the data model activity while providing CRUD'ish.
-*/
-
 'use strict';
 
 const helper = require('./helper');
-slideModel = require('../models/deck.js'),
-oid = require('mongodb').ObjectID,
-collectionName = 'decks';
 
 module.exports = {
   get: function(identifier) {
