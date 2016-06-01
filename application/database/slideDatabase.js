@@ -16,7 +16,22 @@ module.exports = {
         _id: oid(identifier)
       }));
   },
+  getAll: function(identifier) {
+    return helper.connectToDatabase()
+      .then((db) => db.collection('slides'))
+      .then((col) => col.find({ content_id: String(oid(identifier)) }))//TODO use id TODO cast to String?
+      .then((stream) => stream.sort({timestamp: -1}))
+      .then((stream) => stream.toArray());
+  },
 
+  getAllFromCollection: function() {
+    return helper.connectToDatabase()
+      .then((db) => db.collection('slides'))
+      .then((col) => col.find())
+      .then((stream) => stream.sort({timestamp: -1}))
+      .then((stream) => stream.toArray());
+  },
+  
   insert: function(slide) {
     //TODO check for root and parent deck ids to be existant, otherwise create these
     return helper.connectToDatabase()

@@ -1,11 +1,18 @@
+/*
+Controller for handling mongodb and the data model activity while providing CRUD'ish.
+*/
+
 'use strict';
 
 const helper = require('./helper');
+slideModel = require('../models/deck.js'),
+oid = require('mongodb').ObjectID,
+collectionName = 'decks';
 
 module.exports = {
   get: function(identifier) {
     return helper.connectToDatabase()
-      .then((db) => db.collection('slides'))
+      .then((db) => db.collection('decks'))
       .then((col) => col.findOne({
         _id: oid(identifier)
       }));
@@ -24,8 +31,7 @@ module.exports = {
         _id: deck.id
       }, deck));
   }
-};
-
+},
 function convertDeck(deck) {
   let now = new Date();
   return {
@@ -42,4 +48,4 @@ function convertDeck(deck) {
       contentItems: deck.content_items
     }]
   };
-}
+};

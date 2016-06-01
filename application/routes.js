@@ -35,6 +35,20 @@ module.exports = function(server) {
   });
 
   server.route({
+    method: 'GET',
+    path: '/slide/all',
+    handler: handlers.getAllSlides,
+    config: {
+      validate: {
+        params: {
+        },
+      },
+      tags: ['api'],
+      description: 'Get all slide'
+    }
+  });
+
+  server.route({
     method: 'POST',
     path: '/slide/new',
     handler: handlers.newSlide,

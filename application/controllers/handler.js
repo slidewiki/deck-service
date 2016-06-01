@@ -58,7 +58,24 @@ module.exports = {
       speakernotes: '<i>speaker notes:</i> More information on <a href="http://www.test.com" target="_blank">test.com</a>"'};
     reply(slide);
   },
-                //----mockup:end
+  //----mockup:end
+  //Get All Activities from database
+  getAllSlides: function(request, reply) {
+    slideDB.getAllFromCollection()
+      .then((slides) => {
+        slides.forEach((slide) => {
+          co.rewriteID(slide);
+          //activity.author = authorsMap.get(activity.user_id);//insert author data
+        });
+
+        let jsonReply = JSON.stringify(slides);
+        reply(jsonReply);
+
+      }).catch((error) => {
+        request.log('error', error);
+        reply(boom.badImplementation());
+      });
+  },
 
   newSlide: function(request, reply) {
     //NOTE shall the response be cleaned or enhanced with values?
