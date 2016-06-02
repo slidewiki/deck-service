@@ -11,8 +11,8 @@ let ajv = Ajv({
 //build schema
 const objectid = {
   type: 'string',
-  maxLength: 1,
-  minLength: 24
+  maxLength: 24,
+  minLength: 1
 };
 const contributer = {
   type: 'object',
