@@ -125,26 +125,26 @@ module.exports = {
     let deckTree;
     let deckTree1 = {
       title: 'Semantic Web', id: request.params.id, type: 'deck', children: [
-          {title: 'Introduction', id: 66, type: 'slide'},
+          {title: 'Introduction', id: '575060ae4bc68d1000ea952b', type: 'slide'},
           {title: 'RDF Data Model', id: 67, type: 'deck',  children: [
-              {title: 'Introduction', id: 671, type: 'slide'},
-              {title: 'Serialization', id: 673, type: 'slide'},
-              {title: 'Examples', id: 678, type: 'slide'}
+              {title: 'Introduction', id: '57506cbd1ae1bd1000312a70', type: 'slide'},
+              {title: 'Serialization', id: '575039f24bc68d1000ea9525', type: 'slide'},
+              {title: 'Examples', id: '57503dc14bc68d1000ea9526', type: 'slide'}
           ]},
           {title: 'SPARQL', id: 68, type: 'deck',  children: [
               {title: 'Syntax', id: 685, type: 'deck', children: [
-                  {title: 'Same Slide', id: 691, type: 'slide'},
-                  {title: 'Same Slide', id: 691, type: 'slide'}
+                  {title: 'Same Slide', id: '57505e034bc68d1000ea9527', type: 'slide'},
+                  {title: 'Same Slide', id: '57505eec4bc68d1000ea952a', type: 'slide'}
               ]},
-              {title: 'Examples', id: 686, type: 'slide'}
+              {title: 'Examples', id: '57505e674bc68d1000ea9529', type: 'slide'}
           ]
           },
-          {title: 'Conclusion', id: 78, type: 'slide'},
-          {title: 'Future Work', id: 99, type: 'slide'},
-          {title: 'References', id: 79, type: 'slide'},
-          {title: 'Extra1', id: 739, type: 'slide'},
-          {title: 'Extra2', id: 789, type: 'slide'},
-          {title: 'Extra3', id: 799, type: 'slide'}
+          {title: 'Conclusion', id: '57505eec4bc68d1000ea952a', type: 'slide'},
+          {title: 'Future Work', id: '57506cbd1ae1bd1000312a70', type: 'slide'},
+          {title: 'References', id: '574f24e881e34010002b7fd4', type: 'slide'},
+          {title: 'Extra1', id: '574f251081e34010002b7fd6', type: 'slide'},
+          {title: 'Extra2', id: '574f2b2881e34010002b7fd8', type: 'slide'},
+          {title: 'Extra3', id: '574f2bbf81e34010002b7fda', type: 'slide'}
       ]
     };
     let deckTree2 = {
