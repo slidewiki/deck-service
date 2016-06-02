@@ -40,6 +40,9 @@ const slideRevision = {
     content: {
       type: 'string'
     },
+    speakernotes: {
+      type: 'string'
+    },
     user: objectid,
     parent: {
       type: 'object'
