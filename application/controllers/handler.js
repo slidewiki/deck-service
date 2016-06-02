@@ -11,7 +11,7 @@ const boom = require('boom'),
 
 module.exports = {
   getSlide: function(request, reply) {
-/*    //NOTE shall the response be cleaned or enhanced with values?
+    //NOTE shall the response be cleaned or enhanced with values?
     slideDB.get(encodeURIComponent(request.params.id)).then((slide) => {
       if (co.isEmpty(slide))
         reply(boom.notFound());
@@ -21,11 +21,12 @@ module.exports = {
       request.log('error', error);
       reply(boom.badImplementation());
     });
-}, */
+  },
     //TODO - objects in slides - see discussion on JIRA -
     //for example; slide title, content, speaker notes, internal embeded objects (images, videos, sound, flash, etc..)
 
     //use of ' and ' might make difference
+    /*
     let slide = {
       id: request.params.id,
       title: '<h1> Slide #' + request.params.id + '</h1>',
@@ -56,10 +57,12 @@ module.exports = {
                 '          </p>'+
                 '      </div>',
       speakernotes: '<i>speaker notes:</i> More information on <a href="http://www.test.com" target="_blank">test.com</a>"'};
+
     reply(slide);
-  },
+  },*/
   //----mockup:end
-  //Get All Activities from database
+
+  //Get All Slides from database
   getAllSlides: function(request, reply) {
     slideDB.getAllFromCollection()
       .then((slides) => {
