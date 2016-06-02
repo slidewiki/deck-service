@@ -139,12 +139,11 @@ module.exports = {
               {title: 'Examples', id: '57505e674bc68d1000ea9529', type: 'slide'}
           ]
           },
-          {title: 'Conclusion', id: '57505eec4bc68d1000ea952a', type: 'slide'},
+          {title: 'Conclusion', id: '574f2bbf81e34010002b7fda', type: 'slide'},
           {title: 'Future Work', id: '57506cbd1ae1bd1000312a70', type: 'slide'},
           {title: 'References', id: '574f24e881e34010002b7fd4', type: 'slide'},
           {title: 'Extra1', id: '574f251081e34010002b7fd6', type: 'slide'},
-          {title: 'Extra2', id: '574f2b2881e34010002b7fd8', type: 'slide'},
-          {title: 'Extra3', id: '574f2bbf81e34010002b7fda', type: 'slide'}
+          {title: 'Extra2', id: '574f2b2881e34010002b7fd8', type: 'slide'}
       ]
     };
     let deckTree2 = {
