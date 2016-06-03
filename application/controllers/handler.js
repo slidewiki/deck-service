@@ -119,7 +119,36 @@ module.exports = {
       reply(boom.badImplementation());
     });
   },
+  newDeck: function(request, reply) {
+    //NOTE shall the response be cleaned or enhanced with values?
+    deckDB.insert(request.payload).then((inserted) => {
+      //console.log('inserted: ', inserted);
+      if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
+        throw inserted;
+      else
+        reply(co.rewriteID(inserted.ops[0]));
+    }).catch((error) => {
+      request.log('error', error);
+      reply(boom.badImplementation());
+    });
+  },
 
+  updateDeck: function(request, reply) {
+    //NOTE shall the payload and/or response be cleaned or enhanced with values?
+    //or should be deckDB.replace?
+    deckDB.update(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+      //console.log('updated: ', replaced);
+      if (co.isEmpty(replaced.value))
+        throw replaced;
+      else
+        reply(replaced.value);
+    }).catch((error) => {
+      request.log('error', error);
+      reply(boom.badImplementation());
+    });
+  },
+  
+  //decktree
   getDeckTree: function(request, reply) {
     //----mockup:start
     let deckTree;
@@ -192,6 +221,17 @@ module.exports = {
 
   renameDeckTreeNode: function(request, reply) {
     //todo: update the name in DB
+    //should be 'deckDB.update'?
+    deckDB.replace(encodeURIComponent(request.params.id).name, request.payload.name).then((replaced) => {
+      //console.log('updated: ', replaced);
+      if (co.isEmpty(replaced.value))
+        throw replaced;
+      else
+        reply(replaced.value);
+    }).catch((error) => {
+      request.log('error', error);
+      reply(boom.badImplementation());
+    });
     reply({'msg': 'node name got updated. New node name is: ' + request.payload.name});
   },
 

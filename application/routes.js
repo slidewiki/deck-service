@@ -15,10 +15,174 @@ module.exports = function(server) {
         },
       },
       tags: ['api'],
-      description: 'Get matadata of a deck'
+      description: 'Get metadata of a deck'
+    }
+  });
+/*
+  server.route({
+    method: 'POST',
+    path: '/deck/new',
+    handler: handlers.newDeck,
+    config: {
+      validate: {
+        payload: Joi.object().keys({
+          title: Joi.string(),
+          content: Joi.string(),
+          user: Joi.string().alphanum().lowercase(),
+          root_deck: Joi.string().alphanum().lowercase(),
+          parent_slide: Joi.object().keys({
+            id: Joi.string().alphanum().lowercase(),
+            revision: Joi.string().alphanum().lowercase()
+          }),
+          position: Joi.string().alphanum().lowercase().min(0),
+          language: Joi.string(),
+          license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+        }).requiredKeys('user', 'content', 'root_deck', 'license'),
+      },
+      tags: ['api'],
+      description: 'Create a new deck'
     }
   });
 
+
+from deck model:
+
+DECK OBJECT:
+  description: {
+    type: 'string'
+  },
+  language: {
+    type: 'string'
+  },
+  translation: {
+    type: 'object'
+  },
+  lastUpdate: {
+    type: 'string'
+  },
+  revisions: {
+    type: 'array',
+    items: deckRevision
+  },
+  tags: {
+    type: 'array',
+    items: {
+      type: 'string'
+    }
+  }
+
+DECK REVISION OBJECT
+
+title: {
+  type: 'string'
+},
+timestamp: {
+  type: 'string'
+},
+user: objectid,
+parent: {
+  type: 'object'
+},
+popularity: {
+  type: 'number',
+  minimum: 0
+},
+theme: {
+  type: 'object',
+  properties: {
+    default: objectid
+  }
+},
+transition: {
+  type: 'object',
+  properties: {
+    default: objectid
+  }
+},
+comment: {
+  type: 'string'
+},
+abstract: {
+  type: 'string'
+},
+footer: {
+  type: 'object',
+  properties: {
+    text: {
+      type: 'string'
+    }
+  }
+},
+license: {
+  type: 'string',
+  enum: ['CC0', 'CC BY', 'CC BY-SA']
+},
+isFeatured: {
+  type: 'number'
+},
+priority: {
+  type: 'number'
+},
+visibility: {
+  type: 'boolean'
+},
+language: {
+  type: 'string'
+},
+translation: {
+  type: 'object',
+  properties: {
+    status: {
+      type: 'string',
+      enum: ['original', 'google', 'revised']
+    },
+    source: {
+      type: 'object'
+    }
+  }
+},
+tags: {
+  type: 'array',
+  items: {
+    type: 'string'
+  }
+},
+preferences: {
+  type: 'array',
+  items: {
+    type: 'object'
+  }
+},
+contentItems: {
+  type: 'array',
+  items: contentItem
+},
+dataSources: {
+  type: 'array',
+  items: objectid
+}
+
+  //update deck
+  // TODO Altered API from Alis proposal
+  server.route({
+    method: 'PUT',
+    path: '/deck/{id}',
+    handler: handlers.updateDeck,
+    config: {
+      validate: {
+        params: {
+          id: Joi.string().alphanum().lowercase()
+        },
+        payload: Joi.object().keys({
+
+        }).requiredKeys(),
+      },
+      tags: ['api'],
+      description: 'Replace a deck'
+    }
+  });  */
+
+  //slides
   server.route({
     method: 'GET',
     path: '/slide/{id}',
@@ -57,6 +221,7 @@ module.exports = function(server) {
         payload: Joi.object().keys({
           title: Joi.string(),
           content: Joi.string(),
+          speakernotes: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
           root_deck: Joi.string().alphanum().lowercase(),
           parent_slide: Joi.object().keys({
@@ -86,6 +251,7 @@ module.exports = function(server) {
         payload: Joi.object().keys({
           title: Joi.string(),
           content: Joi.string(),
+          speakernotes: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
           root_deck: Joi.string().alphanum().lowercase(),
           parent_slide: Joi.object().keys({
