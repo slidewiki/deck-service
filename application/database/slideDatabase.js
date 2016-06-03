@@ -31,7 +31,7 @@ module.exports = {
       .then((stream) => stream.sort({timestamp: -1}))
       .then((stream) => stream.toArray());
   },
-  
+
   insert: function(slide) {
     //TODO check for root and parent deck ids to be existant, otherwise create these
     return helper.connectToDatabase()
@@ -97,11 +97,12 @@ function convertToNewSlide(slide) {
     language: slide.language,
     revisions: [{
       id: 1,
-      title: slide.title,
       timestamp: now.toISOString(),
       user: slide.user,
       license: slide.license,
+      title: slide.title,
       content: slide.content,
+      speakernotes: slide.speakernotes,
       parent: slide.parent_slide
     }]
   };
@@ -118,11 +119,12 @@ function convertDummySlideWithNewRevision(slide, newRevisionId) {
     language: slide.language,
     revisions: [{
       id: newRevisionId,
-      title: slide.title,
       timestamp: now.toISOString(),
       user: slide.user,
       license: slide.license,
+      title: slide.title,
       content: slide.content,
+      speakernotes: slide.speakernotes,
       parent: slide.parent_slide
     }]
   };
