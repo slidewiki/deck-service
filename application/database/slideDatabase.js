@@ -24,7 +24,7 @@ module.exports = {
       .then((stream) => stream.toArray());
   },
 
-  getAllFromCollection: function() { 
+  getAllFromCollection: function() {
     return helper.connectToDatabase()
       .then((db) => db.collection('slides'))
       .then((col) => col.find())
@@ -93,7 +93,7 @@ function convertToNewSlide(slide) {
   let now = new Date();
   const result = {
     user: slide.user,
-    deck: slide.root_deck.id,
+    deck: slide.root_deck,
     timestamp: now.toISOString(),
     language: slide.language,
     revisions: [{
