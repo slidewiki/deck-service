@@ -24,7 +24,7 @@ module.exports = {
       .then((stream) => stream.toArray());
   },
 
-  getAllFromCollection: function() {
+  getAllFromCollection: function() { 
     return helper.connectToDatabase()
       .then((db) => db.collection('slides'))
       .then((col) => col.find())
@@ -60,7 +60,7 @@ module.exports = {
       .then((col) => {
         return col.findOne({_id: oid(id)}, {fields:{revisions:1}})
           .then((existingSlide) => {
-            const maxRevisionId = existingSlide.revisions.reduce((prev, curr) => {			 
+            const maxRevisionId = existingSlide.revisions.reduce((prev, curr) => {
               if (curr.id > prev)
                 return curr.id;
 
@@ -76,7 +76,7 @@ module.exports = {
                 return slideModel.errors;
               }
 			  //must update content item of parent deck -- should update in code, then update the document at its whole
-			  
+
               return col.findOneAndUpdate({
                 _id: oid(id)
               }, { $push: { revisions: slideWithNewRevision.revisions[0] } });

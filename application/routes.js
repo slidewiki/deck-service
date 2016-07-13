@@ -18,7 +18,7 @@ module.exports = function(server) {
       description: 'Get metadata of a deck'
     }
   });
-  
+
   server.route({
     method: 'POST',
     path: '/deck/new',
@@ -27,17 +27,17 @@ module.exports = function(server) {
       validate: {
         payload: Joi.object().keys({
           description: Joi.string(),
-		  language: Joi.string(),
-		  translation: Joi.string().alphanum().lowercase(),		  
-		  tags: Joi.array().items(Joi.string()).default([]),		  
-		  title: Joi.string(),          
+          language: Joi.string(),
+          translation: Joi.string().alphanum().lowercase(),
+          tags: Joi.array().items(Joi.string()).default([]),
+          title: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
           root_deck: Joi.string().alphanum().lowercase(),
-		  parent_deck: Joi.object().keys({
+          parent_deck: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
-          }),         
-          //position: Joi.string().alphanum().lowercase().min(0),          
+          }),
+          //position: Joi.string().alphanum().lowercase().min(0),
           license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
         }).requiredKeys('user', 'license'),
       },
@@ -45,7 +45,7 @@ module.exports = function(server) {
       description: 'Create a new deck'
     }
   });
-  
+
   server.route({
     method: 'PUT',
     path: '/deck/{id}',
@@ -55,23 +55,23 @@ module.exports = function(server) {
         params: {
           id: Joi.string().alphanum().lowercase()
         },
-      payload: Joi.object().keys({
+        payload: Joi.object().keys({
           description: Joi.string(),
-		  language: Joi.string(),
-		  translation: Joi.string().alphanum().lowercase(),		  
-		  tags: Joi.array().items(Joi.string()).default([]),		  
-		  title: Joi.string(),
+          language: Joi.string(),
+          translation: Joi.string().alphanum().lowercase(),
+          tags: Joi.array().items(Joi.string()).default([]),
+          title: Joi.string(),
           //content: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
           root_deck: Joi.string().alphanum().lowercase(),
-		  parent_deck: Joi.object().keys({
+          parent_deck: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
-          }),         
+          }),
           content_items: Joi.array().items(Joi.object()),
           license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
         }).requiredKeys('user', 'license'),
-	  },
+      },
       tags: ['api'],
       description: 'Replace a deck'
     }
@@ -119,11 +119,11 @@ module.exports = function(server) {
           speakernotes: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
           root_deck: Joi.string().alphanum().lowercase(),
-		  parent_deck: Joi.object().keys({
+          parent_deck: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
-          }), 
-		  //add a field for deck revision?		  
+          }),
+		  //add a field for deck revision?
 		  /* root_deck : Joi.object().keys({
             id: Joi.string().alphanum().lowercase(), //id of the root deck
             revision: Joi.string().alphanum().lowercase() //revision number of the root deck revision
@@ -158,10 +158,10 @@ module.exports = function(server) {
           speakernotes: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
           root_deck: Joi.string().alphanum().lowercase(),
-		  parent_deck: Joi.object().keys({
+          parent_deck: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
-          }), 
+          }),
           parent_slide: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
