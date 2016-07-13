@@ -60,9 +60,9 @@ module.exports = {
       .then((col) => {
         return col.findOne({_id: oid(id)}, {fields:{revisions:1}})
           .then((existingSlide) => {
-            const maxRevisionId = existingSlide.revisions.reduce((prev, curr) => {
-              if (curr > prev)
-                return curr;
+            const maxRevisionId = existingSlide.revisions.reduce((prev, curr) => {			 
+              if (curr.id > prev)
+                return curr.id;
 
               return prev;
             }, 1);
@@ -75,7 +75,8 @@ module.exports = {
               if (!valid) {
                 return slideModel.errors;
               }
-
+			  //must update content item of parent deck -- should update in code, then update the document at its whole
+			  
               return col.findOneAndUpdate({
                 _id: oid(id)
               }, { $push: { revisions: slideWithNewRevision.revisions[0] } });
@@ -92,7 +93,7 @@ function convertToNewSlide(slide) {
   let now = new Date();
   const result = {
     user: slide.user,
-    deck: slide.root_deck,
+    deck: slide.root_deck.id,
     timestamp: now.toISOString(),
     language: slide.language,
     revisions: [{
