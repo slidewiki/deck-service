@@ -20,7 +20,9 @@ const contentItem = {
   type: 'object',
   properties: {
     order: {
-      type: 'string'
+      //type: 'string'
+      type: 'number',
+      minimum: 1
     },
     kind: {
       type: 'string',

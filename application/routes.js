@@ -77,6 +77,24 @@ module.exports = function(server) {
     }
   });
 
+  server.route({
+    method: 'POST',
+    path: '/deck/revert/{id}',
+    handler: handlers.revertDeckRevision,
+    config: {
+      validate: {
+        params: {
+          id: Joi.string().alphanum().lowercase()
+        },
+        payload: Joi.object().keys({
+          revision_id: Joi.string().alphanum().lowercase()
+        }).requiredKeys('revision_id'),
+      },
+      tags: ['api'],
+      description: 'Revert a deck to old revision'
+    }
+  });
+
   //slides
   server.route({
     method: 'GET',

@@ -44,7 +44,7 @@ module.exports = {
     return helper.connectToDatabase()
     .then((db) => db.collection('decks'))
     .then((col) => {
-      return col.findOne({_id: oid(id)}, {fields:{revisions:1}})
+      return col.findOne({_id: oid(id)})
         .then((existingDeck) => {
           const maxRevisionId = existingDeck.revisions.reduce((prev, curr) => {
             if (curr.id > prev)
@@ -54,7 +54,10 @@ module.exports = {
           }, 1);
           let valid = false;
           const newRevisionId = maxRevisionId+1;
-          const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId );
+          //must get previously active revision and copy content items to new revision
+          let activeRevisionIndex = getActiveRevision(existingDeck);
+          let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
+          const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items);
           try {
             valid = deckModel(deckWithNewRevision);
 
@@ -77,18 +80,18 @@ module.exports = {
     helper.connectToDatabase()
     .then((db) => db.collection('decks'))
     .then((col) => {
-      col.findOne({_id: oid(root_deck.id)})
+      col.findOne({_id: oid(root_deck)})
       .then((existingDeck) => {
-        col.findOne({_id: oid(root_deck.id)}, {revisions : {$elemMatch: {id: existingDeck.active}}})
+        col.findOne({_id: oid(root_deck)}, {revisions : {$elemMatch: {id: existingDeck.active}}})
         .then((activeRevision) => col.findOneAndUpdate({
-          _id: oid(root_deck.id),  revisions : {$elemMatch: {id: existingDeck.active}}  },
+          _id: oid(root_deck),  revisions : {$elemMatch: {id: existingDeck.active}}  },
           {
             $push: {
               'revisions.$.contentItems': {
                 order: getOrder(activeRevision)+1,
                 kind: ckind,
                 ref : {
-                  id:citem.id,
+                  id: String(citem.id),
                   revision:1
                 }
               }
@@ -104,13 +107,13 @@ module.exports = {
     helper.connectToDatabase()
     .then((db) => db.collection('decks'))
     .then((col) => {
-      col.findOne({_id: oid(root_deck.id)})
+      col.findOne({_id: oid(root_deck)})
       .then((existingDeck) => {
-        const newRevId = getNewRevisionID(citem.value);
+        const newRevId = getNewRevisionID(citem);
         for(let i = 0; i < existingDeck.revisions.length; i++) {
           if(existingDeck.revisions[i].id === existingDeck.active) {
             for(let j = 0; j < existingDeck.revisions[i].contentItems.length; j++) {
-              if(existingDeck.revisions[i].contentItems[j].ref.id === citem.value._id) {
+              if(existingDeck.revisions[i].contentItems[j].ref.id === String(citem._id)) {
                 existingDeck.revisions[i].contentItems[j].ref.revision = newRevId;
               }
               else continue;
@@ -121,9 +124,29 @@ module.exports = {
         col.save(existingDeck);
       });
     });
+  },
+
+  revert: function(deck_id, deck){
+    //console.log(deck);
+    return helper.connectToDatabase()
+    .then((db) => db.collection('decks'))
+    .then((col) => {
+      return col.findOneAndUpdate({_id: oid(deck_id)}, {'$set' : {'active' : deck.revision_id}});
+
+    });
   }
 
 };
+
+function getActiveRevision(deck){
+  for(let i = 0; i < deck.revisions.length; i++) {
+    if(deck.revisions[i].id === deck.active) {
+      return i;
+    }
+    else continue;
+  }
+  return -1;
+}
 
 function getNewRevisionID(citem){
 
@@ -196,7 +219,7 @@ function convertToNewDeck(deck){
   return result;
 }
 
-function convertDeckWithNewRevision(deck, newRevisionId) {
+function convertDeckWithNewRevision(deck, newRevisionId, content_items) {
   let now = new Date();
   const result = {
     user: deck.user,
@@ -210,7 +233,7 @@ function convertDeckWithNewRevision(deck, newRevisionId) {
       license: deck.license,
       title: deck.title,
       parent: deck.parent_deck,
-      contentItems: deck.content_items
+      contentItems: content_items
     }]
   };
   //console.log('from', slide, 'to', result);

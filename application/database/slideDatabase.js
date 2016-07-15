@@ -75,11 +75,11 @@ module.exports = {
               if (!valid) {
                 return slideModel.errors;
               }
-			  //must update content item of parent deck -- should update in code, then update the document at its whole
+			  //must update content item of root deck -- should update in code, then update the document at its whole
 
               return col.findOneAndUpdate({
                 _id: oid(id)
-              }, { $push: { revisions: slideWithNewRevision.revisions[0] } });
+              }, { $push: { revisions: slideWithNewRevision.revisions[0] } }, {new: true});
             } catch (e) {
               console.log('validation failed', e);
             }

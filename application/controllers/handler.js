@@ -89,7 +89,7 @@ module.exports = {
         throw inserted;
       else{
 
-        deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.parent_deck, 'slide');
+        deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'slide');
         reply(co.rewriteID(inserted.ops[0]));
       }
     }).catch((error) => {
@@ -105,7 +105,12 @@ module.exports = {
       if (co.isEmpty(replaced.value))
         throw replaced;
       else{
-        deckDB.updateContentItem(replaced, '', request.payload.parent_deck, 'slide');
+
+        slideDB.get(replaced.value._id).then((newSlide) => {
+          deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
+        });
+
+
         reply(replaced.value);
       }
     }).catch((error) => {
@@ -131,9 +136,9 @@ module.exports = {
     deckDB.insert(request.payload).then((inserted) => {
       if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
         throw inserted;
-      else{ //check if a parent deck is defined, if yes, update its content items to reflect the new sub-deck
-        if(typeof request.payload.parent_deck !== 'undefined')
-          deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.parent_deck, 'deck');
+      else{ //check if a root deck is defined, if yes, update its content items to reflect the new sub-deck
+        if(typeof request.payload.root_deck !== 'undefined')
+          deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'deck');
         reply(co.rewriteID(inserted.ops[0]));
       }
     }).catch((error) => {
@@ -163,8 +168,24 @@ module.exports = {
       if (co.isEmpty(replaced.value))
         throw replaced;
       else{
-        deckDB.updateContentItem(replaced, '', request.payload.parent_deck, 'deck');
+        deckDB.get(replaced.value._id).then((newDeck) => {
+          deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck');
+        });
+        //deckDB.updateContentItem(replaced, '', request.payload.root_deck, 'deck');
         reply(replaced.value);
+      }
+    }).catch((error) => {
+      request.log('error', error);
+      reply(boom.badImplementation());
+    });
+  },
+
+  revertDeckRevision: function(request, reply) {
+    deckDB.revert(encodeURIComponent(request.params.id), request.payload).then((reverted) => {
+      if (co.isEmpty(reverted))
+        throw reverted;
+      else{        
+        reply(reverted);
       }
     }).catch((error) => {
       request.log('error', error);
