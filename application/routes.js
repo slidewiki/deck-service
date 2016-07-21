@@ -193,6 +193,25 @@ module.exports = function(server) {
       description: 'Replace a slide'
     }
   });
+
+  server.route({
+    method: 'POST',
+    path: '/slide/revert/{id}',
+    handler: handlers.revertSlideRevision,
+    config: {
+      validate: {
+        params: {
+          id: Joi.string().alphanum().lowercase()
+        },
+        payload: Joi.object().keys({
+          revision_id: Joi.string().alphanum().lowercase()
+        }).requiredKeys('revision_id'),
+      },
+      tags: ['api'],
+      description: 'Revert a slide to old revision'
+    }
+  });
+
   //------------decktree APIs----------------
   server.route({
     method: 'GET',

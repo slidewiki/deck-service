@@ -86,6 +86,33 @@ module.exports = {
             return;
           });
       });
+  },
+
+  revert: function(slide_id, slide){ //this can actually revert to past and future revisions
+    //NOTE must add validation on id
+    return helper.connectToDatabase()
+    .then((db) => db.collection('slides'))
+    .then((col) => {
+      col.findOne({_id: oid(slide_id)})
+      .then((existingSlide) => {
+        helper.connectToDatabase().collection('decks').findOne({_id: oid(existingSlide.deck)})
+        .then((root_deck) => {
+          console.log(root_deck);
+          for(let i = 0; i < root_deck.revisions.length; i++) {
+            if(root_deck.revisions[i].id === root_deck.active) {
+              for(let j = 0; j < root_deck.revisions[i].contentItems.length; j++) {
+                if(root_deck.revisions[i].contentItems[j].ref.id === String(slide_id)) {
+                  root_deck.revisions[i].contentItems[j].ref.revision = parseInt(slide.revision_id);
+                }
+                else continue;
+              }
+            }
+            else continue;
+          }
+          col.save(root_deck);
+        });
+      });
+    });
   }
 };
 

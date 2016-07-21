@@ -110,8 +110,21 @@ module.exports = {
           deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
         });
 
-
         reply(replaced.value);
+      }
+    }).catch((error) => {
+      request.log('error', error);
+      reply(boom.badImplementation());
+    });
+  },
+
+  revertSlideRevision: function(request, reply) {
+    slideDB.get(encodeURIComponent(request.params.id), request.payload).then((slide) => {
+      if (co.isEmpty(slide))
+        throw slide;
+      else{
+        deckDB.updateContentItem(slide, parseInt(request.payload.revision_id), slide.deck, 'slide');
+        reply(slide);
       }
     }).catch((error) => {
       request.log('error', error);
@@ -168,10 +181,11 @@ module.exports = {
       if (co.isEmpty(replaced.value))
         throw replaced;
       else{
-        deckDB.get(replaced.value._id).then((newDeck) => {
-          deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck');
-        });
-        //deckDB.updateContentItem(replaced, '', request.payload.root_deck, 'deck');
+        if(request.payload.root_deck){
+          deckDB.get(replaced.value._id).then((newDeck) => {
+            deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck');
+          });
+        }
         reply(replaced.value);
       }
     }).catch((error) => {
@@ -184,7 +198,7 @@ module.exports = {
     deckDB.revert(encodeURIComponent(request.params.id), request.payload).then((reverted) => {
       if (co.isEmpty(reverted))
         throw reverted;
-      else{        
+      else{
         reply(reverted);
       }
     }).catch((error) => {
