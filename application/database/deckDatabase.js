@@ -128,36 +128,45 @@ module.exports = {
     });
   },
 
+  // revert: function(deck_id, deck){ //this can actually revert to past and future revisions
+  //   //NOTE must add validation on deck id
+  //   return helper.connectToDatabase()
+  //   .then((db) => db.collection('decks'))
+  //   .then((col) => {
+  //     return col.findOneAndUpdate({_id: oid(deck_id)}, {'$set' : {'active' : parseInt(deck.revision_id)}})
+  //     .then((existingDeck) => {
+  //       if(existingDeck.value.deck !== null){ //does the deck belong to a root deck? if yes, we must update the contentItems array of the root deck
+  //         col.findOne({_id: oid(existingDeck.value.deck)})
+  //         .then((root_deck) => {
+  //           for(let i = 0; i < root_deck.revisions.length; i++) {
+  //             if(root_deck.revisions[i].id === root_deck.active) {
+  //               for(let j = 0; j < root_deck.revisions[i].contentItems.length; j++) {
+  //                 if(root_deck.revisions[i].contentItems[j].ref.id === String(deck_id)) {
+  //                   root_deck.revisions[i].contentItems[j].ref.revision = parseInt(deck.revision_id);
+  //                 }
+  //                 else continue;
+  //               }
+  //             }
+  //             else continue;
+  //           }
+  //           col.save(root_deck);
+  //         });
+  //       }
+  //       return existingDeck;
+  //     });
+  //
+  //   });
+  // },
+
   revert: function(deck_id, deck){ //this can actually revert to past and future revisions
     //NOTE must add validation on deck id
     return helper.connectToDatabase()
     .then((db) => db.collection('decks'))
     .then((col) => {
-      return col.findOneAndUpdate({_id: oid(deck_id)}, {'$set' : {'active' : parseInt(deck.revision_id)}})
-      .then((existingDeck) => {
-        if(existingDeck.value.deck !== null){ //does the deck belong to a root deck? if yes, we must update the contentItems array of the root deck
-          //console.log(col.findOne({_id: oid(existingDeck.value.deck)}));
-          col.findOne({_id: oid(existingDeck.value.deck)})
-          .then((root_deck) => {
-            for(let i = 0; i < root_deck.revisions.length; i++) {
-              if(root_deck.revisions[i].id === root_deck.active) {
-                for(let j = 0; j < root_deck.revisions[i].contentItems.length; j++) {
-                  if(root_deck.revisions[i].contentItems[j].ref.id === String(deck_id)) {
-                    root_deck.revisions[i].contentItems[j].ref.revision = parseInt(deck.revision_id);
-                  }
-                  else continue;
-                }
-              }
-              else continue;
-            }
-            col.save(root_deck);
-          });
-        }
-        return existingDeck;
-      });
-
+      return col.findOneAndUpdate({_id: oid(deck_id)}, {'$set' : {'active' : parseInt(deck.revision_id)}});
     });
   }
+
 
 };
 

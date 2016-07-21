@@ -199,6 +199,10 @@ module.exports = {
       if (co.isEmpty(reverted))
         throw reverted;
       else{
+        console.log(reverted);
+        if(reverted.value.deck !== null){
+          deckDB.updateContentItem(reverted.value, parseInt(request.payload.revision_id), reverted.value.deck, 'deck');
+        }
         reply(reverted);
       }
     }).catch((error) => {
