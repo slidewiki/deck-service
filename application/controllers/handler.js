@@ -62,6 +62,29 @@ module.exports = {
   },*/
   //----mockup:end
 
+  //Get selected slides from database
+  getSelected: function(request, reply) {
+	  slideDB.getSelected(request.payload)
+	    .then((slides) => {
+              if (co.isEmpty(slides)) {
+	        reply(boom.notFound());
+	      } else {
+	        slides.forEach((slide) => {
+	          if (co.isEmpty(slide)) {
+		    reply(boom.notFound());
+                  } else {
+	       	    co.rewriteID(slide);
+	            let jsonReply = JSON.stringify(slides);
+                    reply(jsonReply);
+		  }
+          });
+        }
+      }).catch((error) => {
+        request.log('error', error);
+        reply(boom.badImplementation());
+      });
+  },
+
   //Get All Slides from database
   getAllSlides: function(request, reply) {
     slideDB.getAllFromCollection()

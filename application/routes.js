@@ -3,6 +3,7 @@
 const Joi = require('joi'),
   handlers = require('./controllers/handler');
 
+
 module.exports = function(server) {
   server.route({
     method: 'GET',
@@ -209,6 +210,21 @@ dataSources: {
       },
       tags: ['api'],
       description: 'Get all slide'
+    }
+  });
+
+  server.route({
+    method: 'PUT',
+    path: '/selectedSlides',
+    handler: handlers.getSelected,
+    config: {
+      validate: {
+	payload: Joi.object().keys({
+         selectedIDs: Joi.array().items(Joi.string().lowercase().alphanum().required())
+         }).requiredKeys('selectedIDs')
+      },
+      tags: ['api'],
+      description: 'Get selected slides'
     }
   });
 
