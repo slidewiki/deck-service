@@ -73,7 +73,7 @@ module.exports = function(server) {
         }).requiredKeys('user', 'license'),
       },
       tags: ['api'],
-      description: 'Replace a deck'
+      description: 'Replace a deck by creating a new revision'
     }
   });
 
@@ -91,7 +91,7 @@ module.exports = function(server) {
         }).requiredKeys('revision_id'),
       },
       tags: ['api'],
-      description: 'Revert a deck to old revision'
+      description: 'Revert a deck to an old revision'
     }
   });
 
@@ -190,7 +190,7 @@ module.exports = function(server) {
         }).requiredKeys('user', 'content', 'root_deck', 'license'),
       },
       tags: ['api'],
-      description: 'Replace a slide'
+      description: 'Replace a slide with a new revision'
     }
   });
 
@@ -208,7 +208,7 @@ module.exports = function(server) {
         }).requiredKeys('revision_id'),
       },
       tags: ['api'],
-      description: 'Revert a slide to old revision'
+      description: 'Revert a slide to an old revision'
     }
   });
 

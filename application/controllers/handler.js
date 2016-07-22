@@ -9,7 +9,7 @@ const boom = require('boom'),
   deckDB = require('../database/deckDatabase'),
   co = require('../common');
 
-module.exports = {
+let self = module.exports = {
   getSlide: function(request, reply) {
     //NOTE shall the response be cleaned or enhanced with values?
     slideDB.get(encodeURIComponent(request.params.id)).then((slide) => {
@@ -199,7 +199,6 @@ module.exports = {
       if (co.isEmpty(reverted))
         throw reverted;
       else{
-        console.log(reverted);
         if(reverted.value.deck !== null){
           deckDB.updateContentItem(reverted.value, parseInt(request.payload.revision_id), reverted.value.deck, 'deck');
         }
@@ -213,43 +212,83 @@ module.exports = {
 
   //decktree
   getDeckTree: function(request, reply) {
-    //----mockup:start
-    let deckTree;
-    let deckTree1 = {
-      title: 'Semantic Web', id: request.params.id, type: 'deck', children: [
-          {title: 'Introduction', id: '575060ae4bc68d1000ea952b', type: 'slide'},
-          {title: 'RDF Data Model', id: 67, type: 'deck',  children: [
-              {title: 'Introduction', id: '57506cbd1ae1bd1000312a70', type: 'slide'},
-              {title: 'Serialization', id: '575039f24bc68d1000ea9525', type: 'slide'},
-              {title: 'Examples', id: '57503dc14bc68d1000ea9526', type: 'slide'}
-          ]},
-          {title: 'SPARQL', id: 68, type: 'deck',  children: [
-              {title: 'Syntax', id: 685, type: 'deck', children: [
-                  {title: 'Same Slide', id: '57505e034bc68d1000ea9527', type: 'slide'},
-                  {title: 'Same Slide', id: '57505eec4bc68d1000ea952a', type: 'slide'}
-              ]},
-              {title: 'Examples', id: '57505e674bc68d1000ea9529', type: 'slide'}
-          ]
-          },
-          {title: 'Conclusion', id: '574f2bbf81e34010002b7fda', type: 'slide'},
-          {title: 'Future Work', id: '574f2b2881e34010002b7fd8', type: 'slide'},
-          {title: 'References', id: '574f24e881e34010002b7fd4', type: 'slide'},
-          {title: 'Extra1', id: '574f251081e34010002b7fd6', type: 'slide'},
-      ]
-    };
-    let deckTree2 = {
-      title: 'Example Deck', id: 91, type: 'deck', children: [
-          {title: 'Slide 1', id: 911, type: 'slide'},
-          {title: 'Slide 2', id: 912, type: 'slide'}
-      ]
-    };
-    if(parseInt(request.params.id) === 91){
-      deckTree = deckTree2;
-    }else{
-      deckTree = deckTree1;
-    }
-    //----mockup:end
-    reply(deckTree);
+    deckDB.getDeckTreeFromDB(request.params.id, '1')
+    .then((deckTree) => {
+      console.log(deckTree);
+      reply(deckTree);
+    });
+
+    //console.log(deckDB.getDeckTreeNodeFromDB(request.params.id, '0', 0));
+    //console.log(deckDB.getDeckTreeNodeFromDB(request.params.id, '0', 1));
+    //reply('yes');
+
+
+
+
+    // let deckTree ;
+    // self.getDeck(request, (deck) => {
+    //   let childrenArray = [];
+    //   //NOTE for now it only gets the first item in the slide revisions.
+    //   //NOTE we have to do recursion for the nested decks!!!
+    //
+    //   for(let i = 0; i < deck.revisions[0].contentItems.length; i++){
+    //
+    //     if(deck.revisions[0].contentItems[i].kind === 'slide'){
+    //
+    //       self.getSlide({'params' : {'id':deck.revisions[0].contentItems[i].ref.id}}, (slide) => {
+    //         childrenArray.push({title: slide.revisions[0].title, id: slide.id+'-'+slide.revisions[0].id, type: 'slide'});
+    //         console.log(childrenArray);
+    //       });
+    //     }
+    //
+    //   }
+    //
+    //   deckTree = {
+    //     //NOTE this gets the first revision for now, we should expect 'deckid-revisionid'
+    //     title: deck.revisions[0].title, id: request.params.id, type: 'deck', children: childrenArray
+    //   };
+    //   //console.log(deckTree);
+    //   reply(deckTree);
+    // });
+
+    //
+    // //----mockup:start
+    // let deckTree;
+    // let deckTree1 = {
+    //   title: 'Semantic Web', id: request.params.id, type: 'deck', children: [
+    //       {title: 'Introduction', id: '575060ae4bc68d1000ea952b', type: 'slide'},
+    //       {title: 'RDF Data Model', id: 67, type: 'deck',  children: [
+    //           {title: 'Introduction', id: '57506cbd1ae1bd1000312a70', type: 'slide'},
+    //           {title: 'Serialization', id: '575039f24bc68d1000ea9525', type: 'slide'},
+    //           {title: 'Examples', id: '57503dc14bc68d1000ea9526', type: 'slide'}
+    //       ]},
+    //       {title: 'SPARQL', id: 68, type: 'deck',  children: [
+    //           {title: 'Syntax', id: 685, type: 'deck', children: [
+    //               {title: 'Same Slide', id: '57505e034bc68d1000ea9527', type: 'slide'},
+    //               {title: 'Same Slide', id: '57505eec4bc68d1000ea952a', type: 'slide'}
+    //           ]},
+    //           {title: 'Examples', id: '57505e674bc68d1000ea9529', type: 'slide'}
+    //       ]
+    //       },
+    //       {title: 'Conclusion', id: '574f2bbf81e34010002b7fda', type: 'slide'},
+    //       {title: 'Future Work', id: '574f2b2881e34010002b7fd8', type: 'slide'},
+    //       {title: 'References', id: '574f24e881e34010002b7fd4', type: 'slide'},
+    //       {title: 'Extra1', id: '574f251081e34010002b7fd6', type: 'slide'},
+    //   ]
+    // };
+    // let deckTree2 = {
+    //   title: 'Example Deck', id: 91, type: 'deck', children: [
+    //       {title: 'Slide 1', id: 911, type: 'slide'},
+    //       {title: 'Slide 2', id: 912, type: 'slide'}
+    //   ]
+    // };
+    // if(parseInt(request.params.id) === 91){
+    //   deckTree = deckTree2;
+    // }else{
+    //   deckTree = deckTree1;
+    // }
+    // //----mockup:end
+
   },
 
   createDeckTreeNode: function(request, reply) {
@@ -262,7 +301,40 @@ module.exports = {
         node = {title: 'Existing Slide', id: 11, type: 'slide'};
       }else{
         //need to make a new slide
-        node = {title: 'New Slide', id: rnd, type: 'slide'};
+
+        //request.payload.selector.id -> parent deck id
+        let spath = request.payload.selector.spath;
+        let spathArray = spath.split(';');
+        let parentID, parentPosition, slidePosition;
+        if(spathArray.length > 1){
+
+          let parentArrayPath = spathArray[spathArray.length-2].split(':');
+          parentID = parentArrayPath[0];
+          parentPosition = parentArrayPath[1];
+
+        }
+        else{
+          parentID = request.payload.selector.id;
+        }
+
+        let slideArrayPath = spathArray[spathArray.length-1].split(':');
+        slidePosition = slideArrayPath[1];
+        //we should call /slide/new
+        let slide = {
+          'title': 'New slide', //NOTE add title
+          'content': '',
+          'language': 'en',
+          'license': 'CC0',
+          'user': '1111',
+          'root_deck': parentID,
+          'position' : slidePosition
+        };
+
+        this.newSlide(slide, (createdSlide) => {
+          node = {title: createdSlide.title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
+        });
+
+
       }
     }else{
       if(parseInt(request.payload.nodeSpec.id)){

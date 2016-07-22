@@ -11,14 +11,14 @@ const helper = require('./helper'),
 module.exports = {
   get: function(identifier) {
     return helper.connectToDatabase()
-      .then((db) => db.collection('slides'))
+      .then((db) => db.collection('decks'))
       .then((col) => col.findOne({
         _id: oid(identifier)
       }));
   },
   getAll: function(identifier) {
     return helper.connectToDatabase()
-      .then((db) => db.collection('slides'))
+      .then((db) => db.collection('decks'))
       .then((col) => col.find({ content_id: String(oid(identifier)) }))//TODO use id TODO cast to String?
       .then((stream) => stream.sort({timestamp: -1}))
       .then((stream) => stream.toArray());
@@ -26,7 +26,7 @@ module.exports = {
 
   getAllFromCollection: function() {
     return helper.connectToDatabase()
-      .then((db) => db.collection('slides'))
+      .then((db) => db.collection('decks'))
       .then((col) => col.find())
       .then((stream) => stream.sort({timestamp: -1}))
       .then((stream) => stream.toArray());
@@ -35,7 +35,7 @@ module.exports = {
   insert: function(slide) {
     //TODO check for root and parent deck ids to be existant, otherwise create these
     return helper.connectToDatabase()
-      .then((db) => db.collection('slides'))
+      .then((db) => db.collection('decks'))
       .then((col) => {
         let valid = false;
         const convertedSlide = convertToNewSlide(slide);
@@ -56,7 +56,7 @@ module.exports = {
 
   replace: function(id, slide) {
     return helper.connectToDatabase()
-      .then((db) => db.collection('slides'))
+      .then((db) => db.collection('decks'))
       .then((col) => {
         return col.findOne({_id: oid(id)}, {fields:{revisions:1}})
           .then((existingSlide) => {
@@ -91,7 +91,7 @@ module.exports = {
   revert: function(slide_id, slide){ //this can actually revert to past and future revisions
     //NOTE must add validation on id
     return helper.connectToDatabase()
-    .then((db) => db.collection('slides'))
+    .then((db) => db.collection('decks'))
     .then((col) => {
       col.findOne({_id: oid(slide_id)})
       .then((existingSlide) => {

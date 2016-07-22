@@ -4,6 +4,8 @@ const helper = require('./helper'),
   oid = require('mongodb').ObjectID,
   deckModel = require('../models/deck.js');
 
+let async = require('async');
+
 module.exports = {
   get: function(identifier) {
     return helper.connectToDatabase()
@@ -128,6 +130,7 @@ module.exports = {
     });
   },
 
+
   // revert: function(deck_id, deck){ //this can actually revert to past and future revisions
   //   //NOTE must add validation on deck id
   //   return helper.connectToDatabase()
@@ -165,9 +168,41 @@ module.exports = {
     .then((col) => {
       return col.findOneAndUpdate({_id: oid(deck_id)}, {'$set' : {'active' : parseInt(deck.revision_id)}});
     });
+  },
+
+
+  getDeckTreeFromDB: function(deck_id, revision_id){
+    let deckTree;
+    return helper.connectToDatabase()
+    .then((db) => db.collection('decks'))
+    .then((col) => {
+      return col.findOne({_id: oid(deck_id)})
+      .then((deck) => {
+        deckTree = { title: deck.revisions[0].title, id: deck_id+'-'+revision_id, type: 'deck', children: []};
+
+        //NOTE for now it only gets the first item in the slide revisions.
+        //NOTE we have to do recursion for the nested decks!!!
+        return new Promise(function(resolve, reject) {
+          async.each(deck.revisions[0].contentItems, function(citem, callback){
+            col.findOne({_id: oid(citem.ref.id)})
+            .then((slide) => {
+              deckTree.children.push({title: slide.revisions[0].title, id: slide._id+'-'+slide.revisions[0].id, type: 'slide'});
+              callback();
+            });
+          },function(err){
+            //NOTE this gets the first revision for now, we should expect 'deckid-revisionid'
+            //console.log(deckTree);
+            //resolve(deckTree);
+            //return deckTree;
+            resolve(deckTree);            
+          });
+
+        });
+
+
+      });
+    });
   }
-
-
 };
 
 function getActiveRevision(deck){
