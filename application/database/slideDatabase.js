@@ -28,7 +28,7 @@ module.exports = {
     return helper.connectToDatabase()
       .then((db) => db.collection('slides'))
       .then((col) => col.find({ _id:  { $in : identifiers.selectedIDs.map(function(id) {
-	          return oid(id);
+        return oid(id);
       })
        }}))
       .then((stream) => stream.sort({timestamp: -1}))
