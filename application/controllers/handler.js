@@ -64,25 +64,25 @@ module.exports = {
 
   //Get selected slides from database
   getSelected: function(request, reply) {
-	  slideDB.getSelected(request.payload)
-	    .then((slides) => {
-              if (co.isEmpty(slides)) {
-	        reply(boom.notFound());
-	      } else {
-	        slides.forEach((slide) => {
-	          if (co.isEmpty(slide)) {
-		    reply(boom.notFound());
-                  } else {
-	       	    co.rewriteID(slide);
-	            let jsonReply = JSON.stringify(slides);
-                    reply(jsonReply);
-		  }
-          });
-        }
-      }).catch((error) => {
-        request.log('error', error);
-        reply(boom.badImplementation());
-      });
+    slideDB.getSelected(request.payload)
+    .then((slides) => {
+      if (co.isEmpty(slides)) {
+        reply(boom.notFound());
+      } else {
+        slides.forEach((slide) => {
+          if (co.isEmpty(slide)) {
+            reply(boom.notFound());
+          } else {
+            co.rewriteID(slide);
+            let jsonReply = JSON.stringify(slides);
+            reply(jsonReply);
+          }
+        });
+      }
+    }).catch((error) => {
+      request.log('error', error);
+      reply(boom.badImplementation());
+    });
   },
 
   //Get All Slides from database
@@ -170,7 +170,7 @@ module.exports = {
       reply(boom.badImplementation());
     });
   },
-  
+
   //decktree
   getDeckTree: function(request, reply) {
     //----mockup:start
