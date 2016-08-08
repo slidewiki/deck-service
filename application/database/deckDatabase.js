@@ -6,13 +6,24 @@ const helper = require('./helper'),
 
 let async = require('async');
 
-module.exports = {
+let self = module.exports = {
   get: function(identifier) {
+    identifier = String(identifier);
     return helper.connectToDatabase()
       .then((db) => db.collection('decks'))
       .then((col) => col.findOne({
-        _id: oid(identifier)
-      }));
+        _id: oid(identifier.split('-')[0])
+      })
+      .then((found) => {
+        let parsed = identifier.split('-');
+        if(parsed.length === 1){
+          return found;
+        }
+        else{
+          return found.revisions[parseInt(parsed[1])-1];
+        }
+      })
+    );
   },
 
   insert: function(deck) {
@@ -34,13 +45,25 @@ module.exports = {
     });
   },
 
-  update: function(deck) {    //when no new revision is needed..?
+  update: function(deck) {    //when no new revision is needed..
     return helper.connectToDatabase()
     .then((db) => db.collection('decks'))
     .then((col) => col.findOneAndUpdate({
       _id: deck.id
     }, deck));
   },
+
+  rename: function(deck_id, newName){
+    let deckId = deck_id.split('-')[0];
+    return helper.connectToDatabase()
+    .then((db) => db.collection('decks'))
+    .then((col) => col.findOne({_id: oid(deckId)})
+    .then((deck) => {
+      deck.revisions[deck_id.split('-')[1]-1].title = newName;
+      return col.findOneAndUpdate({_id: oid(deckId)}, deck);
+    }));
+  },
+
 
   replace: function(id, deck) {
     return helper.connectToDatabase()
@@ -55,7 +78,7 @@ module.exports = {
             return prev;
           }, 1);
           let valid = false;
-          const newRevisionId = maxRevisionId+1;
+          const newRevisionId = parseInt(maxRevisionId)+1;
           //must get previously active revision and copy content items to new revision
           let activeRevisionIndex = getActiveRevision(existingDeck);
           let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
@@ -79,30 +102,126 @@ module.exports = {
   },
 
   insertNewContentItem: function(citem, position, root_deck, ckind){
+    let root_deck_path = root_deck.split('-');
     return helper.connectToDatabase()
     .then((db) => db.collection('decks'))
     .then((col) => {
-      return col.findOne({_id: oid(root_deck)})
+      return col.findOne({_id: oid(root_deck_path[0])})
       .then((existingDeck) => {
-        return col.findOne({_id: oid(root_deck)}, {revisions : {$elemMatch: {id: existingDeck.active}}})
-        .then((activeRevision) => col.findOneAndUpdate({
-          _id: oid(root_deck),  revisions : {$elemMatch: {id: existingDeck.active}}  },
-          {
-            $push: {
-              'revisions.$.contentItems': {
-                order: getOrder(activeRevision)+1,
-                kind: ckind,
-                ref : {
-                  id: String(citem.id),
-                  revision:1
+        //TODO must check if the root_deck comes with a revision id or not, and get the element accordingly
+        let activeRevisionId = existingDeck.active;
+        if(root_deck_path.length > 1){
+          activeRevisionId = root_deck_path[1];
+        }
+        if(position && position > 0){
+          let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+          for(let i = position-1; i < citems.length; i++){
+            citems[i].order = citems[i].order+1;
+          }
+
+          let newCitem = {
+            order: parseInt(position),
+            kind: ckind,
+            ref : {
+              id: String(citem.id),
+              revision:1
+            }
+          };
+          citems.splice(position-1, 0, newCitem);
+          existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+          col.save(existingDeck);
+        }
+        else{
+          col.findOneAndUpdate({
+            _id: oid(root_deck),  revisions : {$elemMatch: {id: activeRevisionId}}  },
+            {
+              $push: {
+                'revisions.$.contentItems': {
+                  order: getOrder(existingDeck.revisions[activeRevisionId-1])+1,
+                  kind: ckind,
+                  ref : {
+                    id: String(citem.id),
+                    revision:1
+                  }
                 }
               }
             }
-          }
-        ));
+          );
+        }
+        //existingDeck.revisions[activeRevisionId-1]
+      });
+    });
+
+  },
+
+  removeContentItem: function(position, root_deck){
+    let root_deck_path = root_deck.split('-');
+    return helper.connectToDatabase()
+    .then((db) => db.collection('decks'))
+    .then((col) => {
+      return col.findOne({_id: oid(root_deck_path[0])})
+      .then((existingDeck) => {
+        //TODO must check if the root_deck comes with a revision id or not, and get the element accordingly
+        let activeRevisionId = existingDeck.active;
+        if(root_deck_path.length > 1){
+          activeRevisionId = root_deck_path[1];
+        }
+        let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+        for(let i = position-1; i < citems.length; i++){
+          citems[i].order = citems[i].order-1;
+        }
+        citems.splice(position-1, 1);
+        existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+        col.save(existingDeck);
       });
     });
   },
+
+
+  // insertNewContentItem: function(citem, position, root_deck, ckind){
+  //   let root_deck_path = root_deck.split('-');
+  //   return helper.connectToDatabase()
+  //   .then((db) => db.collection('decks'))
+  //   .then((col) => {
+  //     return col.findOne({_id: oid(root_deck_path[0])})
+  //     .then((existingDeck) => {
+  //       //TODO must check if the root_deck comes with a revision id or not, and get the element accordingly
+  //       let activeRevisionId = existingDeck.active;
+  //       if(root_deck_path.length > 1){
+  //         activeRevisionId = root_deck_path[1];
+  //       }
+  //       //existingDeck.revisions[activeRevisionId-1]
+  //       return col.findOne({_id: oid(root_deck)}, {revisions : {$elemMatch: {id: activeRevisionId}}})
+  //       .then((activeRevision) => {
+  //         if(position){
+  //           col.findOne({_id: oid(root_deck)})
+  //           .then((existingDeck) => {
+  //             //must update positions of all items after the newly inserted item
+  //             //existingDeck.revisions[activeRevisionId-1].contentItems
+  //           });
+  //
+  //         }
+  //         else{ //no position is defined, add to the last position of the content items array
+  //           col.findOneAndUpdate({
+  //             _id: oid(root_deck),  revisions : {$elemMatch: {id: activeRevisionId}}  },
+  //             {
+  //               $push: {
+  //                 'revisions.$.contentItems': {
+  //                   order: getOrder(activeRevision)+1,
+  //                   kind: ckind,
+  //                   ref : {
+  //                     id: String(citem.id),
+  //                     revision:1
+  //                   }
+  //                 }
+  //               }
+  //             }
+  //           );
+  //         }
+  //       });
+  //     });
+  //   });
+  // },
 
   updateContentItem: function(citem, revertedRevId, root_deck, ckind){ //can be used for reverting or updating
     helper.connectToDatabase()
@@ -111,6 +230,7 @@ module.exports = {
       col.findOne({_id: oid(root_deck)})
       .then((existingDeck) => {
         let newRevId = getNewRevisionID(citem);
+        console.log(newRevId);
         if(revertedRevId !== ''){
           newRevId = revertedRevId;
         }
@@ -171,30 +291,102 @@ module.exports = {
   },
 
 
-  getDeckTreeFromDB: function(deck_id, revision_id){
+  getDeckTreeFromDB: function(deck_id){
     let deckTree;
+    let revision_id = -1;
+    let decktreesplit = deck_id.split('-');
+    if(decktreesplit.length > 1){
+      deck_id = decktreesplit[0];
+      revision_id = decktreesplit[1]-1;
+    }
     return helper.connectToDatabase()
     .then((db) => db.collection('decks'))
     .then((col) => {
       return col.findOne({_id: oid(deck_id)})
       .then((deck) => {
-        deckTree = { title: deck.revisions[0].title, id: deck_id+'-'+revision_id, type: 'deck', children: []};
+        if(revision_id === -1){
+          revision_id = deck.active-1;
+        }
+        deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', children: []};
 
-        //NOTE for now it only gets the first item in the slide revisions.
-        //NOTE we have to do recursion for the nested decks!!!
         return new Promise(function(resolve, reject) {
-          async.each(deck.revisions[0].contentItems, function(citem, callback){
-            col.findOne({_id: oid(citem.ref.id)})
-            .then((slide) => {
-              deckTree.children.push({title: slide.revisions[0].title, id: slide._id+'-'+slide.revisions[0].id, type: 'slide'});
-              callback();
-            });
+          async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
+            if(citem.kind === 'slide'){
+              col.findOne({_id: oid(citem.ref.id)})
+              .then((slide) => {
+                let slide_revision = citem.ref.revision-1;
+                deckTree.children.push({title: slide.revisions[slide_revision].title, id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                callback();
+              });
+            }
+            else{
+              col.findOne({_id: oid(citem.ref.id)})
+              .then((innerDeck) => {
+
+                module.exports.getDeckTreeFromDB(innerDeck._id+'-'+citem.ref.revision)
+                .then((res) => {
+                  deckTree.children.push(res);
+                  callback();
+                });
+              });
+
+            }
+
           },function(err){
-            //NOTE this gets the first revision for now, we should expect 'deckid-revisionid'
-            //console.log(deckTree);
-            //resolve(deckTree);
-            //return deckTree;
-            resolve(deckTree);            
+            resolve(deckTree);
+          });
+
+        });
+
+
+      });
+    });
+  },
+
+  getFlatSlidesFromDB: function(deck_id, deckTree){
+
+    let revision_id = -1;
+    let decktreesplit = deck_id.split('-');
+    if(decktreesplit.length > 1){
+      deck_id = decktreesplit[0];
+      revision_id = decktreesplit[1]-1;
+    }
+    return helper.connectToDatabase()
+    .then((db) => db.collection('decks'))
+    .then((col) => {
+      return col.findOne({_id: oid(deck_id)})
+      .then((deck) => {
+        if(revision_id === -1){
+          revision_id = deck.active-1;
+        }
+        if(!deckTree){
+          deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', children: []};
+        }
+
+        return new Promise(function(resolve, reject) {
+          async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
+            if(citem.kind === 'slide'){
+              col.findOne({_id: oid(citem.ref.id)})
+              .then((slide) => {
+                let slide_revision = citem.ref.revision-1;
+                deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                callback();
+              });
+            }
+            else{
+              col.findOne({_id: oid(citem.ref.id)})
+              .then((innerDeck) => {
+
+                module.exports.getFlatSlidesFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree)
+                .then((res) => {
+                  callback();
+                });
+              });
+
+            }
+
+          },function(err){
+            resolve(deckTree);
           });
 
         });
@@ -229,10 +421,24 @@ function getNewRevisionID(citem){
 }
 
 //returns the max order of appearance (i.e., position) of a content item inside a deck, or 0 if it is empty
+// function getOrder(activeRevision){
+//   if(activeRevision.revisions[0].contentItems.length > 0){
+//     return Math.max.apply(
+//       Math,activeRevision.revisions[0].contentItems.map(
+//         function(o){
+//           return o.order;
+//         }
+//       )
+//     );
+//   }
+//   else return 0;
+// }
+
+//returns the max order of appearance (i.e., position) of a content item inside a deck, or 0 if it is empty
 function getOrder(activeRevision){
-  if(activeRevision.revisions[0].contentItems.length > 0){
+  if(activeRevision.contentItems.length > 0){
     return Math.max.apply(
-      Math,activeRevision.revisions[0].contentItems.map(
+      Math,activeRevision.contentItems.map(
         function(o){
           return o.order;
         }
@@ -264,7 +470,7 @@ function convertToNewDeck(deck){
   let now = new Date();
   const result = {
     user: deck.user,
-    deck: deck.root_deck,
+    deck: deck.root_deck.split('-')[0],
     timestamp: now.toISOString(),
     language: deck.language,
     description: deck.description,

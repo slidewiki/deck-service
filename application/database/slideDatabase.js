@@ -10,11 +10,24 @@ const helper = require('./helper'),
 
 module.exports = {
   get: function(identifier) {
+    identifier = String(identifier);
     return helper.connectToDatabase()
       .then((db) => db.collection('decks'))
+      //must parse the identifier to check if it is dash separated (get revision) or not (get the whole slide)
       .then((col) => col.findOne({
-        _id: oid(identifier)
-      }));
+        _id: oid(identifier.split('-')[0])
+      })
+      .then((found) => {
+        let parsed = identifier.split('-');
+        if(parsed.length === 1){
+          return found;
+        }
+        else{
+          //array index of revision is revision number minus 1? TODO check
+          return found.revisions[parseInt(parsed[1])-1];
+        }
+      })
+    );
   },
   getAll: function(identifier) {
     return helper.connectToDatabase()
@@ -68,14 +81,13 @@ module.exports = {
             }, 1);
 
             let valid = false;
-            const slideWithNewRevision = convertDummySlideWithNewRevision(slide, maxRevisionId+1 );
+            const slideWithNewRevision = convertDummySlideWithNewRevision(slide, parseInt(maxRevisionId)+1 );
             try {
               valid = slideModel(slideWithNewRevision);
 
               if (!valid) {
                 return slideModel.errors;
-              }
-			  //must update content item of root deck -- should update in code, then update the document at its whole
+              }			  
 
               return col.findOneAndUpdate({
                 _id: oid(id)
@@ -88,6 +100,17 @@ module.exports = {
       });
   },
 
+  rename: function(slide_id, newName){
+    let slideId = slide_id.split('-')[0];
+    return helper.connectToDatabase()
+    .then((db) => db.collection('decks'))
+    .then((col) => col.findOne({_id: oid(slideId)})
+    .then((slide) => {
+      slide.revisions[slide_id.split('-')[1]-1].title = newName;
+      return col.findOneAndUpdate({_id: oid(slideId)}, slide);
+    }));
+  },
+
   revert: function(slide_id, slide){ //this can actually revert to past and future revisions
     //NOTE must add validation on id
     return helper.connectToDatabase()
@@ -97,7 +120,7 @@ module.exports = {
       .then((existingSlide) => {
         helper.connectToDatabase().collection('decks').findOne({_id: oid(existingSlide.deck)})
         .then((root_deck) => {
-          console.log(root_deck);
+          //console.log(root_deck);
           for(let i = 0; i < root_deck.revisions.length; i++) {
             if(root_deck.revisions[i].id === root_deck.active) {
               for(let j = 0; j < root_deck.revisions[i].contentItems.length; j++) {
@@ -120,7 +143,7 @@ function convertToNewSlide(slide) {
   let now = new Date();
   const result = {
     user: slide.user,
-    deck: slide.root_deck,
+    deck: String(slide.root_deck.split('-')[0]),
     timestamp: now.toISOString(),
     language: slide.language,
     revisions: [{

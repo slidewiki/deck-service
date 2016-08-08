@@ -11,7 +11,7 @@ module.exports = function(server) {
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         },
       },
       tags: ['api'],
@@ -103,7 +103,7 @@ module.exports = function(server) {
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         },
       },
       tags: ['api'],
@@ -118,6 +118,21 @@ module.exports = function(server) {
     config: {
       validate: {
         params: {
+        },
+      },
+      tags: ['api'],
+      description: 'Get all slide'
+    }
+  });
+
+  server.route({
+    method: 'GET',
+    path: '/deck/{id}/slides',
+    handler: handlers.getFlatSlides,
+    config: {
+      validate: {
+        params: {
+          id: Joi.string()
         },
       },
       tags: ['api'],
@@ -220,7 +235,7 @@ module.exports = function(server) {
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         }
       },
       tags: ['api'],
@@ -236,13 +251,13 @@ module.exports = function(server) {
       validate: {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
-            id: Joi.string().alphanum().lowercase(), //id of the root deck
+            id: Joi.string(), //id of the root deck
             spath: Joi.string(),
             stype: Joi.string(),
-            sid: Joi.string().alphanum().lowercase()
+            sid: Joi.string()
           }),
           nodeSpec: Joi.object().keys({
-            id: Joi.string().alphanum().lowercase(), //0 means it is a new node not existing
+            id: Joi.string(),
             type: Joi.string()
           }),
           user: Joi.string().alphanum().lowercase()
@@ -261,10 +276,10 @@ module.exports = function(server) {
       validate: {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
-            id: Joi.string().alphanum().lowercase(), //id of the root deck
+            id: Joi.string(), //id of the root deck
             spath: Joi.string(),
             stype: Joi.string(),
-            sid: Joi.string().alphanum().lowercase()
+            sid: Joi.string()
           }),
           name: Joi.string(),
           user: Joi.string().alphanum().lowercase()
@@ -283,10 +298,10 @@ module.exports = function(server) {
       validate: {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
-            id: Joi.string().alphanum().lowercase(), //id of the root deck
+            id: Joi.string(), //id of the root deck
             spath: Joi.string(),
             stype: Joi.string(),
-            sid: Joi.string().alphanum().lowercase()
+            sid: Joi.string()
           }),
           user: Joi.string().alphanum().lowercase()
         }).requiredKeys('selector', 'user'),
