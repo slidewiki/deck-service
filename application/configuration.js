@@ -3,7 +3,7 @@
 
 //read mongodb URL from /etc/hosts
 let host = 'localhost';
-const fs = require('fs');
+/* const fs = require('fs');
 const lines = fs.readFileSync('/etc/hosts').toString().split('\n');
 for (let i in lines) {
   if (lines[i].includes('mongodb')) {
@@ -11,7 +11,7 @@ for (let i in lines) {
     host = entrys[entrys.length - 1];
     console.log('Found mongodb host. Using ' + host + ' as database host.');
   }
-}
+} */
 
 //read mongo port from ENV
 const co = require('./common');

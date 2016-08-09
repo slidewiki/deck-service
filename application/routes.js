@@ -12,14 +12,14 @@ module.exports = function(server) {
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         },
       },
       tags: ['api'],
       description: 'Get metadata of a deck'
     }
   });
-/*
+
   server.route({
     method: 'POST',
     path: '/deck/new',
@@ -27,161 +27,74 @@ module.exports = function(server) {
     config: {
       validate: {
         payload: Joi.object().keys({
+          description: Joi.string(),
+          language: Joi.string(),
+          translation: Joi.string().alphanum().lowercase(),
+          tags: Joi.array().items(Joi.string()).default([]),
           title: Joi.string(),
-          content: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
           root_deck: Joi.string().alphanum().lowercase(),
-          parent_slide: Joi.object().keys({
+          parent_deck: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
           }),
-          position: Joi.string().alphanum().lowercase().min(0),
-          language: Joi.string(),
+          //position: Joi.string().alphanum().lowercase().min(0),
           license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
-        }).requiredKeys('user', 'content', 'root_deck', 'license'),
+        }).requiredKeys('user', 'license'),
       },
       tags: ['api'],
       description: 'Create a new deck'
     }
   });
 
-
-from deck model:
-
-DECK OBJECT:
-  description: {
-    type: 'string'
-  },
-  language: {
-    type: 'string'
-  },
-  translation: {
-    type: 'object'
-  },
-  lastUpdate: {
-    type: 'string'
-  },
-  revisions: {
-    type: 'array',
-    items: deckRevision
-  },
-  tags: {
-    type: 'array',
-    items: {
-      type: 'string'
-    }
-  }
-
-DECK REVISION OBJECT
-
-title: {
-  type: 'string'
-},
-timestamp: {
-  type: 'string'
-},
-user: objectid,
-parent: {
-  type: 'object'
-},
-popularity: {
-  type: 'number',
-  minimum: 0
-},
-theme: {
-  type: 'object',
-  properties: {
-    default: objectid
-  }
-},
-transition: {
-  type: 'object',
-  properties: {
-    default: objectid
-  }
-},
-comment: {
-  type: 'string'
-},
-abstract: {
-  type: 'string'
-},
-footer: {
-  type: 'object',
-  properties: {
-    text: {
-      type: 'string'
-    }
-  }
-},
-license: {
-  type: 'string',
-  enum: ['CC0', 'CC BY', 'CC BY-SA']
-},
-isFeatured: {
-  type: 'number'
-},
-priority: {
-  type: 'number'
-},
-visibility: {
-  type: 'boolean'
-},
-language: {
-  type: 'string'
-},
-translation: {
-  type: 'object',
-  properties: {
-    status: {
-      type: 'string',
-      enum: ['original', 'google', 'revised']
-    },
-    source: {
-      type: 'object'
-    }
-  }
-},
-tags: {
-  type: 'array',
-  items: {
-    type: 'string'
-  }
-},
-preferences: {
-  type: 'array',
-  items: {
-    type: 'object'
-  }
-},
-contentItems: {
-  type: 'array',
-  items: contentItem
-},
-dataSources: {
-  type: 'array',
-  items: objectid
-}
-
-  //update deck
-  // TODO Altered API from Alis proposal
   server.route({
     method: 'PUT',
     path: '/deck/{id}',
-    handler: handlers.updateDeck,
+    handler: handlers.updateDeckRevision,
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         },
         payload: Joi.object().keys({
-
-        }).requiredKeys(),
+          description: Joi.string(),
+          language: Joi.string(),
+          translation: Joi.string().alphanum().lowercase(),
+          tags: Joi.array().items(Joi.string()).default([]),
+          title: Joi.string(),
+          //content: Joi.string(),
+          user: Joi.string().alphanum().lowercase(),
+          root_deck: Joi.string(),
+          parent_deck: Joi.object().keys({
+            id: Joi.string().alphanum().lowercase(),
+            revision: Joi.string().alphanum().lowercase()
+          }),
+          content_items: Joi.array().items(Joi.object()),
+          license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+        }).requiredKeys('user', 'license'),
       },
       tags: ['api'],
-      description: 'Replace a deck'
+      description: 'Replace a deck by creating a new revision'
     }
-  });  */
+  });
+
+  server.route({
+    method: 'POST',
+    path: '/deck/revert/{id}',
+    handler: handlers.revertDeckRevision,
+    config: {
+      validate: {
+        params: {
+          id: Joi.string()
+        },
+        payload: Joi.object().keys({
+          revision_id: Joi.string().alphanum().lowercase()
+        }).requiredKeys('revision_id'),
+      },
+      tags: ['api'],
+      description: 'Revert a deck to an old revision'
+    }
+  });
 
   //slides
   server.route({
@@ -191,7 +104,7 @@ dataSources: {
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         },
       },
       tags: ['api'],
@@ -214,17 +127,17 @@ dataSources: {
   });
 
   server.route({
-    method: 'PUT',
-    path: '/selectedSlides',
-    handler: handlers.getSelected,
+    method: 'GET',
+    path: '/deck/{id}/slides',
+    handler: handlers.getFlatSlides,
     config: {
       validate: {
-	payload: Joi.object().keys({
-         selectedIDs: Joi.array().items(Joi.string().lowercase().alphanum().required())
-         }).requiredKeys('selectedIDs')
+        params: {
+          id: Joi.string()
+        },
       },
       tags: ['api'],
-      description: 'Get selected slides'
+      description: 'Get all slide'
     }
   });
 
@@ -240,6 +153,15 @@ dataSources: {
           speakernotes: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
           root_deck: Joi.string().alphanum().lowercase(),
+          parent_deck: Joi.object().keys({
+            id: Joi.string().alphanum().lowercase(),
+            revision: Joi.string().alphanum().lowercase()
+          }),
+		  //add a field for deck revision?
+		  /* root_deck : Joi.object().keys({
+            id: Joi.string().alphanum().lowercase(), //id of the root deck
+            revision: Joi.string().alphanum().lowercase() //revision number of the root deck revision
+          }), */
           parent_slide: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
@@ -258,18 +180,23 @@ dataSources: {
   server.route({
     method: 'PUT',
     path: '/slide/{id}',
-    handler: handlers.updateSlide,
+    //for now, no new revision on replace
+    handler: handlers.updateNoRevisionSlide,
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         },
         payload: Joi.object().keys({
           title: Joi.string(),
           content: Joi.string(),
           speakernotes: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
-          root_deck: Joi.string().alphanum().lowercase(),
+          root_deck: Joi.string(),
+          parent_deck: Joi.object().keys({
+            id: Joi.string().alphanum().lowercase(),
+            revision: Joi.string().alphanum().lowercase()
+          }),
           parent_slide: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
@@ -280,9 +207,28 @@ dataSources: {
         }).requiredKeys('user', 'content', 'root_deck', 'license'),
       },
       tags: ['api'],
-      description: 'Replace a slide'
+      description: 'Replace a slide with a new revision'
     }
   });
+
+  server.route({
+    method: 'POST',
+    path: '/slide/revert/{id}',
+    handler: handlers.revertSlideRevision,
+    config: {
+      validate: {
+        params: {
+          id: Joi.string().alphanum().lowercase()
+        },
+        payload: Joi.object().keys({
+          revision_id: Joi.string().alphanum().lowercase()
+        }).requiredKeys('revision_id'),
+      },
+      tags: ['api'],
+      description: 'Revert a slide to an old revision'
+    }
+  });
+
   //------------decktree APIs----------------
   server.route({
     method: 'GET',
@@ -291,7 +237,7 @@ dataSources: {
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         }
       },
       tags: ['api'],
@@ -307,13 +253,13 @@ dataSources: {
       validate: {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
-            id: Joi.string().alphanum().lowercase(), //id of the root deck
+            id: Joi.string(), //id of the root deck
             spath: Joi.string(),
             stype: Joi.string(),
-            sid: Joi.string().alphanum().lowercase()
+            sid: Joi.string()
           }),
           nodeSpec: Joi.object().keys({
-            id: Joi.string().alphanum().lowercase(), //0 means it is a new node not existing
+            id: Joi.string(),
             type: Joi.string()
           }),
           user: Joi.string().alphanum().lowercase()
@@ -332,10 +278,10 @@ dataSources: {
       validate: {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
-            id: Joi.string().alphanum().lowercase(), //id of the root deck
+            id: Joi.string(), //id of the root deck
             spath: Joi.string(),
             stype: Joi.string(),
-            sid: Joi.string().alphanum().lowercase()
+            sid: Joi.string()
           }),
           name: Joi.string(),
           user: Joi.string().alphanum().lowercase()
@@ -354,10 +300,10 @@ dataSources: {
       validate: {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
-            id: Joi.string().alphanum().lowercase(), //id of the root deck
+            id: Joi.string(), //id of the root deck
             spath: Joi.string(),
             stype: Joi.string(),
-            sid: Joi.string().alphanum().lowercase()
+            sid: Joi.string()
           }),
           user: Joi.string().alphanum().lowercase()
         }).requiredKeys('selector', 'user'),
