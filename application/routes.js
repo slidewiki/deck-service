@@ -62,14 +62,13 @@ module.exports = function(server) {
           translation: Joi.string().alphanum().lowercase(),
           tags: Joi.array().items(Joi.string()).default([]),
           title: Joi.string(),
-          //content: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
           root_deck: Joi.string(),
           parent_deck: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
           }),
-          content_items: Joi.array().items(Joi.object()),
+          content_items: Joi.array(),
           license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
         }).requiredKeys('user', 'license'),
       },
