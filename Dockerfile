@@ -17,7 +17,7 @@ ADD ./application/ ./
 #   Configuration   #
 # ----------------- #
 
-EXPOSE 3000
+EXPOSE 80
 
 # ----------- #
 #   Cleanup   #
