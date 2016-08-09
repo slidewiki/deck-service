@@ -7,7 +7,7 @@
 [![LinesOfCode](https://img.shields.io/badge/LOC-1140-lightgrey.svg)](https://github.com/slidewiki/deck-service/blob/master/application/package.json)
 [![Coverage Status](https://coveralls.io/repos/github/slidewiki/deck-service/badge.svg?branch=master)](https://coveralls.io/github/slidewiki/deck-service?branch=master)
 
-This Microservice handles deck and slide management, backed by mongodb.
+This Microservice handles deck and slide management, backed by mongodb...
 
 You want to **checkout this cool service**? Simply start the service and head over to: [http://localhost:3000/documentation](http://localhost:3000/documentation). We're using  [swagger](https://www.npmjs.com/package/hapi-swagger) to have this super cool API discrovery/documentation tool.
 
