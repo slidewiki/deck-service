@@ -147,6 +147,9 @@ const deck = {
       type: 'string'
     },
     user: objectid,
+    kind: {
+      type: 'string'
+    },
     description: {
       type: 'string'
     },

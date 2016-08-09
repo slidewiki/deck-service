@@ -16,7 +16,8 @@ let self = module.exports = {
       if (co.isEmpty(slide))
         reply(boom.notFound());
       else
-        reply(co.rewriteID(slide));
+        //reply(co.rewriteID(slide));
+        reply(slide);
     }).catch((error) => {
       request.log('error', error);
       reply(boom.badImplementation());
@@ -47,7 +48,7 @@ let self = module.exports = {
       if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
         throw inserted;
       else{
-        deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'slide');
+        //deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'slide');
         reply(co.rewriteID(inserted.ops[0]));
       }
     }).catch((error) => {
@@ -58,18 +59,37 @@ let self = module.exports = {
 
   updateSlide: function(request, reply) {
     //NOTE shall the payload and/or response be cleaned or enhanced with values?
-    slideDB.replace(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+    let slideId = request.params.id;
+
+    slideDB.replace(encodeURIComponent(slideId.split('-')[0]), request.payload).then((replaced) => {
       //console.log('updated: ', replaced);
       if (co.isEmpty(replaced.value))
         throw replaced;
       else{
-        console.log(replaced.value._id);
-
         slideDB.get(replaced.value._id).then((newSlide) => {
-          console.log(newSlide);
-          console.log(request.payload.root_deck);
           deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
         });
+
+        reply(replaced.value);
+      }
+    }).catch((error) => {
+      request.log('error', error);
+      reply(boom.badImplementation());
+    });
+  },
+
+  updateNoRevisionSlide: function(request, reply) {
+    //NOTE shall the payload and/or response be cleaned or enhanced with values?
+    let slideId = request.params.id;
+
+    slideDB.replaceNoRevision(encodeURIComponent(slideId), request.payload).then((replaced) => {
+      //console.log('updated: ', replaced);
+      if (co.isEmpty(replaced))
+        throw replaced;
+      else{
+        // slideDB.get(replaced.value._id).then((newSlide) => {
+        //   deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
+        // });
 
         reply(replaced.value);
       }
@@ -98,7 +118,7 @@ let self = module.exports = {
       if (co.isEmpty(deck))
         reply(boom.notFound());
       else
-        reply(co.rewriteID(deck));
+        reply(deck);
     }).catch((error) => {
       request.log('error', error);
       reply(boom.badImplementation());
@@ -110,14 +130,15 @@ let self = module.exports = {
       if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
         throw inserted;
       else{
-        //create a new slide inside the new deck
+        //create a new slide inside the new deck        
+
         let newSlide = {
           'title': 'New slide',
           'content': '',
           'language': 'en',
           'license': 'CC0',
           //NOTE user_id should be retrieved from the frontend
-          'user': '1111',
+          'user': inserted.ops[0].user,
           'root_deck': String(inserted.ops[0]._id),
           'position' : 1
         };
@@ -126,8 +147,8 @@ let self = module.exports = {
           insertedSlide.ops[0].id = insertedSlide.ops[0]._id;
           deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide')
           .then((insertedContentItem) => {
-            if(typeof request.payload.root_deck !== 'undefined')
-              deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'deck');
+            // if(typeof request.payload.root_deck !== 'undefined')
+            //   deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'deck');
             reply(co.rewriteID(inserted.ops[0]));
           });
 
@@ -144,7 +165,8 @@ let self = module.exports = {
   updateDeck: function(request, reply) {
     //NOTE shall the payload and/or response be cleaned or enhanced with values?
     //or should be deckDB.replace?
-    deckDB.update(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+    let deckId = request.params.id;
+    deckDB.update(encodeURIComponent(deckId.split('-')[0]), request.payload).then((replaced) => {
       //console.log('updated: ', replaced);
       if (co.isEmpty(replaced.value))
         throw replaced;
@@ -207,12 +229,48 @@ let self = module.exports = {
     if(request.payload.nodeSpec.type === 'slide'){
       if(request.payload.nodeSpec.id && request.payload.nodeSpec.id !== '0'){
         //it means it is an existing node, we should retrieve the details then
-        //NOTE get existing slide from DB and create node object in deck tree
-        //node = {title: 'Existing Slide', id: 11, type: 'slide'};
+        let spath = request.payload.selector.spath;
+        let spathArray = spath.split(';');
+        let parentID, parentPosition, slidePosition;
+        if(spathArray.length > 1){
 
-        module.exports.getSlide({'params' : {'id' : request.payload.nodeSpec.id}}, (slide) => {
-          node = {title: slide.title, id: request.payload.nodeSpec.id, type: 'slide'};
-          reply(node);
+          let parentArrayPath = spathArray[spathArray.length-2].split(':');
+          parentID = parentArrayPath[0];
+          parentPosition = parseInt(parentArrayPath[1]);
+
+        }
+        else{
+          parentID = request.payload.selector.id;
+        }
+
+        let slideArrayPath = spathArray[spathArray.length-1].split(':');
+        slidePosition = parseInt(slideArrayPath[1])+1;
+        let slideRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
+        module.exports.getSlide({'params' : {'id' : request.payload.nodeSpec.id.split('-')[0]}}, (slide) => {
+          if(request.payload.nodeSpec.id === request.payload.selector.sid){
+            //we must duplicate the slide
+            let duplicateSlide = slide;
+            duplicateSlide.parent = request.payload.nodeSpec.id;
+            duplicateSlide.comment = 'Duplicate slide of ' + request.payload.nodeSpec.id;
+            //copy the slide to a new duplicate
+            slideDB.copy(duplicateSlide, slideRevision)
+            .then((insertedDuplicate) => {
+              //console.log(insertedDuplicate);
+              insertedDuplicate = insertedDuplicate.ops[0];
+              insertedDuplicate.id = insertedDuplicate._id;
+              //node = {title: insertedDuplicate.revisions[slideRevision].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[slideRevision].id, type: 'slide'};
+              node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
+              deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1);
+              reply(node);
+            });
+          }
+          else{
+            //change position of the existing slide
+            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1);
+            node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
+            reply(node);
+          }
+
         });
 
       }else{
@@ -224,15 +282,21 @@ let self = module.exports = {
 
           let parentArrayPath = spathArray[spathArray.length-2].split(':');
           parentID = parentArrayPath[0];
-          parentPosition = parentArrayPath[1];
+          parentPosition = parseInt(parentArrayPath[1]);
 
         }
         else{
           parentID = request.payload.selector.id;
         }
-
         let slideArrayPath = spathArray[spathArray.length-1].split(':');
-        slidePosition = slideArrayPath[1]+1;
+        slidePosition = parseInt(slideArrayPath[1])+1;
+        if(request.payload.selector.stype === 'deck'){
+          //selector is deck, we can get the root deck id directly
+          parentID = request.payload.selector.sid;
+          slidePosition = 0;
+        }
+
+
         //NOTE we should call /slide/new
         let slide = {
           'title': 'New slide', //NOTE add title
@@ -247,6 +311,7 @@ let self = module.exports = {
         //NOTE update positions accordingly
         module.exports.newSlide({'payload' : slide}, (createdSlide) => {
           node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
+          deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide');
           //we have to return from the callback, else empty node is returned because it is updated asynchronously
           reply(node);
         });
@@ -256,11 +321,26 @@ let self = module.exports = {
     }else{
       if(request.payload.nodeSpec.id && request.payload.nodeSpec.id !== '0'){
         //it means it is an existing node
-        // node = {title: 'Existing Deck', id: 53, type: 'deck',  children: [
-        //        {title: 'Syntax', id: 685, type: 'slide'},
-        //        {title: 'Slide34', id: 691, type: 'slide'}
-        // ]};
+        let spath = request.payload.selector.spath;
+        let spathArray = spath.split(';');
+        let parentID, parentPosition, deckPosition;
+        if(spathArray.length > 1){
+
+          let parentArrayPath = spathArray[spathArray.length-2].split(':');
+          parentID = parentArrayPath[0];
+          parentPosition = parseInt(parentArrayPath[1]);
+
+        }
+        else{
+          parentID = request.payload.selector.id;
+        }
+
+        let deckArrayPath = spathArray[spathArray.length-1].split(':');
+        deckPosition = parseInt(deckArrayPath[1])+1;
+        let deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
+
         module.exports.getDeck({'params': {'id' : request.payload.nodeSpec.id}}, (deck) => {
+          deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
           //we have to return from the callback, else empty node is returned because it is updated asynchronously
           module.exports.getDeckTree({'params': {'id' : deck.id}}, (deckTree) => {
             reply(deckTree);
@@ -270,10 +350,6 @@ let self = module.exports = {
 
 
       }else{
-        //NOTE create the new deck and populate the node object
-        // node = {title: 'New Deck', id: rnd, type: 'deck',  children: [
-        //        {title: 'New Slide', id: rnd, type: 'slide'}
-        // ]};
 
         //need to make a new deck
         let spath = request.payload.selector.spath;
@@ -283,7 +359,7 @@ let self = module.exports = {
 
           let parentArrayPath = spathArray[spathArray.length-2].split(':');
           parentID = parentArrayPath[0];
-          parentPosition = parentArrayPath[1];
+          parentPosition = parseInt(parentArrayPath[1]);
 
         }
         else{
@@ -291,7 +367,7 @@ let self = module.exports = {
         }
 
         let deckArrayPath = spathArray[spathArray.length-1].split(':');
-        deckPosition = deckArrayPath[1]+1;
+        deckPosition = parseInt(deckArrayPath[1])+1;
         //NOTE we should call /slide/new
         let deck = {
           'description': '',
@@ -307,6 +383,8 @@ let self = module.exports = {
 
         //NOTE update positions accordingly
         module.exports.newDeck({'payload' : deck}, (createdDeck) => {
+          if(typeof parentID !== 'undefined')
+            deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck');
           //we have to return from the callback, else empty node is returned because it is updated asynchronously
           module.exports.getDeckTree({'params': {'id' : createdDeck.id}}, (deckTree) => {
             reply(deckTree);
@@ -348,7 +426,6 @@ let self = module.exports = {
 
   deleteDeckTreeNode: function(request, reply) {
     //NOTE no removal in the DB, just unlink from content items, and update the positions of the other elements
-    console.log(request);
     let spath = request.payload.selector.spath;
     let spathArray = spath.split(';');
     let parentID, parentPosition, itemPosition;

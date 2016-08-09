@@ -95,6 +95,9 @@ const slide = {
   type: 'object',
   properties: {
     user: objectid,
+    kind: {
+      type: 'string'
+    },
     description: {
       type: 'string'
     },

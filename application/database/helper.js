@@ -7,6 +7,11 @@ const Db = require('mongodb').Db,
   co = require('../common');
 
 let dbConnection = undefined;
+let incrementationSettings = {
+  collection: 'counters',
+  field: '_id',
+  step: 1
+};
 
 function testDbName(name) {
   return typeof name !== 'undefined' ? name : config.SLIDEWIKIDATABASE;
@@ -23,6 +28,49 @@ function testConnection(dbname) {
     }
   }
   return false;
+}
+
+//Uses extra collection for autoincrementation
+// Code based on https://github.com/TheRoSS/mongodb-autoincrement
+// requires document in collection "counters" like: { "_id" : "slides", "seq" : 1, "field" : "_id" } <- is created if not already existing
+function getNextId(db, collectionName, fieldName) {
+  const fieldNameCorrected = fieldName || incrementationSettings.field;
+  const step = incrementationSettings.step;
+
+  let myPromise = new Promise(function (resolve, reject) {
+    return db.collection(incrementationSettings.collection).findAndModify({
+      _id: collectionName,
+      field: fieldNameCorrected
+    },
+        null, //no sort
+      {
+        $inc: {
+          seq: step
+        }
+      }, {
+        upsert: true, //if there is a problem with _id insert will fail
+        new: true //insert returns the updated document
+      })
+      .then((result) => {
+        console.log('getNextId: returned result', result);
+        if (result.value && result.value.seq) {
+          resolve(result.value.seq);
+        } else {
+          resolve(result.seq);
+        }
+      })
+      .catch((error) => {
+        console.log('getNextId: ERROR', error);
+        if (error.code === 11000) {
+          //no distinct seq
+          reject(error);
+        } else {
+          reject(error);
+        }
+      });
+  });
+
+  return myPromise;
 }
 
 module.exports = {
@@ -71,5 +119,9 @@ module.exports = {
           dbConnection = db;
           return db;
         });
+  },
+
+  getNextIncrementationValueForCollection: function (dbconn, collectionName, fieldName) {
+    return getNextId(dbconn, collectionName, fieldName);
   }
 };

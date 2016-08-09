@@ -53,7 +53,7 @@ module.exports = function(server) {
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         },
         payload: Joi.object().keys({
           description: Joi.string(),
@@ -63,7 +63,7 @@ module.exports = function(server) {
           title: Joi.string(),
           //content: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
-          root_deck: Joi.string().alphanum().lowercase(),
+          root_deck: Joi.string(),
           parent_deck: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
@@ -84,7 +84,7 @@ module.exports = function(server) {
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         },
         payload: Joi.object().keys({
           revision_id: Joi.string().alphanum().lowercase()
@@ -179,18 +179,19 @@ module.exports = function(server) {
   server.route({
     method: 'PUT',
     path: '/slide/{id}',
-    handler: handlers.updateSlide,
+    //for now, no new revision on replace
+    handler: handlers.updateNoRevisionSlide,
     config: {
       validate: {
         params: {
-          id: Joi.string().alphanum().lowercase()
+          id: Joi.string()
         },
         payload: Joi.object().keys({
           title: Joi.string(),
           content: Joi.string(),
           speakernotes: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
-          root_deck: Joi.string().alphanum().lowercase(),
+          root_deck: Joi.string(),
           parent_deck: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
