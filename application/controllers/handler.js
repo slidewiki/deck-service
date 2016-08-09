@@ -186,10 +186,13 @@ let self = module.exports = {
       else{
         if(request.payload.root_deck){
           deckDB.get(replaced.value._id).then((newDeck) => {
-            deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck');
+            deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck')
+            .then((updated) => {
+              reply(replaced.value);
+            });
           });
         }
-        reply(replaced.value);
+        reply(replaced.value);        
       }
     }).catch((error) => {
       request.log('error', error);
