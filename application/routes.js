@@ -156,11 +156,12 @@ module.exports = function(server) {
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
           }),
-		  //add a field for deck revision?
-		  /* root_deck : Joi.object().keys({
+	//add a field for deck revision?
+	/* root_deck : Joi.object().keys({
             id: Joi.string().alphanum().lowercase(), //id of the root deck
             revision: Joi.string().alphanum().lowercase() //revision number of the root deck revision
-          }), */
+           }),
+        */
           parent_slide: Joi.object().keys({
             id: Joi.string().alphanum().lowercase(),
             revision: Joi.string().alphanum().lowercase()
