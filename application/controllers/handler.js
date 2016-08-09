@@ -130,7 +130,7 @@ let self = module.exports = {
       if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
         throw inserted;
       else{
-        //create a new slide inside the new deck        
+        //create a new slide inside the new deck
 
         let newSlide = {
           'title': 'New slide',

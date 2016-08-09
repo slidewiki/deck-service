@@ -3,6 +3,7 @@
 const Joi = require('joi'),
   handlers = require('./controllers/handler');
 
+
 module.exports = function(server) {
   server.route({
     method: 'GET',
