@@ -5,7 +5,7 @@ const hapi = require('hapi'),
 
 const server = new hapi.Server();
 
-let port = (!co.isEmpty(process.env.APPLICATION_PORT)) ? process.env.APPLICATION_PORT : 4000;
+let port = (!co.isEmpty(process.env.APPLICATION_PORT)) ? process.env.APPLICATION_PORT : 3000;
 server.connection({
   port: port
 });
