@@ -52,7 +52,7 @@ function getNextId(db, collectionName, fieldName) {
         new: true //insert returns the updated document
       })
       .then((result) => {
-        console.log('getNextId: returned result', result);
+        //console.log('getNextId: returned result', result);
         if (result.value && result.value.seq) {
           resolve(result.value.seq);
         } else {
@@ -60,7 +60,7 @@ function getNextId(db, collectionName, fieldName) {
         }
       })
       .catch((error) => {
-        console.log('getNextId: ERROR', error);
+        //console.log('getNextId: ERROR', error);
         if (error.code === 11000) {
           //no distinct seq
           reject(error);
