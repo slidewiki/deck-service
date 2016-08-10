@@ -192,7 +192,7 @@ let self = module.exports = {
             });
           });
         }
-        reply(replaced.value);        
+        reply(replaced.value);
       }
     }).catch((error) => {
       request.log('error', error);
