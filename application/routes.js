@@ -29,7 +29,9 @@ module.exports = function(server) {
         payload: Joi.object().keys({
           description: Joi.string(),
           language: Joi.string(),
-          translation: Joi.string().alphanum().lowercase(),
+          translation: Joi.object().keys({
+            status: Joi.string().valid('original', 'google', 'revised')
+          }),
           tags: Joi.array().items(Joi.string()).default([]),
           title: Joi.string(),
           user: Joi.string().alphanum().lowercase(),
