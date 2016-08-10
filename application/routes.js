@@ -255,7 +255,7 @@ module.exports = function(server) {
         payload: Joi.object().keys({
           selector: Joi.object().keys({
             id: Joi.string(), //id of the root deck
-            spath: Joi.string(),
+            spath: Joi.string().allow(''),
             stype: Joi.string(),
             sid: Joi.string()
           }),
