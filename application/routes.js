@@ -134,7 +134,7 @@ module.exports = function(server) {
     config: {
       validate: {
         params: {
-          id: Joi.string(),
+          id: Joi.string()
         },
         query: {
           limit: Joi.string().optional(),
@@ -142,7 +142,7 @@ module.exports = function(server) {
         }
       },
       tags: ['api'],
-      description: 'Get all slide'
+      description: 'Get flat slide structure'
     }
   });
 
