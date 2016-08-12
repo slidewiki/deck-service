@@ -355,6 +355,7 @@ let self = module.exports = {
       }else{
 
         //need to make a new deck
+
         let spath = request.payload.selector.spath;
         let spathArray = spath.split(';');
         let parentID, parentPosition, deckPosition;
@@ -367,6 +368,9 @@ let self = module.exports = {
         }
         else{
           parentID = request.payload.selector.id;
+        }
+        if(request.payload.selector.stype === 'deck'){
+          parentID = request.payload.selector.sid;
         }
 
         let deckArrayPath = spathArray[spathArray.length-1].split(':');
@@ -455,6 +459,31 @@ let self = module.exports = {
   getFlatSlides: function(request, reply){
     deckDB.getFlatSlidesFromDB(request.params.id)
     .then((deckTree) => {
+      if(typeof request.query.limit !== 'undefined' || typeof request.query.offset !== 'undefined'){
+        let limit = request.query.limit, offset = request.query.offset;
+        if(typeof limit !== 'undefined'){
+          limit = parseInt(limit);
+          if(limit < 0 || limit > deckTree.children.length || isNaN(limit))
+            limit = deckTree.children.length;
+        }
+        else{
+          limit = deckTree.children.length;
+        }
+
+        if(typeof offset !== 'undefined'){
+          offset = parseInt(offset);
+          if(offset < 0 || offset >= deckTree.children.length)
+            offset = 0;
+        }
+        else{
+          offset = 0;
+        }
+
+
+        let ending = parseInt(offset)+parseInt(limit);
+        deckTree.children = deckTree.children.slice(offset, ending);
+      }
+
       reply(deckTree);
     });
   }
