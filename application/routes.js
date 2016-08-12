@@ -135,11 +135,12 @@ module.exports = function(server) {
       validate: {
         params: {
           id: Joi.string()
-        },
-        query: {
-          limit: Joi.string().optional(),
-          offset: Joi.string().optional()
         }
+        // ,
+        // query: {
+        //   limit: Joi.string().optional(),
+        //   offset: Joi.string().optional()
+        // }
       },
       tags: ['api'],
       description: 'Get flat slide structure'
