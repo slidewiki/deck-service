@@ -346,15 +346,12 @@ let self = module.exports = {
                         else{
                             col.findOne({_id: parseInt(citem.ref.id)})
                             .then((innerDeck) => {
-
                                 module.exports.getFlatSlidesFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree)
                                 .then((res) => {
                                     callback();
                                 });
                             });
-
                         }
-
                     },function(err){
                         resolve(deckTree);
                     });
