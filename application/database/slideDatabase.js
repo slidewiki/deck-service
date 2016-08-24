@@ -129,7 +129,7 @@ module.exports = {
             .then((existingSlide) => {
                 const maxRevisionId = existingSlide.revisions.reduce((prev, curr) => {
                     if (curr.id > prev)
-                    return curr.id;
+                        return curr.id;
 
                     return prev;
                 }, 1);
