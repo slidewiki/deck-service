@@ -177,7 +177,7 @@ const deck = {
             }
         },
         active: {
-          type: 'number'
+            type: 'number'
         }
     },
     required: ['timestamp', 'user']
