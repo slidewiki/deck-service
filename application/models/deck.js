@@ -176,7 +176,9 @@ const deck = {
                 type: 'string'
             }
         },
-        active: objectid
+        active: {
+          type: 'number'
+        }
     },
     required: ['timestamp', 'user']
 };
