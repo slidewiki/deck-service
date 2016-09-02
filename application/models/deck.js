@@ -97,7 +97,7 @@ const deckRevision = {
         abstract: {
             type: 'string'
         },
-        footer: { //why object?
+        footer: {
             type: 'string'
         },
         isFeatured: {
@@ -176,9 +176,9 @@ const deck = {
             format: 'datetime'
         },
         user: objectid,
-        kind: { // do not need it anymore
-            type: 'string'
-        },
+
+
+
         description: {
             type: 'string'
         },
@@ -196,6 +196,7 @@ const deck = {
                 type: 'string'
             }
         },
+
         active: objectid,
         datasource: {
             type: 'string'
