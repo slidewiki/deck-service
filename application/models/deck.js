@@ -10,7 +10,7 @@ let ajv = Ajv({
 
 //build schema
 const objectid = {
-    type: 'string',
+    type: 'integer',
     maxLength: 24,
     minLength: 1
 };
@@ -53,11 +53,27 @@ const deckRevision = {
             type: 'string'
         },
         timestamp: {
-            type: 'string'
+            type: 'string',
+            format: 'datetime'
         },
         user: objectid,
         parent: {
-            type: 'object'
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'integer'
+                },
+                revision: {
+                    type: 'integer'
+                }
+            }
+        },
+        language: {
+            type: 'string'
+        },
+        license: {
+            type: 'string',
+            enum: ['CC0', 'CC BY', 'CC BY-SA']
         },
         popularity: {
             type: 'number',
@@ -77,21 +93,12 @@ const deckRevision = {
         },
         comment: {
             type: 'string'
-        },
+        }, //revision comment
         abstract: {
             type: 'string'
         },
-        footer: {
-            type: 'object',
-            properties: {
-                text: {
-                    type: 'string'
-                }
-            }
-        },
-        license: {
-            type: 'string',
-            enum: ['CC0', 'CC BY', 'CC BY-SA']
+        footer: { //why object?
+            type: 'string'
         },
         isFeatured: {
             type: 'number'
@@ -102,9 +109,7 @@ const deckRevision = {
         visibility: {
             type: 'boolean'
         },
-        language: {
-            type: 'string'
-        },
+
         translation: {
             type: 'object',
             properties: {
@@ -113,7 +118,15 @@ const deckRevision = {
                     enum: ['original', 'google', 'revised']
                 },
                 source: {
-                    type: 'object'
+                    type: 'object',
+                    properties: {
+                        id: {
+                            type: objectid
+                        }
+                        revision: {
+                            type: 'number'
+                        }
+                    }
                 }
             }
         },
@@ -133,50 +146,73 @@ const deckRevision = {
             type: 'array',
             items: contentItem
         },
-        dataSources: {
-            type: 'array',
-            items: objectid
-        },
-        usage: {
-            type: 'array',
-            items: objectid
-        }
-    },
-    required: ['id', 'timestamp', 'user', 'license']
-};
-const deck = {
-    type: 'object',
-    properties: {
-        timestamp: {
-            type: 'string'
-        },
-        user: objectid,
-        kind: {
-            type: 'string'
-        },
-        description: {
-            type: 'string'
-        },
-        language: {
-            type: 'string'
-        },
-        translation: {
-            type: 'object'
-        },
-        lastUpdate: {
-            type: 'string'
-        },
-        revisions: {
-            type: 'array',
-            items: deckRevision
-        },
-        tags: {
+        dataSources: { //is filled out automatically from the slides
             type: 'array',
             items: {
                 type: 'string'
             }
         },
-        active: objectid
+        usage: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: objectid,
+                    revision: {
+                        type: 'number'
+                    }
+                }
+            }
+        }
+    },
+    required: ['id', 'timestamp', 'user', 'license']
+};
+
+const deck = {
+    type: 'object',
+    properties: {
+        timestamp: {
+            type: 'string',
+            format: 'datetime'
+        },
+        user: objectid,
+        kind: { // do not need it anymore
+            type: 'string'
+        },
+        description: {
+            type: 'string'
+        },
+        lastUpdate: { //timestamp of last slide revision
+            type: 'string',
+            format: 'datetime'
+        },
+        revisions: {
+            type: 'array',
+            items: deckRevision
+        },
+        tags: { //here or in revisions?
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        active: objectid,
+        datasource: {
+            type: 'string'
+        },
+        translation: {
+            type: 'object',
+            properties: {
+                status: {
+                    type: 'string',
+                    enum: ['original', 'google', 'revised']
+                },
+                translator: objectid,
+                source: {
+                    type: 'object'
+                }
+            }
+        },
     },
     required: ['timestamp', 'user']
 };
