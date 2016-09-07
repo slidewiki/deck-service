@@ -60,14 +60,21 @@ let self = module.exports = {
     updateSlide: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         let slideId = request.params.id;
-
-        slideDB.replace(encodeURIComponent(slideId.split('-')[0]), request.payload).then((replaced) => {
+        slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
             //console.log('updated: ', replaced);
             if (co.isEmpty(replaced.value))
                 throw replaced;
             else{
+                //let revisionUpdatedId = slideId.split('-')[1];
+                //we must update all decks in the 'usage' attribute
                 slideDB.get(replaced.value._id).then((newSlide) => {
-                    deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
+                    //console.log('usage', newSlide.revisions[newSlide.revisions.length-1].usage);
+                    let usageArray = newSlide.revisions[newSlide.revisions.length-1].usage;
+                    for(let i = 0; i < usageArray.length; i++){
+                        //console.log('usage deck: ', usageArray[i]);
+                        deckDB.updateContentItem(newSlide, '', usageArray[i], 'slide');
+                    }
+
                 });
 
                 reply(replaced.value);
@@ -486,5 +493,12 @@ let self = module.exports = {
 
             reply(deckTree);
         });
-    }
+    },
+
+    // getEditors: function(request, reply){
+    //     deckDB.getDeckEditors(request.params.id)
+    //     .then((editorsList) => {
+    //         reply(editorsList);
+    //     });
+    // }
 };
