@@ -146,7 +146,7 @@ let self = module.exports = {
                     'license': 'CC0',
                     //NOTE user_id should be retrieved from the frontend
                     'user': inserted.ops[0].user,
-                    'root_deck': String(inserted.ops[0]._id),
+                    'root_deck': String(inserted.ops[0]._id)+'-1',
                     'position' : 1
                 };
                 slideDB.insert(newSlide)
