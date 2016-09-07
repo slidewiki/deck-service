@@ -122,7 +122,7 @@ module.exports = {
     },
 
     replace: function(id, slide) {
-        let idArray = id.split('-');
+        let idArray = String(id).split('-');
         if(idArray.length > 1){
             id = idArray[0];
         }
