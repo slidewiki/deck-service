@@ -495,10 +495,10 @@ let self = module.exports = {
         });
     },
 
-    // getEditors: function(request, reply){
-    //     deckDB.getDeckEditors(request.params.id)
-    //     .then((editorsList) => {
-    //         reply(editorsList);
-    //     });
-    // }
+    getEditors: function(request, reply){
+        deckDB.getDeckEditors(request.params.id)
+        .then((editorsList) => {
+            reply(editorsList);
+        });
+    }
 };

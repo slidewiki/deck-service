@@ -215,9 +215,6 @@ let self = module.exports = {
 
 
     updateContentItem: function(citem, revertedRevId, root_deck, ckind){ //can be used for reverting or updating
-      console.log('citem', citem);
-      console.log('revertedRevId', revertedRevId);
-      console.log('root_deck', root_deck);
         let rootArray = root_deck.split('-');
         //console.log('root_deck', root_deck);
         helper.connectToDatabase()
@@ -370,64 +367,63 @@ let self = module.exports = {
 
             });
         });
+    },
+
+    getDeckEditors(deck_id, editorsList){
+        let revision_id = -1;
+        let decktreesplit = deck_id.split('-');
+        if(decktreesplit.length > 1){
+            deck_id = decktreesplit[0];
+            revision_id = decktreesplit[1]-1;
+        }
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deck_id)})
+            .then((deck) => {
+                if(revision_id === -1){
+                    revision_id = deck.active-1;
+                }
+                if(!editorsList){
+                    editorsList = [deck.user];
+                    pushIfNotExist(editorsList, deck.revisions[revision_id].user);
+                }
+
+                return new Promise(function(resolve, reject) {
+                    async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
+
+                        if(citem.kind === 'slide'){
+                            helper.connectToDatabase()
+                            .then((db) => db.collection('slides'))
+                            .then((col) => {
+                                col.findOne({_id: parseInt(citem.ref.id)})
+                                .then((slide) => {
+                                    let slide_revision = citem.ref.revision-1;
+                                    pushIfNotExist(editorsList, slide.user);
+                                    pushIfNotExist(editorsList, slide.revisions[slide_revision].user);
+                                    callback();
+                                });
+                            });
+                        }
+                        else{
+                            col.findOne({_id: parseInt(citem.ref.id)})
+                            .then((innerDeck) => {
+                                module.exports.getDeckEditors(innerDeck._id+'-'+citem.ref.revision, editorsList)
+                                .then((res) => {
+                                    callback();
+                                });
+                            });
+                        }
+                    },function(err){
+                        resolve(editorsList);
+                    });
+
+                });
+
+
+            });
+        });
     }
-    // ,
-    //
-    // getDeckEditors(deck_id, editorsList){
-    //     let revision_id = -1;
-    //     let decktreesplit = deck_id.split('-');
-    //     if(decktreesplit.length > 1){
-    //         deck_id = decktreesplit[0];
-    //         revision_id = decktreesplit[1]-1;
-    //     }
-    //     return helper.connectToDatabase()
-    //     .then((db) => db.collection('decks'))
-    //     .then((col) => {
-    //         return col.findOne({_id: parseInt(deck_id)})
-    //         .then((deck) => {
-    //             if(revision_id === -1){
-    //                 revision_id = deck.active-1;
-    //             }
-    //             if(!editorsList){
-    //                 editorsList = [deck.user];
-    //                 pushIfNotExist(editorsList, deck.revisions[revision_id].user);
-    //             }
-    //
-    //             return new Promise(function(resolve, reject) {
-    //                 async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
-    //
-    //                     if(citem.kind === 'slide'){
-    //                         helper.connectToDatabase()
-    //                         .then((db) => db.collection('slides'))
-    //                         .then((col) => {
-    //                             col.findOne({_id: parseInt(citem.ref.id)})
-    //                             .then((slide) => {
-    //                                 let slide_revision = citem.ref.revision-1;
-    //                                 pushIfNotExist(editorsList, slide.user);
-    //                                 pushIfNotExist(editorsList, slide.revisions[slide_revision].user);
-    //                                 callback();
-    //                             });
-    //                         });
-    //                     }
-    //                     else{
-    //                         col.findOne({_id: parseInt(citem.ref.id)})
-    //                         .then((innerDeck) => {
-    //                             module.exports.getDeckEditors(innerDeck._id+'-'+citem.ref.revision, editorsList)
-    //                             .then((res) => {
-    //                                 callback();
-    //                             });
-    //                         });
-    //                     }
-    //                 },function(err){
-    //                     resolve(editorsList);
-    //                 });
-    //
-    //             });
-    //
-    //
-    //         });
-    //     });
-    // }
 };
 
 function getActiveRevision(deck){
