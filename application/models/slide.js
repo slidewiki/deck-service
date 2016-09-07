@@ -138,7 +138,7 @@ const slide = {
         },
         active: objectid
     },
-    required: ['user', 'deck', 'timestamp']
+    required: ['user', 'timestamp']
 };
 
 //export

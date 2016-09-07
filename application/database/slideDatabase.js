@@ -122,6 +122,10 @@ module.exports = {
     },
 
     replace: function(id, slide) {
+        let idArray = String(id).split('-');
+        if(idArray.length > 1){
+            id = idArray[0];
+        }
         return helper.connectToDatabase()
         .then((db) => db.collection('slides'))
         .then((col) => {
@@ -133,9 +137,11 @@ module.exports = {
 
                     return prev;
                 }, 1);
+                let usageArray = existingSlide.revisions[idArray[1]-1].usage;
+                //we should remove the usage of the previous revision in the root deck
 
                 let valid = false;
-                const slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(maxRevisionId)+1 );
+                const slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(maxRevisionId)+1, usageArray);
                 try {
                     valid = slideModel(slideWithNewRevision);
 
@@ -155,14 +161,16 @@ module.exports = {
     },
 
     replaceNoRevision: function(id, slide) {
+        let idArray = id.split('-');
+
         return helper.connectToDatabase()
         .then((db) => db.collection('slides'))
         .then((col) => {
-            return col.findOne({_id: parseInt(id.split('-')[0])})
+            return col.findOne({_id: parseInt(idArray[0])})
             .then((existingSlide) => {
 
                 let valid = false;
-                const slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(id.split('-')[1]));
+                const slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(idArray[1]));
 
                 try {
                     valid = slideModel(slideWithNewRevision);
@@ -170,8 +178,8 @@ module.exports = {
                     if (!valid) {
                         return slideModel.errors;
                     }
-
-                    existingSlide.revisions[parseInt(id.split('-')[1])-1] = slideWithNewRevision.revisions[0];
+                    slideWithNewRevision.revisions[0].usage = existingSlide.revisions[idArray[1]-1].usage;
+                    existingSlide.revisions[parseInt(idArray[1])-1] = slideWithNewRevision.revisions[0];
                     col.save(existingSlide);
                     return slideWithNewRevision;
                 } catch (e) {
@@ -228,15 +236,18 @@ module.exports = {
 
 function convertToNewSlide(slide) {
     let now = new Date();
+    //let root_deck = String(slide.root_deck.split('-')[0]); //we should put the deck revision in the usage as well...
+    let usageArray = [slide.root_deck];
     const result = {
         _id: slide._id,
-        user: slide.user,
+        user: slide.user, //is this redundant?
         kind: 'slide',
-        deck: String(slide.root_deck.split('-')[0]),
+        //deck: String(slide.root_deck.split('-')[0]),
         timestamp: now.toISOString(),
         language: slide.language,
         revisions: [{
             id: 1,
+            usage: usageArray,
             timestamp: now.toISOString(),
             user: slide.user,
             license: slide.license,
@@ -250,7 +261,7 @@ function convertToNewSlide(slide) {
     return result;
 }
 
-function convertSlideWithNewRevision(slide, newRevisionId) {
+function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
     let now = new Date();
     const result = {
         user: slide.user,
@@ -259,6 +270,7 @@ function convertSlideWithNewRevision(slide, newRevisionId) {
         language: slide.language,
         revisions: [{
             id: newRevisionId,
+            usage: usageArray,
             timestamp: now.toISOString(),
             user: slide.user,
             license: slide.license,

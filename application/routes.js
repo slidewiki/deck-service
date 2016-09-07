@@ -20,6 +20,21 @@ module.exports = function(server) {
         }
     });
 
+    // server.route({
+    //     method: 'GET',
+    //     path: '/deck/{id}/editors',
+    //     handler: handlers.getEditors,
+    //     config: {
+    //         validate: {
+    //             params: {
+    //                 id: Joi.string()
+    //             },
+    //         },
+    //         tags: ['api'],
+    //         description: 'Get editors (owners and contributors) of a deck and its sub-components'
+    //     }
+    // });
+
     server.route({
         method: 'POST',
         path: '/deck/new',
@@ -187,7 +202,7 @@ module.exports = function(server) {
         method: 'PUT',
         path: '/slide/{id}',
         //for now, no new revision on replace
-        handler: handlers.updateNoRevisionSlide,
+        handler: handlers.updateSlide,
         config: {
             validate: {
                 params: {

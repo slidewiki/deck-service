@@ -42,10 +42,13 @@ let self = module.exports = {
             .then((col) => {
                 let valid = false;
                 deck._id = newId;
-                if(typeof deck.root_deck !== 'undefined'){
-                    deck.root_deck = deck.root_deck.split('-')[0];
-                }
-                else {
+                // if(typeof deck.root_deck !== 'undefined'){
+                //     deck.root_deck = deck.root_deck.split('-')[0];
+                // }
+                // else {
+                //     deck.root_deck = null;
+                // }
+                if(typeof deck.root_deck === 'undefined'){
                     deck.root_deck = null;
                 }
 
@@ -101,9 +104,11 @@ let self = module.exports = {
                 let valid = false;
                 const newRevisionId = parseInt(maxRevisionId)+1;
                 //must get previously active revision and copy content items to new revision
+                //NOTE or should we get the id from the request, it contains the revision that is replaced...
                 let activeRevisionIndex = getActiveRevision(existingDeck);
                 let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
-                const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items);
+                let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
+                const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
                 try {
                     valid = deckModel(deckWithNewRevision);
 
@@ -211,12 +216,13 @@ let self = module.exports = {
 
     updateContentItem: function(citem, revertedRevId, root_deck, ckind){ //can be used for reverting or updating
         let rootArray = root_deck.split('-');
-
+        //console.log('root_deck', root_deck);
         helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
             col.findOne({_id: parseInt(rootArray[0])})
             .then((existingDeck) => {
+                //console.log('existingDeck', existingDeck);
                 let newRevId = getNewRevisionID(citem);
                 if(revertedRevId !== ''){
                     newRevId = revertedRevId;
@@ -362,6 +368,63 @@ let self = module.exports = {
             });
         });
     }
+    // ,
+    //
+    // getDeckEditors(deck_id, editorsList){
+    //     let revision_id = -1;
+    //     let decktreesplit = deck_id.split('-');
+    //     if(decktreesplit.length > 1){
+    //         deck_id = decktreesplit[0];
+    //         revision_id = decktreesplit[1]-1;
+    //     }
+    //     return helper.connectToDatabase()
+    //     .then((db) => db.collection('decks'))
+    //     .then((col) => {
+    //         return col.findOne({_id: parseInt(deck_id)})
+    //         .then((deck) => {
+    //             if(revision_id === -1){
+    //                 revision_id = deck.active-1;
+    //             }
+    //             if(!editorsList){
+    //                 editorsList = [deck.user];
+    //                 pushIfNotExist(editorsList, deck.revisions[revision_id].user);
+    //             }
+    //
+    //             return new Promise(function(resolve, reject) {
+    //                 async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
+    //
+    //                     if(citem.kind === 'slide'){
+    //                         helper.connectToDatabase()
+    //                         .then((db) => db.collection('slides'))
+    //                         .then((col) => {
+    //                             col.findOne({_id: parseInt(citem.ref.id)})
+    //                             .then((slide) => {
+    //                                 let slide_revision = citem.ref.revision-1;
+    //                                 pushIfNotExist(editorsList, slide.user);
+    //                                 pushIfNotExist(editorsList, slide.revisions[slide_revision].user);
+    //                                 callback();
+    //                             });
+    //                         });
+    //                     }
+    //                     else{
+    //                         col.findOne({_id: parseInt(citem.ref.id)})
+    //                         .then((innerDeck) => {
+    //                             module.exports.getDeckEditors(innerDeck._id+'-'+citem.ref.revision, editorsList)
+    //                             .then((res) => {
+    //                                 callback();
+    //                             });
+    //                         });
+    //                     }
+    //                 },function(err){
+    //                     resolve(editorsList);
+    //                 });
+    //
+    //             });
+    //
+    //
+    //         });
+    //     });
+    // }
 };
 
 function getActiveRevision(deck){
@@ -434,10 +497,15 @@ function convertDeck(deck) {
 
 function convertToNewDeck(deck){
     let now = new Date();
+    let root_deck = deck.root_deck;
+    let usageArray = [];
+    if(root_deck !== null){
+        usageArray.push(root_deck);
+    }
     const result = {
         _id: deck._id,
         user: deck.user,
-        deck: deck.root_deck,
+        //deck: deck.root_deck,
         kind: 'deck',
         timestamp: now.toISOString(),
         language: deck.language,
@@ -448,6 +516,7 @@ function convertToNewDeck(deck){
         active: 1,
         revisions: [{
             id: 1,
+            usage: usageArray, //create new array and insert root deck
             title: deck.title,
             timestamp: now.toISOString(),
             user: deck.user,
@@ -460,7 +529,7 @@ function convertToNewDeck(deck){
     return result;
 }
 
-function convertDeckWithNewRevision(deck, newRevisionId, content_items) {
+function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray) {
     let now = new Date();
     const result = {
         user: deck.user,
@@ -469,6 +538,7 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items) {
         language: deck.language,
         revisions: [{
             id: newRevisionId,
+            usage: usageArray,
             timestamp: now.toISOString(),
             user: deck.user,
             license: deck.license,
@@ -480,3 +550,9 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items) {
     //console.log('from', slide, 'to', result);
     return result;
 }
+
+// function pushIfNotExist(editorsList, toBeInserted){
+//     if(!editorsList.includes(toBeInserted)){
+//         editorsList.push(toBeInserted);
+//     }
+// }
