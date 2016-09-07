@@ -344,7 +344,7 @@ let self = module.exports = {
                                 col.findOne({_id: parseInt(citem.ref.id)})
                                 .then((slide) => {
                                     let slide_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                                    deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
                                     callback();
                                 });
                             });
