@@ -111,7 +111,7 @@ let self = module.exports = {
             if (co.isEmpty(slide))
                 throw slide;
             else{
-                deckDB.updateContentItem(slide, parseInt(request.payload.revision_id), slide.deck, 'slide');
+                deckDB.updateContentItem(slide, parseInt(request.payload.revision_id), request.payload.root_deck, 'slide');
                 reply(slide);
             }
         }).catch((error) => {

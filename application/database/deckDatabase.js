@@ -215,6 +215,9 @@ let self = module.exports = {
 
 
     updateContentItem: function(citem, revertedRevId, root_deck, ckind){ //can be used for reverting or updating
+      console.log('citem', citem);
+      console.log('revertedRevId', revertedRevId);
+      console.log('root_deck', root_deck);
         let rootArray = root_deck.split('-');
         //console.log('root_deck', root_deck);
         helper.connectToDatabase()

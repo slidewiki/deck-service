@@ -239,11 +239,12 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().alphanum().lowercase()
+                    id: Joi.string()
                 },
                 payload: Joi.object().keys({
-                    revision_id: Joi.string().alphanum().lowercase()
-                }).requiredKeys('revision_id'),
+                    revision_id: Joi.string().alphanum().lowercase(),
+                    root_deck: Joi.string()
+                }).requiredKeys('revision_id', 'root_deck'),
             },
             tags: ['api'],
             description: 'Revert a slide to an old revision'
