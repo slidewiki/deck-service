@@ -9,11 +9,13 @@ let async = require('async');
 
 let self = module.exports = {
     get: function(identifier) {
-        identifier = String(identifier).split('-')[0];
+        //identifier = String(identifier).split('-')[0];
+        identifier = String(identifier);
+        let idArray = identifier.split('-');
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => col.findOne({
-            _id: parseInt(identifier.split('-')[0])
+            _id: parseInt(idArray[0])
         })
         .then((found) => {
             let parsed = identifier.split('-');
@@ -25,7 +27,7 @@ let self = module.exports = {
                 // revision.id = identifier;
                 // revision.kind = 'deck';
                 // return revision;
-                let revision = found.revisions[parseInt(parsed[1])-1];
+                let revision = found.revisions[parseInt(idArray[1])-1];
                 found.revisions = [revision];
                 return found;
             }
@@ -370,6 +372,7 @@ let self = module.exports = {
     },
 
     getDeckEditors(deck_id, editorsList){
+
         let revision_id = -1;
         let decktreesplit = deck_id.split('-');
         if(decktreesplit.length > 1){
@@ -550,8 +553,8 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
     return result;
 }
 
-// function pushIfNotExist(editorsList, toBeInserted){
-//     if(!editorsList.includes(toBeInserted)){
-//         editorsList.push(toBeInserted);
-//     }
-// }
+function pushIfNotExist(editorsList, toBeInserted){
+    if(!editorsList.includes(toBeInserted)){
+        editorsList.push(toBeInserted);
+    }
+}
