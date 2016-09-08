@@ -20,20 +20,20 @@ module.exports = function(server) {
         }
     });
 
-    // server.route({
-    //     method: 'GET',
-    //     path: '/deck/{id}/editors',
-    //     handler: handlers.getEditors,
-    //     config: {
-    //         validate: {
-    //             params: {
-    //                 id: Joi.string()
-    //             },
-    //         },
-    //         tags: ['api'],
-    //         description: 'Get editors (owners and contributors) of a deck and its sub-components'
-    //     }
-    // });
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/editors',
+        handler: handlers.getEditors,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Get editors (owners and contributors) of a deck and its sub-components'
+        }
+    });
 
     server.route({
         method: 'POST',
@@ -239,11 +239,12 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().alphanum().lowercase()
+                    id: Joi.string()
                 },
                 payload: Joi.object().keys({
-                    revision_id: Joi.string().alphanum().lowercase()
-                }).requiredKeys('revision_id'),
+                    revision_id: Joi.string().alphanum().lowercase(),
+                    root_deck: Joi.string()
+                }).requiredKeys('revision_id', 'root_deck'),
             },
             tags: ['api'],
             description: 'Revert a slide to an old revision'

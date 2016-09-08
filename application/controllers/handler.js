@@ -111,7 +111,7 @@ let self = module.exports = {
             if (co.isEmpty(slide))
                 throw slide;
             else{
-                deckDB.updateContentItem(slide, parseInt(request.payload.revision_id), slide.deck, 'slide');
+                deckDB.updateContentItem(slide, parseInt(request.payload.revision_id), request.payload.root_deck, 'slide');
                 reply(slide);
             }
         }).catch((error) => {
@@ -495,10 +495,10 @@ let self = module.exports = {
         });
     },
 
-    // getEditors: function(request, reply){
-    //     deckDB.getDeckEditors(request.params.id)
-    //     .then((editorsList) => {
-    //         reply(editorsList);
-    //     });
-    // }
+    getEditors: function(request, reply){
+        deckDB.getDeckEditors(request.params.id)
+        .then((editorsList) => {
+            reply(editorsList);
+        });
+    }
 };
