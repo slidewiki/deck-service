@@ -216,7 +216,7 @@ const deck = {
                     language: {
                         type: 'string'
                     },
-                    deck_id: object_id
+                    deck_id: objectid
                 }
             }
         },
