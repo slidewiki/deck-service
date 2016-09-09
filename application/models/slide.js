@@ -148,7 +148,7 @@ const slide = {
             format: 'datetime'
         }
     },
-    required: ['user', 'deck', 'timestamp']
+    required: ['user', 'timestamp']
 };
 
 //export
