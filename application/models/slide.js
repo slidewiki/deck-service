@@ -109,7 +109,7 @@ const slide = {
             properties: {
                 status: {
                     type: 'string',
-                    enum: ['original', 'google', 'revised']
+                    enum: ['original', 'google', 'revised', null]
                 },
                 translator: objectid,
                 source: {

@@ -109,27 +109,6 @@ const deckRevision = {
         visibility: {
             type: 'boolean'
         },
-
-        translation: {
-            type: 'object',
-            properties: {
-                status: {
-                    type: 'string',
-                    enum: ['original', 'google', 'revised']
-                },
-                source: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: objectid
-                        }
-                        revision: {
-                            type: 'number'
-                        }
-                    }
-                }
-            }
-        },
         tags: {
             type: 'array',
             items: {
@@ -163,7 +142,39 @@ const deckRevision = {
                     }
                 }
             }
-        }
+        },
+        translated_from: { //if this deck_revision is a result of translation
+            type: 'object',
+            properties: {
+                status: {
+                    type: 'string',
+                    enum: ['original', 'google', 'revised', null]
+                },
+                source: {
+                    type: 'object',
+                    properties: {
+                        id: {
+                            type: 'number'
+                        },
+                        revision: {
+                            type: 'number'
+                        }
+                    }
+                },
+                translator: {
+                    type: 'object',
+                    properties: {
+                        id: {
+                            type: 'number',
+                        },
+                        username:{
+                            type: 'string'
+                        }
+                    }
+
+                }
+            }
+        },
     },
     required: ['id', 'timestamp', 'user', 'license']
 };
@@ -176,9 +187,6 @@ const deck = {
             format: 'datetime'
         },
         user: objectid,
-
-
-
         description: {
             type: 'string'
         },
@@ -196,21 +204,50 @@ const deck = {
                 type: 'string'
             }
         },
-
         active: objectid,
         datasource: {
             type: 'string'
         },
-        translation: {
+        translations: { //put here all translations explicitly - deck ids
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    language: {
+                        type: 'string'
+                    },
+                    deck_id: object_id
+                }
+            }
+        },
+        translated_from: { //if this deck is a result of translation
             type: 'object',
             properties: {
                 status: {
                     type: 'string',
-                    enum: ['original', 'google', 'revised']
+                    enum: ['original', 'google', 'revised', null]
                 },
-                translator: objectid,
                 source: {
-                    type: 'object'
+                    type: 'object',
+                    properties: {
+                        id: {
+                            type: 'number'
+                        },
+                        revision: {
+                            type: 'number'
+                        }
+                    }
+                },
+                translator: {
+                    type: 'object',
+                    properties: {
+                        id: {
+                            type: 'number',
+                        },
+                        username:{
+                            type: 'string'
+                        }
+                    }
                 }
             }
         },
