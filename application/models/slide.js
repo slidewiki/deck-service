@@ -10,11 +10,11 @@ let ajv = Ajv({
 
 //build schema
 const objectid = {
-    type: 'number',
+    type: 'string',
     maxLength: 24,
     minLength: 1
 };
-const contributor = {
+const contributer = {
     type: 'object',
     properties: {
         id: objectid,
@@ -35,8 +35,7 @@ const slideRevision = {
             type: 'string'
         },
         timestamp: {
-            type: 'string',
-            format: 'datetime'
+            type: 'string'
         },
         content: {
             type: 'string'
@@ -46,24 +45,34 @@ const slideRevision = {
         },
         user: objectid,
         parent: {
-            type: 'object',
-            properties: {
-                id: objectid,
-                revision: {
-                    type: 'number'
-                }
-            }
+            type: 'object'
         }, //ObjectId or Number or both
         popularity: {
             type: 'number',
             minimum: 0
         },
-        comment: { //revision comment
+        comment: {
+            type: 'string'
+        },
+        note: {
             type: 'string'
         },
         license: {
             type: 'string',
             enum: ['CC0', 'CC BY', 'CC BY-SA']
+        },
+        translation: {
+            type: 'object',
+            properties: {
+                status: {
+                    type: 'string',
+                    enum: ['original', 'google', 'revised']
+                },
+                translator: objectid,
+                source: {
+                    type: 'object'
+                }
+            }
         },
         tags: {
             type: 'array',
@@ -81,15 +90,7 @@ const slideRevision = {
         },
         usage: {
             type: 'array',
-            items: {
-                type: 'object',
-                properties: {
-                    id: objectid,
-                    revision: {
-                        type: 'number'
-                    }
-                }
-            }
+            items: objectid
         }
     },
     required: ['id', 'timestamp', 'user', 'license']
@@ -98,6 +99,9 @@ const slide = {
     type: 'object',
     properties: {
         user: objectid,
+        kind: {
+            type: 'string'
+        },
         description: {
             type: 'string'
         },
@@ -105,31 +109,24 @@ const slide = {
             type: 'string'
         },
         translation: {
-            type: 'object',
-            properties: {
-                status: {
-                    type: 'string',
-                    enum: ['original', 'google', 'revised', null]
-                },
-                translator: objectid,
-                source: {
-                    type: 'object'
-                }
-            }
+            source: 'object'
+        },
+        position: {
+            type: 'number',
+            minimum: 1
         },
         timestamp: {
-            type: 'string',
-            format: 'datetime'
+            type: 'string'
         },
         revisions: {
             type: 'array',
             items: slideRevision
         },
-        contributors: {
+        contributers: {
             type: 'array',
             items: {
                 oneOf: [
-                    contributor
+                    contributer
                 ]
             }
         },
@@ -139,14 +136,7 @@ const slide = {
                 type: 'string'
             }
         },
-        active: objectid,
-        datasource: {
-            type: 'string'
-        },
-        lastUpdate: {
-            type: 'string',
-            format: 'datetime'
-        }
+        active: objectid
     },
     required: ['user', 'timestamp']
 };

@@ -10,7 +10,7 @@ let ajv = Ajv({
 
 //build schema
 const objectid = {
-    type: 'integer',
+    type: 'string',
     maxLength: 24,
     minLength: 1
 };
@@ -53,27 +53,11 @@ const deckRevision = {
             type: 'string'
         },
         timestamp: {
-            type: 'string',
-            format: 'datetime'
+            type: 'string'
         },
         user: objectid,
         parent: {
-            type: 'object',
-            properties: {
-                id: {
-                    type: 'integer'
-                },
-                revision: {
-                    type: 'integer'
-                }
-            }
-        },
-        language: {
-            type: 'string'
-        },
-        license: {
-            type: 'string',
-            enum: ['CC0', 'CC BY', 'CC BY-SA']
+            type: 'object'
         },
         popularity: {
             type: 'number',
@@ -93,12 +77,21 @@ const deckRevision = {
         },
         comment: {
             type: 'string'
-        }, //revision comment
+        },
         abstract: {
             type: 'string'
         },
         footer: {
-            type: 'string'
+            type: 'object',
+            properties: {
+                text: {
+                    type: 'string'
+                }
+            }
+        },
+        license: {
+            type: 'string',
+            enum: ['CC0', 'CC BY', 'CC BY-SA']
         },
         isFeatured: {
             type: 'number'
@@ -108,6 +101,21 @@ const deckRevision = {
         },
         visibility: {
             type: 'boolean'
+        },
+        language: {
+            type: 'string'
+        },
+        translation: {
+            type: 'object',
+            properties: {
+                status: {
+                    type: 'string',
+                    enum: ['original', 'google', 'revised']
+                },
+                source: {
+                    type: 'object'
+                }
+            }
         },
         tags: {
             type: 'array',
@@ -125,132 +133,52 @@ const deckRevision = {
             type: 'array',
             items: contentItem
         },
-        dataSources: { //is filled out automatically from the slides
+        dataSources: {
             type: 'array',
-            items: {
-                type: 'string'
-            }
+            items: objectid
         },
         usage: {
             type: 'array',
-            items: {
-                type: 'object',
-                properties: {
-                    id: objectid,
-                    revision: {
-                        type: 'number'
-                    }
-                }
-            }
-        },
-        translated_from: { //if this deck_revision is a result of translation
-            type: 'object',
-            properties: {
-                status: {
-                    type: 'string',
-                    enum: ['original', 'google', 'revised', null]
-                },
-                source: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number'
-                        },
-                        revision: {
-                            type: 'number'
-                        }
-                    }
-                },
-                translator: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number',
-                        },
-                        username:{
-                            type: 'string'
-                        }
-                    }
-
-                }
-            }
-        },
+            items: objectid
+        }
     },
     required: ['id', 'timestamp', 'user', 'license']
 };
-
 const deck = {
     type: 'object',
     properties: {
         timestamp: {
-            type: 'string',
-            format: 'datetime'
+            type: 'string'
         },
         user: objectid,
+        kind: {
+            type: 'string'
+        },
         description: {
             type: 'string'
         },
-        lastUpdate: { //timestamp of last slide revision
-            type: 'string',
-            format: 'datetime'
+        language: {
+            type: 'string'
+        },
+        translation: {
+            type: 'object'
+        },
+        lastUpdate: {
+            type: 'string'
         },
         revisions: {
             type: 'array',
             items: deckRevision
         },
-        tags: { //here or in revisions?
+        tags: {
             type: 'array',
             items: {
                 type: 'string'
             }
         },
-        active: objectid,
-        datasource: {
-            type: 'string'
-        },
-        translations: { //put here all translations explicitly - deck ids
-            type: 'array',
-            items: {
-                type: 'object',
-                properties: {
-                    language: {
-                        type: 'string'
-                    },
-                    deck_id: objectid
-                }
-            }
-        },
-        translated_from: { //if this deck is a result of translation
-            type: 'object',
-            properties: {
-                status: {
-                    type: 'string',
-                    enum: ['original', 'google', 'revised', null]
-                },
-                source: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number'
-                        },
-                        revision: {
-                            type: 'number'
-                        }
-                    }
-                },
-                translator: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number',
-                        },
-                        username:{
-                            type: 'string'
-                        }
-                    }
-                }
-            }
-        },
+        active: {
+            type: 'number'
+        }
     },
     required: ['timestamp', 'user']
 };
