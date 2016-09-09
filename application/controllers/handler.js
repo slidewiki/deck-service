@@ -61,7 +61,7 @@ let self = module.exports = {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         let slideId = request.params.id;
         slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
-            //console.log('updated: ', replaced);
+            //console.log('updated: ', replaced.value.revisions);
             if (co.isEmpty(replaced.value))
                 throw replaced;
             else{
@@ -74,10 +74,12 @@ let self = module.exports = {
                         //console.log('usage deck: ', usageArray[i]);
                         deckDB.updateContentItem(newSlide, '', usageArray[i], 'slide');
                     }
+                    newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
+                    reply(newSlide);
 
                 });
 
-                reply(replaced.value);
+                //reply(replaced.value);
             }
         }).catch((error) => {
             request.log('error', error);
