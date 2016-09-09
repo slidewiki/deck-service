@@ -327,7 +327,10 @@ let self = module.exports = {
                 if(request.payload.hasOwnProperty('title')){
                     slide.title = request.payload.title;
                 }
-                
+                if(request.payload.hasOwnProperty('license')){
+                    slide.license = request.payload.license;
+                }
+
                 //NOTE update positions accordingly
                 module.exports.newSlide({'payload' : slide}, (createdSlide) => {
                     node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
