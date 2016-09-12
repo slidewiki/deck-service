@@ -287,7 +287,8 @@ module.exports = function(server) {
                     user: Joi.string().alphanum().lowercase(),
                     content: Joi.string(),
                     title: Joi.string(),
-                    license: Joi.string()
+                    license: Joi.string(),
+                    speakernotes: Joi.string()
                 }).requiredKeys('selector', 'user'),
             },
             tags: ['api'],
