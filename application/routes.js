@@ -86,7 +86,8 @@ module.exports = function(server) {
                         revision: Joi.string().alphanum().lowercase()
                     }),
                     content_items: Joi.array(),
-                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    new_revision: Joi.boolean()
                 }).requiredKeys('user', 'license'),
             },
             tags: ['api'],

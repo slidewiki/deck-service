@@ -60,6 +60,7 @@ let self = module.exports = {
     updateSlide: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         let slideId = request.params.id;
+
         slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
             //console.log('updated: ', replaced.value.revisions);
             if (co.isEmpty(replaced.value))
@@ -68,12 +69,18 @@ let self = module.exports = {
                 //let revisionUpdatedId = slideId.split('-')[1];
                 //we must update all decks in the 'usage' attribute
                 slideDB.get(replaced.value._id).then((newSlide) => {
-                    //console.log('usage', newSlide.revisions[newSlide.revisions.length-1].usage);
-                    let usageArray = newSlide.revisions[newSlide.revisions.length-1].usage;
-                    for(let i = 0; i < usageArray.length; i++){
-                        //console.log('usage deck: ', usageArray[i]);
-                        deckDB.updateContentItem(newSlide, '', usageArray[i], 'slide');
-                    }
+
+                    // let usageArray = newSlide.revisions[newSlide.revisions.length-1].usage;
+                    // for(let i = 0; i < usageArray.length; i++){
+                    //     //console.log('usage deck: ', usageArray[i]);
+                    //     if(usageArray[i].hasOwnProperty('id') && usageArray[i].hasOwnProperty('revision')){
+                    //         deckDB.updateContentItem(newSlide, '', usageArray[i].id+'-'+usageArray[i].revision, 'slide');
+                    //     }
+                    //     else
+                    //         deckDB.updateContentItem(newSlide, '', usageArray[i], 'slide');
+                    // }
+                    //only update the root deck, i.e., direct parent                    
+                    deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
                     newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
                     reply(newSlide);
 
@@ -140,6 +147,7 @@ let self = module.exports = {
                 throw inserted;
             else{
                 //create a new slide inside the new deck
+                //console.log('inserted', inserted);
 
                 let newSlide = {
                     'title': 'New slide',
@@ -151,8 +159,10 @@ let self = module.exports = {
                     'root_deck': String(inserted.ops[0]._id)+'-1',
                     'position' : 1
                 };
+                //console.log('slide', newSlide);
                 slideDB.insert(newSlide)
                 .then((insertedSlide) => {
+                    //console.log('inserted_slide', insertedSlide);
                     insertedSlide.ops[0].id = insertedSlide.ops[0]._id;
                     deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide')
                     .then((insertedContentItem) => {
@@ -189,24 +199,38 @@ let self = module.exports = {
 
     updateDeckRevision: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
-        deckDB.replace(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
-            if (co.isEmpty(replaced.value))
-                throw replaced;
-            else{
-                if(request.payload.root_deck){
-                    deckDB.get(replaced.value._id).then((newDeck) => {
-                        deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck')
-                        .then((updated) => {
-                            reply(replaced.value);
+        if(request.payload.new_revision){
+            deckDB.replace(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+                if (co.isEmpty(replaced.value))
+                    throw replaced;
+                else{
+                    if(request.payload.root_deck){
+                        deckDB.get(replaced.value._id).then((newDeck) => {
+                            deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck')
+                            .then((updated) => {
+                                reply(replaced.value);
+                            });
                         });
-                    });
+                    }
+                    reply(replaced.value);
                 }
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
+        }
+        else{
+            deckDB.update(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+                if (co.isEmpty(replaced.value))
+                    throw replaced;
+                else
                 reply(replaced.value);
-            }
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
-        });
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
+        }
+
     },
 
     revertDeckRevision: function(request, reply) {
@@ -378,7 +402,6 @@ let self = module.exports = {
             }else{
 
                 //need to make a new deck
-
                 let spath = request.payload.selector.spath;
                 let spathArray = spath.split(';');
                 let parentID, parentPosition, deckPosition;
