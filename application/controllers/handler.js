@@ -210,9 +210,12 @@ let self = module.exports = {
                 else{
                     if(request.payload.root_deck){
                         deckDB.get(replaced.value._id).then((newDeck) => {
+                            //console.log('newDeck', newDeck);
                             deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck')
                             .then((updated) => {
-                                reply(replaced.value);
+                                newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
+                                //console.log('replaced', newDeck);
+                                reply(newDeck);
                             });
                         });
                     }

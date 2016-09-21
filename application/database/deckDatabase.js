@@ -128,6 +128,10 @@ let self = module.exports = {
 
 
     replace: function(id, deck) {
+        let idArray = String(id).split('-');
+        if(idArray.length > 1){
+            id = idArray[0];
+        }
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -144,12 +148,26 @@ let self = module.exports = {
                 //must get previously active revision and copy content items to new revision
                 //NOTE or should we get the id from the request, it contains the revision that is replaced...
                 let activeRevisionIndex = getActiveRevision(existingDeck);
-                if(id.split('-').length > 1){
-                    activeRevisionIndex = parseInt(id.split('-')[1])-1;
+                if(idArray.length > 1){
+                    activeRevisionIndex = parseInt(idArray[1])-1;
                 }
                 //console.log('activeRevisionIndex', activeRevisionIndex);
-                let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
                 let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
+                //we should remove the usage of the previous revision in the root deck
+                let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
+                if(deck.root_deck){
+                    //console.log(slide.root_deck);
+
+                    for(let i = 0; i < previousUsageArray.length; i++){
+                        if(previousUsageArray[i].id === parseInt(deck.root_deck.split('-')[0]) && previousUsageArray[i].revision === parseInt(deck.root_deck.split('-')[1])){
+                            previousUsageArray.splice(i,1);
+                            break;
+                        }
+                    }
+                }
+                usageArray = [{'id':parseInt(deck.root_deck.split('-')[0]), 'revision': parseInt(deck.root_deck.split('-')[1])}];
+                let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
+                //let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
                 //console.log('content_items', content_items);
                 //console.log('usageArray', usageArray);
                 const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
@@ -182,9 +200,17 @@ let self = module.exports = {
                             });
                         }
                     }
+                    let new_revisions = existingDeck.revisions;
+                    new_revisions[idArray[1]-1].usage = previousUsageArray;
+                    new_revisions.push(deckWithNewRevision.revisions[0]);
+
                     return col.findOneAndUpdate({
                         _id: parseInt(id)
-                    }, {$set: updatedMetadata, $push: { revisions: deckWithNewRevision.revisions[0] } });
+                    //}, { $push: { revisions: slideWithNewRevision.revisions[0] } }, {new: true});
+                    }, { $set: { revisions: new_revisions } }, {new: true});
+                    // return col.findOneAndUpdate({
+                    //     _id: parseInt(id)
+                    // }, {$set: updatedMetadata, $push: { revisions: deckWithNewRevision.revisions[0] } });
                 } catch (e) {
                     console.log('validation failed', e);
                 }
