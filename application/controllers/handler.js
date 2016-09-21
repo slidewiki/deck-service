@@ -516,5 +516,55 @@ let self = module.exports = {
         .then((editorsList) => {
             reply(editorsList);
         });
+    },
+
+    //returns metadata about all decks a user owns
+    getAllDecks: (request, reply) => {
+        //TODO another API for user activity is needed
+        let decks = deckDB.find('decks', {
+            userid: request.params.userid,
+            kind: 'deck'
+        });
+
+        console.log('handler getAllDecks: found decks:', decks);
+
+        if (decks.length < 1) {
+            reply(boom.notFound());
+            return;
+        }
+
+        let result = [];
+
+        decks.forEach((deck) => {
+            let metadata = {};
+            metadata.timestamp = deck.timestamp;
+            metadata.description = deck.description;
+            metadata.language = deck.language;
+            metadata.lastUpdate = deck.lastUpdate;
+            metadata.tags = deck.tags;
+            metadata.translation = deck.translation;
+
+            //get revision
+            let revision = {};
+            for (let key in deck.revisions) {
+                if (deck.revisions[key].id === deck.active)
+                    revision = deck.revisions[key];
+            }
+
+            metadata.timestamp = revision.timestamp;
+            metadata.comment = revision.comment;
+            metadata.abstract = revision.abstract;
+            metadata.countRevisions = deck.revisions.length;
+            metadata.license = revision.license;
+            metadata.priority = revision.priority;
+            metadata.visibility = revision.visibility;
+            metadata.language = revision.language;
+            metadata.translation = revision.translation;
+            metadata.tags = revision.tags;
+
+            result.push(metadata);
+        });
+
+        return reply(result);
     }
 };

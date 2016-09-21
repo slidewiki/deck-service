@@ -5,6 +5,22 @@ const Joi = require('joi'),
 
 
 module.exports = function(server) {
+
+    server.route({
+        method: 'GET',
+        path: '/alldecks/{userid}',
+        handler: handlers.getAllDecks,
+        config: {
+            validate: {
+                params: {
+                    userid: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Get all decks of a user as metadata'
+        }
+    });
+
     server.route({
         method: 'GET',
         path: '/deck/{id}',
