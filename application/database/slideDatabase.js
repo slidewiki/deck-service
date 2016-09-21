@@ -152,6 +152,8 @@ module.exports = {
                 }
 
                 let valid = false;
+                //should empty usage array and keep only the new root deck revision
+                usageArray = [{'id':parseInt(slide.root_deck.split('-')[0]), 'revision': parseInt(slide.root_deck.split('-')[1])}];
                 const slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(maxRevisionId)+1, usageArray);
                 try {
                     valid = slideModel(slideWithNewRevision);
@@ -244,6 +246,30 @@ module.exports = {
                     col.save(root_deck);
                 });
             });
+        });
+    },
+
+    updateUsage: function(slide, new_revision_id, root_deck){
+        let idArray = slide.split('-');
+        let rootDeckArray = root_deck.split('-');
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(idArray[0])})
+              .then((existingSlide) => {
+                  //first remove usage of deck from old revision
+                  let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
+                  for(let i = 0; i < usageArray.length; i++){
+                      if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
+                          usageArray.splice(i,1);
+                          break;
+                      }
+                  }
+                  //then update usage array of new/reverted revision
+                  existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+                  col.save(existingSlide);
+                  return existingSlide;
+              });
         });
     }
 };

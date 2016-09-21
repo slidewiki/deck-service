@@ -105,7 +105,8 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 payload: Joi.object().keys({
-                    revision_id: Joi.string().alphanum().lowercase()
+                    revision_id: Joi.string().alphanum().lowercase(),
+                    root_deck: Joi.string()
                 }).requiredKeys('revision_id'),
             },
             tags: ['api'],
@@ -173,17 +174,11 @@ module.exports = function(server) {
                     content: Joi.string(),
                     speakernotes: Joi.string(),
                     user: Joi.string().alphanum().lowercase(),
-                    root_deck: Joi.string().alphanum().lowercase(),
+                    root_deck: Joi.string(),
                     parent_deck: Joi.object().keys({
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
                     }),
-                    //add a field for deck revision?
-                    /* root_deck : Joi.object().keys({
-                    id: Joi.string().alphanum().lowercase(), //id of the root deck
-                    revision: Joi.string().alphanum().lowercase() //revision number of the root deck revision
-                }),
-                */
                     parent_slide: Joi.object().keys({
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
