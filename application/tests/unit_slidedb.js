@@ -34,7 +34,7 @@ describe('Database', () => {
                 language: 'en',
                 license: 'CC0',
                 user: 1,
-                root_deck: "25-1"
+                root_deck: '25-1'
             };
             let res = db.insert(slide);
             //res.then((data) => console.log('resolved', data));
