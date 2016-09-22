@@ -26,8 +26,8 @@ describe('REST API', () => {
         content: 'dummy',
         language: 'en',
         license: 'CC0',
-        user: '112233445566778899001213',
-        root_deck: '112233445566778899001214'
+        user: '1',
+        root_deck: '25-1'
     };
     let options = {
         method: 'POST',
@@ -47,7 +47,7 @@ describe('REST API', () => {
                 let payload = JSON.parse(response.payload);
                 payload.should.be.an('object').and.contain.keys('language', 'timestamp', 'user');
                 payload.language.should.equal('en');
-                payload.user.should.equal('112233445566778899001213');
+                payload.user.should.equal(1);
                 done();
             });
         });

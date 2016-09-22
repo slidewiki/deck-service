@@ -139,19 +139,35 @@ module.exports = {
                 }, 1);
                 let usageArray = existingSlide.revisions[idArray[1]-1].usage;
                 //we should remove the usage of the previous revision in the root deck
+                let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
+                if(slide.root_deck){
+                    //console.log(slide.root_deck);
+
+                    for(let i = 0; i < previousUsageArray.length; i++){
+                        if(previousUsageArray[i].id === parseInt(slide.root_deck.split('-')[0]) && previousUsageArray[i].revision === parseInt(slide.root_deck.split('-')[1])){
+                            previousUsageArray.splice(i,1);
+                            break;
+                        }
+                    }
+                }
 
                 let valid = false;
+                //should empty usage array and keep only the new root deck revision
+                usageArray = [{'id':parseInt(slide.root_deck.split('-')[0]), 'revision': parseInt(slide.root_deck.split('-')[1])}];
                 const slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(maxRevisionId)+1, usageArray);
                 try {
                     valid = slideModel(slideWithNewRevision);
-
                     if (!valid) {
                         return slideModel.errors;
                     }
+                    let new_revisions = existingSlide.revisions;
+                    new_revisions[idArray[1]-1].usage = previousUsageArray;
+                    new_revisions.push(slideWithNewRevision.revisions[0]);
 
                     return col.findOneAndUpdate({
                         _id: parseInt(id)
-                    }, { $push: { revisions: slideWithNewRevision.revisions[0] } }, {new: true});
+                    //}, { $push: { revisions: slideWithNewRevision.revisions[0] } }, {new: true});
+                    }, { $set: { revisions: new_revisions } }, {new: true});
                 } catch (e) {
                     console.log('validation failed', e);
                 }
@@ -231,16 +247,46 @@ module.exports = {
                 });
             });
         });
+    },
+
+    updateUsage: function(slide, new_revision_id, root_deck){
+        let idArray = slide.split('-');
+        let rootDeckArray = root_deck.split('-');
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(idArray[0])})
+              .then((existingSlide) => {
+                  //first remove usage of deck from old revision
+                  let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
+                  for(let i = 0; i < usageArray.length; i++){
+                      if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
+                          usageArray.splice(i,1);
+                          break;
+                      }
+                  }
+                  //then update usage array of new/reverted revision
+                  existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+                  col.save(existingSlide);
+                  return existingSlide;
+              });
+        });
     }
 };
 
 function convertToNewSlide(slide) {
     let now = new Date();
     //let root_deck = String(slide.root_deck.split('-')[0]); //we should put the deck revision in the usage as well...
-    let usageArray = [slide.root_deck];
+    slide.user = parseInt(slide.user);
+    let root_deck_array = slide.root_deck.split('-');
+    let usageArray = [];
+    usageArray.push({
+        'id': parseInt(root_deck_array[0]),
+        'revision': parseInt(root_deck_array[1])
+    });
     const result = {
         _id: slide._id,
-        user: slide.user, //is this redundant?
+        user: slide.user,
         kind: 'slide',
         //deck: String(slide.root_deck.split('-')[0]),
         timestamp: now.toISOString(),
@@ -263,6 +309,7 @@ function convertToNewSlide(slide) {
 
 function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
     let now = new Date();
+    slide.user = parseInt(slide.user);
     const result = {
         user: slide.user,
         deck: slide.root_deck,
@@ -277,7 +324,7 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
             title: slide.title,
             content: slide.content,
             speakernotes: slide.speakernotes,
-            parent: slide.parent_slide
+            //parent: slide.parent_slide
         }]
     };
     //console.log('from', slide, 'to', result);

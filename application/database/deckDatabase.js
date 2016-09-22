@@ -63,7 +63,6 @@ let self = module.exports = {
 
                 try {
                     const convertedDeck = convertToNewDeck(deck);
-                    //console.log(convertedDeck);
                     valid = deckModel(convertedDeck);
                     if (!valid) {
                         return deckModel.errors;
@@ -78,12 +77,49 @@ let self = module.exports = {
         });
     },
 
-    update: function(deck) {    //when no new revision is needed..
+    update: function(id, deck) {    //when no new revision is needed..
+        // return helper.connectToDatabase()
+        // .then((db) => db.collection('decks'))
+        // .then((col) => col.findOneAndUpdate({
+        //     _id: deck.id
+        // }, deck));
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
-        .then((col) => col.findOneAndUpdate({
-            _id: deck.id
-        }, deck));
+        .then((col) => {
+            return col.findOne({_id: parseInt(id)})
+            .then((existingDeck) => {
+                let valid = false;
+                let idArray = id.split('-');
+                let activeRevisionIndex ;
+                if(idArray.length > 1){
+                    activeRevisionIndex = parseInt(idArray[1])-1;
+                }
+                else{
+                    activeRevisionIndex = getActiveRevision(existingDeck);
+                }
+
+                const deckRevision = existingDeck.revisions[activeRevisionIndex];
+                deckRevision.title = deck.title;
+                deckRevision.description = deck.description;
+                deckRevision.license = deck.license;
+                //deckRevision.theme = deck.theme;
+                deckRevision.tags = deck.tags;
+                existingDeck.revisions[activeRevisionIndex-1] = deckRevision;
+                try {
+                    valid = deckModel(deckRevision);
+
+                    if (!valid) {
+                        return deckModel.errors;
+                    }
+                    return col.findOneAndUpdate({
+                        _id: parseInt(id)
+                    }, existingDeck, {new: true});
+                } catch (e) {
+                    console.log('validation failed', e);
+                }
+                return;
+            });
+        });
     },
 
     rename: function(deck_id, newName){
@@ -99,6 +135,10 @@ let self = module.exports = {
 
 
     replace: function(id, deck) {
+        let idArray = String(id).split('-');
+        if(idArray.length > 1){
+            id = idArray[0];
+        }
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -115,19 +155,69 @@ let self = module.exports = {
                 //must get previously active revision and copy content items to new revision
                 //NOTE or should we get the id from the request, it contains the revision that is replaced...
                 let activeRevisionIndex = getActiveRevision(existingDeck);
-                let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
+                if(idArray.length > 1){
+                    activeRevisionIndex = parseInt(idArray[1])-1;
+                }
+                //console.log('activeRevisionIndex', activeRevisionIndex);
                 let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
+                //we should remove the usage of the previous revision in the root deck
+                let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
+                if(deck.root_deck){
+                    //console.log(slide.root_deck);
+
+                    for(let i = 0; i < previousUsageArray.length; i++){
+                        if(previousUsageArray[i].id === parseInt(deck.root_deck.split('-')[0]) && previousUsageArray[i].revision === parseInt(deck.root_deck.split('-')[1])){
+                            previousUsageArray.splice(i,1);
+                            break;
+                        }
+                    }
+                }
+                usageArray = [{'id':parseInt(deck.root_deck.split('-')[0]), 'revision': parseInt(deck.root_deck.split('-')[1])}];
+                let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
+                //let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
+                //console.log('content_items', content_items);
+                //console.log('usageArray', usageArray);
                 const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
+                let updatedMetadata = {active : newRevisionId};
+
                 try {
                     valid = deckModel(deckWithNewRevision);
 
                     if (!valid) {
                         return deckModel.errors;
                     }
+                    for(let i = 0; i < content_items.length; i++){
+                        let citem = content_items[i];
+                        if(citem.kind === 'slide'){
+                            helper.connectToDatabase()
+                            .then((db) => db.collection('slides'))
+                            .then((col) => {
+                                col.findOne({_id: parseInt(citem.ref.id)})
+                                .then((slide) => {
+                                    slide.revisions[citem.ref.revision-1].usage.push({'id': parseInt(id), 'revision': newRevisionId});
+                                    col.save(slide);
+                                });
+                            });
+                        }
+                        else{
+                            col.findOne({_id: parseInt(citem.ref.id)})
+                            .then((innerDeck) => {
+                                innerDeck.revisions[citem.ref.revision-1].usage.push({'id': parseInt(id), 'revision': newRevisionId});
+                                col.save(innerDeck);
+                            });
+                        }
+                    }
+                    let new_revisions = existingDeck.revisions;
+                    new_revisions[idArray[1]-1].usage = previousUsageArray;
+                    new_revisions.push(deckWithNewRevision.revisions[0]);
 
                     return col.findOneAndUpdate({
                         _id: parseInt(id)
-                    }, {$set: {active : newRevisionId}, $push: { revisions: deckWithNewRevision.revisions[0] } });
+                    //}, { $push: { revisions: slideWithNewRevision.revisions[0] } }, {new: true});
+                    }, { $set: { revisions: new_revisions } }, {new: true});
+                    // return col.findOneAndUpdate({
+                    //     _id: parseInt(id)
+                    // }, {$set: updatedMetadata, $push: { revisions: deckWithNewRevision.revisions[0] } });
                 } catch (e) {
                     console.log('validation failed', e);
                 }
@@ -164,7 +254,7 @@ let self = module.exports = {
                         order: parseInt(position),
                         kind: ckind,
                         ref : {
-                            id: String(citem.id),
+                            id: parseInt(citem.id),
                             revision:citem_revision_id
                         }
                     };
@@ -181,7 +271,7 @@ let self = module.exports = {
                                     order: parseInt(getOrder(existingDeck.revisions[activeRevisionId-1]))+1,
                                     kind: ckind,
                                     ref : {
-                                        id: String(citem.id),
+                                        id: parseInt(citem.id),
                                         revision:citem_revision_id
                                     }
                                 }
@@ -226,10 +316,10 @@ let self = module.exports = {
     updateContentItem: function(citem, revertedRevId, root_deck, ckind){ //can be used for reverting or updating
         let rootArray = root_deck.split('-');
         //console.log('root_deck', root_deck);
-        helper.connectToDatabase()
+        return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
-            col.findOne({_id: parseInt(rootArray[0])})
+            return col.findOne({_id: parseInt(rootArray[0])})
             .then((existingDeck) => {
                 //console.log('existingDeck', existingDeck);
                 let newRevId = getNewRevisionID(citem);
@@ -240,11 +330,13 @@ let self = module.exports = {
                 if(rootArray.length > 1){
                     rootRev = rootArray[1];
                 }
+                let old_rev_id = rootArray[1];
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
 
                         for(let j = 0; j < existingDeck.revisions[i].contentItems.length; j++) {
-                            if(existingDeck.revisions[i].contentItems[j].ref.id === String(citem._id)) {
+                            if(existingDeck.revisions[i].contentItems[j].ref.id === citem._id) {
+                                old_rev_id = existingDeck.revisions[i].contentItems[j].ref.revision;
                                 existingDeck.revisions[i].contentItems[j].ref.revision = newRevId;
                             }
                             else continue;
@@ -253,6 +345,7 @@ let self = module.exports = {
                     else continue;
                 }
                 col.save(existingDeck);
+                return {'old_revision': old_rev_id, 'new_revision': newRevId};
             });
         });
     },
@@ -263,7 +356,34 @@ let self = module.exports = {
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
-            return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(deck.revision_id)}});
+            return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(deck.revision_id)}}, {new: true});
+        });
+    },
+
+    updateUsage: function(deck, new_revision_id, root_deck){
+        let idArray = deck.split('-');
+        let rootDeckArray = root_deck.split('-');
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(idArray[0])})
+              .then((existingDeck) => {
+                  //first remove usage of deck from old revision
+                  if(root_deck){
+                      let usageArray = existingDeck.revisions[parseInt(idArray[1])-1].usage;
+                      for(let i = 0; i < usageArray.length; i++){
+                          if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
+                              usageArray.splice(i,1);
+                              break;
+                          }
+                      }
+                      //then update usage array of new/reverted revision
+                      existingDeck.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+                  }
+                  existingDeck.active = new_revision_id;
+                  col.save(existingDeck);
+                  return existingDeck;
+              });
         });
     },
 
@@ -509,8 +629,13 @@ function convertToNewDeck(deck){
     let root_deck = deck.root_deck;
     let usageArray = [];
     if(root_deck !== null){
-        usageArray.push(root_deck);
+        let root_deck_array = root_deck.split('-');
+        usageArray.push({
+            'id': parseInt(root_deck_array[0]),
+            'revision': parseInt(root_deck_array[1])
+        });
     }
+    deck.user = parseInt(deck.user);
     const result = {
         _id: deck._id,
         user: deck.user,
@@ -521,7 +646,7 @@ function convertToNewDeck(deck){
         description: deck.description,
         translation: deck.translation,
         lastUpdate: now.toISOString(),
-        tags: deck.tags,
+        //tags: deck.tags,
         active: 1,
         revisions: [{
             id: 1,
@@ -531,6 +656,7 @@ function convertToNewDeck(deck){
             user: deck.user,
             license: deck.license,
             parent: deck.parent_deck,
+            tags: deck.tags,
             contentItems: []
         }]
     };
@@ -540,6 +666,7 @@ function convertToNewDeck(deck){
 
 function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray) {
     let now = new Date();
+    deck.user = parseInt(deck.user);
     const result = {
         user: deck.user,
         deck: deck.root_deck,
@@ -553,6 +680,8 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
             license: deck.license,
             title: deck.title,
             parent: deck.parent_deck,
+            description: deck.description,
+            tags: deck.tags,
             contentItems: content_items
         }]
     };

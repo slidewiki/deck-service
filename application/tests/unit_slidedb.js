@@ -33,8 +33,8 @@ describe('Database', () => {
                 content: 'dummy',
                 language: 'en',
                 license: 'CC0',
-                user: '112233445566778899001213',
-                root_deck: '112233445566778899001214'
+                user: 1,
+                root_deck: '25-1'
             };
             let res = db.insert(slide);
             //res.then((data) => console.log('resolved', data));
@@ -42,7 +42,7 @@ describe('Database', () => {
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('ops').that.is.not.empty,
                 //res.should.eventually.have.deep.property('ops[0]').that.has.all.keys('_id', 'language'),
-                res.should.eventually.have.deep.property('ops[0].language', slide.language)
+                //res.should.eventually.have.deep.property('ops[0].language', slide.language)
             ]);
         });
 
@@ -52,8 +52,8 @@ describe('Database', () => {
                 content: 'dummy',
                 language: 'en',
                 license: 'CC0',
-                user: '112233445566778899001213',
-                root_deck: '112233445566778899001214'
+                user: 1,
+                root_deck: '25-1'
             };
             let ins = db.insert(slide);
             let res = ins.then((ins) => db.get(ins.ops[0]._id));
