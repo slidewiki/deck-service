@@ -209,7 +209,7 @@ let self = module.exports = {
                     return col.findOneAndUpdate({
                         _id: parseInt(id)
                     //}, { $push: { revisions: slideWithNewRevision.revisions[0] } }, {new: true});
-                  }, { $set: { revisions: new_revisions, active: newRevisionId } }, {new: true});
+                    }, { $set: { revisions: new_revisions, active: newRevisionId } }, {new: true});
                     // return col.findOneAndUpdate({
                     //     _id: parseInt(id)
                     // }, {$set: updatedMetadata, $push: { revisions: deckWithNewRevision.revisions[0] } });
