@@ -162,6 +162,7 @@ let self = module.exports = {
                 let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
                 //we should remove the usage of the previous revision in the root deck
                 let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
+
                 if(deck.root_deck){
                     //console.log(slide.root_deck);
 
@@ -171,8 +172,9 @@ let self = module.exports = {
                             break;
                         }
                     }
+                    usageArray = [{'id':parseInt(deck.root_deck.split('-')[0]), 'revision': parseInt(deck.root_deck.split('-')[1])}];
                 }
-                usageArray = [{'id':parseInt(deck.root_deck.split('-')[0]), 'revision': parseInt(deck.root_deck.split('-')[1])}];
+
                 let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
                 //let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
                 //console.log('content_items', content_items);
@@ -214,7 +216,7 @@ let self = module.exports = {
                     return col.findOneAndUpdate({
                         _id: parseInt(id)
                     //}, { $push: { revisions: slideWithNewRevision.revisions[0] } }, {new: true});
-                    }, { $set: { revisions: new_revisions } }, {new: true});
+                    }, { $set: { revisions: new_revisions, active: newRevisionId } }, {new: true});
                     // return col.findOneAndUpdate({
                     //     _id: parseInt(id)
                     // }, {$set: updatedMetadata, $push: { revisions: deckWithNewRevision.revisions[0] } });
