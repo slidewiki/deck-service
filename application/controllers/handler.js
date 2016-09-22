@@ -7,7 +7,8 @@ Handles the requests by executing stuff and replying to the client. Uses promise
 const boom = require('boom'),
     slideDB = require('../database/slideDatabase'),
     deckDB = require('../database/deckDatabase'),
-    co = require('../common');
+    co = require('../common'),
+    Joi = require('joi');
 
 let self = module.exports = {
     getSlide: function(request, reply) {
@@ -588,6 +589,72 @@ let self = module.exports = {
         deckDB.getDeckEditors(request.params.id)
         .then((editorsList) => {
             reply(editorsList);
+        });
+    },
+
+    //returns metadata about all decks a user owns
+    getAllDecks: (request, reply) => {
+        //TODO another API for user activity is needed
+
+        //parse userid
+        let userid = request.params.userid;
+        const integerSchema = Joi.number().integer();
+        const validationResult = integerSchema.validate(userid);
+        if (validationResult.error === null) {
+            userid = validationResult.value;
+        }
+
+        let decksPromise = deckDB.find('decks', {
+            user: userid,
+            kind: 'deck'
+        });
+
+        decksPromise.then((decks) => {
+            console.log('handler getAllDecks: found decks:', decks);
+
+            if (decks.length < 1) {
+                reply(boom.notFound());
+                return;
+            }
+
+            let result = [];
+
+            decks.forEach((deck) => {
+                let metadata = {};
+                metadata._id = deck._id;
+                metadata.timestamp = deck.timestamp;
+                metadata.description = deck.description;
+                metadata.language = deck.language;
+                metadata.lastUpdate = deck.lastUpdate;
+                metadata.tags = deck.tags;
+                metadata.translation = deck.translation;
+                metadata.countRevisions = deck.revisions.length;
+                metadata.active = deck.active;
+
+                //get revision
+                let revision = {};
+                for (let key in deck.revisions) {
+                    if (deck.revisions[key].id === deck.active)
+                        revision = deck.revisions[key];
+                }
+
+                metadata.timestamp = revision.timestamp;
+                metadata.title = revision.title;
+                metadata.comment = revision.comment;
+                metadata.abstract = revision.abstract;
+                metadata.license = revision.license;
+                metadata.priority = revision.priority;
+                metadata.visibility = revision.visibility;
+                metadata.language = revision.language;
+                metadata.translation = revision.translation;
+                metadata.tags = revision.tags;
+                metadata.parent = revision.parent;
+
+                result.push(metadata);
+            });
+
+            return reply(result);
+
         });
     }
 };
