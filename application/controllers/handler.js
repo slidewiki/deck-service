@@ -60,6 +60,7 @@ let self = module.exports = {
     updateSlide: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         let slideId = request.params.id;
+
         slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
             //console.log('updated: ', replaced.value.revisions);
             if (co.isEmpty(replaced.value))
@@ -68,12 +69,9 @@ let self = module.exports = {
                 //let revisionUpdatedId = slideId.split('-')[1];
                 //we must update all decks in the 'usage' attribute
                 slideDB.get(replaced.value._id).then((newSlide) => {
-                    //console.log('usage', newSlide.revisions[newSlide.revisions.length-1].usage);
-                    let usageArray = newSlide.revisions[newSlide.revisions.length-1].usage;
-                    for(let i = 0; i < usageArray.length; i++){
-                        //console.log('usage deck: ', usageArray[i]);
-                        deckDB.updateContentItem(newSlide, '', usageArray[i], 'slide');
-                    }
+
+                    //only update the root deck, i.e., direct parent
+                    deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
                     newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
                     reply(newSlide);
 
@@ -109,12 +107,25 @@ let self = module.exports = {
     },
 
     revertSlideRevision: function(request, reply) {
-        slideDB.get(encodeURIComponent(request.params.id), request.payload).then((slide) => {
+        slideDB.get(encodeURIComponent(request.params.id.split('-')[0]), request.payload).then((slide) => {
             if (co.isEmpty(slide))
                 throw slide;
             else{
-                deckDB.updateContentItem(slide, parseInt(request.payload.revision_id), request.payload.root_deck, 'slide');
-                reply(slide);
+                let revision_id = parseInt(request.payload.revision_id);
+                deckDB.updateContentItem(slide, revision_id, request.payload.root_deck, 'slide')
+                .then((updatedIds) => {
+                    let fullId = request.params.id;
+                    if(fullId.split('-').length < 2){
+                        fullId += '-'+updatedIds.old_revision;
+                    }
+                    slideDB.updateUsage(fullId, revision_id, request.payload.root_deck).then((updatedSlide) => {
+                        let revisionArray = [updatedSlide.revisions[revision_id-1]];
+                        updatedSlide.revisions = revisionArray;
+                        reply(updatedSlide);
+                    });
+
+                });
+
             }
         }).catch((error) => {
             request.log('error', error);
@@ -140,6 +151,7 @@ let self = module.exports = {
                 throw inserted;
             else{
                 //create a new slide inside the new deck
+                //console.log('inserted', inserted);
 
                 let newSlide = {
                     'title': 'New slide',
@@ -151,8 +163,10 @@ let self = module.exports = {
                     'root_deck': String(inserted.ops[0]._id)+'-1',
                     'position' : 1
                 };
+                //console.log('slide', newSlide);
                 slideDB.insert(newSlide)
                 .then((insertedSlide) => {
+                    //console.log('inserted_slide', insertedSlide);
                     insertedSlide.ops[0].id = insertedSlide.ops[0]._id;
                     deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide')
                     .then((insertedContentItem) => {
@@ -189,40 +203,100 @@ let self = module.exports = {
 
     updateDeckRevision: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
-        deckDB.replace(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
-            if (co.isEmpty(replaced.value))
-                throw replaced;
-            else{
-                if(request.payload.root_deck){
-                    deckDB.get(replaced.value._id).then((newDeck) => {
-                        deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck')
-                        .then((updated) => {
-                            reply(replaced.value);
+        if(request.payload.new_revision){
+            deckDB.replace(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+                if (co.isEmpty(replaced.value))
+                    throw replaced;
+                else{
+                    if(request.payload.root_deck){
+                        deckDB.get(replaced.value._id).then((newDeck) => {
+                            //console.log('newDeck', newDeck);
+                            deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck')
+                            .then((updated) => {
+                                newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
+                                //console.log('replaced', newDeck);
+                                reply(newDeck);
+                            });
                         });
-                    });
+                    }
+                    reply(replaced.value);
                 }
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
+        }
+        else{
+            deckDB.update(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+                if (co.isEmpty(replaced.value))
+                    throw replaced;
+                else
                 reply(replaced.value);
-            }
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
-        });
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
+        }
+
     },
 
+    // revertDeckRevision: function(request, reply) {
+    //     deckDB.revert(encodeURIComponent(request.params.id), request.payload).then((reverted) => {
+    //         if (co.isEmpty(reverted))
+    //             throw reverted;
+    //         else{
+    //             if(reverted.value.deck !== null){
+    //                 deckDB.updateContentItem(reverted.value, parseInt(request.payload.revision_id), reverted.value.deck, 'deck');
+    //             }
+    //             reply(reverted);
+    //         }
+    //     }).catch((error) => {
+    //         request.log('error', error);
+    //         reply(boom.badImplementation());
+    //     });
+    // },
+
     revertDeckRevision: function(request, reply) {
-        deckDB.revert(encodeURIComponent(request.params.id), request.payload).then((reverted) => {
-            if (co.isEmpty(reverted))
-                throw reverted;
-            else{
-                if(reverted.value.deck !== null){
-                    deckDB.updateContentItem(reverted.value, parseInt(request.payload.revision_id), reverted.value.deck, 'deck');
+        if(request.payload.root_deck === null || !request.payload.hasOwnProperty('root_deck') || request.payload.root_deck.split('-')[0] === request.params.id.split('-')[0] ){
+            deckDB.revert(encodeURIComponent(request.params.id), request.payload).then((reverted) => {
+                if (co.isEmpty(reverted))
+                    throw reverted;
+                else{
+                    reverted.value.revisions = [reverted.value.revisions[parseInt(request.payload.revision_id)-1]];
+                    reply(reverted.value);
                 }
-                reply(reverted);
-            }
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
-        });
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
+        }
+        else{
+            deckDB.get(encodeURIComponent(request.params.id.split('-')[0]), request.payload).then((deck) => {
+                if (co.isEmpty(deck))
+                    throw deck;
+                else{
+                    let revision_id = parseInt(request.payload.revision_id);
+                    deckDB.updateContentItem(deck, revision_id, request.payload.root_deck, 'deck')
+                    .then((updatedIds) => {
+                        let fullId = request.params.id;
+                        if(fullId.split('-').length < 2){
+                            fullId += '-'+updatedIds.old_revision;
+                        }
+                        deckDB.updateUsage(fullId, revision_id, request.payload.root_deck).then((updatedDeck) => {
+                            let revisionArray = [updatedDeck.revisions[revision_id-1]];
+                            updatedDeck.revisions = revisionArray;
+                            reply(updatedDeck);
+                        });
+
+                    });
+
+                }
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
+        }
+
     },
 
     //decktree
@@ -378,7 +452,6 @@ let self = module.exports = {
             }else{
 
                 //need to make a new deck
-
                 let spath = request.payload.selector.spath;
                 let spathArray = spath.split(';');
                 let parentID, parentPosition, deckPosition;

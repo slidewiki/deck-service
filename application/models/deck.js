@@ -10,7 +10,7 @@ let ajv = Ajv({
 
 //build schema
 const objectid = {
-    type: 'string',
+    type: 'integer',
     maxLength: 24,
     minLength: 1
 };
@@ -20,7 +20,6 @@ const contentItem = {
     type: 'object',
     properties: {
         order: {
-            //type: 'string'
             type: 'number',
             minimum: 1
         },
@@ -53,11 +52,20 @@ const deckRevision = {
             type: 'string'
         },
         timestamp: {
-            type: 'string'
+            type: 'string',
+            format: 'datetime'
         },
         user: objectid,
         parent: {
-            type: 'object'
+            type: 'object',
+            // properties: {
+            //     id: {
+            //         type: 'integer'
+            //     },
+            //     revision: {
+            //         type: 'integer'
+            //     }
+            // }
         },
         popularity: {
             type: 'number',
@@ -133,13 +141,56 @@ const deckRevision = {
             type: 'array',
             items: contentItem
         },
-        dataSources: {
+        dataSources: { //is filled out automatically from the slides
             type: 'array',
-            items: objectid
+            items: {
+                type: 'string'
+            }
         },
         usage: {
             type: 'array',
-            items: objectid
+            items: {
+                type: 'object',
+                properties: {
+                    id: objectid,
+                    revision: {
+                        type: 'number',
+                        minimum: 1
+                    }
+                },
+                required: ['id','revision']
+            }
+        }
+    },
+    translated_from: { //if this deck_revision is a result of translation
+        type: 'object',
+        properties: {
+            status: {
+                type: 'string',
+                enum: ['original', 'google', 'revised', null]
+            },
+            source: {
+                type: 'object',
+                properties: {
+                    id: {
+                        type: 'number'
+                    },
+                    revision: {
+                        type: 'number'
+                    }
+                }
+            },
+            translator: {
+                type: 'object',
+                properties: {
+                    id: {
+                        type: 'number',
+                    },
+                    username:{
+                        type: 'string'
+                    }
+                }
+            }
         }
     },
     required: ['id', 'timestamp', 'user', 'license']
@@ -148,7 +199,8 @@ const deck = {
     type: 'object',
     properties: {
         timestamp: {
-            type: 'string'
+            type: 'string',
+            format: 'datetime'
         },
         user: objectid,
         kind: {
@@ -164,7 +216,8 @@ const deck = {
             type: 'object'
         },
         lastUpdate: {
-            type: 'string'
+            type: 'string',
+            format: 'datetime'
         },
         revisions: {
             type: 'array',
@@ -178,6 +231,52 @@ const deck = {
         },
         active: {
             type: 'number'
+        },
+        datasource: {
+            type: 'string'
+        },
+        translations: { //put here all translations explicitly - deck ids
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    language: {
+                        type: 'string'
+                    },
+                    deck_id: objectid
+                }
+            }
+        },
+        translated_from: { //if this deck is a result of translation
+            type: 'object',
+            properties: {
+                status: {
+                    type: 'string',
+                    enum: ['original', 'google', 'revised', null]
+                },
+                source: {
+                    type: 'object',
+                    properties: {
+                        id: {
+                            type: 'number'
+                        },
+                        revision: {
+                            type: 'number'
+                        }
+                    }
+                },
+                translator: {
+                    type: 'object',
+                    properties: {
+                        id: {
+                            type: 'number',
+                        },
+                        username:{
+                            type: 'string'
+                        }
+                    }
+                }
+            }
         }
     },
     required: ['timestamp', 'user']
