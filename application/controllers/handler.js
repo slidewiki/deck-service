@@ -548,6 +548,7 @@ let self = module.exports = {
 
             decks.forEach((deck) => {
                 let metadata = {};
+                metadata._id = deck._id;
                 metadata.timestamp = deck.timestamp;
                 metadata.description = deck.description;
                 metadata.language = deck.language;
