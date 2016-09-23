@@ -158,7 +158,7 @@ let self = module.exports = {
                 if(idArray.length > 1){
                     activeRevisionIndex = parseInt(idArray[1])-1;
                 }
-                //console.log('activeRevisionIndex', activeRevisionIndex);
+
                 let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
                 //we should remove the usage of the previous revision in the root deck
                 let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
@@ -210,7 +210,7 @@ let self = module.exports = {
                         }
                     }
                     let new_revisions = existingDeck.revisions;
-                    new_revisions[idArray[1]-1].usage = previousUsageArray;
+                    new_revisions[activeRevisionIndex].usage = previousUsageArray;
                     new_revisions.push(deckWithNewRevision.revisions[0]);
 
                     return col.findOneAndUpdate({
