@@ -209,18 +209,21 @@ let self = module.exports = {
                 if (co.isEmpty(replaced.value))
                     throw replaced;
                 else{
-                    if(request.payload.root_deck){
-                        deckDB.get(replaced.value._id).then((newDeck) => {
-                            //console.log('newDeck', newDeck);
+                    deckDB.get(replaced.value._id).then((newDeck) => {
+                        if(request.payload.root_deck){
                             deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck')
                             .then((updated) => {
                                 newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
-                                //console.log('replaced', newDeck);
                                 reply(newDeck);
                             });
-                        });
-                    }
-                    reply(replaced.value);
+                        }
+                        else{
+                            //reply(replaced.value);
+                            newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
+                            reply(newDeck);
+                        }
+                    });
+
                 }
             }).catch((error) => {
                 request.log('error', error);
