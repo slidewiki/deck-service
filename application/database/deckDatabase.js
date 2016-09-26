@@ -35,6 +35,13 @@ let self = module.exports = {
     );
     },
 
+    find: (collection, query) => {
+        return helper.connectToDatabase()
+        .then((db) => db.collection(collection))
+        .then((col) => col.find(query))
+        .then((cursor) => cursor.toArray());
+    },
+
     insert: function(deck) {
         return helper.connectToDatabase()
         .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
