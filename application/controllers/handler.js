@@ -157,12 +157,25 @@ let self = module.exports = {
                     'title': 'New slide',
                     'content': '',
                     'language': 'en',
-                    'license': 'CC0',
+                    'license': request.payload.license,
                     //NOTE user_id should be retrieved from the frontend
                     'user': inserted.ops[0].user,
                     'root_deck': String(inserted.ops[0]._id)+'-1',
                     'position' : 1
                 };
+
+                if(request.payload.hasOwnProperty('first_slide')){
+                    if(request.payload.first_slide.hasOwnProperty('content')){
+                        newSlide.content = request.payload.first_slide.content;
+                    }
+                    if(request.payload.first_slide.hasOwnProperty('title')){
+                        newSlide.title = request.payload.first_slide.title;
+                    }
+                    if(request.payload.first_slide.hasOwnProperty('speakernotes')){
+                        newSlide.speakernotes = request.payload.first_slide.speakernotes;
+                    }
+                }
+
                 //console.log('slide', newSlide);
                 slideDB.insert(newSlide)
                 .then((insertedSlide) => {
@@ -591,6 +604,20 @@ let self = module.exports = {
         deckDB.getDeckEditors(request.params.id)
         .then((editorsList) => {
             reply(editorsList);
+        });
+    },
+
+    needsNewRevision: function(request, reply){
+        let item = request.params.id;
+        module.exports.getEditors({'params': {'id' : request.params.id}}, (editorsList) => {
+            if(editorsList.includes(parseInt(request.query.user))){
+                //user is an editor
+                reply(false);
+            }
+            else{
+                //user is not an editor or owner
+                reply(true);
+            }
         });
     }
 };

@@ -47,12 +47,12 @@ const slideRevision = {
         user: objectid,
         parent: {
             type: 'object',
-            // properties: {
-            //     id: objectid,
-            //     revision: {
-            //         type: 'number'
-            //     }
-            // }
+            properties: {
+                id: objectid,
+                revision: {
+                    type: 'number'
+                }
+            }
         }, //ObjectId or Number or both
         popularity: {
             type: 'number',
@@ -63,10 +63,6 @@ const slideRevision = {
         },
         note: {
             type: 'string'
-        },
-        license: {
-            type: 'string',
-            enum: ['CC0', 'CC BY', 'CC BY-SA']
         },
         translation: {
             type: 'object',
@@ -108,40 +104,90 @@ const slideRevision = {
                 },
                 required: ['id','revision']
             }
-        }
+        },
+        language: {
+            type: 'string'
+        },
     },
-    required: ['id', 'timestamp', 'user', 'license']
+    required: ['id', 'timestamp', 'user']
 };
 const slide = {
     type: 'object',
     properties: {
         user: objectid,
-        kind: {
-            type: 'string'
-        },
+        // kind: {
+        //     type: 'string'
+        // },
         description: {
             type: 'string'
         },
-        language: {
-            type: 'string'
+        license: {
+            type: 'string',
+            enum: ['CC0', 'CC BY', 'CC BY-SA']
         },
-        translation: {
+        // language: {
+        //     type: 'string'
+        // },
+        // translation: {
+        //     type: 'object',
+        //     properties: {
+        //         status: {
+        //             type: 'string',
+        //             enum: ['original', 'google', 'revised', null]
+        //         },
+        //         translator: objectid,
+        //         source: {
+        //             type: 'object'
+        //         }
+        //     }
+        // },
+        translations: { //put here all translations explicitly - deck ids
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    language: {
+                        type: 'string'
+                    },
+                    slide_id: objectid
+                }
+            }
+        },
+        translated_from: { //if this slide is a result of translation
             type: 'object',
             properties: {
                 status: {
                     type: 'string',
                     enum: ['original', 'google', 'revised', null]
                 },
-                translator: objectid,
                 source: {
-                    type: 'object'
+                    type: 'object',
+                    properties: {
+                        id: {
+                            type: 'number'
+                        },
+                        revision: {
+                            type: 'number'
+                        }
+                    }
+                },
+                translator: {
+                    type: 'object',
+                    properties: {
+                        id: {
+                            type: 'number',
+                        },
+                        username:{
+                            type: 'string'
+                        }
+                    }
                 }
             }
         },
-        position: {
-            type: 'number',
-            minimum: 1
-        },
+        // position: {
+        //     type: 'number',
+        //     minimum: 1
+        // },
         timestamp: {
             type: 'string',
             format: 'datetime'
@@ -164,7 +210,7 @@ const slide = {
                 type: 'string'
             }
         },
-        active: objectid,
+        //active: objectid,
         datasource: {
             type: 'string'
         },
