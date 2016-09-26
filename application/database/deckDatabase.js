@@ -100,11 +100,11 @@ let self = module.exports = {
 
                 const deckRevision = existingDeck.revisions[activeRevisionIndex];
                 deckRevision.title = deck.title;
-                deckRevision.description = deck.description;
-                deckRevision.license = deck.license;
-                //deckRevision.theme = deck.theme;
+                existingDeck.description = deck.description;
+                existingDeck.license = deck.license;
+                //add comment, abstract, footer
                 deckRevision.tags = deck.tags;
-                existingDeck.revisions[activeRevisionIndex-1] = deckRevision;
+                existingDeck.revisions[activeRevisionIndex] = deckRevision;
                 try {
                     valid = deckModel(deckRevision);
 
@@ -179,8 +179,10 @@ let self = module.exports = {
                 //let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
                 //console.log('content_items', content_items);
                 //console.log('usageArray', usageArray);
+
                 const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
-                let updatedMetadata = {active : newRevisionId};
+                deckWithNewRevision.timestamp = existingDeck.timestamp;
+                deckWithNewRevision.user = existingDeck.user;
 
                 try {
                     valid = deckModel(deckWithNewRevision);
@@ -212,11 +214,16 @@ let self = module.exports = {
                     let new_revisions = existingDeck.revisions;
                     new_revisions[activeRevisionIndex].usage = previousUsageArray;
                     new_revisions.push(deckWithNewRevision.revisions[0]);
+                    // let new_metadata = deckWithNewRevision;
+                    // delete new_metadata.revisions;
+                    // console.log(new_revisions);
+                    deckWithNewRevision.revisions = new_revisions;
 
+                    //col.save(existingDeck);
                     return col.findOneAndUpdate({
                         _id: parseInt(id)
                     //}, { $push: { revisions: slideWithNewRevision.revisions[0] } }, {new: true});
-                    }, { $set: { revisions: new_revisions, active: newRevisionId } }, {new: true});
+                    }, { $set: deckWithNewRevision }, {new: true});
                     // return col.findOneAndUpdate({
                     //     _id: parseInt(id)
                     // }, {$set: updatedMetadata, $push: { revisions: deckWithNewRevision.revisions[0] } });
@@ -380,7 +387,15 @@ let self = module.exports = {
                           }
                       }
                       //then update usage array of new/reverted revision
-                      existingDeck.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+                      let contains = false;
+                      for(let j = 0; j < existingDeck.revisions[parseInt(new_revision_id)-1].usage.length; j++){
+                          if(existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
+                              contains = true;
+                              break;
+                          }
+                      }
+                      if(!contains)
+                          existingDeck.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
                   }
                   existingDeck.active = new_revision_id;
                   col.save(existingDeck);
@@ -607,24 +622,24 @@ function getOrder(activeRevision){
     }
     else return 0;
 }
-
-function convertDeck(deck) {
-    let now = new Date();
-    return {
-        user: deck.user,
-        deck: deck.root_deck,
-        timestamp: now,
-        lastUpdate: now,
-        license: deck.license,
-        revisions: [{
-            title: deck.title,
-            timestamp: now,
-            user: deck.user,
-            visibility: false,
-            contentItems: deck.content_items
-        }]
-    };
-}
+//
+// function convertDeck(deck) {
+//     let now = new Date();
+//     return {
+//         user: deck.user,
+//         deck: deck.root_deck,
+//         timestamp: now,
+//         lastUpdate: now,
+//         license: deck.license,
+//         revisions: [{
+//             title: deck.title,
+//             timestamp: now,
+//             user: deck.user,
+//             visibility: false,
+//             contentItems: deck.content_items
+//         }]
+//     };
+// }
 
 function convertToNewDeck(deck){
     let now = new Date();
@@ -642,12 +657,15 @@ function convertToNewDeck(deck){
         _id: deck._id,
         user: deck.user,
         //deck: deck.root_deck,
-        kind: 'deck',
+        //kind: 'deck',
         timestamp: now.toISOString(),
-        language: deck.language,
+        //language: deck.language,
         description: deck.description,
-        translation: deck.translation,
+        translated_from: deck.translation,
+        //translations: deck.translations,
         lastUpdate: now.toISOString(),
+        datasource: deck.datasource,
+        license: deck.license,
         //tags: deck.tags,
         active: 1,
         revisions: [{
@@ -656,9 +674,13 @@ function convertToNewDeck(deck){
             title: deck.title,
             timestamp: now.toISOString(),
             user: deck.user,
-            license: deck.license,
+            language: deck.language,
+            //license: deck.license,
             parent: deck.parent_deck,
             tags: deck.tags,
+            comment: deck.comment,
+            abstract: deck.abstract,
+            footer: deck.footer,
             contentItems: []
         }]
     };
@@ -670,20 +692,26 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
     let now = new Date();
     deck.user = parseInt(deck.user);
     const result = {
-        user: deck.user,
-        deck: deck.root_deck,
-        timestamp: now.toISOString(),
-        language: deck.language,
+        //user: deck.user,
+        //deck: deck.root_deck,
+        //timestamp: deck.timestamp,
+        description: deck.description,
+        lastUpdate: now.toISOString(),
+        datasource: deck.datasource,
+        license: deck.license,
+        active: newRevisionId,
         revisions: [{
             id: newRevisionId,
             usage: usageArray,
+            title: deck.title,
             timestamp: now.toISOString(),
             user: deck.user,
-            license: deck.license,
-            title: deck.title,
+            language: deck.language,
             parent: deck.parent_deck,
-            description: deck.description,
             tags: deck.tags,
+            comment: deck.comment,
+            abstract: deck.abstract,
+            footer: deck.footer,
             contentItems: content_items
         }]
     };

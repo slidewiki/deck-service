@@ -20,7 +20,7 @@ const contentItem = {
     type: 'object',
     properties: {
         order: {
-            type: 'number',
+            type: 'integer',
             minimum: 1
         },
         kind: {
@@ -32,7 +32,7 @@ const contentItem = {
             properties: {
                 id: objectid,
                 revision: {
-                    type: 'number',
+                    type: 'integer',
                     minimum: 1
                 } //if not given use the last revision
             },
@@ -90,17 +90,12 @@ const deckRevision = {
             type: 'string'
         },
         footer: {
-            type: 'object',
-            properties: {
-                text: {
-                    type: 'string'
-                }
-            }
+            type: 'string'
         },
-        license: {
-            type: 'string',
-            enum: ['CC0', 'CC BY', 'CC BY-SA']
-        },
+        // license: {
+        //     type: 'string',
+        //     enum: ['CC0', 'CC BY', 'CC BY-SA']
+        // },
         isFeatured: {
             type: 'number'
         },
@@ -193,7 +188,7 @@ const deckRevision = {
             }
         }
     },
-    required: ['id', 'timestamp', 'user', 'license']
+    required: ['id', 'timestamp', 'user']
 };
 const deck = {
     type: 'object',
@@ -203,18 +198,18 @@ const deck = {
             format: 'datetime'
         },
         user: objectid,
-        kind: {
-            type: 'string'
-        },
+        // kind: {
+        //     type: 'string'
+        // },
         description: {
             type: 'string'
         },
-        language: {
-            type: 'string'
-        },
-        translation: {
-            type: 'object'
-        },
+        // language: {
+        //     type: 'string'
+        // },
+        // translation: {
+        //     type: 'object'
+        // },
         lastUpdate: {
             type: 'string',
             format: 'datetime'
@@ -230,10 +225,14 @@ const deck = {
             }
         },
         active: {
-            type: 'number'
+            type: 'integer'
         },
         datasource: {
             type: 'string'
+        },
+        license: {
+            type: 'string',
+            enum: ['CC0', 'CC BY', 'CC BY-SA']
         },
         translations: { //put here all translations explicitly - deck ids
             type: 'array',

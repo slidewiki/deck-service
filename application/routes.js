@@ -38,6 +38,24 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deck/{id}/needsNewRevision',
+        handler: handlers.needsNewRevision,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                query: {
+                    user: Joi.string()
+                }
+            },
+            tags: ['api'],
+            description: 'Decide if deck needs new revision.'
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/editors',
         handler: handlers.getEditors,
         config: {
@@ -71,7 +89,14 @@ module.exports = function(server) {
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
                     }),
-                    //position: Joi.string().alphanum().lowercase().min(0),
+                    abstract: Joi.string().allow(''),
+                    comment: Joi.string().allow(''),
+                    footer: Joi.string().allow(''),
+                    first_slide: Joi.object().keys({
+                        content: Joi.string().allow(''),
+                        title: Joi.string().allow(''),
+                        speakernotes: Joi.string().allow('')
+                    }),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
                 }).requiredKeys('user', 'license'),
             },
@@ -102,9 +127,12 @@ module.exports = function(server) {
                         revision: Joi.string().alphanum().lowercase()
                     }),
                     content_items: Joi.array(),
+                    abstract: Joi.string().allow(''),
+                    comment: Joi.string().allow(''),
+                    footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     new_revision: Joi.boolean()
-                }).requiredKeys('user', 'license'),
+                }).requiredKeys('user'),
             },
             tags: ['api'],
             description: 'Replace a deck by creating a new revision'
@@ -201,6 +229,9 @@ module.exports = function(server) {
                     }),
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
+                    comment: Joi.string().allow(''),
+                    description: Joi.string().allow(''),
+                    tags: Joi.array().items(Joi.string()).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
                 }).requiredKeys('user', 'content', 'root_deck', 'license'),
             },
@@ -234,10 +265,13 @@ module.exports = function(server) {
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
                     }),
+                    comment: Joi.string().allow(''),
+                    description: Joi.string().allow(''),
+                    tags: Joi.array().items(Joi.string()).default([]),
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
-                }).requiredKeys('user', 'content', 'root_deck', 'license'),
+                }).requiredKeys('user', 'content', 'root_deck'),
             },
             tags: ['api'],
             description: 'Replace a slide with a new revision'
