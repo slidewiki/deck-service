@@ -675,8 +675,7 @@ let self = module.exports = {
         }
 
         let decksPromise = deckDB.find('decks', {
-            user: userid,
-            kind: 'deck'
+            user: userid
         });
 
         decksPromise.then((decks) => {
