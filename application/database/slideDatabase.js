@@ -103,12 +103,26 @@ module.exports = {
                 let revisionCopied = slide.revisions[slideRevision];
                 let now = new Date();
                 let timestamp = now.toISOString();
-                revisionCopied.parent = slide.parent;
+                let parentArray = slide.parent.split('-');
+                if(parentArray.length > 1){
+                    revisionCopied.parent = {'id': parseInt(parentArray[0]), 'revision': parseInt(parentArray[1])};
+                }
+                else{
+                    revisionCopied.parent = slide.parent;
+                }
                 revisionCopied.comment = slide.comment;
                 revisionCopied.id = 1;
                 revisionCopied.timestamp = timestamp;
                 slide.revisions = [revisionCopied];
                 slide.timestamp = timestamp;
+                // let contributors = slide.contributors;
+                // let existingUserContributorIndex = findWithAttr(contributors, 'user', slide.user);
+                // if(existingUserContributorIndex > -1)
+                //     contributors[existingUserContributorIndex].count++;
+                // else{
+                //     contributors.push({'user': slide.user, 'count': 1});
+                // }
+                // slide.contributors = contributors;
                 delete slide.parent;
                 delete slide.comment;
                 try {
@@ -154,10 +168,22 @@ module.exports = {
                 let valid = false;
                 //should empty usage array and keep only the new root deck revision
                 usageArray = [{'id':parseInt(slide.root_deck.split('-')[0]), 'revision': parseInt(slide.root_deck.split('-')[1])}];
-                const slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(maxRevisionId)+1, usageArray);
+                let slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(maxRevisionId)+1, usageArray);
                 slideWithNewRevision.timestamp = existingSlide.timestamp;
                 slideWithNewRevision.license = existingSlide.license;
-                console.log(slideWithNewRevision);
+                slideWithNewRevision.user = existingSlide.user;
+                if(existingSlide.hasOwnProperty('contributors')){
+                    let contributors = existingSlide.contributors;
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', slide.user);
+                    if(existingUserContributorIndex > -1)
+                        contributors[existingUserContributorIndex].count++;
+                    else{
+                        contributors.push({'user': slide.user, 'count': 1});
+                    }
+                    slideWithNewRevision.contributors = contributors;
+                }
+                
+
                 try {
                     valid = slideModel(slideWithNewRevision);
                     if (!valid) {
@@ -296,6 +322,7 @@ function convertToNewSlide(slide) {
         'id': parseInt(root_deck_array[0]),
         'revision': parseInt(root_deck_array[1])
     });
+    let contributorsArray = [{'user': slide.user, 'count': 1}];
     const result = {
         _id: slide._id,
         user: slide.user,
@@ -305,6 +332,7 @@ function convertToNewSlide(slide) {
         lastUpdate: now.toISOString(),
         language: slide.language,
         license: slide.license,
+        contributors: contributorsArray,
         description: slide.description,
         revisions: [{
             id: 1,
@@ -326,7 +354,7 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
     let now = new Date();
     slide.user = parseInt(slide.user);
     const result = {
-        user: slide.user,
+        //user: slide.user,
         //deck: slide.root_deck,
         //timestamp: now.toISOString(),
         lastUpdate: now.toISOString(),
@@ -346,4 +374,13 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
     };
     //console.log('from', slide, 'to', result);
     return result;
+}
+
+function findWithAttr(array, attr, value) {
+    for(var i = 0; i < array.length; i++) {
+        if(array[i][attr] === value) {
+            return i;
+        }
+    }
+    return -1;
 }

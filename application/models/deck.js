@@ -14,7 +14,17 @@ const objectid = {
     maxLength: 24,
     minLength: 1
 };
-
+const contributor = {
+    type: 'object',
+    properties: {
+        id: objectid,
+        count: {
+            type: 'integer',
+            minimum: 1
+        }
+    },
+    required: ['id']
+};
 //build schema
 const contentItem = {
     type: 'object',
@@ -222,6 +232,12 @@ const deck = {
             type: 'array',
             items: {
                 type: 'string'
+            }
+        },
+        contributors: {
+            type: 'array',
+            items: {
+                contributor
             }
         },
         active: {

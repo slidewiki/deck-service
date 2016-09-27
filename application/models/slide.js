@@ -18,8 +18,9 @@ const contributor = {
     type: 'object',
     properties: {
         id: objectid,
-        name: {
-            type: 'string'
+        count: {
+            type: 'integer',
+            minimum: 1
         }
     },
     required: ['id']
@@ -199,9 +200,7 @@ const slide = {
         contributors: {
             type: 'array',
             items: {
-                oneOf: [
-                    contributor
-                ]
+                contributor                
             }
         },
         tags: {
