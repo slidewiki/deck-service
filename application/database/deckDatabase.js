@@ -471,6 +471,8 @@ let self = module.exports = {
                 });
 
 
+            }).catch((err) => {
+                console.log('Deck not found');
             });
         });
     },
@@ -675,7 +677,7 @@ function convertToNewDeck(deck){
     let contributorsArray = [{'user': deck.user, 'count': 1}];
     if(!deck.hasOwnProperty('tags') || deck.tags === null){
         deck.tags = [];
-    }    
+    }
     const result = {
         _id: deck._id,
         user: deck.user,
