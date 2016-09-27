@@ -609,7 +609,6 @@ let self = module.exports = {
     },
 
     needsNewRevision: function(request, reply){
-        let item = request.params.id;
         module.exports.getEditors({'params': {'id' : request.params.id}}, (editorsList) => {
             if(editorsList.includes(parseInt(request.query.user))){
                 //user is an editor
@@ -619,6 +618,12 @@ let self = module.exports = {
                 //user is not an editor or owner
                 reply(true);
             }
+        });
+    },
+
+    handleChange: function(request, reply){
+        deckDB.handleChange(request.params.id, request.query.root_deck, request.query.user, (changeSet) => {
+            reply(changeSet);
         });
     },
 

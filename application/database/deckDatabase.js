@@ -31,8 +31,10 @@ let self = module.exports = {
                 found.revisions = [revision];
                 return found;
             }
+        }).catch((err) => {
+            console.log('Deck not found.');
         })
-    );
+      );
     },
 
     find: (collection, query) => {
@@ -183,6 +185,16 @@ let self = module.exports = {
                 const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
                 deckWithNewRevision.timestamp = existingDeck.timestamp;
                 deckWithNewRevision.user = existingDeck.user;
+                if(existingDeck.hasOwnProperty('contributors')){
+                    let contributors = existingDeck.contributors;
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', deck.user);
+                    if(existingUserContributorIndex > -1)
+                        contributors[existingUserContributorIndex].count++;
+                    else{
+                        contributors.push({'user': deck.user, 'count': 1});
+                    }
+                    deckWithNewRevision.contributors = contributors;  
+                }
 
                 try {
                     valid = deckModel(deckWithNewRevision);
@@ -570,7 +582,11 @@ let self = module.exports = {
 
             });
         });
-    }
+    },
+
+    // handleChange(deck, root_deck, user_id){
+    //
+    // }
 };
 
 function getActiveRevision(deck){
@@ -653,6 +669,7 @@ function convertToNewDeck(deck){
         });
     }
     deck.user = parseInt(deck.user);
+    let contributorsArray = [{'user': deck.user, 'count': 1}];
     const result = {
         _id: deck._id,
         user: deck.user,
@@ -666,6 +683,7 @@ function convertToNewDeck(deck){
         lastUpdate: now.toISOString(),
         datasource: deck.datasource,
         license: deck.license,
+        contributors: contributorsArray,
         //tags: deck.tags,
         active: 1,
         revisions: [{
@@ -723,4 +741,13 @@ function pushIfNotExist(editorsList, toBeInserted){
     if(!editorsList.includes(toBeInserted)){
         editorsList.push(toBeInserted);
     }
+}
+
+function findWithAttr(array, attr, value) {
+    for(var i = 0; i < array.length; i++) {
+        if(array[i][attr] === value) {
+            return i;
+        }
+    }
+    return -1;
 }
