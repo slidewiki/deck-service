@@ -181,6 +181,9 @@ let self = module.exports = {
                 //let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
                 //console.log('content_items', content_items);
                 //console.log('usageArray', usageArray);
+                if(deck.fork){
+                    usageArray = [];
+                }
 
                 const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
                 deckWithNewRevision.timestamp = existingDeck.timestamp;
@@ -193,7 +196,7 @@ let self = module.exports = {
                     else{
                         contributors.push({'user': deck.user, 'count': 1});
                     }
-                    deckWithNewRevision.contributors = contributors;  
+                    deckWithNewRevision.contributors = contributors;
                 }
 
                 try {
@@ -670,6 +673,9 @@ function convertToNewDeck(deck){
     }
     deck.user = parseInt(deck.user);
     let contributorsArray = [{'user': deck.user, 'count': 1}];
+    if(!deck.hasOwnProperty('tags') || deck.tags === null){
+        deck.tags = [];
+    }    
     const result = {
         _id: deck._id,
         user: deck.user,
@@ -709,6 +715,9 @@ function convertToNewDeck(deck){
 function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray) {
     let now = new Date();
     deck.user = parseInt(deck.user);
+    if(!deck.hasOwnProperty('tags') || deck.tags === null){
+        deck.tags = [];
+    }
     const result = {
         //user: deck.user,
         //deck: deck.root_deck,
