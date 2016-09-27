@@ -140,6 +140,24 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'PUT',
+        path: '/deck/{id}/fork',
+        handler: handlers.forkDeckRevision,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                payload: Joi.object().keys({                    
+                    user: Joi.string().alphanum().lowercase()
+                }).requiredKeys('user'),
+            },
+            tags: ['api'],
+            description: 'Create a fork of a deck, by creating a new revision'
+        }
+    });
+
+    server.route({
         method: 'POST',
         path: '/deck/revert/{id}',
         handler: handlers.revertDeckRevision,
