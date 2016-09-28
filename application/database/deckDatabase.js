@@ -646,138 +646,113 @@ let self = module.exports = {
         result.reverse();
         let revisions = [], new_revisions = [];
         return new Promise(function(resolve, reject) {
-        async.eachSeries(result, function(next_deck, callback){
-            module.exports.needsNewRevision(next_deck.id, user_id).then((needs) => {
-                if(!needs){
-                    callback();
-                }
-                else{
-                    revisions.push(next_deck);
-                    callback();
-                }
-            });
-        },function(err){
-            //let newParentMap = []; //NOTE might not need
-            console.log('revisions array', revisions);
-            revisions.reverse(); //start from the innermost deck that needs revision
-
-              async.eachSeries(revisions, function(next_needs_revision, callback){
-                  //iteratively do the needed revisions
-                  console.log('next_needs_revision', next_needs_revision);
-                  module.exports.get(encodeURIComponent(next_needs_revision.id)).then((existingDeck) => {
-                      let ind = existingDeck.revisions.length-1;
-                      let payload = {
-                          title: existingDeck.revisions[ind].title,
-                          description: existingDeck.description,
-                          language: existingDeck.revisions[ind].language,
-                          tags: existingDeck.revisions[ind].tags,
-                          license: existingDeck.license,
-                          user: user_id
-                      };
-                      if(next_needs_revision.hasOwnProperty('parent_id')){
-                          if(findWithAttrRev(revisions, 'id', next_needs_revision.parent_id) > -1){
-                              module.exports.get(next_needs_revision.parent_id).then((existing_root_deck) => {
-                                  payload.root_deck = existing_root_deck._id+'-'+existing_root_deck.active;
-                                  console.log('will be updated with parent', payload.root_deck);
-                                  module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
+            async.eachSeries(result, function(next_deck, callback){
+                module.exports.needsNewRevision(next_deck.id, user_id).then((needs) => {
+                    if(!needs){
+                        callback();
+                    }
+                    else{
+                        revisions.push(next_deck);
+                        callback();
+                    }
+                });
+            },function(err){
+                console.log('revisions array', revisions);
+                revisions.reverse(); //start from the innermost deck that needs revision
+                async.eachSeries(revisions, function(next_needs_revision, callback){
+                    //iteratively do the needed revisions
+                    console.log('next_needs_revision', next_needs_revision);
+                    module.exports.get(encodeURIComponent(next_needs_revision.id)).then((existingDeck) => {
+                        let ind = existingDeck.revisions.length-1;
+                        let payload = {
+                            title: existingDeck.revisions[ind].title,
+                            description: existingDeck.description,
+                            language: existingDeck.revisions[ind].language,
+                            tags: existingDeck.revisions[ind].tags,
+                            license: existingDeck.license,
+                            user: user_id
+                        };
+                        if(next_needs_revision.hasOwnProperty('parent_id')){
+                            if(findWithAttrRev(revisions, 'id', next_needs_revision.parent_id) > -1){
+                                module.exports.get(next_needs_revision.parent_id).then((existing_root_deck) => {
+                                    payload.root_deck = existing_root_deck._id+'-'+existing_root_deck.active;
+                                    console.log('will be updated with parent', payload.root_deck);
+                                    module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
                                         //must update parent of next revision with new revision id
-                                      console.log('updated ', replaced);
-                                      //NOTE must update content items of parent
-                                      module.exports.get(replaced.value._id).then((newDeck) => {
+                                        console.log('updated ', replaced);
+                                        //NOTE must update content items of parent
+                                        module.exports.get(replaced.value._id).then((newDeck) => {
 
-                                          //only update the root deck, i.e., direct parent
-                                          module.exports.updateContentItem(newDeck, '', payload.root_deck, 'deck')
-                                          .then((updated) => {
-                                              new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
-                                              //new_revisions[0]=newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id;
-                                              callback();
-                                          });
-
-                                      });
-
-                                  }).catch((error) => {
-                                      console.log('error', error);
-                                      //reply(boom.badImplementation());
-                                  });
-                              });
-                              //payload.root_deck = next_needs_revision.parent_id.split('-')[0];
-                          }
-                          else{
-                              payload.root_deck = next_needs_revision.parent_id; //NOTE parent must contain the revision number!
-                              console.log('will be updated with parent', payload.root_deck);
-                              module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
+                                            //only update the root deck, i.e., direct parent
+                                            module.exports.updateContentItem(newDeck, '', payload.root_deck, 'deck')
+                                            .then((updated) => {
+                                                new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
+                                                //new_revisions[0]=newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id;
+                                                callback();
+                                            });
+                                        });
+                                    }).catch((error) => {
+                                        console.log('error', error);
+                                        //reply(boom.badImplementation());
+                                    });
+                                });
+                                //payload.root_deck = next_needs_revision.parent_id.split('-')[0];
+                            }
+                            else{
+                                payload.root_deck = next_needs_revision.parent_id; //NOTE parent must contain the revision number!
+                                console.log('will be updated with parent', payload.root_deck);
+                                module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
                                     //must update parent of next revision with new revision id
-                                  console.log('updated ', replaced);
-                                  //NOTE must update content items of parent
-                                  module.exports.get(replaced.value._id).then((newDeck) => {
+                                    console.log('updated ', replaced);
+                                    //NOTE must update content items of parent
+                                    module.exports.get(replaced.value._id).then((newDeck) => {
 
-                                      //only update the root deck, i.e., direct parent
-                                      module.exports.updateContentItem(newDeck, '', payload.root_deck, 'deck')
-                                      .then((updated) => {
-                                          new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
-                                          //new_revisions[0]=newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id;
-                                          callback();
-                                      });
-                                  });
-                              }).catch((error) => {
-                                  console.log('error', error);
-                                  //reply(boom.badImplementation());
-                              });
-                          }
-                      }
-                      else{
-                          module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
-                              //must update parent of next revision with new revision id
-                              console.log('updated ', replaced);
-                              module.exports.get(replaced.value._id).then((newDeck) => {
-                                  new_revisions.push({'root_changed': newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id});
-                              });
-                              //new_revisions.push();'
-                              //new_revisions.push('root changed');
-                              //new_revisions[0] = 'root_changed';
-                              callback();
-                          }).catch((error) => {
-                              console.log('error', error);
-                            //reply(boom.badImplementation());
-                          });
-                      }
-
-                  });
-                  //module.exports.replace()
-
-
-              },function(error){
-                  console.log('final revisions', revisions);
-                  console.log('new revisions', new_revisions);
-                  if(new_revisions[0].hasOwnProperty('root_changed')){
-                      //new_root = new_revisions[new_revisions.length-1].root_changed;
-                      resolve(new_revisions[0]);
-                  }
-                  else{
-                    module.exports.getFlatSlidesFromDB(root_deck, undefined, true).then((flatTree) => {
-                        for(let i = 0; i < flatTree.children.length; i++){
-                            if(flatTree.children[i].id === new_revisions[0]){
-                                resolve({'id': flatTree.children[i].id, 'position': i+1});
+                                        //only update the root deck, i.e., direct parent
+                                        module.exports.updateContentItem(newDeck, '', payload.root_deck, 'deck')
+                                        .then((updated) => {
+                                            new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
+                                            //new_revisions[0]=newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id;
+                                            callback();
+                                        });
+                                    });
+                                }).catch((error) => {
+                                    console.log('error', error);
+                                    //reply(boom.badImplementation());
+                                });
                             }
                         }
-
+                        else{
+                            module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
+                                //must update parent of next revision with new revision id
+                                console.log('updated ', replaced);
+                                module.exports.get(replaced.value._id).then((newDeck) => {
+                                    new_revisions.push({'root_changed': newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id});
+                                });
+                                callback();
+                            }).catch((error) => {
+                                console.log('error', error);
+                            });
+                        }
                     });
-                  }
 
-
-                  // return new Promise(function(resolve, reject) {
-                  //     resolve(revisions);
-                  // });
-              });
+                },function(error){
+                    console.log('final revisions', revisions);
+                    console.log('new revisions', new_revisions);
+                    if(new_revisions[0].hasOwnProperty('root_changed')){
+                        resolve(new_revisions[0]);
+                    }
+                    else{
+                        module.exports.getFlatSlidesFromDB(root_deck, undefined, true).then((flatTree) => {
+                            for(let i = 0; i < flatTree.children.length; i++){
+                                if(flatTree.children[i].id === new_revisions[0]){
+                                    resolve({'id': flatTree.children[i].id, 'position': i+1});
+                                }
+                            }
+                        });
+                    }
+                });
             });
-
-
-
-            // return new Promise(function(resolve, reject) {
-            //     resolve(revisions);
-            // });
         });
-
     }
 };
 
