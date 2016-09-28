@@ -605,7 +605,7 @@ let self = module.exports = {
     },
 
     getFlatSlides: function(request, reply){
-        deckDB.getFlatSlidesFromDB(request.params.id)
+        deckDB.getFlatSlidesFromDB(request.params.id, undefined)
         .then((deckTree) => {
             if(typeof request.query.limit !== 'undefined' || typeof request.query.offset !== 'undefined'){
                 let limit = request.query.limit, offset = request.query.offset;
@@ -644,22 +644,21 @@ let self = module.exports = {
     },
 
     needsNewRevision: function(request, reply){
-        module.exports.getEditors({'params': {'id' : request.params.id}}, (editorsList) => {
-            if(editorsList.includes(parseInt(request.query.user))){
-                //user is an editor
-                reply(false);
-            }
-            else{
-                //user is not an editor or owner
-                reply(true);
-            }
+        deckDB.needsNewRevision(request.params.id, request.query.user).then((needsNewRevision) => {
+            console.log(needsNewRevision);
+
+            reply(needsNewRevision);
         });
     },
 
     handleChange: function(request, reply){
-        deckDB.handleChange(request.params.id, request.query.root_deck, request.query.user, (changeSet) => {
-            reply(changeSet);
+        module.exports.getDeckTree({'params': {'id' : request.query.root_deck}}, (decktree) => {
+            deckDB.handleChange(decktree, request.params.id, request.query.root_deck, request.query.user).then((changeSet) => {
+                console.log(changeSet);
+                reply(changeSet);
+            });
         });
+
     },
 
     //returns metadata about all decks a user owns

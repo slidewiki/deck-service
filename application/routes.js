@@ -56,6 +56,25 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deck/{id}/handleChange',
+        handler: handlers.handleChange,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                query: {
+                    root_deck: Joi.string(),
+                    user: Joi.string()
+                }
+            },
+            tags: ['api'],
+            description: 'Checks the decktree to see which decks need new revisions, starting from a given deck up.'
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/editors',
         handler: handlers.getEditors,
         config: {
@@ -148,7 +167,7 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string()
                 },
-                payload: Joi.object().keys({                    
+                payload: Joi.object().keys({
                     user: Joi.string().alphanum().lowercase()
                 }).requiredKeys('user'),
             },
