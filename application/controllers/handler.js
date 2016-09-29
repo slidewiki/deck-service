@@ -55,7 +55,7 @@ let self = module.exports = {
                 if(content === ''){
                     content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
                 }
-                createThumbnail(content, slideId, user);
+                createThumbnail(content, slideId, user); 
 
                 reply(co.rewriteID(inserted.ops[0]));
             }
