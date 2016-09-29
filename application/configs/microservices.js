@@ -1,13 +1,14 @@
-
 'use strict';
+
+
 
 module.exports = {
     'file': {
-        uri: 'fileservice.manfredfris.ch',
+        uri: (!co.isEmpty(process.env.SERVICE_URL_FILE)) ? process.env.SERVICE_URL_FILE : 'fileservice.experimental.slidewiki.org',
         shareVolume: '/data/files'
     },
     'image': {
-        uri: 'imageservice.manfredfris.ch',
+        uri: (!co.isEmpty(process.env.SERVICE_URL_IMAGE)) ? process.env.SERVICE_URL_IMAGE : 'imageservice.experimental.slidewiki.org',
         port: 80
     }
 };

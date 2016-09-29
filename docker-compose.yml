@@ -9,3 +9,5 @@ deckservice:
     - APPLICATION_PORT=80
     - DATABASE_PORT=27017
     - VIRTUAL_HOST=deckservice.experimental.slidewiki.org
+    - SERVICE_URL_FILE=fileservice.experimental.slidewiki.org
+    - SERVICE_URL_IMAGE=imageservice.experimental.slidewiki.org
