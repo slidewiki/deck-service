@@ -497,7 +497,7 @@ let self = module.exports = {
                     revision_id = deck.active-1;
                 }
                 if(!deckTree){
-                    deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', children: []};
+                    deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), children: []};
                 }
 
                 return new Promise(function(resolve, reject) {
@@ -510,7 +510,7 @@ let self = module.exports = {
                                 col.findOne({_id: parseInt(citem.ref.id)})
                                 .then((slide) => {
                                     let slide_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                                    deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, user: String(slide.revisions[slide_revision].user), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
                                     callback();
                                 });
                             });
@@ -520,7 +520,7 @@ let self = module.exports = {
                             .then((innerDeck) => {
                                 if(return_decks){
                                     let deck_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: innerDeck.revisions[deck_revision].title, id: innerDeck._id+'-'+innerDeck.revisions[deck_revision].id, type: 'deck'});
+                                    deckTree.children.push({title: innerDeck.revisions[deck_revision].title, user: String(innerDeck.revisions[deck_revision].user), id: innerDeck._id+'-'+innerDeck.revisions[deck_revision].id, type: 'deck'});
                                 }
                                 module.exports.getFlatSlidesFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree, return_decks)
                                 .then((res) => {

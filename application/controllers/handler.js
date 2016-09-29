@@ -90,7 +90,7 @@ let self = module.exports = {
 
                 }).catch((error) => {
                     request.log('error', error);
-                    reply(boom.badImplementation());                              
+                    reply(boom.badImplementation());
                 });
 
                 //reply(replaced.value);
@@ -746,48 +746,47 @@ let self = module.exports = {
 };
 
 function createThumbnail(slideContent, slideId, user) {
+    let http = require('http');
+    let he = require('he');
 
-  let http = require('http');
-  let he = require('he');
+    let encodedContent = he.encode(slideContent, {allowUnsafeSymbols: true});
 
-  let encodedContent = he.encode(slideContent, {allowUnsafeSymbols: true});
+    let jsonData = {
+        userID: String(user),
+        html: encodedContent,
+        filename: slideId
+    };
 
-  let jsonData = {
-    userID: String(user),
-    html: encodedContent,
-    filename: slideId
-  };
-  //console.log(jsonData);
-  let data = JSON.stringify(jsonData);
+    let data = JSON.stringify(jsonData);
 
-  let options = {
-    host: Microservices.image.uri,
-    port: Microservices.image.port,
-    path: '/thumbnail',
-    method: 'POST',
-    headers : {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
-      'Content-Length': data.length
-    }
-  };
-  let req = http.request(options, (res) => {
-    // console.log('STATUS: ' + res.statusCode);
-    // console.log('HEADERS: ' + JSON.stringify(res.headers));
-    res.setEncoding('utf8');
-    res.on('data', (chunk) => {
-      // console.log('Response: ', chunk);
-      // let newDeckTreeNode = JSON.parse(chunk);
+    let options = {
+        host: Microservices.image.uri,
+        port: Microservices.image.port,
+        path: '/thumbnail',
+        method: 'POST',
+        headers : {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Content-Length': data.length
+        }
+    };
+    let req = http.request(options, (res) => {
+        // console.log('STATUS: ' + res.statusCode);
+        // console.log('HEADERS: ' + JSON.stringify(res.headers));
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+        // console.log('Response: ', chunk);
+        // let newDeckTreeNode = JSON.parse(chunk);
 
-      // resolve(newDeckTreeNode);
+        // resolve(newDeckTreeNode);
+        });
     });
-  });
-  req.on('error', (e) => {
-    console.log('problem with request thumb: ' + e.message);
-    // reject(e);
-  });
-  req.write(data);
-  req.end();
+    req.on('error', (e) => {
+        console.log('problem with request thumb: ' + e.message);
+        // reject(e);
+    });
+    req.write(data);
+    req.end();
 
-  console.log(slideId);
+    console.log(slideId);
 }
