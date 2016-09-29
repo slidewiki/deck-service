@@ -55,7 +55,7 @@ let self = module.exports = {
                 if(content === ''){
                     content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
                 }
-                createThumbnail(content, slideId, user); 
+                createThumbnail(content, slideId, user);
 
                 reply(co.rewriteID(inserted.ops[0]));
             }
@@ -203,7 +203,11 @@ let self = module.exports = {
                         //   deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'deck');
                         reply(co.rewriteID(inserted.ops[0]));
                     });
-
+                    let content = newSlide.content, user = inserted.ops[0].user, slideId = insertedSlide.ops[0].id+'-'+1;
+                    if(content === ''){
+                        content = '<h2>'+newSlide.title+'</h2>';
+                    }
+                    createThumbnail(content, slideId, user);
                 });
                 //check if a root deck is defined, if yes, update its content items to reflect the new sub-deck
 
