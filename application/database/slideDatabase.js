@@ -82,6 +82,8 @@ module.exports = {
                     if (!valid) {
                         return slideModel.errors;
                     }
+                    //create thumbnail here
+                    
                     return col.insertOne(convertedSlide);
                 } catch (e) {
                     console.log('validation failed', e);
@@ -182,7 +184,7 @@ module.exports = {
                     }
                     slideWithNewRevision.contributors = contributors;
                 }
-                
+
 
                 try {
                     valid = slideModel(slideWithNewRevision);

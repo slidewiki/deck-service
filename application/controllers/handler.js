@@ -8,7 +8,8 @@ const boom = require('boom'),
     slideDB = require('../database/slideDatabase'),
     deckDB = require('../database/deckDatabase'),
     co = require('../common'),
-    Joi = require('joi');
+    Joi = require('joi'),
+    Microservices = require('../configs/microservices');
 
 let self = module.exports = {
     getSlide: function(request, reply) {
@@ -50,6 +51,12 @@ let self = module.exports = {
                 throw inserted;
             else{
                 //deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'slide');
+                let content = inserted.ops[0].revisions[0].content, user = request.payload.user, slideId = inserted.ops[0]._id+'-'+1;
+                if(content === ''){
+                    content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                }
+                createThumbnail(content, slideId, user); 
+
                 reply(co.rewriteID(inserted.ops[0]));
             }
         }).catch((error) => {
@@ -74,8 +81,16 @@ let self = module.exports = {
                     //only update the root deck, i.e., direct parent
                     deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
                     newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
+                    let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
+                    if(content === ''){
+                        content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                    }
+                    createThumbnail(content, newSlideId, user);
                     reply(newSlide);
 
+                }).catch((error) => {
+                    request.log('error', error);
+                    reply(boom.badImplementation());
                 });
 
                 //reply(replaced.value);
@@ -605,7 +620,7 @@ let self = module.exports = {
     },
 
     getFlatSlides: function(request, reply){
-        deckDB.getFlatSlidesFromDB(request.params.id)
+        deckDB.getFlatSlidesFromDB(request.params.id, undefined)
         .then((deckTree) => {
             if(typeof request.query.limit !== 'undefined' || typeof request.query.offset !== 'undefined'){
                 let limit = request.query.limit, offset = request.query.offset;
@@ -644,22 +659,21 @@ let self = module.exports = {
     },
 
     needsNewRevision: function(request, reply){
-        module.exports.getEditors({'params': {'id' : request.params.id}}, (editorsList) => {
-            if(editorsList.includes(parseInt(request.query.user))){
-                //user is an editor
-                reply(false);
-            }
-            else{
-                //user is not an editor or owner
-                reply(true);
-            }
+        deckDB.needsNewRevision(request.params.id, request.query.user).then((needsNewRevision) => {
+            console.log(needsNewRevision);
+
+            reply(needsNewRevision);
         });
     },
 
     handleChange: function(request, reply){
-        deckDB.handleChange(request.params.id, request.query.root_deck, request.query.user, (changeSet) => {
-            reply(changeSet);
+        module.exports.getDeckTree({'params': {'id' : request.query.root_deck}}, (decktree) => {
+            deckDB.handleChange(decktree, request.params.id, request.query.root_deck, request.query.user).then((changeSet) => {
+                console.log(changeSet);
+                reply(changeSet);
+            });
         });
+
     },
 
     //returns metadata about all decks a user owns
@@ -726,4 +740,52 @@ let self = module.exports = {
 
         });
     }
+
+
 };
+
+function createThumbnail(slideContent, slideId, user) {
+    let http = require('http');
+    let he = require('he');
+
+    let encodedContent = he.encode(slideContent, {allowUnsafeSymbols: true});
+
+    let jsonData = {
+        userID: String(user),
+        html: encodedContent,
+        filename: slideId
+    };
+
+    let data = JSON.stringify(jsonData);
+
+    let options = {
+        host: Microservices.image.uri,
+        port: Microservices.image.port,
+        path: '/thumbnail',
+        method: 'POST',
+        headers : {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Content-Length': data.length
+        }
+    };
+    let req = http.request(options, (res) => {
+        // console.log('STATUS: ' + res.statusCode);
+        // console.log('HEADERS: ' + JSON.stringify(res.headers));
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+        // console.log('Response: ', chunk);
+        // let newDeckTreeNode = JSON.parse(chunk);
+
+        // resolve(newDeckTreeNode);
+        });
+    });
+    req.on('error', (e) => {
+        console.log('problem with request thumb: ' + e.message);
+        // reject(e);
+    });
+    req.write(data);
+    req.end();
+
+    console.log(slideId);
+}

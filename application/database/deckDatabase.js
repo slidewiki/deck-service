@@ -167,7 +167,10 @@ let self = module.exports = {
 
                 if(deck.root_deck){
                     //console.log(slide.root_deck);
-
+                    // let root_deck_array = deck.root_deck.split('-');
+                    // if(root_deck_array.length === 1){
+                    //     root_deck_array.push(getActiveRevision(existingRootDeck));
+                    // }
                     for(let i = 0; i < previousUsageArray.length; i++){
                         if(previousUsageArray[i].id === parseInt(deck.root_deck.split('-')[0]) && previousUsageArray[i].revision === parseInt(deck.root_deck.split('-')[1])){
                             previousUsageArray.splice(i,1);
@@ -477,7 +480,7 @@ let self = module.exports = {
         });
     },
 
-    getFlatSlidesFromDB: function(deck_id, deckTree){
+    getFlatSlidesFromDB: function(deck_id, deckTree, return_decks){
 
         let revision_id = -1;
         let decktreesplit = deck_id.split('-');
@@ -494,7 +497,7 @@ let self = module.exports = {
                     revision_id = deck.active-1;
                 }
                 if(!deckTree){
-                    deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', children: []};
+                    deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), children: []};
                 }
 
                 return new Promise(function(resolve, reject) {
@@ -507,7 +510,7 @@ let self = module.exports = {
                                 col.findOne({_id: parseInt(citem.ref.id)})
                                 .then((slide) => {
                                     let slide_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                                    deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, user: String(slide.revisions[slide_revision].user), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
                                     callback();
                                 });
                             });
@@ -515,7 +518,11 @@ let self = module.exports = {
                         else{
                             col.findOne({_id: parseInt(citem.ref.id)})
                             .then((innerDeck) => {
-                                module.exports.getFlatSlidesFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree)
+                                if(return_decks){
+                                    let deck_revision = citem.ref.revision-1;
+                                    deckTree.children.push({title: innerDeck.revisions[deck_revision].title, user: String(innerDeck.revisions[deck_revision].user), id: innerDeck._id+'-'+innerDeck.revisions[deck_revision].id, type: 'deck'});
+                                }
+                                module.exports.getFlatSlidesFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree, return_decks)
                                 .then((res) => {
                                     callback();
                                 });
@@ -589,10 +596,192 @@ let self = module.exports = {
         });
     },
 
-    // handleChange(deck, root_deck, user_id){
-    //
-    // }
+    forkDeckRevision(deck){
+        module.exports.get(encodeURIComponent(deck.id)).then((existingDeck) => {
+            let ind = existingDeck.revisions.length-1;
+            let payload = {
+                title: existingDeck.revisions[ind].title,
+                description: existingDeck.description,
+                language: existingDeck.revisions[ind].language,
+                tags: existingDeck.revisions[ind].tags,
+                license: existingDeck.license,
+                user: request.payload.user,
+                fork: true
+            };
+            module.exports.replace(encodeURIComponent(deck.id), payload).then((replaced) => {
+                if (co.isEmpty(replaced.value))
+                    throw replaced;
+                else{
+                    return replaced;
+                }
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
+        });
+    },
+
+    needsNewRevision(deck, user){
+        return module.exports.getDeckEditors(deck).then((editorsList) => {
+            if(editorsList.includes(parseInt(user))){
+                //user is an editor
+                return new Promise(function(resolve, reject) {
+                    resolve(false);
+                });
+            }
+            else{
+                //user is not an editor or owner
+                return new Promise(function(resolve, reject) {
+                    resolve(true);
+                });
+            }
+        });
+    },
+
+    handleChange(decktree, deck, root_deck, user_id){
+        let result = findDeckInDeckTree(decktree.children, deck, [{'id': root_deck}]);
+
+        //result.push({'id': deck);
+        console.log('result', result);
+        result.reverse();
+        let revisions = [], new_revisions = [];
+        return new Promise(function(resolve, reject) {
+            async.eachSeries(result, function(next_deck, callback){
+                module.exports.needsNewRevision(next_deck.id, user_id).then((needs) => {
+                    if(!needs){
+                        callback();
+                    }
+                    else{
+                        revisions.push(next_deck);
+                        callback();
+                    }
+                });
+            },function(err){
+                console.log('revisions array', revisions);
+                revisions.reverse(); //start from the innermost deck that needs revision
+                async.eachSeries(revisions, function(next_needs_revision, callback){
+                    //iteratively do the needed revisions
+                    console.log('next_needs_revision', next_needs_revision);
+                    module.exports.get(encodeURIComponent(next_needs_revision.id)).then((existingDeck) => {
+                        let ind = existingDeck.revisions.length-1;
+                        let payload = {
+                            title: existingDeck.revisions[ind].title,
+                            description: existingDeck.description,
+                            language: existingDeck.revisions[ind].language,
+                            tags: existingDeck.revisions[ind].tags,
+                            license: existingDeck.license,
+                            user: user_id
+                        };
+                        if(next_needs_revision.hasOwnProperty('parent_id')){
+                            if(findWithAttrRev(revisions, 'id', next_needs_revision.parent_id) > -1){
+                                module.exports.get(next_needs_revision.parent_id).then((existing_root_deck) => {
+                                    payload.root_deck = existing_root_deck._id+'-'+existing_root_deck.active;
+                                    console.log('will be updated with parent', payload.root_deck);
+                                    module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
+                                        //must update parent of next revision with new revision id
+                                        console.log('updated ', replaced);
+                                        //NOTE must update content items of parent
+                                        module.exports.get(replaced.value._id).then((newDeck) => {
+
+                                            //only update the root deck, i.e., direct parent
+                                            module.exports.updateContentItem(newDeck, '', payload.root_deck, 'deck')
+                                            .then((updated) => {
+                                                new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
+                                                //new_revisions[0]=newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id;
+                                                callback();
+                                            });
+                                        });
+                                    }).catch((error) => {
+                                        console.log('error', error);
+                                        //reply(boom.badImplementation());
+                                    });
+                                });
+                                //payload.root_deck = next_needs_revision.parent_id.split('-')[0];
+                            }
+                            else{
+                                payload.root_deck = next_needs_revision.parent_id; //NOTE parent must contain the revision number!
+                                console.log('will be updated with parent', payload.root_deck);
+                                module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
+                                    //must update parent of next revision with new revision id
+                                    console.log('updated ', replaced);
+                                    //NOTE must update content items of parent
+                                    module.exports.get(replaced.value._id).then((newDeck) => {
+
+                                        //only update the root deck, i.e., direct parent
+                                        module.exports.updateContentItem(newDeck, '', payload.root_deck, 'deck')
+                                        .then((updated) => {
+                                            new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
+                                            //new_revisions[0]=newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id;
+                                            callback();
+                                        });
+                                    });
+                                }).catch((error) => {
+                                    console.log('error', error);
+                                    //reply(boom.badImplementation());
+                                });
+                            }
+                        }
+                        else{
+                            module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
+                                //must update parent of next revision with new revision id
+                                console.log('updated ', replaced);
+                                module.exports.get(replaced.value._id).then((newDeck) => {
+                                    new_revisions.push({'root_changed': newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id});
+                                });
+                                callback();
+                            }).catch((error) => {
+                                console.log('error', error);
+                            });
+                        }
+                    });
+
+                },function(error){
+                    console.log('final revisions', revisions);
+                    console.log('new revisions', new_revisions);
+                    if(new_revisions[0].hasOwnProperty('root_changed')){
+                        resolve(new_revisions[0]);
+                    }
+                    else{
+                        module.exports.getFlatSlidesFromDB(root_deck, undefined, true).then((flatTree) => {
+                            for(let i = 0; i < flatTree.children.length; i++){
+                                if(flatTree.children[i].id === new_revisions[0]){
+                                    resolve({'id': flatTree.children[i].id, 'position': i+1});
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        });
+    }
 };
+
+
+
+function findDeckInDeckTree(decktree, deck, path){
+    if (decktree) {
+        for (let i = 0; i < decktree.length; i++) {
+
+            if(decktree[i].type === 'slide')
+                continue;
+            //console.log(decktree[i]);
+            if (decktree[i].id === String(deck)) {
+                let npath = JSON.parse(JSON.stringify(path));
+                npath.push({'id': decktree[i].id, 'parent_id': path[path.length-1].id});
+                return npath;
+            }
+            else{
+                let npath = JSON.parse(JSON.stringify(path));
+                npath.push({'id': decktree[i].id, 'parent_id': path[path.length-1].id});
+                //console.log(path);
+                let found = findDeckInDeckTree(decktree[i].children, deck, npath);
+                if(found) return found;
+
+            }
+        }
+    }
+    else return;
+}
 
 function getActiveRevision(deck){
     for(let i = 0; i < deck.revisions.length; i++) {
@@ -757,6 +946,15 @@ function pushIfNotExist(editorsList, toBeInserted){
 function findWithAttr(array, attr, value) {
     for(var i = 0; i < array.length; i++) {
         if(array[i][attr] === value) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+function findWithAttrRev(array, attr, value) {
+    for(var i = 0; i < array.length; i++) {
+        if(array[i][attr].split('-')[0] === value.split('-')[0]) {
             return i;
         }
     }
