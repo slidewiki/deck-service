@@ -8,4 +8,4 @@ deckservice:
   environment:
     - APPLICATION_PORT=80
     - DATABASE_PORT=27017
-    - VIRTUAL_HOST=deckservice.manfredfris.ch
+    - VIRTUAL_HOST=deckservice.experimental.slidewiki.org
