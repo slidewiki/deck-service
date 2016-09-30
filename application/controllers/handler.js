@@ -664,18 +664,56 @@ let self = module.exports = {
 
     needsNewRevision: function(request, reply){
         deckDB.needsNewRevision(request.params.id, request.query.user).then((needsNewRevision) => {
-            console.log(needsNewRevision);
-
+            //console.log(needsNewRevision);
             reply(needsNewRevision);
         });
     },
 
     handleChange: function(request, reply){
-        module.exports.getDeckTree({'params': {'id' : request.query.root_deck}}, (decktree) => {
-            deckDB.handleChange(decktree, request.params.id, request.query.root_deck, request.query.user).then((changeSet) => {
-                console.log(changeSet);
-                reply(changeSet);
-            });
+        deckDB.get(request.params.id).then((foundDeck) => {
+            let active = -1;
+            let idArray = request.params.id.split('-');
+            if(idArray.length > 1){
+                active = idArray[1];
+            }
+            else{
+                active = foundDeck.active;
+            }
+            request.params.id = idArray[0]+'-'+active;
+            deckDB.get(request.query.root_deck).then((foundRootDeck) => {
+                let activeRoot = -1;
+                let rootIdArray = request.query.root_deck.split('-');
+                if(rootIdArray.length > 1){
+                    activeRoot = rootIdArray[1];
+                }
+                else{
+                    activeRoot = parseInt(foundRootDeck.active);
+                }
+                request.query.root_deck = rootIdArray[0]+'-'+activeRoot;
+                //console.log('deck', request.params.id);
+                //console.log('root_deck', request.query.root_deck);
+                module.exports.getDeckTree({'params': {'id' : request.query.root_deck}}, (decktree) => {
+                    deckDB.handleChange(decktree, request.params.id, request.query.root_deck, request.query.user).then((changeSet) => {
+                        //console.log(changeSet);
+                        if(!changeSet){
+                            throw changeSet;
+                        }
+                        else{
+                            reply(changeSet);
+                        }
+                    }).catch((e) => {
+                        request.log('error', e);
+                        reply(boom.badImplementation());
+                    });;
+                });
+            }).catch((err) => {
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });;
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
         });
 
     },

@@ -640,7 +640,12 @@ let self = module.exports = {
 
     handleChange(decktree, deck, root_deck, user_id){
         let result = findDeckInDeckTree(decktree.children, deck, [{'id': root_deck}]);
-
+        if(!result || result.length === 0){
+            return new Promise(function(resolve, reject) {
+                console.log('Requested deck not found in the deck tree. If you havent defined revisions, then maybe active revisions of deck and root do not match');
+                resolve();
+            });
+        }
         //result.push({'id': deck);
         //console.log('result', result);
         result.reverse();
@@ -648,7 +653,7 @@ let self = module.exports = {
         return new Promise(function(resolve, reject) {
             async.eachSeries(result, function(next_deck, callback){
                 module.exports.needsNewRevision(next_deck.id, user_id).then((needs) => {
-                    if(!needs){
+                    if(!needs.needs_revision){
                         callback();
                     }
                     else{
@@ -657,7 +662,10 @@ let self = module.exports = {
                     }
                 });
             },function(err){
-                //console.log('revisions array', revisions);
+                console.log('revisions array', revisions);
+                if(revisions.length === 0){
+                    resolve({'needsRevision': false});
+                }
                 revisions.reverse(); //start from the innermost deck that needs revision
                 async.eachSeries(revisions, function(next_needs_revision, callback){
                     //iteratively do the needed revisions
@@ -738,6 +746,9 @@ let self = module.exports = {
                 },function(error){
                     //console.log('final revisions', revisions);
                     //console.log('new revisions', new_revisions);
+                    if(new_revisions.length === 0){
+                        resolve({'needsRevision': false});
+                    }
                     if(new_revisions[0].hasOwnProperty('root_changed')){
                         let resp = {
                             'new_deck_id': new_revisions[0].root_changed,
