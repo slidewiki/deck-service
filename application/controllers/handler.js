@@ -68,37 +68,47 @@ let self = module.exports = {
     updateSlide: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         let slideId = request.params.id;
-
-        slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
-            //console.log('updated: ', replaced.value.revisions);
-            if (co.isEmpty(replaced.value))
-                throw replaced;
-            else{
-                //let revisionUpdatedId = slideId.split('-')[1];
-                //we must update all decks in the 'usage' attribute
-                slideDB.get(replaced.value._id).then((newSlide) => {
-
-                    //only update the root deck, i.e., direct parent
-                    deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
-                    newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
-                    let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
-                    if(content === ''){
-                        content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
-                    }
-                    createThumbnail(content, newSlideId, user);
-                    reply(newSlide);
-
-                }).catch((error) => {
-                    request.log('error', error);
-                    reply(boom.badImplementation());
-                });
-
-                //reply(replaced.value);
+        //must handle changes here.
+        //console.log('request payload', request.payload);
+        //if(true) reply(true);
+        module.exports.handleChange({'params': {'id':request.payload.root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck}}
+        ,(changeset) => {
+            //console.log('changeset', changeset);
+            if(changeset && changeset.hasOwnProperty('target_deck')){
+                //revisioning took place, we must update root deck
+                request.payload.root_deck = changeset.target_deck;
             }
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
+            //console.log('new payload', request.payload);
+            slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
+                if (co.isEmpty(replaced.value))
+                    throw replaced;
+                else{
+                    //we must update all decks in the 'usage' attribute
+                    slideDB.get(replaced.value._id).then((newSlide) => {
+
+                        //only update the root deck, i.e., direct parent
+                        deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
+                        newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
+                        let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
+                        if(content === ''){
+                            content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                        }
+                        createThumbnail(content, newSlideId, user);
+                        reply(newSlide);
+
+                    }).catch((error) => {
+                        request.log('error', error);
+                        reply(boom.badImplementation());
+                    });
+
+                  //reply(replaced.value);
+                }
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
         });
+
     },
 
     updateNoRevisionSlide: function(request, reply) {
@@ -670,6 +680,7 @@ let self = module.exports = {
     },
 
     handleChange: function(request, reply){
+        //console.log(request);
         deckDB.get(request.params.id).then((foundDeck) => {
             let active = -1;
             let idArray = request.params.id.split('-');

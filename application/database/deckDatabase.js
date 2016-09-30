@@ -640,6 +640,8 @@ let self = module.exports = {
 
     handleChange(decktree, deck, root_deck, user_id){
         let result = findDeckInDeckTree(decktree.children, deck, [{'id': root_deck}]);
+        if(root_deck === deck)
+            result = [{'id': root_deck}];
         if(!result || result.length === 0){
             return new Promise(function(resolve, reject) {
                 console.log('Requested deck not found in the deck tree. If you havent defined revisions, then maybe active revisions of deck and root do not match');
@@ -653,6 +655,7 @@ let self = module.exports = {
         return new Promise(function(resolve, reject) {
             async.eachSeries(result, function(next_deck, callback){
                 module.exports.needsNewRevision(next_deck.id, user_id).then((needs) => {
+                    //console.log(needs);
                     if(!needs.needs_revision){
                         callback();
                     }
@@ -662,7 +665,7 @@ let self = module.exports = {
                     }
                 });
             },function(err){
-                console.log('revisions array', revisions);
+                //console.log('revisions array', revisions);
                 if(revisions.length === 0){
                     resolve({'needsRevision': false});
                 }
@@ -755,13 +758,26 @@ let self = module.exports = {
                             'position': 0,
                             'root_changed' : true
                         };
+                        for(let i = 0; i < new_revisions.length; i++){
+                            if(!new_revisions[i].hasOwnProperty('root_changed') && new_revisions[i].split('-')[0] === deck.split('-')[0]){
+                                resp.target_deck = new_revisions[i];
+                            }
+                        }
+                        //console.log('resp', resp);
                         resolve(resp);
                     }
                     else{
+                        //console.log(new_revisions);
+                        let target_deck = '';
+                        for(let i = 0; i < new_revisions.length; i++){
+                            if(!new_revisions[i].hasOwnProperty('root_changed') && new_revisions[i].split('-')[0] === deck.split('-')[0]){
+                                target_deck = new_revisions[i];
+                            }
+                        }
                         module.exports.getFlatSlidesFromDB(root_deck, undefined, true).then((flatTree) => {
                             for(let i = 0; i < flatTree.children.length; i++){
                                 if(flatTree.children[i].id === new_revisions[0]){
-                                    resolve({'new_deck_id': flatTree.children[i].id, 'position': i+1, 'root_changed': false});
+                                    resolve({'target_deck': target_deck, 'new_deck_id': flatTree.children[i].id, 'position': i+1, 'root_changed': false});
                                 }
                             }
                         });
