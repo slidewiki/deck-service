@@ -23,6 +23,22 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/allfeatured/{limit}/{offset}',
+        handler: handlers.getAllFeatured,
+        config: {
+            validate: {
+                params: {
+                    limit: Joi.string(),
+                    offset: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Get all featured decks as metadata with a possibility to set limit and offset'
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}',
         handler: handlers.getDeck,
         config: {

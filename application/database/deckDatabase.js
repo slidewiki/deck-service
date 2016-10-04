@@ -480,6 +480,51 @@ let self = module.exports = {
         });
     },
 
+    //, {revisions: {$elemMatch: {isFeatured: '1'}}}
+
+    getAllFeatured: function(limit, offset) {
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => col.findOne({
+            _id: 33
+        })
+        .then((found) => {
+            return found;
+        }).catch((err) => {
+            console.log('Deck not found.');
+        })
+      );
+    // },
+
+
+        // return helper.connectToDatabase()
+        // .then((db) => db.collection('decks'))
+        // .then((col) => col.find({_id : 33})
+        // .then((decks) => {
+        //     return decks;
+        // })
+        // .catch((err) => {
+        //     console.log(err);
+        // })
+    // );
+        // deckDB.find({'isFeatured' : }, {limit:request.params.limit, skip:request.params.offset}, (err, decks) => {
+        //     if (err) {
+        //         reply(boom.notFound());
+        //         return;
+        //     }
+        //
+        //     deckDB.count({}, (err, count) => {
+        //         if (err) {
+        //             reply(boom.notFound());
+        //             return;
+        //         }
+        //
+        //         return reply({count: count, animals: decks});
+        //     });
+        // });
+    },
+
     getFlatSlidesFromDB: function(deck_id, deckTree, return_decks){
 
         let revision_id = -1;
@@ -499,7 +544,7 @@ let self = module.exports = {
                 if(!deckTree){
                     deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), children: []};
                 }
-
+                //TODO Darya: do not call revisions by a key, but by id!!!
                 return new Promise(function(resolve, reject) {
                     async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
 

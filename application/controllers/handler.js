@@ -2,6 +2,8 @@
 Handles the requests by executing stuff and replying to the client. Uses promises to get stuff done.
 */
 
+
+
 'use strict';
 
 const boom = require('boom'),
@@ -9,6 +11,7 @@ const boom = require('boom'),
     deckDB = require('../database/deckDatabase'),
     co = require('../common'),
     Joi = require('joi'),
+    async = require('async'),
     Microservices = require('../configs/microservices');
 
 let self = module.exports = {
@@ -717,6 +720,56 @@ let self = module.exports = {
         });
 
     },
+
+    getAllFeatured: (request, reply) => {
+        deckDB.find('decks', {'revisions.isFeatured': 1})
+        .then((decks) => {
+            if (decks.length < 1) {
+                reply(boom.notFound());
+                return;
+            }
+            let result = [];
+            async.each(decks, (deck, callback) => {
+                let metadata = {};
+                metadata._id = deck._id;
+                metadata.description = deck.description;
+                metadata.language = deck.language;
+                metadata.lastUpdate = deck.lastUpdate;
+                metadata.countRevisions = deck.revisions.length;
+                metadata.active = deck.active;
+                //get revision
+                let revision = {};
+                for (let key in deck.revisions) {
+                    if (deck.revisions[key].isFeatured === 1)
+                        revision = deck.revisions[key];
+                }
+                metadata.title = revision.title;
+                metadata.language = revision.language;
+                metadata.featured_revision = revision.id;
+                metadata.tags = revision.tags;
+                // deckDB.getFlatSlidesFromDB(deck._id + '-' + revision.id, undefined) //TODO add slides count
+                // .then((deck_tree) => {
+                //     //console.log('DECKSLIDES: ' + deck_slides.children.length);
+                //     metadata.timestamp = revision.timestamp; 
+                //     metadata.abstract = revision.abstract;
+                //     metadata.slides_count = deck_tree.children.length;
+                result.push(metadata);
+                callback();
+                // })
+                // .catch((error) => {
+                //     console.log(error);
+                //     reply(boom.badImplementation);
+                // });
+            }, () => {
+                return reply(result);
+            });
+        })
+        .catch((err) => {
+            console.log(err);
+            reply(boom.notFound());
+        });
+    },
+
 
     //returns metadata about all decks a user owns
     getAllDecks: (request, reply) => {
