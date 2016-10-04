@@ -480,51 +480,6 @@ let self = module.exports = {
         });
     },
 
-    //, {revisions: {$elemMatch: {isFeatured: '1'}}}
-
-    getAllFeatured: function(limit, offset) {
-
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => col.findOne({
-            _id: 33
-        })
-        .then((found) => {
-            return found;
-        }).catch((err) => {
-            console.log('Deck not found.');
-        })
-      );
-    // },
-
-
-        // return helper.connectToDatabase()
-        // .then((db) => db.collection('decks'))
-        // .then((col) => col.find({_id : 33})
-        // .then((decks) => {
-        //     return decks;
-        // })
-        // .catch((err) => {
-        //     console.log(err);
-        // })
-    // );
-        // deckDB.find({'isFeatured' : }, {limit:request.params.limit, skip:request.params.offset}, (err, decks) => {
-        //     if (err) {
-        //         reply(boom.notFound());
-        //         return;
-        //     }
-        //
-        //     deckDB.count({}, (err, count) => {
-        //         if (err) {
-        //             reply(boom.notFound());
-        //             return;
-        //         }
-        //
-        //         return reply({count: count, animals: decks});
-        //     });
-        // });
-    },
-
     getFlatSlidesFromDB: function(deck_id, deckTree, return_decks){
 
         let revision_id = -1;
