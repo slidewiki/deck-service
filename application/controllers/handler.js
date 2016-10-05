@@ -828,6 +828,18 @@ let self = module.exports = {
                 metadata.tags = revision.tags;
                 metadata.parent = revision.parent;
 
+                //get first slide
+                let firstSlide = undefined;
+                for (let key in revision.contentItems) {
+                    if (revision.contentItems[key].order === 1
+                      && revision.contentItems[key].kind === 'slide') {
+                        firstSlide = revision.contentItems[key].ref.id;
+                        if (revision.contentItems[key].ref.revision)
+                            firstSlide += '-' + revision.contentItems[key].ref.revision;
+                    }
+                };
+                metadata.firstSlide = firstSlide;
+
                 result.push(metadata);
             });
 
