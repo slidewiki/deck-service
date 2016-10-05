@@ -67,6 +67,8 @@ let self = module.exports = {
 
     updateSlide: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
+
+        //console.log(request);
         let slideId = request.params.id;
         //must handle changes here.
         //console.log('request payload', request.payload);
@@ -87,13 +89,18 @@ let self = module.exports = {
                     slideDB.get(replaced.value._id).then((newSlide) => {
 
                         //only update the root deck, i.e., direct parent
+
                         deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
                         newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
                         let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
                         if(content === ''){
-                            content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                            content = '<h2>'+newSlide.revisions[0].title+'</h2>';
                         }
                         createThumbnail(content, newSlideId, user);
+                        if(changeset && changeset.hasOwnProperty('target_deck')){
+                            changeset.new_revisions.push(newSlideId);
+                            newSlide.changeset = changeset;
+                        }
                         reply(newSlide);
 
                     }).catch((error) => {
@@ -463,40 +470,52 @@ let self = module.exports = {
                     slidePosition = 0;
                 }
 
+                //handle revisioning here
+                module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+                ,(changeset) => {
+                  //console.log('changeset', changeset);
+                    if(changeset && changeset.hasOwnProperty('target_deck')){
+                      //revisioning took place, we must update root deck
+                        parentID = changeset.target_deck;
+                    }
 
-                //NOTE we should call /slide/new
-                let slide = {
-                    'title': 'New slide', //NOTE add title
-                    'content': '',
-                    'language': 'en',
-                    'license': 'CC0',
-                    //NOTE user_id should be retrieved from the frontend
-                    'user': request.payload.user,
-                    'root_deck': parentID,
-                    'position' : slidePosition
-                };
+                    //NOTE we should call /slide/new
+                    let slide = {
+                        'title': 'New slide', //NOTE add title
+                        'content': '',
+                        'language': 'en',
+                        'license': 'CC0',
+                        //NOTE user_id should be retrieved from the frontend
+                        'user': request.payload.user,
+                        'root_deck': parentID,
+                        'position' : slidePosition
+                    };
 
-                if(request.payload.hasOwnProperty('content')){
-                    slide.content = request.payload.content;
-                }
-                if(request.payload.hasOwnProperty('title')){
-                    slide.title = request.payload.title;
-                }
-                if(request.payload.hasOwnProperty('license')){
-                    slide.license = request.payload.license;
-                }
-                if(request.payload.hasOwnProperty('speakernotes')){
-                    slide.speakernotes = request.payload.speakernotes;
-                }
+                    if(request.payload.hasOwnProperty('content')){
+                        slide.content = request.payload.content;
+                    }
+                    if(request.payload.hasOwnProperty('title')){
+                        slide.title = request.payload.title;
+                    }
+                    if(request.payload.hasOwnProperty('license')){
+                        slide.license = request.payload.license;
+                    }
+                    if(request.payload.hasOwnProperty('speakernotes')){
+                        slide.speakernotes = request.payload.speakernotes;
+                    }
 
-                //NOTE update positions accordingly
-                module.exports.newSlide({'payload' : slide}, (createdSlide) => {
-                    node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
-                    deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide');
-                    //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                    reply(node);
+                    //NOTE update positions accordingly
+                    module.exports.newSlide({'payload' : slide}, (createdSlide) => {
+                        node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
+                        deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide');
+                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                        if(changeset && changeset.hasOwnProperty('target_deck')){
+                            node.changeset = changeset;
+                        }
+                        reply(node);
+                    });
+
                 });
-
 
             }
         }else{
@@ -552,29 +571,44 @@ let self = module.exports = {
 
                 let deckArrayPath = spathArray[spathArray.length-1].split(':');
                 deckPosition = parseInt(deckArrayPath[1])+1;
-                //NOTE we should call /slide/new
-                let deck = {
-                    'description': '',
-                    'title': 'New deck', //NOTE add title
-                    'content': '',
-                    'language': 'en',
-                    'license': 'CC0',
-                    //NOTE user_id should be retrieved from the frontend
-                    'user': request.payload.user,
-                    'root_deck': parentID,
-                    'position' : deckPosition
-                };
 
-                //NOTE update positions accordingly
-                module.exports.newDeck({'payload' : deck}, (createdDeck) => {
-                    if(typeof parentID !== 'undefined')
-                        deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck');
-                    //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                    module.exports.getDeckTree({'params': {'id' : createdDeck.id}}, (deckTree) => {
-                        reply(deckTree);
+                module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+                ,(changeset) => {
+                  //console.log('changeset', changeset);
+                    if(changeset && changeset.hasOwnProperty('target_deck')){
+                      //revisioning took place, we must update root deck
+                        parentID = changeset.target_deck;
+                    }
+                    //NOTE we should call /slide/new
+                    let deck = {
+                        'description': '',
+                        'title': 'New deck', //NOTE add title
+                        'content': '',
+                        'language': 'en',
+                        'license': 'CC0',
+                        //NOTE user_id should be retrieved from the frontend
+                        'user': request.payload.user,
+                        'root_deck': parentID,
+                        'position' : deckPosition
+                    };
+
+                    //NOTE update positions accordingly
+                    module.exports.newDeck({'payload' : deck}, (createdDeck) => {
+                        if(typeof parentID !== 'undefined')
+                            deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck');
+                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                        module.exports.getDeckTree({'params': {'id' : createdDeck.id}}, (deckTree) => {
+                            if(changeset && changeset.hasOwnProperty('target_deck')){
+                                deckTree.changeset = changeset;
+                            }
+                            reply(deckTree);
+                        });
+
                     });
-
                 });
+
+
+
             }
         }
         //----mockup:end
@@ -583,26 +617,94 @@ let self = module.exports = {
 
     renameDeckTreeNode: function(request, reply) {
         //NOTE check if it is deck or slide
+        //console.log('request', request.payload);
+
         if(request.payload.selector.stype === 'deck'){
-            deckDB.rename(encodeURIComponent(request.payload.selector.sid), request.payload.name).then((renamed) => {
-                if (co.isEmpty(renamed.value))
-                    throw renamed;
-                else
-                reply(renamed.value);
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
+            let root_deck = request.payload.selector.sid;
+            module.exports.handleChange({'params': {'id':request.payload.selector.sid}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+            ,(changeset) => {
+              //console.log('changeset', changeset);
+                if(changeset && changeset.hasOwnProperty('target_deck')){
+                  //revisioning took place, we must update root deck
+                    root_deck = changeset.target_deck;
+                }
+                deckDB.rename(encodeURIComponent(root_deck), request.payload.name).then((renamed) => {
+                    if (co.isEmpty(renamed.value))
+                        throw renamed;
+                    else{
+                        let response = {'title' : renamed.value};
+                        if(changeset && changeset.hasOwnProperty('target_deck')){
+                            response.changeset = changeset;
+                        }
+                        reply(response);
+                    }
+
+                }).catch((error) => {
+                    request.log('error', error);
+                    reply(boom.badImplementation());
+                });
             });
+
         }else {
-            slideDB.rename(encodeURIComponent(request.payload.selector.sid), request.payload.name).then((renamed) => {
-                if (co.isEmpty(renamed.value))
-                    throw renamed;
-                else
-                reply(renamed.value);
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
+            let root_deck ;
+            let slide_id = request.payload.selector.sid;
+            let spath = request.payload.selector.spath;
+            let spathArray = spath.split(';');
+            if(spathArray.length > 1){
+                let parentArrayPath = spathArray[spathArray.length-2].split(':');
+                root_deck = parentArrayPath[0];
+                //parentPosition = parentArrayPath[1];
+            }
+            else{
+                root_deck = request.payload.selector.id;
+            }
+            //we must create a new slide revision as well, because of renaming it
+            module.exports.getSlide({'params' : {'id' : slide_id}}, (slide) => {
+              //console.log('existing', slide);
+
+                let new_slide = {
+                    'title' : request.payload.name,
+                    'content' : slide.revisions[0].content,
+                    'speakernotes' : slide.revisions[0].speakernotes,
+                    'user' : request.payload.user,
+                    'root_deck' : root_deck,
+                    'top_root_deck' : request.payload.selector.id,
+                    'language' : slide.language,
+                    'license' : slide.license,
+                    'tags' : slide.revisions[0].tags
+                };
+                if(new_slide.speakernotes === null){
+                    new_slide.speakernotes = '';
+                }
+                if(new_slide.tags === null){
+                    new_slide.tags = [];
+                }
+                let new_request = {'params' : {'id' :encodeURIComponent(slide_id)}, 'payload' : new_slide};
+                module.exports.updateSlide(new_request, (updated) => {
+                    reply(updated);
+                });
             });
+
+          // module.exports.handleChange({'params': {'id': root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+          // ,(changeset) => {
+          //   //console.log('changeset', changeset);
+          //     if(changeset && changeset.hasOwnProperty('target_deck')){
+          //       //revisioning took place, we must update root deck
+          //         root_deck = changeset.target_deck;
+          //     }
+          //     //should we create a new revision of the slide to be renamed?
+          //
+          //     slideDB.rename(encodeURIComponent(request.payload.selector.sid), request.payload.name).then((renamed) => {
+          //         if (co.isEmpty(renamed.value))
+          //             throw renamed;
+          //         else
+          //         reply(renamed.value);
+          //     }).catch((error) => {
+          //         request.log('error', error);
+          //         reply(boom.badImplementation());
+          //     });
+          //   });
+
         }
 
         //reply({'msg': 'node name got updated. New node name is: ' + request.payload.name});
@@ -626,11 +728,27 @@ let self = module.exports = {
 
         let itemArrayPath = spathArray[spathArray.length-1].split(':');
         itemPosition = itemArrayPath[1];
-        //NOTE removes item in given position -- do we have to validate with sid ?
-        deckDB.removeContentItem(itemPosition, parentID)
-        .then((removed) => {
-            reply(removed);
+
+        module.exports.handleChange({'params': {'id': parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+        ,(changeset) => {
+          //console.log('changeset', changeset);
+            if(changeset && changeset.hasOwnProperty('target_deck')){
+              //revisioning took place, we must update root deck
+                parentID = changeset.target_deck;
+            }
+            //NOTE removes item in given position -- do we have to validate with sid ?
+            deckDB.removeContentItem(itemPosition, parentID)
+            .then((removed) => {
+                if(!removed){
+                    removed = {};
+                }
+                if(changeset && changeset.hasOwnProperty('target_deck')){
+                    removed.changeset = changeset;
+                }
+                reply(removed);
+            });
         });
+
     },
 
     getFlatSlides: function(request, reply){

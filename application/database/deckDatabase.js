@@ -26,13 +26,14 @@ let self = module.exports = {
                 // let revision = found.revisions[parseInt(parsed[1])-1];
                 // revision.id = identifier;
                 // revision.kind = 'deck';
-                // return revision;
+                // return revision;                
                 let revision = found.revisions[parseInt(idArray[1])-1];
                 found.revisions = [revision];
                 return found;
             }
         }).catch((err) => {
             console.log('Deck not found.');
+            console.log('err', err);
         })
       );
     },
@@ -362,7 +363,7 @@ let self = module.exports = {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
 
                         for(let j = 0; j < existingDeck.revisions[i].contentItems.length; j++) {
-                            if(existingDeck.revisions[i].contentItems[j].ref.id === citem._id) {
+                            if(existingDeck.revisions[i].contentItems[j].ref.id === citem._id && existingDeck.revisions[i].contentItems[j].kind === ckind) {
                                 old_rev_id = existingDeck.revisions[i].contentItems[j].ref.revision;
                                 existingDeck.revisions[i].contentItems[j].ref.revision = newRevId;
                             }
@@ -476,6 +477,7 @@ let self = module.exports = {
 
             }).catch((err) => {
                 console.log('Deck not found');
+                console.log('err', err);
             });
         });
     },
@@ -690,7 +692,7 @@ let self = module.exports = {
                                     //console.log('will be updated with parent', payload.root_deck);
                                     module.exports.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
                                         //must update parent of next revision with new revision id
-                                        console.log('updated ', replaced);
+                                        //console.log('updated ', replaced);
                                         //NOTE must update content items of parent
                                         module.exports.get(replaced.value._id).then((newDeck) => {
 
@@ -738,8 +740,8 @@ let self = module.exports = {
                                 //console.log('updated ', replaced);
                                 module.exports.get(replaced.value._id).then((newDeck) => {
                                     new_revisions.push({'root_changed': newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id});
+                                    callback();
                                 });
-                                callback();
                             }).catch((error) => {
                                 console.log('error', error);
                             });
@@ -752,36 +754,43 @@ let self = module.exports = {
                     if(new_revisions.length === 0){
                         resolve({'needsRevision': false});
                     }
-                    if(new_revisions[0].hasOwnProperty('root_changed')){
-                        let resp = {
-                            'new_deck_id': new_revisions[0].root_changed,
-                            'position': 0,
-                            'root_changed' : true
-                        };
-                        for(let i = 0; i < new_revisions.length; i++){
-                            if(!new_revisions[i].hasOwnProperty('root_changed') && new_revisions[i].split('-')[0] === deck.split('-')[0]){
-                                resp.target_deck = new_revisions[i];
-                            }
-                        }
-                        //console.log('resp', resp);
-                        resolve(resp);
-                    }
                     else{
-                        //console.log(new_revisions);
-                        let target_deck = '';
-                        for(let i = 0; i < new_revisions.length; i++){
-                            if(!new_revisions[i].hasOwnProperty('root_changed') && new_revisions[i].split('-')[0] === deck.split('-')[0]){
-                                target_deck = new_revisions[i];
-                            }
-                        }
-                        module.exports.getFlatSlidesFromDB(root_deck, undefined, true).then((flatTree) => {
-                            for(let i = 0; i < flatTree.children.length; i++){
-                                if(flatTree.children[i].id === new_revisions[0]){
-                                    resolve({'target_deck': target_deck, 'new_deck_id': flatTree.children[i].id, 'position': i+1, 'root_changed': false});
+                        if(new_revisions[0].hasOwnProperty('root_changed')){
+                            let resp = {
+                                'new_deck_id': new_revisions[0].root_changed,
+                                'position': 0,
+                                'root_changed' : true
+                            };
+                            for(let i = 0; i < new_revisions.length; i++){
+                                if(!new_revisions[i].hasOwnProperty('root_changed') && new_revisions[i].split('-')[0] === deck.split('-')[0]){
+                                    resp.target_deck = new_revisions[i];
                                 }
                             }
-                        });
+                            if(deck === root_deck)
+                                resp.target_deck = new_revisions[0].root_changed;
+
+                            resp.new_revisions = new_revisions;
+                            //console.log('resp', resp);
+                            resolve(resp);
+                        }
+                        else{
+                            //console.log(new_revisions);
+                            let target_deck = '';
+                            for(let i = 0; i < new_revisions.length; i++){
+                                if(!new_revisions[i].hasOwnProperty('root_changed') && new_revisions[i].split('-')[0] === deck.split('-')[0]){
+                                    target_deck = new_revisions[i];
+                                }
+                            }
+                            module.exports.getFlatSlidesFromDB(root_deck, undefined, true).then((flatTree) => {
+                                for(let i = 0; i < flatTree.children.length; i++){
+                                    if(flatTree.children[i].id === new_revisions[0]){
+                                        resolve({'new_revisions': new_revisions, 'target_deck': target_deck, 'new_deck_id': flatTree.children[i].id, 'position': i+1, 'root_changed': false});
+                                    }
+                                }
+                            });
+                        }
                     }
+
                 });
             });
         });
