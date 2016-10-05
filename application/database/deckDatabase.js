@@ -499,7 +499,7 @@ let self = module.exports = {
                 if(!deckTree){
                     deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), children: []};
                 }
-
+                //TODO Darya: do not call revisions by a key, but by id!!!
                 return new Promise(function(resolve, reject) {
                     async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
 
