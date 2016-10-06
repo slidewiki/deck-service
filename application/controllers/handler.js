@@ -189,7 +189,8 @@ let self = module.exports = {
                 let newSlide = {
                     'title': 'New slide',
                     'content': '',
-                    'language': 'en',
+                    //'language': 'en_EN',
+                    'language': request.payload.language,
                     'license': request.payload.license,
                     //NOTE user_id should be retrieved from the frontend
                     'user': inserted.ops[0].user,
@@ -478,42 +479,45 @@ let self = module.exports = {
                       //revisioning took place, we must update root deck
                         parentID = changeset.target_deck;
                     }
+                    module.exports.getDeck({'params': {'id':parentID}}, (parentDeck) => {
+                        //NOTE we should call /slide/new
+                        let slide = {
+                            'title': 'New slide', //NOTE add title
+                            'content': '',
+                            //'language': 'en_EN',
+                            'language': parentDeck.revisions[0].language,
+                            'license': parentDeck.license,
+                            //NOTE user_id should be retrieved from the frontend
+                            'user': request.payload.user,
+                            'root_deck': parentID,
+                            'position' : slidePosition
+                        };
 
-                    //NOTE we should call /slide/new
-                    let slide = {
-                        'title': 'New slide', //NOTE add title
-                        'content': '',
-                        'language': 'en',
-                        'license': 'CC0',
-                        //NOTE user_id should be retrieved from the frontend
-                        'user': request.payload.user,
-                        'root_deck': parentID,
-                        'position' : slidePosition
-                    };
-
-                    if(request.payload.hasOwnProperty('content')){
-                        slide.content = request.payload.content;
-                    }
-                    if(request.payload.hasOwnProperty('title')){
-                        slide.title = request.payload.title;
-                    }
-                    if(request.payload.hasOwnProperty('license')){
-                        slide.license = request.payload.license;
-                    }
-                    if(request.payload.hasOwnProperty('speakernotes')){
-                        slide.speakernotes = request.payload.speakernotes;
-                    }
-
-                    //NOTE update positions accordingly
-                    module.exports.newSlide({'payload' : slide}, (createdSlide) => {
-                        node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
-                        deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide');
-                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                        if(changeset && changeset.hasOwnProperty('target_deck')){
-                            node.changeset = changeset;
+                        if(request.payload.hasOwnProperty('content')){
+                            slide.content = request.payload.content;
                         }
-                        reply(node);
+                        if(request.payload.hasOwnProperty('title')){
+                            slide.title = request.payload.title;
+                        }
+                        if(request.payload.hasOwnProperty('license')){
+                            slide.license = request.payload.license;
+                        }
+                        if(request.payload.hasOwnProperty('speakernotes')){
+                            slide.speakernotes = request.payload.speakernotes;
+                        }
+
+                        //NOTE update positions accordingly
+                        module.exports.newSlide({'payload' : slide}, (createdSlide) => {
+                            node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
+                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide');
+                            //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                            if(changeset && changeset.hasOwnProperty('target_deck')){
+                                node.changeset = changeset;
+                            }
+                            reply(node);
+                        });
                     });
+
 
                 });
 
@@ -579,32 +583,35 @@ let self = module.exports = {
                       //revisioning took place, we must update root deck
                         parentID = changeset.target_deck;
                     }
-                    //NOTE we should call /slide/new
-                    let deck = {
-                        'description': '',
-                        'title': 'New deck', //NOTE add title
-                        'content': '',
-                        'language': 'en',
-                        'license': 'CC0',
-                        //NOTE user_id should be retrieved from the frontend
-                        'user': request.payload.user,
-                        'root_deck': parentID,
-                        'position' : deckPosition
-                    };
+                    module.exports.getDeck({'params': {'id':parentID}}, (parentDeck) => {
+                        //NOTE we should call /slide/new
+                        let deck = {
+                            'description': '',
+                            'title': 'New deck', //NOTE add title
+                            'content': '',
+                            'language': parentDeck.revisions[0].language,
+                            'license': parentDeck.license,
+                            //NOTE user_id should be retrieved from the frontend
+                            'user': request.payload.user,
+                            'root_deck': parentID,
+                            'position' : deckPosition
+                        };
 
-                    //NOTE update positions accordingly
-                    module.exports.newDeck({'payload' : deck}, (createdDeck) => {
-                        if(typeof parentID !== 'undefined')
-                            deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck');
-                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                        module.exports.getDeckTree({'params': {'id' : createdDeck.id}}, (deckTree) => {
-                            if(changeset && changeset.hasOwnProperty('target_deck')){
-                                deckTree.changeset = changeset;
-                            }
-                            reply(deckTree);
+                        //NOTE update positions accordingly
+                        module.exports.newDeck({'payload' : deck}, (createdDeck) => {
+                            if(typeof parentID !== 'undefined')
+                                deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck');
+                            //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                            module.exports.getDeckTree({'params': {'id' : createdDeck.id}}, (deckTree) => {
+                                if(changeset && changeset.hasOwnProperty('target_deck')){
+                                    deckTree.changeset = changeset;
+                                }
+                                reply(deckTree);
+                            });
+
                         });
-
                     });
+
                 });
 
 
