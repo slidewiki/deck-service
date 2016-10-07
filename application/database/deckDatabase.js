@@ -480,6 +480,18 @@ let self = module.exports = {
         });
     },
 
+    getUsernameById: function(user_id){
+        return helper.connectToDatabase()
+        .then((db) => db.collection('users'))
+        .then((col) => col.findOne({
+            _id: user_id})
+        .then((user) => {
+            return user.username;
+        })
+        );
+    },
+
+
     getFlatSlidesFromDB: function(deck_id, deckTree, return_decks){
 
         let revision_id = -1;

@@ -721,6 +721,12 @@ let self = module.exports = {
 
     },
 
+    findUserById: (id) => {
+        return userDB.findOneById((id), (err, found) => {
+            return found.username;
+        });
+    },
+
     getAllFeatured: (request, reply) => {
         deckDB.find('decks', {'revisions.isFeatured': 1})
         .then((decks) => {
@@ -737,6 +743,9 @@ let self = module.exports = {
                 metadata.lastUpdate = deck.lastUpdate;
                 metadata.countRevisions = deck.revisions.length;
                 metadata.active = deck.active;
+                metadata.user = deck.user;
+
+                metadata.timestamp = deck.timestamp;
                 //get revision
                 let revision = {};
                 for (let key in deck.revisions) {
@@ -747,14 +756,25 @@ let self = module.exports = {
                 metadata.language = revision.language;
                 metadata.featured_revision = revision.id;
                 metadata.tags = revision.tags;
+                deckDB.getUsernameById(deck.user) //get username
+                .then((username) => {
+                    metadata.username = username;
+                    result.push(metadata);
+                    callback();
+                })
+                .catch((err) => {
+                    console.log(err);
+                    metadata.username = null;
+                    result.push(metadata);
+                    callback();
+                });
                 // deckDB.getFlatSlidesFromDB(deck._id + '-' + revision.id, undefined) //TODO add slides count
                 // .then((deck_tree) => {
                 //     //console.log('DECKSLIDES: ' + deck_slides.children.length);
-                //     metadata.timestamp = revision.timestamp; 
+                //     metadata.timestamp = revision.timestamp;
                 //     metadata.abstract = revision.abstract;
                 //     metadata.slides_count = deck_tree.children.length;
-                result.push(metadata);
-                callback();
+
                 // })
                 // .catch((error) => {
                 //     console.log(error);
