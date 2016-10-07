@@ -14,6 +14,21 @@ const boom = require('boom'),
     async = require('async'),
     Microservices = require('../configs/microservices');
 
+    const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px; background-color: rgb(255, 255, 255); transform: scale(0.84375, 0.84375); transform-origin: left top 0px;">'+
+        '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; border-width: 1pt; border-image: initial; z-index: 23488; border-style: dashed; border-color: rgb(51, 204, 51);">'+
+        '<h3 class="h-mid"><span class="text-block" style="color: #000; font-size: 44pt; font-family: Calibri Light; font-weight: initial; font-style: normal; text-decoration: initial; vertical-align: ;">Title</span></h3>'+
+        '</div>'+
+        ''+
+        '<div _id="3" _idx="1" _name="Content Placeholder 2" _type="body" class="block content v-up" style="position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; border-width: 1pt; border-image: initial; z-index: 23520; border-style: dashed; border-color: rgb(51, 204, 51);">'+
+        '<ul>'+
+        '	<li class="h-left" style="text-align: left;"><span class="text-block" style="color: #000; font-size: 28pt; font-family: Calibri; font-weight: initial; font-style: normal; text-decoration: initial; vertical-align: ;">Text bullet 1</span></li>'+
+        '	<li class="h-left" style="text-align: left;"><span class="text-block" style="color: #000; font-size: 28pt; font-family: Calibri; font-weight: initial; font-style: normal; text-decoration: initial; vertical-align: ;">Text bullet 2</span></li>'+
+        '</ul>'+
+        ''+
+        '<div class="h-left">&nbsp;</div>'+
+        '</div>'+
+        '</div>';
+
 let self = module.exports = {
     getSlide: function(request, reply) {
         //NOTE shall the response be cleaned or enhanced with values?
@@ -58,6 +73,8 @@ let self = module.exports = {
                 if(content === ''){
                     content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
                 }
+                //for now we use hardcoded template for new slides
+                content = slidetemplate;
                 createThumbnail(content, slideId, user);
 
                 reply(co.rewriteID(inserted.ops[0]));
@@ -98,6 +115,8 @@ let self = module.exports = {
                         let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
                         if(content === ''){
                             content = '<h2>'+newSlide.revisions[0].title+'</h2>';
+                            //for now we use hardcoded template for new slides
+                            content = slidetemplate;
                         }
                         createThumbnail(content, newSlideId, user);
                         if(changeset && changeset.hasOwnProperty('target_deck')){
@@ -191,7 +210,9 @@ let self = module.exports = {
 
                 let newSlide = {
                     'title': 'New slide',
-                    'content': '',
+                    //'content': '',
+                    //for now we use hardcoded template for new slides
+                    'content': slidetemplate,
                     //'language': 'en_EN',
                     'language': request.payload.language,
                     'license': request.payload.license,
@@ -228,6 +249,8 @@ let self = module.exports = {
                     if(content === ''){
                         content = '<h2>'+newSlide.title+'</h2>';
                     }
+                    //for now we use hardcoded template for new slides
+                    content = slidetemplate;
                     createThumbnail(content, slideId, user);
                 });
                 //check if a root deck is defined, if yes, update its content items to reflect the new sub-deck
@@ -502,7 +525,9 @@ let self = module.exports = {
                         //NOTE we should call /slide/new
                         let slide = {
                             'title': 'New slide', //NOTE add title
-                            'content': '',
+                            //'content': '',
+                            //for now we use hardcoded template for new slides
+                            'content': slidetemplate,
                             //'language': 'en_EN',
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
@@ -607,7 +632,9 @@ let self = module.exports = {
                         let deck = {
                             'description': '',
                             'title': 'New deck', //NOTE add title
-                            'content': '',
+                            //'content': '',
+                            //for now we use hardcoded template for new slides
+                            'content': slidetemplate,
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
                             //NOTE user_id should be retrieved from the frontend
@@ -908,7 +935,7 @@ let self = module.exports = {
                 // deckDB.getFlatSlidesFromDB(deck._id + '-' + revision.id, undefined) //TODO add slides count
                 // .then((deck_tree) => {
                 //     //console.log('DECKSLIDES: ' + deck_slides.children.length);
-                //     metadata.timestamp = revision.timestamp; 
+                //     metadata.timestamp = revision.timestamp;
                 //     metadata.abstract = revision.abstract;
                 //     metadata.slides_count = deck_tree.children.length;
                 result.push(metadata);
