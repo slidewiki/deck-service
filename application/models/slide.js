@@ -17,13 +17,13 @@ const objectid = {
 const contributor = {
     type: 'object',
     properties: {
-        id: objectid,
+        user: objectid,
         count: {
             type: 'integer',
             minimum: 1
         }
     },
-    required: ['id']
+    required: ['user']
 };
 const slideRevision = {
     type: 'object',
@@ -200,7 +200,7 @@ const slide = {
         contributors: {
             type: 'array',
             items: {
-                contributor                
+                contributor
             }
         },
         tags: {

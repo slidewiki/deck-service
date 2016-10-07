@@ -17,13 +17,13 @@ const objectid = {
 const contributor = {
     type: 'object',
     properties: {
-        id: objectid,
+        user: objectid,
         count: {
             type: 'integer',
             minimum: 1
         }
     },
-    required: ['id']
+    required: ['user']
 };
 //build schema
 const contentItem = {
