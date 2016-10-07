@@ -913,7 +913,8 @@ let self = module.exports = {
     },
 
     getAllFeatured: (request, reply) => {
-        deckDB.find('decks', {'revisions.isFeatured': 1})
+        console.log(request.params);
+        deckDB.findWithLimit('decks', {'revisions.isFeatured': 1}, parseInt(request.params.limit), parseInt(request.params.offset))
         .then((decks) => {
             if (decks.length < 1) {
                 reply(boom.notFound());

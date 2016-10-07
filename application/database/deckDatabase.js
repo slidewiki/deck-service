@@ -45,6 +45,13 @@ let self = module.exports = {
         .then((cursor) => cursor.toArray());
     },
 
+    findWithLimit : (collection, query, limit, offset) => {
+        return helper.connectToDatabase()
+        .then((db) => db.collection(collection))
+        .then((col) => col.find(query).skip(offset).limit(limit))
+        .then((cursor) => cursor.toArray());
+    },
+
     insert: function(deck) {
         return helper.connectToDatabase()
         .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
@@ -652,7 +659,7 @@ let self = module.exports = {
         });
     },
 
-    handleChange(decktree, deck, root_deck, user_id){        
+    handleChange(decktree, deck, root_deck, user_id){
         if(!root_deck){
             return new Promise(function(resolve, reject) {
                 console.log('No need for recursive revisioning');
