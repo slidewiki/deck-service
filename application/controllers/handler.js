@@ -255,30 +255,46 @@ let self = module.exports = {
     updateDeckRevision: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         if(request.payload.new_revision){
-            deckDB.replace(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
-                if (co.isEmpty(replaced.value))
-                    throw replaced;
-                else{
-                    deckDB.get(replaced.value._id).then((newDeck) => {
-                        if(request.payload.root_deck){
-                            deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck')
-                            .then((updated) => {
+            let root_deck ;
+            if(request.payload.root_deck){
+                root_deck = request.payload.root_deck;
+            }
+            module.exports.handleChange({'params': {'id': root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck}}
+            ,(changeset) => {
+                //console.log('changeset', changeset);
+                if(changeset && changeset.hasOwnProperty('target_deck')){
+                    //revisioning took place, we must update root deck
+                    request.payload.root_deck = changeset.target_deck;
+                }
+                deckDB.replace(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+                    if (co.isEmpty(replaced.value))
+                        throw replaced;
+                    else{
+                        deckDB.get(replaced.value._id).then((newDeck) => {
+                            if(changeset && changeset.hasOwnProperty('target_deck')){
+                                newDeck.changeset = changeset;
+                            }
+                            if(request.payload.root_deck){
+                                deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck')
+                                .then((updated) => {
+                                    newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
+                                    reply(newDeck);
+                                });
+                            }
+                            else{
+                                //reply(replaced.value);
                                 newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
                                 reply(newDeck);
-                            });
-                        }
-                        else{
-                            //reply(replaced.value);
-                            newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
-                            reply(newDeck);
-                        }
-                    });
+                            }
+                        });
 
-                }
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
+                    }
+                }).catch((error) => {
+                    request.log('error', error);
+                    reply(boom.badImplementation());
+                });
             });
+
         }
         else{
             deckDB.update(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
@@ -805,52 +821,58 @@ let self = module.exports = {
     },
 
     handleChange: function(request, reply){
-        //console.log(request);
-        deckDB.get(request.params.id).then((foundDeck) => {
-            let active = -1;
-            let idArray = request.params.id.split('-');
-            if(idArray.length > 1){
-                active = idArray[1];
-            }
-            else{
-                active = foundDeck.active;
-            }
-            request.params.id = idArray[0]+'-'+active;
-            deckDB.get(request.query.root_deck).then((foundRootDeck) => {
-                let activeRoot = -1;
-                let rootIdArray = request.query.root_deck.split('-');
-                if(rootIdArray.length > 1){
-                    activeRoot = rootIdArray[1];
+        //console.log(request.query);
+        if(!request.params.id){
+            reply();
+        }
+        else{
+            deckDB.get(request.params.id).then((foundDeck) => {
+                let active = -1;
+                let idArray = request.params.id.split('-');
+                if(idArray.length > 1){
+                    active = idArray[1];
                 }
                 else{
-                    activeRoot = parseInt(foundRootDeck.active);
+                    active = foundDeck.active;
                 }
-                request.query.root_deck = rootIdArray[0]+'-'+activeRoot;
-                //console.log('deck', request.params.id);
-                //console.log('root_deck', request.query.root_deck);
-                module.exports.getDeckTree({'params': {'id' : request.query.root_deck}}, (decktree) => {
-                    deckDB.handleChange(decktree, request.params.id, request.query.root_deck, request.query.user).then((changeSet) => {
-                        //console.log(changeSet);
-                        if(!changeSet){
-                            throw changeSet;
-                        }
-                        else{
-                            reply(changeSet);
-                        }
-                    }).catch((e) => {
-                        request.log('error', e);
-                        reply(boom.badImplementation());
-                    });;
-                });
-            }).catch((err) => {
-                request.log('error', err);
-                reply(boom.badImplementation());
-            });;
+                request.params.id = idArray[0]+'-'+active;
+                deckDB.get(request.query.root_deck).then((foundRootDeck) => {
+                    let activeRoot = -1;
+                    let rootIdArray = request.query.root_deck.split('-');
+                    if(rootIdArray.length > 1){
+                        activeRoot = rootIdArray[1];
+                    }
+                    else{
+                        activeRoot = parseInt(foundRootDeck.active);
+                    }
+                    request.query.root_deck = rootIdArray[0]+'-'+activeRoot;
+                    //console.log('deck', request.params.id);
+                    //console.log('root_deck', request.query.root_deck);
+                    module.exports.getDeckTree({'params': {'id' : request.query.root_deck}}, (decktree) => {
+                        deckDB.handleChange(decktree, request.params.id, request.query.root_deck, request.query.user).then((changeSet) => {
+                            //console.log(changeSet);
+                            if(!changeSet){
+                                throw changeSet;
+                            }
+                            else{
+                                reply(changeSet);
+                            }
+                        }).catch((e) => {
+                            request.log('error', e);
+                            reply(boom.badImplementation());
+                        });;
+                    });
+                }).catch((err) => {
+                    request.log('error', err);
+                    reply(boom.badImplementation());
+                });;
 
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
-        });
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
+        }
+
 
     },
 

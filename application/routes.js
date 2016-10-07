@@ -141,6 +141,7 @@ module.exports = function(server) {
                     title: Joi.string(),
                     user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string(),
+                    top_root_deck: Joi.string(),
                     parent_deck: Joi.object().keys({
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()

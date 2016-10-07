@@ -19,14 +19,14 @@ let self = module.exports = {
         })
         .then((found) => {
             let parsed = identifier.split('-');
-            if(parsed.length === 1){
+            if(parsed.length === 1 || idArray[1] === ''){
                 return found;
             }
             else{
                 // let revision = found.revisions[parseInt(parsed[1])-1];
                 // revision.id = identifier;
                 // revision.kind = 'deck';
-                // return revision;                
+                // return revision;
                 let revision = found.revisions[parseInt(idArray[1])-1];
                 found.revisions = [revision];
                 return found;
@@ -640,7 +640,13 @@ let self = module.exports = {
         });
     },
 
-    handleChange(decktree, deck, root_deck, user_id){
+    handleChange(decktree, deck, root_deck, user_id){        
+        if(!root_deck){
+            return new Promise(function(resolve, reject) {
+                console.log('No need for recursive revisioning');
+                resolve();
+            });
+        }
         let result = findDeckInDeckTree(decktree.children, deck, [{'id': root_deck}]);
         if(root_deck === deck)
             result = [{'id': root_deck}];
