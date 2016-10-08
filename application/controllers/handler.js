@@ -924,7 +924,8 @@ let self = module.exports = {
                 let metadata = {};
                 metadata._id = deck._id;
                 metadata.description = deck.description;
-                metadata.language = deck.language;
+                metadata.language = '' + deck.language;
+                metadata.language = metadata.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
                 metadata.lastUpdate = deck.lastUpdate;
                 metadata.countRevisions = deck.revisions.length;
                 metadata.active = deck.active;
@@ -972,8 +973,6 @@ let self = module.exports = {
                 let metadata = {};
                 metadata._id = deck._id;
                 metadata.description = deck.description;
-                metadata.language = deck.language;
-                metadata.lastUpdate = deck.lastUpdate;
                 metadata.countRevisions = deck.revisions.length;
                 metadata.active = deck.active;
                 metadata.user = deck.user;
@@ -986,9 +985,9 @@ let self = module.exports = {
                         revision = deck.revisions[key];
                 }
                 metadata.title = revision.title;
-                metadata.language = revision.language;
+                metadata.language = '' + revision.language;
+                metadata.language = metadata.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
                 metadata.revision_to_show = revision.id;
-                metadata.tags = revision.tags;
                 deckDB.getUsernameById(deck.user) //get username
                 .then((username) => {
                     metadata.username = username;
@@ -1043,7 +1042,6 @@ let self = module.exports = {
                 metadata._id = deck._id;
                 metadata.timestamp = deck.timestamp;
                 metadata.description = deck.description;
-                metadata.language = deck.language;
                 metadata.lastUpdate = deck.lastUpdate;
                 metadata.tags = deck.tags;
                 metadata.translation = deck.translation;
@@ -1064,7 +1062,8 @@ let self = module.exports = {
                 metadata.license = revision.license;
                 metadata.priority = revision.priority;
                 metadata.visibility = revision.visibility;
-                metadata.language = revision.language;
+                metadata.language = '' + revision.language;
+                metadata.language = metadata.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
                 metadata.translation = revision.translation;
                 metadata.tags = revision.tags;
                 metadata.parent = revision.parent;

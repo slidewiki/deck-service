@@ -502,7 +502,11 @@ let self = module.exports = {
         .then((col) => col.findOne({
             _id: user_id})
         .then((user) => {
-            return user.username;
+            if (user){
+                return user.username;
+            }else{
+                return '';
+            }
         })
         );
     },
