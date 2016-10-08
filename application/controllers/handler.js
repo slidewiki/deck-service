@@ -933,7 +933,7 @@ let self = module.exports = {
                 let revision = deck.revisions[deck.active-1];
                 metadata.title = revision.title;
                 if (revision.language){
-                    metadata.language = revision.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
+                    metadata.language = revision.language.length === 2 ? revision.language : revision.language.substring(0, 2);
                 }else{
                     metadata.language = 'en';
                 }
@@ -986,7 +986,7 @@ let self = module.exports = {
                 }
                 metadata.title = revision.title;
                 if (revision.language){
-                    metadata.language = revision.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
+                    metadata.language = revision.language.length === 2 ? revision.language : revision.language.substring(0, 2);
                 }else{
                     metadata.language = 'en';
                 }
@@ -1066,7 +1066,7 @@ let self = module.exports = {
                 metadata.priority = revision.priority;
                 metadata.visibility = revision.visibility;
                 if (revision.language){
-                    metadata.language = revision.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
+                    metadata.language = revision.language.length === 2 ? revision.language : revision.language.substring(0, 2);
                 }else{
                     metadata.language = 'en';
                 }
