@@ -912,8 +912,55 @@ let self = module.exports = {
         });
     },
 
+    getAllRecent: (request, reply) => {
+        deckDB.findWithLimitAndSort('decks', {}, parseInt(request.params.limit), parseInt(request.params.offset), {'timestamp': -1})
+        .then((decks) => {
+            if (decks.length < 1) {
+                reply(boom.notFound());
+                return;
+            }
+            let result = [];
+            async.each(decks, (deck, callback) => {
+                let metadata = {};
+                metadata._id = deck._id;
+                metadata.description = deck.description;
+                metadata.language = deck.language;
+                metadata.lastUpdate = deck.lastUpdate;
+                metadata.countRevisions = deck.revisions.length;
+                metadata.active = deck.active;
+                metadata.user = deck.user;
+
+                metadata.timestamp = deck.timestamp;
+                //get revision
+                let revision = deck.revisions[deck.active-1];
+                metadata.title = revision.title;
+                metadata.language = revision.language;
+                metadata.revision_to_show = revision.id;
+                metadata.tags = revision.tags;
+                deckDB.getUsernameById(deck.user) //get username
+                .then((username) => {
+                    metadata.username = username;
+                    result.push(metadata);
+                    callback();
+                })
+                .catch((err) => {
+                    console.log(err);
+                    metadata.username = null;
+                    result.push(metadata);
+                    callback();
+                });
+            }, () => {
+                return reply(result);
+            });
+        })
+        .catch((err) => {
+            console.log(err);
+            reply(boom.notFound());
+        });
+    },
+
+
     getAllFeatured: (request, reply) => {
-        console.log(request.params);
         deckDB.findWithLimit('decks', {'revisions.isFeatured': 1}, parseInt(request.params.limit), parseInt(request.params.offset))
         .then((decks) => {
             if (decks.length < 1) {
@@ -940,7 +987,7 @@ let self = module.exports = {
                 }
                 metadata.title = revision.title;
                 metadata.language = revision.language;
-                metadata.featured_revision = revision.id;
+                metadata.revision_to_show = revision.id;
                 metadata.tags = revision.tags;
                 deckDB.getUsernameById(deck.user) //get username
                 .then((username) => {
@@ -954,18 +1001,6 @@ let self = module.exports = {
                     result.push(metadata);
                     callback();
                 });
-                // deckDB.getFlatSlidesFromDB(deck._id + '-' + revision.id, undefined) //TODO add slides count
-                // .then((deck_tree) => {
-                //     //console.log('DECKSLIDES: ' + deck_slides.children.length);
-                //     metadata.timestamp = revision.timestamp;
-                //     metadata.abstract = revision.abstract;
-                //     metadata.slides_count = deck_tree.children.length;
-
-                // })
-                // .catch((error) => {
-                //     console.log(error);
-                //     reply(boom.badImplementation);
-                // });
             }, () => {
                 return reply(result);
             });
@@ -994,7 +1029,7 @@ let self = module.exports = {
         });
 
         decksPromise.then((decks) => {
-            console.log('handler getAllDecks: found decks:', decks);
+            //console.log('handler getAllDecks: found decks:', decks);
 
             if (decks.length < 1) {
                 reply(boom.notFound());
