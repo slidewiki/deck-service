@@ -45,10 +45,17 @@ let self = module.exports = {
         .then((cursor) => cursor.toArray());
     },
 
-    findWithLimit : (collection, query, limit, offset) => {
+    findWithLimit: (collection, query, limit, offset) => {
         return helper.connectToDatabase()
         .then((db) => db.collection(collection))
         .then((col) => col.find(query).skip(offset).limit(limit))
+        .then((cursor) => cursor.toArray());
+    },
+
+    findWithLimitAndSort: (collection, query, limit, offset, sorter) => {
+        return helper.connectToDatabase()
+        .then((db) => db.collection(collection))
+        .then((col) => col.find(query).sort(sorter).skip(offset).limit(limit).sort(sorter))
         .then((cursor) => cursor.toArray());
     },
 

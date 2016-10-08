@@ -39,6 +39,22 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/allrecent/{limit}/{offset}',
+        handler: handlers.getAllRecent,
+        config: {
+            validate: {
+                params: {
+                    limit: Joi.string(),
+                    offset: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Get all recent decks as metadata with a possibility to set limit and offset'
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}',
         handler: handlers.getDeck,
         config: {
