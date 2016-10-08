@@ -932,8 +932,11 @@ let self = module.exports = {
                 //get revision
                 let revision = deck.revisions[deck.active-1];
                 metadata.title = revision.title;
-                metadata.language = '' + revision.language;
-                metadata.language = metadata.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
+                if (revision.language){
+                    metadata.language = revision.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
+                }else{
+                    metadata.language = 'en';
+                }
                 metadata.revision_to_show = revision.id;
                 deckDB.getUsernameById(deck.user) //get username
                 .then((username) => {
@@ -982,8 +985,11 @@ let self = module.exports = {
                         revision = deck.revisions[key];
                 }
                 metadata.title = revision.title;
-                metadata.language = '' + revision.language;
-                metadata.language = metadata.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
+                if (revision.language){
+                    metadata.language = revision.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
+                }else{
+                    metadata.language = 'en';
+                }
                 metadata.revision_to_show = revision.id;
                 deckDB.getUsernameById(deck.user) //get username
                 .then((username) => {
@@ -1059,8 +1065,11 @@ let self = module.exports = {
                 metadata.license = revision.license;
                 metadata.priority = revision.priority;
                 metadata.visibility = revision.visibility;
-                metadata.language = '' + revision.language;
-                metadata.language = metadata.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
+                if (revision.language){
+                    metadata.language = revision.language.length === 2 ? metadata.language : metadata.language.substring(0, 2);
+                }else{
+                    metadata.language = 'en';
+                }
                 metadata.translation = revision.translation;
                 metadata.tags = revision.tags;
                 metadata.parent = revision.parent;
