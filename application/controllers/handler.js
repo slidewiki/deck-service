@@ -27,7 +27,7 @@ const slidetemplate = '<div class="pptx2html" style="position: relative; width: 
         ''+
         '<div class="h-left">&nbsp;</div>'+
         '</div>'+
-        '</div>';
+        '</div>'; 
 
 let self = module.exports = {
     getSlide: function(request, reply) {
