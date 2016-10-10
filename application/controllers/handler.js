@@ -14,12 +14,12 @@ const boom = require('boom'),
     async = require('async'),
     Microservices = require('../configs/microservices');
 
-const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px; background-color: rgb(255, 255, 255); transform: scale(0.84375, 0.84375); transform-origin: left top 0px;">'+
-        '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; border-width: 1pt; border-image: initial; z-index: 23488; border-style: dashed; border-color: rgb(51, 204, 51);">'+
+const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
+        '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;">'+
         '<h3 class="h-mid"><span class="text-block" style="color: #000; font-size: 44pt; font-family: Calibri Light; font-weight: initial; font-style: normal; text-decoration: initial; vertical-align: ;">Title</span></h3>'+
         '</div>'+
         ''+
-        '<div _id="3" _idx="1" _name="Content Placeholder 2" _type="body" class="block content v-up" style="position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; border-width: 1pt; border-image: initial; z-index: 23520; border-style: dashed; border-color: rgb(51, 204, 51);">'+
+        '<div _id="3" _idx="1" _name="Content Placeholder 2" _type="body" class="block content v-up" style="position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;">'+
         '<ul>'+
         '	<li class="h-left" style="text-align: left;"><span class="text-block" style="color: #000; font-size: 28pt; font-family: Calibri; font-weight: initial; font-style: normal; text-decoration: initial; vertical-align: ;">Text bullet 1</span></li>'+
         '	<li class="h-left" style="text-align: left;"><span class="text-block" style="color: #000; font-size: 28pt; font-family: Calibri; font-weight: initial; font-style: normal; text-decoration: initial; vertical-align: ;">Text bullet 2</span></li>'+
