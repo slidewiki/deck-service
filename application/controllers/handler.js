@@ -913,7 +913,7 @@ let self = module.exports = {
     },
 
     getAllRecent: (request, reply) => {
-        deckDB.findWithLimitAndSort('decks', {}, parseInt(request.params.limit), parseInt(request.params.offset), {'timestamp': -1})
+        deckDB.findWithLimitAndSort('decks', {}, parseInt(request.params.limit), parseInt(request.params.offset), {'timestamp': 1})
         .then((decks) => {
             if (decks.length < 1) {
                 reply(boom.notFound());
