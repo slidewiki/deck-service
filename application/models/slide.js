@@ -36,8 +36,7 @@ const slideRevision = {
             type: 'string'
         },
         timestamp: {
-            type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         content: {
             type: 'string'
@@ -190,8 +189,7 @@ const slide = {
         //     minimum: 1
         // },
         timestamp: {
-            type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         revisions: {
             type: 'array',
@@ -214,8 +212,7 @@ const slide = {
             type: 'string'
         },
         lastUpdate: {
-            type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         }
     },
     required: ['user', 'timestamp']
