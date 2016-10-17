@@ -27,7 +27,7 @@ const slidetemplate = '<div class="pptx2html" style="position: relative; width: 
         ''+
         '<div class="h-left">&nbsp;</div>'+
         '</div>'+
-        '</div>'; 
+        '</div>';
 
 let self = module.exports = {
     getSlide: function(request, reply) {
@@ -210,9 +210,9 @@ let self = module.exports = {
 
                 let newSlide = {
                     'title': 'New slide',
-                    //'content': '',
+                    'content': '',
                     //for now we use hardcoded template for new slides
-                    'content': slidetemplate,
+                    //'content': slidetemplate,
                     //'language': 'en_EN',
                     'language': request.payload.language,
                     'license': request.payload.license,
@@ -248,9 +248,10 @@ let self = module.exports = {
                     let content = newSlide.content, user = inserted.ops[0].user, slideId = insertedSlide.ops[0].id+'-'+1;
                     if(content === ''){
                         content = '<h2>'+newSlide.title+'</h2>';
+                        //for now we use hardcoded template for new slides
+                        content = slidetemplate;
                     }
-                    //for now we use hardcoded template for new slides
-                    content = slidetemplate;
+
                     createThumbnail(content, slideId, user);
                 });
                 //check if a root deck is defined, if yes, update its content items to reflect the new sub-deck
