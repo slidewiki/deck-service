@@ -72,9 +72,9 @@ let self = module.exports = {
                 let content = inserted.ops[0].revisions[0].content, user = request.payload.user, slideId = inserted.ops[0]._id+'-'+1;
                 if(content === ''){
                     content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                    //for now we use hardcoded template for new slides
+                    content = slidetemplate;
                 }
-                //for now we use hardcoded template for new slides
-                content = slidetemplate;
                 createThumbnail(content, slideId, user);
 
                 reply(co.rewriteID(inserted.ops[0]));
