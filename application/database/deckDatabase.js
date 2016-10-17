@@ -117,6 +117,7 @@ let self = module.exports = {
 
                 const deckRevision = existingDeck.revisions[activeRevisionIndex];
                 deckRevision.title = deck.title;
+                deckRevision.language = deck.language;
                 existingDeck.description = deck.description;
                 existingDeck.license = deck.license;
                 //add comment, abstract, footer
