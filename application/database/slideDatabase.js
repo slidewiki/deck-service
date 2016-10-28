@@ -237,6 +237,34 @@ module.exports = {
         });
     },
 
+    saveDataSources: function(id, dataSources) {
+        let idArray = id.split('-');
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(idArray[0])})
+            .then((existingSlide) => {
+
+                let valid = false;
+                try {
+                    existingSlide.revisions[parseInt(idArray[1])-1].dataSources = dataSources;
+                    valid = slideModel(existingSlide);
+
+                    if (!valid) {
+                        return slideModel.errors;
+                    }
+
+                    col.save(existingSlide);
+                    return dataSources;
+                } catch (e) {
+                    console.log('validation failed', e);
+                }
+                return;
+            });
+        });
+    },
+
     rename: function(slide_id, newName){
         let slideId = slide_id.split('-')[0];
         return helper.connectToDatabase()

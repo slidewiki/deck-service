@@ -368,6 +368,31 @@ module.exports = function(server) {
         }
     });
 
+    server.route({
+        method: 'PUT',
+        path: '/slide/datasources/{id}',
+        handler: handlers.saveDataSources,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                payload: Joi.object().keys({
+                    datasources: Joi.array().items({
+                        type: Joi.string(),
+                        title: Joi.string(),
+                        url: Joi.string(),
+                        comment: Joi.string(),
+                        authors: Joi.string(),
+                        year: Joi.string()
+                    }).default([])
+                }).requiredKeys('datasources'),
+            },
+            tags: ['api'],
+            description: 'Replace slide data sources'
+        }
+    });
+
     //------------decktree APIs----------------
     server.route({
         method: 'GET',

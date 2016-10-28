@@ -188,6 +188,22 @@ let self = module.exports = {
         });
     },
 
+    saveDataSources: function(request, reply) {
+        let slideId = request.params.id;
+
+        slideDB.saveDataSources(encodeURIComponent(slideId), request.payload).then((replaced) => {
+            //console.log('updated: ', replaced);
+            if (co.isEmpty(replaced))
+                throw replaced;
+            else {
+                reply(replaced.value);
+            }
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
     getDeck: function(request, reply) {
         deckDB.get(encodeURIComponent(request.params.id)).then((deck) => {
             if (co.isEmpty(deck))

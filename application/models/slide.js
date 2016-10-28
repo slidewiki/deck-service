@@ -90,7 +90,14 @@ const slideRevision = {
         },
         dataSources: {
             type: 'array',
-            items: objectid
+            items: {
+                type: 'string',
+                title: 'string',
+                url: 'string',
+                comment: 'string',
+                authors: 'string',
+                year: 'string'
+            }
         },
         usage: {
             type: 'array',
