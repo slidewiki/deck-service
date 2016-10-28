@@ -208,8 +208,58 @@ let self = module.exports = {
         deckDB.get(encodeURIComponent(request.params.id)).then((deck) => {
             if (co.isEmpty(deck))
                 reply(boom.notFound());
-            else
-            reply(deck);
+            else {
+                //create data sources array
+                const deckIdParts = request.params.id.split('-');
+                const deckRevisionId = (deckIdParts.length > 0) ? deckIdParts[deckIdParts.length - 1] : deck.active;
+
+                if (deck.revisions !== undefined && deck.revisions.length > 0 && deck.revisions[0] !== null) {
+                    let deckRevision = deck.revisions.find((revision) => revision.id === deckRevisionId);
+                    if (deckRevision !== undefined) {
+                        let dataSources = [];
+                        if (deckRevision.contentItems !== undefined) {
+                            deckRevision.contentItems.forEach((contentItem) => {
+                                if (contentItem.kind === 'slide') {
+                                    const slideId = contentItem.ref.id;
+                                    const slideRevisionId = contentItem.ref.revision;
+                                    module.exports.getSlide({'params' : {'id' : slideId}}, (slide) => {
+                                        if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
+                                            let slideRevision = slide.revisions.find((revision) => revision.id === slideRevisionId);
+                                            if (slideRevision !== undefined && slideRevision.dataSources !== undefined) {
+                                                const slideRevisionTitle = slideRevision.title;
+                                                slideRevision.dataSources.forEach((dataSource) => {
+                                                    //check if dataSource is unique
+                                                    let unique = true;
+                                                    for (let i = 0; i < dataSources.length; i++) {
+                                                        let dataSourceInArray = dataSources[i];
+                                                        if (dataSourceInArray.type === dataSource.type &&
+                                                            dataSourceInArray.title === dataSource.title &&
+                                                            dataSourceInArray.url === dataSource.url &&
+                                                            dataSourceInArray.comment === dataSource.comment &&
+                                                            dataSourceInArray.authors === dataSource.authors) {
+
+                                                            unique = false;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if (unique) {
+                                                        dataSource.sid = slideId + '-' + slideRevision;
+                                                        dataSource.stitle = slideRevisionTitle;
+                                                        dataSources.push(dataSource);
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                        deckRevision.dataSources = dataSources;
+                    }
+                }
+
+                reply(deck);
+            }
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
