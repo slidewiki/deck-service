@@ -193,11 +193,7 @@ let self = module.exports = {
 
         slideDB.saveDataSources(encodeURIComponent(slideId), request.payload.dataSources).then((replaced) => {
             //console.log('updated: ', replaced);
-            if (co.isEmpty(replaced))
-                throw replaced;
-            else {
-                reply(replaced.value);
-            }
+            reply(replaced);
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
