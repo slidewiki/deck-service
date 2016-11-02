@@ -346,7 +346,10 @@ let self = module.exports = {
                 }
                 //remove reference from item to root deck, and from deck to removed item
                 let itemId = citems[position-1].ref.id;
+                //NOTE here we must also update the usage of itemID, by removing root_deck
                 col.findOneAndUpdate({_id: parseInt(itemId)}, {'$set' : {'deck' : null}});
+
+
                 citems.splice(position-1, 1);
                 existingDeck.revisions[activeRevisionId-1].contentItems = citems;
                 col.save(existingDeck);

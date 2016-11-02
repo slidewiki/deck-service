@@ -121,6 +121,36 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/revisionCount',
+        handler: handlers.countDeckRevisions,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Get total count of revisions for this deck'
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/slideCount',
+        handler: handlers.countSlides,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Get total count of slides for this deck'
+        }
+    });
+
+    server.route({
         method: 'POST',
         path: '/deck/new',
         handler: handlers.newDeck,
@@ -365,6 +395,21 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Revert a slide to an old revision'
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/revisionCount',
+        handler: handlers.countSlideRevisions,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Get total count of revisions for this slide'
         }
     });
 
