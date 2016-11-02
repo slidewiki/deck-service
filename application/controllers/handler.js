@@ -484,6 +484,7 @@ let self = module.exports = {
                     }
                     else{
                         //change position of the existing slide
+                        //NOTE must also update usage
                         deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1);
                         node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
                         reply(node);
@@ -1092,6 +1093,49 @@ let self = module.exports = {
 
             return reply(result);
 
+        });
+    },
+
+    countDeckRevisions: function(request, reply){
+        deckDB.get(request.params.id.split('-')[0]).then((foundDeck) => {
+            if(!foundDeck){
+                reply(boom.notFound());
+            }
+            else{
+                reply(foundDeck.revisions.length);
+            }
+        });
+    },
+
+    countSlideRevisions: function(request, reply){
+        slideDB.get(request.params.id.split('-')[0]).then((foundSlide) => {
+            if(!foundSlide){
+                reply(boom.notFound());
+            }
+            else{
+                reply(foundSlide.revisions.length);                
+            }
+        });
+    },
+
+    countSlides: function(request, reply){
+        deckDB.get(request.params.id).then((foundDeck) => {
+            if(!foundDeck){
+                reply(boom.notFound());
+            }
+            else{
+                let activeRevision = 1;
+                if(request.params.id.split('-').length > 1){
+                    activeRevision = parseInt(request.params.id.split('-')[1]);
+                }
+                let slideCount = 0;
+                for(let i = 0; i < foundDeck.revisions[activeRevision-1].contentItems.length; i++){
+                    if(foundDeck.revisions[activeRevision-1].contentItems[i].kind === 'slide'){
+                        slideCount++;
+                    }
+                }
+                reply(slideCount);
+            }
         });
     }
 
