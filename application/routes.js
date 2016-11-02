@@ -378,15 +378,15 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 payload: Joi.object().keys({
-                    datasources: Joi.array().items({
+                    dataSources: Joi.array().items(Joi.object().keys({
                         type: Joi.string(),
                         title: Joi.string(),
-                        url: Joi.string(),
-                        comment: Joi.string(),
-                        authors: Joi.string(),
-                        year: Joi.string()
-                    }).default([])
-                }).requiredKeys('datasources'),
+                        url: Joi.string().allow(''),
+                        comment: Joi.string().allow(''),
+                        authors: Joi.string().allow(''),
+                        year: Joi.string().allow('')
+                    })).default([])
+                }).requiredKeys('dataSources'),
             },
             tags: ['api'],
             description: 'Replace slide data sources'

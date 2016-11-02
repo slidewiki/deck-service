@@ -25,6 +25,30 @@ const contributor = {
     },
     required: ['user']
 };
+const dataSource = {
+    type: 'object',
+    properties: {
+        type: {
+            type: 'string'
+        },
+        title: {
+            type: 'string'
+        },
+        url: {
+            type: 'string'
+        },
+        comment: {
+            type: 'string'
+        },
+        authors: {
+            type: 'string'
+        },
+        year: {
+            type: 'string'
+        }
+    },
+    required: ['type','title']
+};
 const slideRevision = {
     type: 'object',
     properties: {
@@ -90,14 +114,7 @@ const slideRevision = {
         },
         dataSources: {
             type: 'array',
-            items: {
-                type: 'string',
-                title: 'string',
-                url: 'string',
-                comment: 'string',
-                authors: 'string',
-                year: 'string'
-            }
+            items: dataSource
         },
         usage: {
             type: 'array',

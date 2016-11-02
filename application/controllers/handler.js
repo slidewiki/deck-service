@@ -191,7 +191,7 @@ let self = module.exports = {
     saveDataSources: function(request, reply) {
         let slideId = request.params.id;
 
-        slideDB.saveDataSources(encodeURIComponent(slideId), request.payload).then((replaced) => {
+        slideDB.saveDataSources(encodeURIComponent(slideId), request.payload.dataSources).then((replaced) => {
             //console.log('updated: ', replaced);
             if (co.isEmpty(replaced))
                 throw replaced;

@@ -248,7 +248,11 @@ module.exports = {
 
                 let valid = false;
                 try {
-                    existingSlide.revisions[parseInt(idArray[1])-1].dataSources = dataSources;
+                    const revisionId = idArray[1];
+                    let revision = (revisionId !== undefined) ? existingSlide.revisions.find((revision) => String(revision.id) === String(revisionId)) : undefined;
+                    if (revision !== undefined) {
+                        revision.dataSources = dataSources;
+                    }
                     valid = slideModel(existingSlide);
 
                     if (!valid) {
