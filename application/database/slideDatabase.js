@@ -344,7 +344,7 @@ module.exports = {
               });
         });
     }
-};
+}; 
 
 function convertToNewSlide(slide) {
     let now = new Date();
