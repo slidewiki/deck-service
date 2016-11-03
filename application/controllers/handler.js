@@ -207,20 +207,22 @@ let self = module.exports = {
             else {
                 //create data sources array
                 const deckIdParts = request.params.id.split('-');
-                const deckRevisionId = (deckIdParts.length > 0) ? deckIdParts[deckIdParts.length - 1] : deck.active;
+                const deckRevisionId = (deckIdParts.length > 1) ? deckIdParts[deckIdParts.length - 1] : deck.active;
 
                 if (deck.revisions !== undefined && deck.revisions.length > 0 && deck.revisions[0] !== null) {
-                    let deckRevision = deck.revisions.find((revision) => revision.id === deckRevisionId);
+                    let deckRevision = deck.revisions.find((revision) => String(revision.id) === String(deckRevisionId));
                     if (deckRevision !== undefined) {
                         let dataSources = [];
                         if (deckRevision.contentItems !== undefined) {
+                            let arrayOfSlidePromisses = [];
                             deckRevision.contentItems.forEach((contentItem) => {
                                 if (contentItem.kind === 'slide') {
                                     const slideId = contentItem.ref.id;
                                     const slideRevisionId = contentItem.ref.revision;
-                                    module.exports.getSlide({'params' : {'id' : slideId}}, (slide) => {
+                                    // let promise = module.exports.getSlide({'params' : {'id' : slideId}}, (slide) => {
+                                    let promise = slideDB.get(encodeURIComponent(slideId)).then((slide) => {
                                         if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
-                                            let slideRevision = slide.revisions.find((revision) => revision.id === slideRevisionId);
+                                            let slideRevision = slide.revisions.find((revision) =>  String(revision.id) ===  String(slideRevisionId));
                                             if (slideRevision !== undefined && slideRevision.dataSources !== undefined) {
                                                 const slideRevisionTitle = slideRevision.title;
                                                 slideRevision.dataSources.forEach((dataSource) => {
@@ -239,22 +241,38 @@ let self = module.exports = {
                                                         }
                                                     }
                                                     if (unique) {
-                                                        dataSource.sid = slideId + '-' + slideRevision;
+                                                        dataSource.sid = slideId + '-' + slideRevisionId;
                                                         dataSource.stitle = slideRevisionTitle;
                                                         dataSources.push(dataSource);
                                                     }
                                                 });
                                             }
                                         }
+                                    }).catch((error) => {
+                                        request.log('error', error);
+                                        reply(boom.badImplementation());
                                     });
+                                    arrayOfSlidePromisses.push(promise);
                                 }
                             });
-                        }
-                        deckRevision.dataSources = dataSources;
-                    }
-                }
+                            Promise.all(arrayOfSlidePromisses).then(() => {
+                                deckRevision.dataSources = dataSources;
+                                reply(deck);
 
-                reply(deck);
+                            }).catch((error) => {
+                                request.log('error', error);
+                                reply(boom.badImplementation());
+                            });
+                        } else {
+                            deckRevision.dataSources = [];
+                            reply(deck);
+                        }
+                    } else {
+                        reply(deck);
+                    }
+                } else {
+                    reply(deck);
+                }
             }
         }).catch((error) => {
             request.log('error', error);
