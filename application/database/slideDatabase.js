@@ -245,24 +245,17 @@ module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
             .then((existingSlide) => {
-
-                // let valid = false;
                 try {
                     const revisionId = idArray[1];
                     let revision = (revisionId !== undefined) ? existingSlide.revisions.find((revision) => String(revision.id) === String(revisionId)) : undefined;
                     if (revision !== undefined) {
                         revision.dataSources = dataSources;
                     }
-                    // valid = slideModel(existingSlide);
-                    //
-                    // if (!valid) {
-                    //     return slideModel.errors;
-                    // }
 
                     col.save(existingSlide);
                     return dataSources;
                 } catch (e) {
-                    console.log('validation failed', e);
+                    console.log('saveDataSources failed', e);
                 }
                 return;
             });
@@ -344,7 +337,7 @@ module.exports = {
               });
         });
     }
-}; 
+};
 
 function convertToNewSlide(slide) {
     let now = new Date();

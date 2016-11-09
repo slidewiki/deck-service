@@ -219,7 +219,6 @@ let self = module.exports = {
                                 if (contentItem.kind === 'slide') {
                                     const slideId = contentItem.ref.id;
                                     const slideRevisionId = contentItem.ref.revision;
-                                    // let promise = module.exports.getSlide({'params' : {'id' : slideId}}, (slide) => {
                                     let promise = slideDB.get(encodeURIComponent(slideId)).then((slide) => {
                                         if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
                                             let slideRevision = slide.revisions.find((revision) =>  String(revision.id) ===  String(slideRevisionId));
@@ -258,7 +257,6 @@ let self = module.exports = {
                             Promise.all(arrayOfSlidePromisses).then(() => {
                                 deckRevision.dataSources = dataSources;
                                 reply(deck);
-
                             }).catch((error) => {
                                 request.log('error', error);
                                 reply(boom.badImplementation());
@@ -1193,7 +1191,7 @@ let self = module.exports = {
                 reply(boom.notFound());
             }
             else{
-                reply(foundSlide.revisions.length);                
+                reply(foundSlide.revisions.length);
             }
         });
     },
