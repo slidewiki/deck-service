@@ -237,6 +237,31 @@ module.exports = {
         });
     },
 
+    saveDataSources: function(id, dataSources) {
+        let idArray = id.split('-');
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(idArray[0])})
+            .then((existingSlide) => {
+                try {
+                    const revisionId = idArray[1];
+                    let revision = (revisionId !== undefined) ? existingSlide.revisions.find((revision) => String(revision.id) === String(revisionId)) : undefined;
+                    if (revision !== undefined) {
+                        revision.dataSources = dataSources;
+                    }
+
+                    col.save(existingSlide);
+                    return dataSources;
+                } catch (e) {
+                    console.log('saveDataSources failed', e);
+                }
+                return;
+            });
+        });
+    },
+
     rename: function(slide_id, newName){
         let slideId = slide_id.split('-')[0];
         return helper.connectToDatabase()
@@ -312,7 +337,7 @@ module.exports = {
               });
         });
     }
-}; 
+};
 
 function convertToNewSlide(slide) {
     let now = new Date();

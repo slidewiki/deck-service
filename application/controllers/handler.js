@@ -188,12 +188,90 @@ let self = module.exports = {
         });
     },
 
+    saveDataSources: function(request, reply) {
+        let slideId = request.params.id;
+
+        slideDB.saveDataSources(encodeURIComponent(slideId), request.payload.dataSources).then((replaced) => {
+            //console.log('updated: ', replaced);
+            reply(replaced);
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
     getDeck: function(request, reply) {
         deckDB.get(encodeURIComponent(request.params.id)).then((deck) => {
             if (co.isEmpty(deck))
                 reply(boom.notFound());
-            else
-            reply(deck);
+            else {
+                //create data sources array
+                const deckIdParts = request.params.id.split('-');
+                const deckRevisionId = (deckIdParts.length > 1) ? deckIdParts[deckIdParts.length - 1] : deck.active;
+
+                if (deck.revisions !== undefined && deck.revisions.length > 0 && deck.revisions[0] !== null) {
+                    let deckRevision = deck.revisions.find((revision) => String(revision.id) === String(deckRevisionId));
+                    if (deckRevision !== undefined) {
+                        let dataSources = [];
+                        if (deckRevision.contentItems !== undefined) {
+                            let arrayOfSlidePromisses = [];
+                            deckRevision.contentItems.forEach((contentItem) => {
+                                if (contentItem.kind === 'slide') {
+                                    const slideId = contentItem.ref.id;
+                                    const slideRevisionId = contentItem.ref.revision;
+                                    let promise = slideDB.get(encodeURIComponent(slideId)).then((slide) => {
+                                        if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
+                                            let slideRevision = slide.revisions.find((revision) =>  String(revision.id) ===  String(slideRevisionId));
+                                            if (slideRevision !== undefined && slideRevision.dataSources !== undefined) {
+                                                const slideRevisionTitle = slideRevision.title;
+                                                slideRevision.dataSources.forEach((dataSource) => {
+                                                    //check if dataSource is unique
+                                                    let unique = true;
+                                                    for (let i = 0; i < dataSources.length; i++) {
+                                                        let dataSourceInArray = dataSources[i];
+                                                        if (dataSourceInArray.type === dataSource.type &&
+                                                            dataSourceInArray.title === dataSource.title &&
+                                                            dataSourceInArray.url === dataSource.url &&
+                                                            dataSourceInArray.comment === dataSource.comment &&
+                                                            dataSourceInArray.authors === dataSource.authors) {
+
+                                                            unique = false;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if (unique) {
+                                                        dataSource.sid = slideId + '-' + slideRevisionId;
+                                                        dataSource.stitle = slideRevisionTitle;
+                                                        dataSources.push(dataSource);
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    }).catch((error) => {
+                                        request.log('error', error);
+                                        reply(boom.badImplementation());
+                                    });
+                                    arrayOfSlidePromisses.push(promise);
+                                }
+                            });
+                            Promise.all(arrayOfSlidePromisses).then(() => {
+                                deckRevision.dataSources = dataSources;
+                                reply(deck);
+                            }).catch((error) => {
+                                request.log('error', error);
+                                reply(boom.badImplementation());
+                            });
+                        } else {
+                            deckRevision.dataSources = [];
+                            reply(deck);
+                        }
+                    } else {
+                        reply(deck);
+                    }
+                } else {
+                    reply(deck);
+                }
+            }
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
@@ -1113,7 +1191,7 @@ let self = module.exports = {
                 reply(boom.notFound());
             }
             else{
-                reply(foundSlide.revisions.length);                
+                reply(foundSlide.revisions.length);
             }
         });
     },
