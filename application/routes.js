@@ -371,7 +371,15 @@ module.exports = function(server) {
                     tags: Joi.array().items(Joi.string()).default([]),
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
-                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    dataSources: Joi.array().items(Joi.object().keys({
+                        type: Joi.string(),
+                        title: Joi.string(),
+                        url: Joi.string().allow(''),
+                        comment: Joi.string().allow(''),
+                        authors: Joi.string().allow(''),
+                        year: Joi.string().allow('')
+                    })).default([])
                 }).requiredKeys('user', 'content', 'root_deck'),
             },
             tags: ['api'],

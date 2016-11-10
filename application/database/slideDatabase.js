@@ -395,7 +395,8 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
             title: slide.title,
             content: slide.content,
             speakernotes: slide.speakernotes,
-            tags: slide.tags
+            tags: slide.tags,
+            dataSources: slide.dataSources
             //parent: slide.parent_slide
         }]
     };
