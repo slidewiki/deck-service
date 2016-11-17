@@ -197,9 +197,9 @@ let self = module.exports = {
                 }
 
                 let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
-                for(let i = 0; i < content_items.length; i++){
-                    content_items[i].order = parseInt(content_items[i].order);
-                }
+                // for(let i = 0; i < content_items.length; i++){
+                //     content_items[i].order = parseInt(content_items[i].order);
+                // }
                 //let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
                 //console.log('content_items', content_items);
                 //console.log('usageArray', usageArray);
