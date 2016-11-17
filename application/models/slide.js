@@ -134,7 +134,7 @@ const slideRevision = {
             type: 'string'
         },
     },
-    required: ['id', 'timestamp', 'user']
+    required: ['id', 'user']
 };
 const slide = {
     type: 'object',
@@ -242,7 +242,7 @@ const slide = {
             format: 'datetime'
         }
     },
-    required: ['user', 'timestamp']
+    required: ['user']
 };
 
 //export
