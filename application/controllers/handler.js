@@ -222,7 +222,7 @@ let self = module.exports = {
                                     let promise = slideDB.get(encodeURIComponent(slideId)).then((slide) => {
                                         if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
                                             let slideRevision = slide.revisions.find((revision) =>  String(revision.id) ===  String(slideRevisionId));
-                                            if (slideRevision !== undefined && slideRevision.dataSources !== undefined) {
+                                            if (slideRevision !== undefined && slideRevision.dataSources!==null && slideRevision.dataSources !== undefined) {
                                                 const slideRevisionTitle = slideRevision.title;
                                                 slideRevision.dataSources.forEach((dataSource) => {
                                                     //check if dataSource is unique
