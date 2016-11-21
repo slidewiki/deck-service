@@ -206,6 +206,7 @@ let self = module.exports = {
                 reply(boom.notFound());
             else {
                 //create data sources array
+                console.log(deck);
                 const deckIdParts = request.params.id.split('-');
                 const deckRevisionId = (deckIdParts.length > 1) ? deckIdParts[deckIdParts.length - 1] : deck.active;
 

@@ -26,8 +26,13 @@ module.exports = {
             else{
                 //array index of revision is revision number minus 1
                 let revision = found.revisions[parseInt(idArray[1])-1];
-                found.revisions = [revision];
-                return found;
+                if(typeof revision === 'undefined'){
+                    return ;
+                }
+                else{
+                    found.revisions = [revision];
+                    return found;
+                }
                 // revision.id = identifier;
                 // revision.kind = 'slide';
                 // return revision;
