@@ -28,8 +28,15 @@ let self = module.exports = {
                 // revision.kind = 'deck';
                 // return revision;
                 let revision = found.revisions[parseInt(idArray[1])-1];
-                found.revisions = [revision];
-                return found;
+                if(typeof revision === 'undefined'){
+                    console.log('Deck not found.');
+                    console.log('err', err);
+                    return ;
+                }
+                else{
+                    found.revisions = [revision];
+                    return found;
+                }            
             }
         }).catch((err) => {
             console.log('Deck not found.');
