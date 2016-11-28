@@ -206,7 +206,7 @@ let self = module.exports = {
                 reply(boom.notFound());
             else {
                 //create data sources array
-                console.log(deck);
+                //console.log(deck);
                 const deckIdParts = request.params.id.split('-');
                 const deckRevisionId = (deckIdParts.length > 1) ? deckIdParts[deckIdParts.length - 1] : deck.active;
 
@@ -566,6 +566,9 @@ let self = module.exports = {
                         //NOTE must also update usage
                         deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1);
                         node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
+                        //NOTE must update usage of newly inserted slide
+                        //TODO not tested
+                        slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
                         reply(node);
                     }
 
@@ -670,6 +673,8 @@ let self = module.exports = {
 
                 module.exports.getDeck({'params': {'id' : request.payload.nodeSpec.id}}, (deck) => {
                     deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
+                    //TODO not tested update usage
+                    deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
                     //we have to return from the callback, else empty node is returned because it is updated asynchronously
                     module.exports.getDeckTree({'params': {'id' : deck.id}}, (deckTree) => {
                         reply(deckTree);
@@ -888,6 +893,9 @@ let self = module.exports = {
     getFlatSlides: function(request, reply){
         deckDB.getFlatSlidesFromDB(request.params.id, undefined)
         .then((deckTree) => {
+            if (co.isEmpty(deckTree)){
+                reply(boom.notFound());
+            }
             if(typeof request.query.limit !== 'undefined' || typeof request.query.offset !== 'undefined'){
                 let limit = request.query.limit, offset = request.query.offset;
                 if(typeof limit !== 'undefined'){
@@ -1264,5 +1272,5 @@ function createThumbnail(slideContent, slideId, user) {
     req.write(data);
     req.end();
 
-    console.log(slideId);
+    //console.log(slideId);
 }

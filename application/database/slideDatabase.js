@@ -190,7 +190,6 @@ module.exports = {
                     slideWithNewRevision.contributors = contributors;
                 }
 
-
                 try {
                     valid = slideModel(slideWithNewRevision);
                     if (!valid) {
@@ -341,6 +340,31 @@ module.exports = {
                   return existingSlide;
               });
         });
+    },
+    
+    addToUsage: function(itemToAdd, root_deck_path){
+        let itemId = itemToRemove.ref.id;
+        let itemRevision = itemToRemove.ref.revision;
+        if(itemToRemove.kind === 'slide'){
+            helper.connectToDatabase()
+            .then((db) => db.collection('slides'))
+            .then((col2) => {
+                col2.findOneAndUpdate(
+                    {_id: parseInt(itemId), 'revisions.id':itemRevision},
+                    {$push: {'revisions.$.usage': {id: itemId, revision: itemRevision}}}
+                );
+            });
+        }
+        else{
+            helper.connectToDatabase()
+            .then((db) => db.collection('decks'))
+            .then((col2) => {
+                col2.findOneAndUpdate(
+                    {_id: parseInt(itemId), 'revisions.id':itemRevision},
+                    {$push: {'revisions.$.usage': {id: itemId, revision: itemRevision}}}
+                );
+            });
+        }
     }
 };
 
@@ -354,6 +378,9 @@ function convertToNewSlide(slide) {
         'id': parseInt(root_deck_array[0]),
         'revision': parseInt(root_deck_array[1])
     });
+    if(slide.language === null){
+        slide.language = 'en_EN';
+    }
     let contributorsArray = [{'user': slide.user, 'count': 1}];
     const result = {
         _id: slide._id,
@@ -375,7 +402,8 @@ function convertToNewSlide(slide) {
             content: slide.content,
             speakernotes: slide.speakernotes,
             parent: slide.parent_slide,
-            tags: slide.tags
+            tags: slide.tags,
+            license: slide.license,
         }]
     };
     //console.log('from', slide, 'to', result);
@@ -385,6 +413,9 @@ function convertToNewSlide(slide) {
 function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
     let now = new Date();
     slide.user = parseInt(slide.user);
+    if(slide.language === null){
+        slide.language = 'en_EN';
+    }
     const result = {
         //user: slide.user,
         //deck: slide.root_deck,
@@ -401,7 +432,8 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
             content: slide.content,
             speakernotes: slide.speakernotes,
             tags: slide.tags,
-            dataSources: slide.dataSources
+            dataSources: slide.dataSources,
+            license: slide.license
             //parent: slide.parent_slide
         }]
     };
