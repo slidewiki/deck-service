@@ -178,7 +178,17 @@ module.exports = function(server) {
                         title: Joi.string().allow(''),
                         speakernotes: Joi.string().allow('')
                     }),
-                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    editors: Joi.object().keys({
+                        groups: Joi.array().items(Joi.object().keys({
+                            id: Joi.number(),
+                            name: Joi.string()
+                        })).default([]),
+                        users: Joi.array().items(Joi.object().keys({
+                            id: Joi.number(),
+                            username: Joi.string()
+                        })).default([])
+                    })
                 }).requiredKeys('user', 'license'),
             },
             tags: ['api'],
@@ -213,7 +223,17 @@ module.exports = function(server) {
                     comment: Joi.string().allow(''),
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
-                    new_revision: Joi.boolean()
+                    new_revision: Joi.boolean(),
+                    editors: Joi.object().keys({
+                        groups: Joi.array().items(Joi.object().keys({
+                            id: Joi.number(),
+                            name: Joi.string()
+                        })).default([]),
+                        users: Joi.array().items(Joi.object().keys({
+                            id: Joi.number(),
+                            username: Joi.string()
+                        })).default([])
+                    })
                 }).requiredKeys('user'),
             },
             tags: ['api'],

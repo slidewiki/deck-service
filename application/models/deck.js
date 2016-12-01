@@ -51,6 +51,37 @@ const contentItem = {
     },
     required: ['kind', 'ref']
 };
+const editors = {
+    type: 'object',
+    properties: {
+        groups: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: {
+                        type: 'number'
+                    },
+                    name: {
+                        type: 'string'
+                    }
+                }
+            }
+        },
+        users: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: objectid,
+                    username: {
+                        type: 'string'
+                    }
+                }
+            }
+        }
+    }
+};
 const deckRevision = {
     type: 'object',
     properties: {
@@ -66,6 +97,7 @@ const deckRevision = {
             format: 'datetime'
         },
         user: objectid,
+        editors: editors,
         parent: {
             type: 'object',
             // properties: {
