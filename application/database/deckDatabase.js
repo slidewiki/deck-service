@@ -449,13 +449,14 @@ let self = module.exports = {
     addToUsage: function(itemToAdd, root_deck_path){
         let itemId = itemToAdd.ref.id;
         let itemRevision = itemToAdd.ref.revision;
+        let usageToPush = {id: parseInt(root_deck_path[0]), revision: parseInt(root_deck_path[1])};
         if(itemToAdd.kind === 'slide'){
             helper.connectToDatabase()
             .then((db) => db.collection('slides'))
             .then((col2) => {
                 col2.findOneAndUpdate(
                     {_id: parseInt(itemId), 'revisions.id':itemRevision},
-                    {$push: {'revisions.$.usage': {id: itemId, revision: itemRevision}}}
+                    {$push: {'revisions.$.usage': usageToPush}}
                 );
             });
         }
@@ -465,7 +466,7 @@ let self = module.exports = {
             .then((col2) => {
                 col2.findOneAndUpdate(
                     {_id: parseInt(itemId), 'revisions.id':itemRevision},
-                    {$push: {'revisions.$.usage': {id: itemId, revision: itemRevision}}}
+                    {$push: {'revisions.$.usage': usageToPush}}
                 );
             });
         }

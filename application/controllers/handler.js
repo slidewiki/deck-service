@@ -544,6 +544,7 @@ let self = module.exports = {
                 slidePosition = parseInt(slideArrayPath[1])+1;
                 let slideRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
                 module.exports.getSlide({'params' : {'id' : request.payload.nodeSpec.id.split('-')[0]}}, (slide) => {
+                    //console.log('inserting slide', slide);
                     if(request.payload.nodeSpec.id === request.payload.selector.sid){
                         //we must duplicate the slide
                         let duplicateSlide = slide;
@@ -564,6 +565,7 @@ let self = module.exports = {
                     else{
                         //change position of the existing slide
                         //NOTE must also update usage
+                        slide.id = slide._id;
                         deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1);
                         node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
                         //NOTE must update usage of newly inserted slide
@@ -672,6 +674,7 @@ let self = module.exports = {
                 let deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
 
                 module.exports.getDeck({'params': {'id' : request.payload.nodeSpec.id}}, (deck) => {
+                    deck.id = deck._id;
                     deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
                     //TODO not tested update usage
                     deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
@@ -885,6 +888,25 @@ let self = module.exports = {
                     removed.changeset = changeset;
                 }
                 reply(removed);
+            });
+        });
+
+    },
+
+    moveDeckTreeNode: function(request, reply) {
+        //console.log('payload', request.payload);
+        module.exports.deleteDeckTreeNode({'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user}},
+        (removed) => {
+            let nodeSpec = {'id': request.payload.sourceSelector.sid, 'type': request.payload.sourceSelector.stype};
+            request.payload.targetSelector.spath = request.payload.targetSelector.sid + ':' + request.payload.targetIndex;
+            request.payload.targetSelector.id = request.payload.targetSelector.sid;
+            let payload  = {'payload': {
+                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user}};
+            //console.log('nodeSpec', nodeSpec);
+            //console.log('payload', payload);
+            module.exports.createDeckTreeNode(payload,
+            (inserted) => {
+                reply('inserted', inserted);
             });
         });
 
