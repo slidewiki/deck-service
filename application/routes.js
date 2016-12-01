@@ -533,4 +533,32 @@ module.exports = function(server) {
             description: 'Delete a node (slide/deck) from the deck tree'
         }
     });
+
+    server.route({
+        method: 'PUT',
+        path: '/decktree/node/move',
+        handler: handlers.moveDeckTreeNode,
+        config: {
+            validate: {
+                payload: Joi.object().keys({
+                    sourceSelector: Joi.object().keys({
+                        id: Joi.string(), //id of the root deck
+                        spath: Joi.string().allow(''),
+                        stype: Joi.string(),
+                        sid: Joi.string()
+                    }),
+                    targetSelector: Joi.object().keys({
+                        id: Joi.string(), //id of the root deck
+                        spath: Joi.string().allow(''),
+                        stype: Joi.string(),
+                        sid: Joi.string()
+                    }),
+                    user: Joi.string().alphanum().lowercase(),
+                    targetIndex: Joi.number()
+                }).requiredKeys('sourceSelector', 'targetSelector', 'user', 'targetIndex'),
+            },
+            tags: ['api'],
+            description: 'Move a node (slide/deck) in a different position in the deck tree'
+        }
+    });
 };
