@@ -894,16 +894,50 @@ let self = module.exports = {
     },
 
     moveDeckTreeNode: function(request, reply) {
-        //console.log('payload', request.payload);
+        console.log('original payload', request.payload);
         module.exports.deleteDeckTreeNode({'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user}},
         (removed) => {
             let nodeSpec = {'id': request.payload.sourceSelector.sid, 'type': request.payload.sourceSelector.stype};
+            let sourceParentDeck = request.payload.sourceSelector.id;
+            let spathArray = request.payload.sourceSelector.spath.split(';');
+            if(spathArray.length > 1){
+
+                let parentArrayPath = spathArray[spathArray.length-2].split(':');
+                sourceParentDeck = parentArrayPath[0];
+                //parentPosition = parentArrayPath[1];
+            }
+            let targetParentDeck = request.payload.targetSelector.id;
+            if(request.payload.targetSelector.spath !== ''){
+                if(request.payload.targetSelector.stype === 'deck'){
+                    targetParentDeck = request.payload.targetSelector.sid;
+                }
+                else{
+                    let targetspathArray = request.payload.targetSelector.spath.split(';');
+                    if(targetspathArray.length > 1){
+
+                        let parentArrayPath = targetspathArray[targetspathArray.length-2].split(':');
+                        targetParentDeck = parentArrayPath[0];
+                        //parentPosition = parentArrayPath[1];
+                    }
+                    else{
+                        let parentArrayPath = targetspathArray[targetspathArray.length-1].split(':');
+                        targetParentDeck = parentArrayPath[0];
+                    }
+                }
+
+            }
+
+            let itemArrayPath = spathArray[spathArray.length-1].split(':');
+            let itemPosition = itemArrayPath[1];
+            if(sourceParentDeck === targetParentDeck && parseInt(itemPosition) < request.payload.targetIndex){
+                request.payload.targetIndex--;
+            }
             request.payload.targetSelector.spath = request.payload.targetSelector.sid + ':' + request.payload.targetIndex;
             request.payload.targetSelector.id = request.payload.targetSelector.sid;
             let payload  = {'payload': {
                 'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user}};
-            //console.log('nodeSpec', nodeSpec);
-            //console.log('payload', payload);
+            console.log('nodeSpec', nodeSpec);
+            console.log('payload', payload);
             module.exports.createDeckTreeNode(payload,
             (inserted) => {
                 reply('inserted', inserted);
