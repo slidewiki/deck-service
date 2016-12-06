@@ -894,7 +894,7 @@ let self = module.exports = {
     },
 
     moveDeckTreeNode: function(request, reply) {
-        console.log('original payload', request.payload);
+        //console.log('original payload', request.payload);
         module.exports.deleteDeckTreeNode({'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user}},
         (removed) => {
             let nodeSpec = {'id': request.payload.sourceSelector.sid, 'type': request.payload.sourceSelector.stype};
@@ -926,6 +926,36 @@ let self = module.exports = {
                 }
 
             }
+            console.log('sourceParentDeck before', sourceParentDeck);
+            console.log('targetParentDeck before', targetParentDeck);
+            if(removed.hasOwnProperty('changeset')){
+                console.log('changeset of removed', removed.changeset);
+                let removed_changeset = removed.changeset;
+                if(removed_changeset.hasOwnProperty('new_revisions')){
+                    for(let i = 0; i < removed_changeset.new_revisions.length; i++){
+                        let next_new_revision = removed_changeset.new_revisions[i];
+                        if(i === 0 && removed_changeset.new_revisions[i].hasOwnProperty('root_changed')){
+                            next_new_revision = removed_changeset.new_revisions[i].root_changed;
+                        }
+                        let next_new_revision_path = next_new_revision.split('-');
+                        if(sourceParentDeck.split('-')[0] === next_new_revision_path[0]){
+                            sourceParentDeck = sourceParentDeck.split('-')[0] + '-' + next_new_revision_path[1];
+                        }
+                        if(targetParentDeck.split('-')[0] === next_new_revision_path[0]){
+                            targetParentDeck = targetParentDeck.split('-')[0] + '-' + next_new_revision_path[1];
+                        }
+                        if(request.payload.targetSelector.sid.split('-')[0] === next_new_revision_path[0]){
+                            request.payload.targetSelector.sid = request.payload.targetSelector.sid.split('-')[0] + '-' + next_new_revision_path[1];
+                        }
+                        if(nodeSpec.id.split('-')[0] === next_new_revision_path[0]){
+                            nodeSpec.id = nodeSpec.id.split('-')[0] + '-' + next_new_revision_path[1];
+                        }
+
+                    }
+                }
+            }
+            console.log('sourceParentDeck after', sourceParentDeck);
+            console.log('targetParentDeck after', targetParentDeck);
 
             let itemArrayPath = spathArray[spathArray.length-1].split(':');
             let itemPosition = itemArrayPath[1];
@@ -936,8 +966,8 @@ let self = module.exports = {
             request.payload.targetSelector.id = request.payload.targetSelector.sid;
             let payload  = {'payload': {
                 'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user}};
-            console.log('nodeSpec', nodeSpec);
-            console.log('payload', payload);
+            //console.log('nodeSpec', nodeSpec);
+            //console.log('payload', payload);
             module.exports.createDeckTreeNode(payload,
             (inserted) => {
                 reply('inserted', inserted);
