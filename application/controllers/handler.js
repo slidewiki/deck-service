@@ -213,6 +213,12 @@ let self = module.exports = {
                 if (deck.revisions !== undefined && deck.revisions.length > 0 && deck.revisions[0] !== null) {
                     let deckRevision = deck.revisions.find((revision) => String(revision.id) === String(deckRevisionId));
                     if (deckRevision !== undefined) {
+                        //add language of the active revision to the deck
+                        if (deckRevision.language){
+                            deck.language = deckRevision.language.length === 2 ? deckRevision.language : deckRevision.language.substring(0, 2);
+                        }else{
+                            deck.language = 'en';
+                        }
                         let dataSources = [];
                         if (deckRevision.contentItems !== undefined) {
                             let arrayOfSlidePromisses = [];
