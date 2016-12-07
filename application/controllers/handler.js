@@ -1021,7 +1021,7 @@ let self = module.exports = {
                 //console.log('removed_changeset', removed_changeset);
                 //console.log('inserted_changeset', inserted_changeset);
 
-                reply('inserted', inserted);
+                reply(inserted);
             });
         });
 
