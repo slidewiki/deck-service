@@ -1101,7 +1101,7 @@ let self = module.exports = {
                 return;
             }
             let result = [];
-            async.each(decks, (deck, callback) => {
+            async.eachSeries(decks, (deck, callback) => {
                 let metadata = {};
                 metadata._id = deck._id;
                 metadata.description = deck.description;
@@ -1150,7 +1150,7 @@ let self = module.exports = {
                 return;
             }
             let result = [];
-            async.each(decks, (deck, callback) => {
+            async.eachSeries(decks, (deck, callback) => {
                 let metadata = {};
                 metadata._id = deck._id;
                 metadata.description = deck.description;
