@@ -1188,10 +1188,14 @@ let self = module.exports = {
 
 
     getAllFeatured: (request, reply) => {
+
+        if(request.params.offset === 'null'){
+            request.params.offset = 0;
+        }
         deckDB.findWithLimit('decks', {'revisions.isFeatured': 1}, parseInt(request.params.limit), parseInt(request.params.offset))
         .then((decks) => {
             if (decks.length < 1) {
-                reply(boom.notFound());
+                reply([]);
                 return;
             }
             let result = [];
