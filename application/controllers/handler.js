@@ -206,13 +206,19 @@ let self = module.exports = {
                 reply(boom.notFound());
             else {
                 //create data sources array
-                console.log(deck);
+                //console.log(deck);
                 const deckIdParts = request.params.id.split('-');
                 const deckRevisionId = (deckIdParts.length > 1) ? deckIdParts[deckIdParts.length - 1] : deck.active;
 
                 if (deck.revisions !== undefined && deck.revisions.length > 0 && deck.revisions[0] !== null) {
                     let deckRevision = deck.revisions.find((revision) => String(revision.id) === String(deckRevisionId));
                     if (deckRevision !== undefined) {
+                        //add language of the active revision to the deck
+                        if (deckRevision.language){
+                            deck.language = deckRevision.language.length === 2 ? deckRevision.language : deckRevision.language.substring(0, 2);
+                        }else{
+                            deck.language = 'en';
+                        }
                         let dataSources = [];
                         if (deckRevision.contentItems !== undefined) {
                             let arrayOfSlidePromisses = [];
@@ -537,13 +543,14 @@ let self = module.exports = {
 
                 }
                 else{
-                    parentID = request.payload.selector.id;
+                    parentID = request.payload.selector.sid;
                 }
 
                 let slideArrayPath = spathArray[spathArray.length-1].split(':');
                 slidePosition = parseInt(slideArrayPath[1])+1;
                 let slideRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
                 module.exports.getSlide({'params' : {'id' : request.payload.nodeSpec.id.split('-')[0]}}, (slide) => {
+                    //console.log('inserting slide', slide);
                     if(request.payload.nodeSpec.id === request.payload.selector.sid){
                         //we must duplicate the slide
                         let duplicateSlide = slide;
@@ -564,9 +571,26 @@ let self = module.exports = {
                     else{
                         //change position of the existing slide
                         //NOTE must also update usage
-                        deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1);
-                        node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
-                        reply(node);
+                        slide.id = slide._id;
+                        //console.log(request.payload.selector);
+                        module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+                        ,(changeset) => {
+                          //console.log('changeset', changeset);
+                            if(changeset && changeset.hasOwnProperty('target_deck')){
+                              //revisioning took place, we must update root deck
+                                parentID = changeset.target_deck;
+                            }
+                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1);
+                            node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
+                            //NOTE must update usage of newly inserted slide
+                            //TODO not tested
+                            slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
+                            if(changeset && changeset.hasOwnProperty('target_deck')){
+                                node.changeset = changeset;
+                            }
+                            reply(node);
+                        });
+
                     }
 
                 });
@@ -595,6 +619,7 @@ let self = module.exports = {
                 }
 
                 //handle revisioning here
+                //console.log(request.payload.selector);
                 module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                 ,(changeset) => {
                   //console.log('changeset', changeset);
@@ -661,7 +686,7 @@ let self = module.exports = {
 
                 }
                 else{
-                    parentID = request.payload.selector.id;
+                    parentID = request.payload.selector.sid;
                 }
 
                 let deckArrayPath = spathArray[spathArray.length-1].split(':');
@@ -669,11 +694,26 @@ let self = module.exports = {
                 let deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
 
                 module.exports.getDeck({'params': {'id' : request.payload.nodeSpec.id}}, (deck) => {
-                    deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
-                    //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                    module.exports.getDeckTree({'params': {'id' : deck.id}}, (deckTree) => {
-                        reply(deckTree);
+                    deck.id = deck._id;
+                    module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+                    ,(changeset) => {
+                      //console.log('changeset', changeset);
+                        if(changeset && changeset.hasOwnProperty('target_deck')){
+                          //revisioning took place, we must update root deck
+                            parentID = changeset.target_deck;
+                        }
+                        deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
+                        //TODO not tested update usage
+                        deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
+                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                        module.exports.getDeckTree({'params': {'id' : deck.id}}, (deckTree) => {
+                            if(changeset && changeset.hasOwnProperty('target_deck')){
+                                deckTree.changeset = changeset;
+                            }
+                            reply(deckTree);
+                        });
                     });
+
 
                 });
 
@@ -885,9 +925,120 @@ let self = module.exports = {
 
     },
 
+    moveDeckTreeNode: function(request, reply) {
+        console.log('original payload', request.payload);
+        module.exports.deleteDeckTreeNode({'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user}},
+        (removed) => {
+            let nodeSpec = {'id': request.payload.sourceSelector.sid, 'type': request.payload.sourceSelector.stype};
+            let sourceParentDeck = request.payload.sourceSelector.id;
+            let spathArray = request.payload.sourceSelector.spath.split(';');
+            if(spathArray.length > 1){
+
+                let parentArrayPath = spathArray[spathArray.length-2].split(':');
+                sourceParentDeck = parentArrayPath[0];
+                //parentPosition = parentArrayPath[1];
+            }
+            let targetParentDeck = request.payload.targetSelector.id;
+            if(request.payload.targetSelector.spath !== ''){
+                if(request.payload.targetSelector.stype === 'deck'){
+                    targetParentDeck = request.payload.targetSelector.sid;
+                }
+                else{
+                    let targetspathArray = request.payload.targetSelector.spath.split(';');
+                    if(targetspathArray.length > 1){
+
+                        let parentArrayPath = targetspathArray[targetspathArray.length-2].split(':');
+                        targetParentDeck = parentArrayPath[0];
+                        //parentPosition = parentArrayPath[1];
+                    }
+                    else{
+                        let parentArrayPath = targetspathArray[targetspathArray.length-1].split(':');
+                        targetParentDeck = parentArrayPath[0];
+                    }
+                }
+
+            }
+            console.log('sourceParentDeck before', sourceParentDeck);
+            console.log('targetParentDeck before', targetParentDeck);
+            let removed_changeset, inserted_changeset ;
+            if(removed.hasOwnProperty('changeset')){
+                //console.log('changeset of removed', removed.changeset);
+                removed_changeset = removed.changeset;
+                if(removed_changeset.hasOwnProperty('new_revisions')){
+                    for(let i = 0; i < removed_changeset.new_revisions.length; i++){
+                        let next_new_revision = removed_changeset.new_revisions[i];
+                        if(i === 0 && removed_changeset.new_revisions[i].hasOwnProperty('root_changed')){
+                            next_new_revision = removed_changeset.new_revisions[i].root_changed;
+                        }
+                        let next_new_revision_path = next_new_revision.split('-');
+                        if(sourceParentDeck.split('-')[0] === next_new_revision_path[0]){
+                            sourceParentDeck = sourceParentDeck.split('-')[0] + '-' + next_new_revision_path[1];
+                        }
+                        if(targetParentDeck.split('-')[0] === next_new_revision_path[0]){
+                            targetParentDeck = targetParentDeck.split('-')[0] + '-' + next_new_revision_path[1];
+                        }
+                        if(request.payload.targetSelector.sid.split('-')[0] === next_new_revision_path[0]){
+                            request.payload.targetSelector.sid = request.payload.targetSelector.sid.split('-')[0] + '-' + next_new_revision_path[1];
+                        }
+                        if(request.payload.targetSelector.id.split('-')[0] === next_new_revision_path[0]){
+                            request.payload.targetSelector.id = request.payload.targetSelector.id.split('-')[0] + '-' + next_new_revision_path[1];
+                        }
+                        if(nodeSpec.id.split('-')[0] === next_new_revision_path[0]){
+                            nodeSpec.id = nodeSpec.id.split('-')[0] + '-' + next_new_revision_path[1];
+                        }
+
+                    }
+                }
+            }
+            console.log('sourceParentDeck after', sourceParentDeck);
+            console.log('targetParentDeck after', targetParentDeck);
+
+            let itemArrayPath = spathArray[spathArray.length-1].split(':');
+            let itemPosition = itemArrayPath[1];
+            if(sourceParentDeck === targetParentDeck && parseInt(itemPosition) < request.payload.targetIndex){
+                request.payload.targetIndex--;
+            }
+            request.payload.targetSelector.spath = request.payload.targetSelector.sid + ':' + request.payload.targetIndex;
+            if(request.payload.targetSelector.id.split('-')[0] === request.payload.targetSelector.sid.split('-')[0]){
+                request.payload.targetSelector.id = request.payload.targetSelector.sid;
+            }
+            let payload  = {'payload': {
+                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user}};
+            //console.log('nodeSpec', nodeSpec);
+            console.log('payload', payload);
+            module.exports.createDeckTreeNode(payload,
+            (inserted) => {
+
+                // if(inserted.hasOwnProperty('changeset')){
+                //     inserted_changeset = inserted.changeset;
+                // }
+                if(inserted.hasOwnProperty('changeset') && removed.hasOwnProperty('changeset')){
+                    inserted_changeset = inserted.changeset;
+                    inserted.inserted_changeset = inserted_changeset;
+                    inserted.removed_changeset = removed_changeset;
+                }
+                else if(removed.hasOwnProperty('changeset')){
+                    inserted.changeset = removed_changeset;
+                }
+                if(inserted.hasOwnProperty('changeset')){
+                    inserted_changeset = inserted.changeset;
+                    inserted.changeset = inserted_changeset;
+                }
+                //console.log('removed_changeset', removed_changeset);
+                //console.log('inserted_changeset', inserted_changeset);
+
+                reply(inserted);
+            });
+        });
+
+    },
+
     getFlatSlides: function(request, reply){
         deckDB.getFlatSlidesFromDB(request.params.id, undefined)
         .then((deckTree) => {
+            if (co.isEmpty(deckTree)){
+                reply(boom.notFound());
+            }
             if(typeof request.query.limit !== 'undefined' || typeof request.query.offset !== 'undefined'){
                 let limit = request.query.limit, offset = request.query.offset;
                 if(typeof limit !== 'undefined'){
@@ -1001,7 +1152,7 @@ let self = module.exports = {
                 return;
             }
             let result = [];
-            async.each(decks, (deck, callback) => {
+            async.eachSeries(decks, (deck, callback) => {
                 let metadata = {};
                 metadata._id = deck._id;
                 metadata.description = deck.description;
@@ -1043,14 +1194,18 @@ let self = module.exports = {
 
 
     getAllFeatured: (request, reply) => {
+
+        if(request.params.offset === 'null'){
+            request.params.offset = 0;
+        }
         deckDB.findWithLimit('decks', {'revisions.isFeatured': 1}, parseInt(request.params.limit), parseInt(request.params.offset))
         .then((decks) => {
             if (decks.length < 1) {
-                reply(boom.notFound());
+                reply([]);
                 return;
             }
             let result = [];
-            async.each(decks, (deck, callback) => {
+            async.eachSeries(decks, (deck, callback) => {
                 let metadata = {};
                 metadata._id = deck._id;
                 metadata.description = deck.description;
@@ -1264,5 +1419,5 @@ function createThumbnail(slideContent, slideId, user) {
     req.write(data);
     req.end();
 
-    console.log(slideId);
+    //console.log(slideId);
 }

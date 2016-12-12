@@ -36,7 +36,7 @@ let self = module.exports = {
                 else{
                     found.revisions = [revision];
                     return found;
-                }            
+                }
             }
         }).catch((err) => {
             console.log('Deck not found.');
@@ -355,10 +355,45 @@ let self = module.exports = {
                     citems[i].order = citems[i].order-1;
                 }
                 //remove reference from item to root deck, and from deck to removed item
-                let itemId = citems[position-1].ref.id;
-                //NOTE here we must also update the usage of itemID, by removing root_deck
-                col.findOneAndUpdate({_id: parseInt(itemId)}, {'$set' : {'deck' : null}});
-
+                // let itemId = citems[position-1].ref.id;
+                // let itemRevision = citems[position-1].ref.revision;
+                //
+                // if(citems[position-1].kind === 'slide'){
+                //     helper.connectToDatabase()
+                //     .then((db) => db.collection('slides'))
+                //     .then((col2) => {
+                //         col2.findOne({_id: parseInt(itemId)})
+                //         .then((foundSlide) => {
+                //             let oldUsage = foundSlide.revisions[itemRevision-1].usage;
+                //             for(let i = 0; i < oldUsage.length; i++){
+                //                 if(oldUsage[i].id === parseInt(root_deck_path[0]) && oldUsage[i].revision === parseInt(root_deck_path[1])){
+                //                     oldUsage.splice(i,1);
+                //                     break;
+                //                 }
+                //             }
+                //             foundSlide.revisions[itemRevision-1].usage = oldUsage;
+                //             col2.save(foundSlide);
+                //         });
+                //
+                //     });
+                // }
+                // else{
+                //
+                //     col.findOne({_id: parseInt(itemId)})
+                //     .then((foundDeck) => {
+                //         let oldUsage = foundDeck.revisions[itemRevision-1].usage;
+                //         for(let i = 0; i < oldUsage.length; i++){
+                //             if(oldUsage[i].id === parseInt(root_deck_path[0]) && oldUsage[i].revision === parseInt(root_deck_path[1])){
+                //                 oldUsage.splice(i,1);
+                //                 break;
+                //             }
+                //         }
+                //         foundDeck.revisions[itemRevision-1].usage = oldUsage;
+                //         col.save(foundDeck);
+                //
+                //     });
+                // }
+                module.exports.removeFromUsage(citems[position-1], root_deck_path);
 
                 citems.splice(position-1, 1);
                 existingDeck.revisions[activeRevisionId-1].contentItems = citems;
@@ -366,6 +401,75 @@ let self = module.exports = {
 
             });
         });
+    },
+
+    removeFromUsage: function(itemToRemove, root_deck_path){
+        let itemId = itemToRemove.ref.id;
+        let itemRevision = itemToRemove.ref.revision;
+        if(itemToRemove.kind === 'slide'){
+            helper.connectToDatabase()
+            .then((db) => db.collection('slides'))
+            .then((col2) => {
+                col2.findOne({_id: parseInt(itemId)})
+                .then((foundSlide) => {
+                    let oldUsage = foundSlide.revisions[itemRevision-1].usage;
+                    for(let i = 0; i < oldUsage.length; i++){
+                        if(oldUsage[i].id === parseInt(root_deck_path[0]) && oldUsage[i].revision === parseInt(root_deck_path[1])){
+                            oldUsage.splice(i,1);
+                            break;
+                        }
+                    }
+                    foundSlide.revisions[itemRevision-1].usage = oldUsage;
+                    col2.save(foundSlide);
+                });
+
+            });
+        }
+        else{
+            helper.connectToDatabase()
+            .then((db) => db.collection('decks'))
+            .then((col) => {
+                col.findOne({_id: parseInt(itemId)})
+                .then((foundDeck) => {
+                    let oldUsage = foundDeck.revisions[itemRevision-1].usage;
+                    for(let i = 0; i < oldUsage.length; i++){
+                        if(oldUsage[i].id === parseInt(root_deck_path[0]) && oldUsage[i].revision === parseInt(root_deck_path[1])){
+                            oldUsage.splice(i,1);
+                            break;
+                        }
+                    }
+                    foundDeck.revisions[itemRevision-1].usage = oldUsage;
+                    col.save(foundDeck);
+
+                });
+            });
+        }
+    },
+
+    addToUsage: function(itemToAdd, root_deck_path){
+        let itemId = itemToAdd.ref.id;
+        let itemRevision = itemToAdd.ref.revision;
+        let usageToPush = {id: parseInt(root_deck_path[0]), revision: parseInt(root_deck_path[1])};
+        if(itemToAdd.kind === 'slide'){
+            helper.connectToDatabase()
+            .then((db) => db.collection('slides'))
+            .then((col2) => {
+                col2.findOneAndUpdate(
+                    {_id: parseInt(itemId), 'revisions.id':itemRevision},
+                    {$push: {'revisions.$.usage': usageToPush}}
+                );
+            });
+        }
+        else{
+            helper.connectToDatabase()
+            .then((db) => db.collection('decks'))
+            .then((col2) => {
+                col2.findOneAndUpdate(
+                    {_id: parseInt(itemId), 'revisions.id':itemRevision},
+                    {$push: {'revisions.$.usage': usageToPush}}
+                );
+            });
+        }
     },
 
 
@@ -539,6 +643,7 @@ let self = module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(deck_id)})
             .then((deck) => {
+                //console.log(deck);
                 if(revision_id === -1){
                     revision_id = deck.active-1;
                 }
@@ -581,6 +686,8 @@ let self = module.exports = {
                 });
 
 
+            }).catch((error) => {
+                return ;
             });
         });
     },
@@ -999,6 +1106,9 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
     deck.user = parseInt(deck.user);
     if(!deck.hasOwnProperty('tags') || deck.tags === null){
         deck.tags = [];
+    }
+    if(deck.language === null){
+        deck.language = 'en_EN';
     }
     const result = {
         //user: deck.user,
