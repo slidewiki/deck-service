@@ -554,12 +554,14 @@ let self = module.exports = {
                     if(request.payload.nodeSpec.id === request.payload.selector.sid){
                         //we must duplicate the slide
                         let duplicateSlide = slide;
+                        parentID = request.payload.selector.id;
+                        //console.log('here');
                         duplicateSlide.parent = request.payload.nodeSpec.id;
                         duplicateSlide.comment = 'Duplicate slide of ' + request.payload.nodeSpec.id;
                         //copy the slide to a new duplicate
                         slideDB.copy(duplicateSlide, slideRevision)
                         .then((insertedDuplicate) => {
-                            //console.log(insertedDuplicate);
+                            //console.log('parentID', parentID);
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             //node = {title: insertedDuplicate.revisions[slideRevision].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[slideRevision].id, type: 'slide'};
@@ -698,6 +700,7 @@ let self = module.exports = {
                     module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                     ,(changeset) => {
                       //console.log('changeset', changeset);
+                        parentID = request.payload.selector.id;
                         if(changeset && changeset.hasOwnProperty('target_deck')){
                           //revisioning took place, we must update root deck
                             parentID = changeset.target_deck;
