@@ -76,6 +76,9 @@ const editors = {
                     id: objectid,
                     username: {
                         type: 'string'
+                    },
+                    joined: {
+                        type: 'date-time'
                     }
                 }
             }
@@ -97,6 +100,10 @@ const deckRevision = {
             format: 'datetime'
         },
         user: objectid,
+        accessLevel: {
+            type: 'string',
+            enum: ['public', 'restricted', 'private']
+        },
         editors: editors,
         parent: {
             type: 'object',
