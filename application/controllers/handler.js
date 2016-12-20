@@ -12,7 +12,9 @@ const boom = require('boom'),
     co = require('../common'),
     Joi = require('joi'),
     async = require('async'),
-    Microservices = require('../configs/microservices');
+    Microservices = require('../configs/microservices'),
+    requestLib = require('request'),
+    config = request('../configuration');
 
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
         '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;">'+
@@ -1420,4 +1422,61 @@ function createThumbnail(slideContent, slideId, user) {
     req.end();
 
     //console.log(slideId);
+}
+
+function isUserAllowedToEditTheDeck(request, deckRevision) {
+    const JWT = request.auth.token;
+    const accessLevel = deckRevision.accessLevel;
+    const users = deckRevision.editors.users;
+    const groups = deckRevision.editors.groups;
+
+    let promise = new Promise((resolve, reject) => {
+        if (accessLevel === 'public')
+            return resolve(true);
+
+        if (deckRevision.user === request.auth.credentials.userid)
+            return resolve(true);
+
+        if (accessLevel === 'private') {
+            return resolve(false);
+        }
+
+        let isUserAnAuthorizedUser = (users.findIndex((user) => {
+            return user.id === request.auth.credentials.userid;
+        }) !== -1);
+
+        if (isUserAnAuthorizedUser)
+            return resolve(true);
+
+        let header = {};
+        header[config.JWT.HEADER] = JWT;
+        const options = {
+            url: Microservices.user.uri + ':' + Microservices.user.port + '/userdata',
+            method: 'GET',
+            json: true,
+            headers: header
+        };
+
+        function callback(error, response, body) {
+            console.log('/userdata: ', error, response.statusCode, body);
+
+            if (!error && (response.statusCode === 200)) {
+                if (body.groups === undefined || body.groups.length < 1)
+                    body.groups = [];
+
+                isUserAnAuthorizedUser = isUserAnAuthorizedUser || ( groups.findIndex((group) => {
+                    return (body.groups.findIndex((group2) => {
+                        return group2._id === group.id;
+                    }) !== -1);
+                }) !== -1 );
+
+                resolve(isUserAnAuthorizedUser);
+            } else {
+                return reject(error);
+            }
+        }
+
+        requestLib(options, callback);
+    });
+    return promise;
 }
