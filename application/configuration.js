@@ -6,26 +6,37 @@ let host = 'localhost';
 const fs = require('fs');
 const lines = fs.readFileSync('/etc/hosts').toString().split('\n');
 for (let i in lines) {
-  if (lines[i].includes('mongodb')) {
-    const entrys = lines[i].split(' ');
-    host = entrys[entrys.length - 1];
-    console.log('Found mongodb host. Using ' + host + ' as database host.');
-  }
+    if (lines[i].includes('mongodb')) {
+        const entrys = lines[i].split(' ');
+        host = entrys[entrys.length - 1];
+        console.log('Found mongodb host. Using ' + host + ' as database host.');
+    }
 }
 
 //read mongo port from ENV
 const co = require('./common');
 let port = 27017;
 if (!co.isEmpty(process.env.DATABASE_PORT)){
-  port = process.env.DATABASE_PORT;
-  //console.log('Using port ' + port + ' as database port.'); TODO replace it with logging, that isn't printed at npm run test:unit
+    port = process.env.DATABASE_PORT;
+    //console.log('Using port ' + port + ' as database port.'); TODO replace it with logging, that isn't printed at npm run test:unit
+}
+
+//JWT serial
+let JWTSerial = '69aac7f95a9152cd4ae7667c80557c284e413d748cca4c5715b3f02020a5ae1b';
+if (!co.isEmpty(process.env.JWT_SERIAL)){
+    JWTSerial = process.env.JWT_SERIAL;
 }
 
 module.exports = {
-  MongoDB: {
-    PORT: port,
-    HOST: host,
-    NS: 'local',
-    SLIDEWIKIDATABASE: 'slidewiki'
-  }
+    MongoDB: {
+        PORT: port,
+        HOST: host,
+        NS: 'local',
+        SLIDEWIKIDATABASE: 'slidewiki'
+    },
+    JWT: {
+        SERIAL: JWTSerial,
+        HEADER: '----jwt----',
+        ALGORITHM:  'HS512'
+    }
 };
