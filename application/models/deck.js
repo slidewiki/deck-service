@@ -98,7 +98,7 @@ const deckRevision = {
         },
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
         accessLevel: {
@@ -245,7 +245,7 @@ const deck = {
     properties: {
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
         // kind: {
@@ -262,7 +262,7 @@ const deck = {
         // },
         lastUpdate: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         revisions: {
             type: 'array',

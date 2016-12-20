@@ -151,6 +151,43 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/editAllowed',
+        handler: handlers.validateAuthorizationForDeck,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown()
+            },
+            tags: ['api'],
+            description: 'Check if user is allowed to edit the deck.',
+            response: {
+                schema: Joi.object().keys({
+                    allowed: Joi.boolean()
+                }).required('allowed')
+            },
+            auth: 'jwt',
+            plugins: {
+                'hapi-swagger': {
+                    responses: {
+                        ' 200 ': {
+                            'description': 'Successful',
+                        },
+                        ' 404 ': {
+                            'description': 'Deck not found. Check the id.'
+                        }
+                    },
+                    payloadType: 'form'
+                }
+            }
+        }
+    });
+
+    server.route({
         method: 'POST',
         path: '/deck/new',
         handler: handlers.newDeck,

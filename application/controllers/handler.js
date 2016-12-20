@@ -14,7 +14,7 @@ const boom = require('boom'),
     async = require('async'),
     Microservices = require('../configs/microservices'),
     requestLib = require('request'),
-    config = request('../configuration');
+    config = require('../configuration');
 
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
         '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;">'+
@@ -1373,9 +1373,31 @@ let self = module.exports = {
                 reply(slideCount);
             }
         });
+    },
+
+    validateAuthorizationForDeck: (request, reply) => {
+        let deckid = request.params.id; //TODO handle if no revision is given
+
+        return deckDB.get(deckid)
+            .then((result) => {
+                console.log('validateAuthorizationForDeck: deckid, deck:', deckid, result);
+                if (result === null || result === undefined || result._id === undefined)
+                    return reply(boom.notFound());
+
+                return isUserAllowedToEditTheDeck(request, result)
+                    .then((isAllowed) => {
+                        return reply({allowed: isAllowed});
+                    })
+                    .catch((error) => {
+                        console.log('Error', error);
+                        return reply(boom.badImplementation());
+                    });
+            })
+            .catch((error) => {
+                console.log('Error', error);
+                return reply(boom.badImplementation());
+            });
     }
-
-
 };
 
 function createThumbnail(slideContent, slideId, user) {
@@ -1426,9 +1448,16 @@ function createThumbnail(slideContent, slideId, user) {
 
 function isUserAllowedToEditTheDeck(request, deckRevision) {
     const JWT = request.auth.token;
-    const accessLevel = deckRevision.accessLevel;
-    const users = deckRevision.editors.users;
-    const groups = deckRevision.editors.groups;
+    const accessLevel = deckRevision.accessLevel || 'public';
+    if (deckRevision.editors === undefined)
+        deckRevision.editors = {
+            users: [],
+            groups: []
+        };
+    const users = deckRevision.editors.users || [];
+    const groups = deckRevision.editors.groups || [];
+
+    console.log('isUserAllowedToEditTheDeck: accessLevel, userid:', accessLevel, request.auth.credentials.userid);
 
     let promise = new Promise((resolve, reject) => {
         if (accessLevel === 'public')
@@ -1472,6 +1501,8 @@ function isUserAllowedToEditTheDeck(request, deckRevision) {
 
                 resolve(isUserAnAuthorizedUser);
             } else {
+                if (response.statusCode === 404)
+                    return resolve(false);  //user not found
                 return reject(error);
             }
         }
