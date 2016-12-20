@@ -78,7 +78,8 @@ const editors = {
                         type: 'string'
                     },
                     joined: {
-                        type: 'date-time'
+                        type: 'string',
+                        format: 'date-time'
                     }
                 }
             }
