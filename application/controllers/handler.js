@@ -1383,7 +1383,7 @@ let self = module.exports = {
 
         return deckDB.get(deckid)
             .then((result) => {
-                console.log('validateAuthorizationForDeck: deckid, deck:', deckid, result);
+                // console.log('validateAuthorizationForDeck: deckid, deck:', deckid, result);
                 if (result === null || result === undefined || result._id === undefined)
                     return reply(boom.notFound());
 

@@ -315,7 +315,7 @@ let self = module.exports = {
                     existingDeck.revisions[activeRevisionId-1].contentItems = citems;
                     col.save(existingDeck);
                 }
-                else{                    
+                else{
                     col.findOneAndUpdate({
                         _id: parseInt(root_deck_path[0]),  revisions : {$elemMatch: {id: parseInt(activeRevisionId)}}  },
                         {
@@ -1095,7 +1095,8 @@ function convertToNewDeck(deck){
             abstract: deck.abstract,
             footer: deck.footer,
             contentItems: []
-        }]
+        }],
+        editors: deck.editors
     };
     //console.log('from', slide, 'to', result);
     return result;
