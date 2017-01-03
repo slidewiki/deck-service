@@ -122,6 +122,7 @@ let self = module.exports = {
                     activeRevisionIndex = getActiveRevision(existingDeck);
                 }
 
+                //TODO check if all attributes are used from payload
                 const deckRevision = existingDeck.revisions[activeRevisionIndex];
                 deckRevision.title = deck.title;
                 deckRevision.language = deck.language;
@@ -129,6 +130,8 @@ let self = module.exports = {
                 existingDeck.license = deck.license;
                 //add comment, abstract, footer
                 deckRevision.tags = deck.tags;
+                deckRevision.accessLevel = deck.accessLevel;
+                deckRevision.editors = deck.editors;
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
                 try {
                     valid = deckModel(deckRevision);
@@ -1094,9 +1097,10 @@ function convertToNewDeck(deck){
             comment: deck.comment,
             abstract: deck.abstract,
             footer: deck.footer,
-            contentItems: []
-        }],
-        editors: deck.editors
+            contentItems: [],
+            accessLevel: deck.accessLevel,
+            editors: deck.editors
+        }]
     };
     //console.log('from', slide, 'to', result);
     return result;
@@ -1132,7 +1136,9 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
             comment: deck.comment,
             abstract: deck.abstract,
             footer: deck.footer,
-            contentItems: content_items
+            contentItems: content_items,
+            accessLevel: deck.accessLevel,
+            editors: deck.editors
         }]
     };
     //console.log('from', slide, 'to', result);

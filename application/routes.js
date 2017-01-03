@@ -261,6 +261,7 @@ module.exports = function(server) {
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     new_revision: Joi.boolean(),
+                    accessLevel: Joi.string().valid('public', 'restricted', 'private'),
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number(),
