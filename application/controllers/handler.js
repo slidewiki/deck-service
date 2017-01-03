@@ -1457,6 +1457,7 @@ function createThumbnail(slideContent, slideId, user) {
     //console.log(slideId);
 }
 
+//Checks with the user data and the deck revision, if the user is allowed to edit the deck
 function isUserAllowedToEditTheDeck(request, deckRevision) {
     const JWT = request.auth.token;
     const accessLevel = deckRevision.accessLevel || 'public';
@@ -1468,7 +1469,7 @@ function isUserAllowedToEditTheDeck(request, deckRevision) {
     const users = deckRevision.editors.users || [];
     const groups = deckRevision.editors.groups || [];
 
-    console.log('isUserAllowedToEditTheDeck: accessLevel, userid:', accessLevel, request.auth.credentials.userid);
+    console.log('isUserAllowedToEditTheDeck: accessLevel, userid:', accessLevel, ',', request.auth.credentials.userid);
 
     let promise = new Promise((resolve, reject) => {
         if (deckRevision === {})
