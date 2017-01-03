@@ -1379,13 +1379,21 @@ let self = module.exports = {
     },
 
     validateAuthorizationForDeck: (request, reply) => {
-        let deckid = request.params.id; //TODO handle if no revision is given
+        let deckid = request.params.id;
 
         return deckDB.get(deckid)
             .then((result) => {
                 console.log('validateAuthorizationForDeck: deckid, deck:', deckid, result);
                 if (result === null || result === undefined || result._id === undefined)
                     return reply(boom.notFound());
+
+                //handle if no revision is given (result is a deck)
+                if (result.revisions) {
+                    result = result.revisions.filter((el) => {
+                        return el.id === result.active;
+                    }) || [{}];
+                    result = result[0];
+                }
 
                 return isUserAllowedToEditTheDeck(request, result)
                     .then((isAllowed) => {
@@ -1463,6 +1471,9 @@ function isUserAllowedToEditTheDeck(request, deckRevision) {
     console.log('isUserAllowedToEditTheDeck: accessLevel, userid:', accessLevel, request.auth.credentials.userid);
 
     let promise = new Promise((resolve, reject) => {
+        if (deckRevision === {})
+            return resolve(false);
+
         if (accessLevel === 'public')
             return resolve(true);
 
