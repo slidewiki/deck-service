@@ -246,8 +246,8 @@ let self = module.exports = {
                             promise.then((deckTree) => {
                                 deckTree.children.forEach((child) => {
                                     let idArray = child.id.split('-');
-                                    const newSlideId = idArray[0];
-                                    const newSlideRevisionId = idArray[1];
+                                    const newSlideId = parseInt(idArray[0]);
+                                    const newSlideRevisionId = parseInt(idArray[1]);
                                     if (!(newSlideId in slideRevisionsMap)) {
                                         arrayOfSlideIds.push(newSlideId);
                                         slideRevisionsMap[newSlideId] = newSlideRevisionId;
