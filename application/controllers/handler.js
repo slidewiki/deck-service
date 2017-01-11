@@ -219,20 +219,53 @@ let self = module.exports = {
                         }else{
                             deck.language = 'en';
                         }
+                        // get dataSources for the deck
                         let dataSources = [];
                         if (deckRevision.contentItems !== undefined) {
-                            let arrayOfSlidePromisses = [];
+                            // get first level of slides - from contentItems
+                            let arrayOfSlideIds = [];
+                            let slideRevisionsMap = {};
+                            let thereAreSubdecks = false;// does this deck have some subdecks
                             deckRevision.contentItems.forEach((contentItem) => {
                                 if (contentItem.kind === 'slide') {
                                     const slideId = contentItem.ref.id;
-                                    const slideRevisionId = contentItem.ref.revision;
-                                    let promise = slideDB.get(encodeURIComponent(slideId)).then((slide) => {
+                                    const revisionId = contentItem.ref.revision;
+                                    arrayOfSlideIds.push(slideId);
+                                    slideRevisionsMap[slideId] = revisionId;
+                                } else {
+                                    thereAreSubdecks = true;
+                                }
+                            });
+
+                            let promise = Promise.resolve({children: []});
+                            if (thereAreSubdecks) {
+                                //if there are subdecks, get the rest of slides, from deeper levels ( > 1 )
+                                promise = deckDB.getFlatSlidesFromDB(request.params.id, undefined);
+                            }
+
+                            promise.then((deckTree) => {
+                                deckTree.children.forEach((child) => {
+                                    let idArray = child.id.split('-');
+                                    const newSlideId = idArray[0];
+                                    const newSlideRevisionId = idArray[1];
+                                    if (!(newSlideId in slideRevisionsMap)) {
+                                        arrayOfSlideIds.push(newSlideId);
+                                        slideRevisionsMap[newSlideId] = newSlideRevisionId;
+                                    }
+                                });
+                            }).then(() => {
+                                // get dataSources
+                                slideDB.getSelected({selectedIDs: arrayOfSlideIds})// get slides with ids in arrayOfSlideIds
+                                .then((slides) => {
+                                    slides.forEach((slide) => {
                                         if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
+                                            const slideId = slide._id;
+                                            const slideRevisionId = slideRevisionsMap[slideId];
                                             let slideRevision = slide.revisions.find((revision) =>  String(revision.id) ===  String(slideRevisionId));
-                                            if (slideRevision !== undefined && slideRevision.dataSources!==null && slideRevision.dataSources !== undefined) {
+                                            if (slideRevision !== undefined && slideRevision.dataSources !== null && slideRevision.dataSources !== undefined) {
                                                 const slideRevisionTitle = slideRevision.title;
                                                 slideRevision.dataSources.forEach((dataSource) => {
-                                                    //check if dataSource is unique
+                                                    //check that the dataSource has not already been added to the array
                                                     let unique = true;
                                                     for (let i = 0; i < dataSources.length; i++) {
                                                         let dataSourceInArray = dataSources[i];
@@ -240,8 +273,8 @@ let self = module.exports = {
                                                             dataSourceInArray.title === dataSource.title &&
                                                             dataSourceInArray.url === dataSource.url &&
                                                             dataSourceInArray.comment === dataSource.comment &&
-                                                            dataSourceInArray.authors === dataSource.authors) {
-
+                                                            dataSourceInArray.authors === dataSource.authors)
+                                                        {
                                                             unique = false;
                                                             break;
                                                         }
@@ -254,19 +287,11 @@ let self = module.exports = {
                                                 });
                                             }
                                         }
-                                    }).catch((error) => {
-                                        request.log('error', error);
-                                        reply(boom.badImplementation());
                                     });
-                                    arrayOfSlidePromisses.push(promise);
-                                }
-                            });
-                            Promise.all(arrayOfSlidePromisses).then(() => {
-                                deckRevision.dataSources = dataSources;
-                                reply(deck);
-                            }).catch((error) => {
-                                request.log('error', error);
-                                reply(boom.badImplementation());
+
+                                    deckRevision.dataSources = dataSources;
+                                    reply(deck);
+                                });
                             });
                         } else {
                             deckRevision.dataSources = [];
