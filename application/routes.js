@@ -219,11 +219,14 @@ module.exports = function(server) {
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number(),
-                            name: Joi.string()
+                            name: Joi.string(),
+                            joined: Joi.string()
                         })).default([]),
                         users: Joi.array().items(Joi.object().keys({
-                            id: Joi.number(),
-                            username: Joi.string()
+                            userid: Joi.number(),
+                            username: Joi.string(),
+                            joined: Joi.string(),
+                            picture: Joi.string()
                         })).default([])
                     })
                 }).requiredKeys('user', 'license'),
@@ -265,11 +268,14 @@ module.exports = function(server) {
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number(),
-                            name: Joi.string()
+                            name: Joi.string(),
+                            joined: Joi.string()
                         })).default([]),
                         users: Joi.array().items(Joi.object().keys({
-                            id: Joi.number(),
-                            username: Joi.string()
+                            userid: Joi.number(),
+                            username: Joi.string(),
+                            joined: Joi.string(),
+                            picture: Joi.string()
                         })).default([])
                     })
                 }).requiredKeys('user'),

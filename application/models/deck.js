@@ -64,6 +64,10 @@ const editors = {
                     },
                     name: {
                         type: 'string'
+                    },
+                    joined: {
+                        type: 'string',
+                        format: 'date-time'
                     }
                 }
             }
@@ -80,6 +84,9 @@ const editors = {
                     joined: {
                         type: 'string',
                         format: 'date-time'
+                    },
+                    picture: {
+                        type: 'string'
                     }
                 }
             }
