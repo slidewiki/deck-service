@@ -54,10 +54,7 @@ module.exports = {
     getSelected: function(identifiers) {
         return helper.connectToDatabase()
         .then((db) => db.collection('slides'))
-        .then((col) => col.find({ _id:  { $in : identifiers.selectedIDs.map(function(id) {
-            return oid(id);
-        })
-    }}))
+        .then((col) => col.find({ _id:  { $in : identifiers.selectedIDs }}))
     .then((stream) => stream.sort({timestamp: -1}))
     .then((stream) => stream.toArray());
     },
