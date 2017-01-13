@@ -291,7 +291,13 @@ let self = module.exports = {
 
                                     deckRevision.dataSources = dataSources;
                                     reply(deck);
+                                }).catch((error) => {
+                                    console.log('error', error);
+                                    reply(deck);
                                 });
+                            }).catch((error) => {
+                                console.log('error', error);
+                                reply(deck);
                             });
                         } else {
                             deckRevision.dataSources = [];
