@@ -555,7 +555,7 @@ let self = module.exports = {
                     //console.log('inserting slide', slide);
                     if(request.payload.nodeSpec.id === request.payload.selector.sid){
                         //we must duplicate the slide
-                        let duplicateSlide = slide;                        
+                        let duplicateSlide = slide;
                         if(spathArray.length <= 1)
                             parentID = request.payload.selector.id;
                         //console.log('here');
@@ -703,11 +703,19 @@ let self = module.exports = {
                     module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                     ,(changeset) => {
                       //console.log('changeset', changeset);
-                        parentID = request.payload.selector.id;
+                        if(request.payload.selector.stype === 'deck'){
+                            parentID = request.payload.selector.sid;
+                        }
+                        else{
+                            parentID = request.payload.selector.id;
+                        }
+
                         if(changeset && changeset.hasOwnProperty('target_deck')){
                           //revisioning took place, we must update root deck
                             parentID = changeset.target_deck;
                         }
+                        console.log('parentID', parentID);
+                        console.log('deckPosition', deckPosition);
                         deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
                         //TODO not tested update usage
                         deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
@@ -932,7 +940,7 @@ let self = module.exports = {
     },
 
     moveDeckTreeNode: function(request, reply) {
-        console.log('original payload', request.payload);
+        //console.log('original payload', request.payload);
         module.exports.deleteDeckTreeNode({'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user}},
         (removed) => {
             let nodeSpec = {'id': request.payload.sourceSelector.sid, 'type': request.payload.sourceSelector.stype};
@@ -964,8 +972,8 @@ let self = module.exports = {
                 }
 
             }
-            console.log('sourceParentDeck before', sourceParentDeck);
-            console.log('targetParentDeck before', targetParentDeck);
+            //console.log('sourceParentDeck before', sourceParentDeck);
+            //console.log('targetParentDeck before', targetParentDeck);
             let removed_changeset, inserted_changeset ;
             if(removed.hasOwnProperty('changeset')){
                 //console.log('changeset of removed', removed.changeset);
@@ -996,8 +1004,8 @@ let self = module.exports = {
                     }
                 }
             }
-            console.log('sourceParentDeck after', sourceParentDeck);
-            console.log('targetParentDeck after', targetParentDeck);
+            //console.log('sourceParentDeck after', sourceParentDeck);
+            //console.log('targetParentDeck after', targetParentDeck);
 
             let itemArrayPath = spathArray[spathArray.length-1].split(':');
             let itemPosition = itemArrayPath[1];
@@ -1011,7 +1019,7 @@ let self = module.exports = {
             let payload  = {'payload': {
                 'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user}};
             //console.log('nodeSpec', nodeSpec);
-            console.log('payload', payload);
+            //console.log('payload', payload);
             module.exports.createDeckTreeNode(payload,
             (inserted) => {
 
