@@ -555,8 +555,9 @@ let self = module.exports = {
                     //console.log('inserting slide', slide);
                     if(request.payload.nodeSpec.id === request.payload.selector.sid){
                         //we must duplicate the slide
-                        let duplicateSlide = slide;
-                        parentID = request.payload.selector.id;
+                        let duplicateSlide = slide;                        
+                        if(spathArray.length <= 1)
+                            parentID = request.payload.selector.id;
                         //console.log('here');
                         duplicateSlide.parent = request.payload.nodeSpec.id;
                         duplicateSlide.comment = 'Duplicate slide of ' + request.payload.nodeSpec.id;
