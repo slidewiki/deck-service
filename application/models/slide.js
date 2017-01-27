@@ -61,7 +61,7 @@ const slideRevision = {
         },
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         content: {
             type: 'string'
@@ -215,7 +215,7 @@ const slide = {
         // },
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         revisions: {
             type: 'array',
@@ -239,7 +239,7 @@ const slide = {
         },
         lastUpdate: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         }
     },
     required: ['user']

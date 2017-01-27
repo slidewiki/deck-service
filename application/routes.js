@@ -151,6 +151,43 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/editAllowed',
+        handler: handlers.validateAuthorizationForDeck,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown()
+            },
+            tags: ['api'],
+            description: 'Check if user is allowed to edit the deck.',
+            response: {
+                schema: Joi.object().keys({
+                    allowed: Joi.boolean()
+                }).required('allowed')
+            },
+            auth: 'jwt',
+            plugins: {
+                'hapi-swagger': {
+                    responses: {
+                        ' 200 ': {
+                            'description': 'Successful',
+                        },
+                        ' 404 ': {
+                            'description': 'Deck not found. Check the id.'
+                        }
+                    },
+                    payloadType: 'form'
+                }
+            }
+        }
+    });
+
+    server.route({
         method: 'POST',
         path: '/deck/new',
         handler: handlers.newDeck,
@@ -178,7 +215,20 @@ module.exports = function(server) {
                         title: Joi.string().allow(''),
                         speakernotes: Joi.string().allow('')
                     }),
-                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    editors: Joi.object().keys({
+                        groups: Joi.array().items(Joi.object().keys({
+                            id: Joi.number(),
+                            name: Joi.string(),
+                            joined: Joi.string()
+                        })).default([]),
+                        users: Joi.array().items(Joi.object().keys({
+                            userid: Joi.number(),
+                            username: Joi.string(),
+                            joined: Joi.string(),
+                            picture: Joi.string()
+                        })).default([])
+                    })
                 }).requiredKeys('user', 'license'),
             },
             tags: ['api'],
@@ -213,7 +263,21 @@ module.exports = function(server) {
                     comment: Joi.string().allow(''),
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
-                    new_revision: Joi.boolean()
+                    new_revision: Joi.boolean(),
+                    accessLevel: Joi.string().valid('public', 'restricted', 'private'),
+                    editors: Joi.object().keys({
+                        groups: Joi.array().items(Joi.object().keys({
+                            id: Joi.number(),
+                            name: Joi.string(),
+                            joined: Joi.string()
+                        })).default([]),
+                        users: Joi.array().items(Joi.object().keys({
+                            userid: Joi.number(),
+                            username: Joi.string(),
+                            joined: Joi.string(),
+                            picture: Joi.string()
+                        })).default([])
+                    })
                 }).requiredKeys('user'),
             },
             tags: ['api'],

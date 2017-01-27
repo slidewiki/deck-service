@@ -51,6 +51,48 @@ const contentItem = {
     },
     required: ['kind', 'ref']
 };
+const editors = {
+    type: 'object',
+    properties: {
+        groups: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: {
+                        type: 'number'
+                    },
+                    name: {
+                        type: 'string'
+                    },
+                    joined: {
+                        type: 'string',
+                        format: 'date-time'
+                    }
+                }
+            }
+        },
+        users: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: objectid,
+                    username: {
+                        type: 'string'
+                    },
+                    joined: {
+                        type: 'string',
+                        format: 'date-time'
+                    },
+                    picture: {
+                        type: 'string'
+                    }
+                }
+            }
+        }
+    }
+};
 const deckRevision = {
     type: 'object',
     properties: {
@@ -63,9 +105,14 @@ const deckRevision = {
         },
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
+        accessLevel: {
+            type: 'string',
+            enum: ['public', 'restricted', 'private']
+        },
+        editors: editors,
         parent: {
             type: 'object',
             // properties: {
@@ -205,7 +252,7 @@ const deck = {
     properties: {
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
         // kind: {
@@ -222,7 +269,7 @@ const deck = {
         // },
         lastUpdate: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         revisions: {
             type: 'array',

@@ -33,10 +33,12 @@
     "good-console": "^6.1.1",
     "good-squeeze": "^3.0.1",
     "hapi": "^13.4.0",
+    "hapi-auth-jwt2": "^7.2.4",
     "hapi-swagger": "^5.1.0",
     "he": "^1.1.0",
     "inert": "^4.0.0",
     "joi": "^8.1.0",
+    "js-sha512": "^0.2.2",
     "mongodb": "^2.1.19",
     "striptags": "^2.1.1",
     "vision": "^4.1.0"
