@@ -707,7 +707,7 @@ let self = module.exports = {
                         }
                         else{
                             parentID = request.payload.selector.id;
-                         }
+                        }
                         if(changeset && changeset.hasOwnProperty('target_deck')){
                           //revisioning took place, we must update root deck
                             parentID = changeset.target_deck;
