@@ -1,30 +1,31 @@
-/* This module is used for confugrating the mongodb connection*/
+/* This module is used for configurating the mongodb connection*/
 'use strict';
 
-//read mongodb URL from /etc/hosts
-let host = 'localhost';
-const fs = require('fs');
-const lines = fs.readFileSync('/etc/hosts').toString().split('\n');
-for (let i in lines) {
-    if (lines[i].includes('mongodb')) {
-        const entrys = lines[i].split(' ');
-        host = entrys[entrys.length - 1];
-        console.log('Found mongodb host. Using ' + host + ' as database host.');
-    }
-}
-
-//read mongo port from ENV
 const co = require('./common');
-let port = 27017;
-if (!co.isEmpty(process.env.DATABASE_PORT)){
-    port = process.env.DATABASE_PORT;
-    //console.log('Using port ' + port + ' as database port.'); TODO replace it with logging, that isn't printed at npm run test:unit
-}
 
-//JWT serial
-let JWTSerial = '69aac7f95a9152cd4ae7667c80557c284e413d748cca4c5715b3f02020a5ae1b';
-if (!co.isEmpty(process.env.JWT_SERIAL)){
-    JWTSerial = process.env.JWT_SERIAL;
+let host = 'localhost';
+//read mongo URL from /etc/hosts
+const fs = require('fs');
+try {
+    const lines = fs.readFileSync('/etc/hosts').toString().split('\n');
+    lines.filter((line) => line.includes('mongodb')).forEach((line) => {
+        const entries = line.split(' ');
+        host = entries[entries.length - 1];
+        console.log('Using ' + host + ' as database host.');
+    });
+} catch (e) {
+    console.log('Exception: Windows or no read rights to read /etc/hosts (bad)');
+}
+//read mongo URL from ENV
+host = (!co.isEmpty(process.env.DATABASE_URL)) ? process.env.DATABASE_URL : host;
+if (host !== 'localhost')
+    console.log('Using ' + host + ' as database host.');
+
+let port = 27017;
+//read mongo port from ENV
+if (!co.isEmpty(process.env.DATABASE_PORT)) {
+    port = process.env.DATABASE_PORT;
+    console.log('Using ' + port + ' as database port.');
 }
 
 module.exports = {
@@ -33,10 +34,5 @@ module.exports = {
         HOST: host,
         NS: 'local',
         SLIDEWIKIDATABASE: 'slidewiki'
-    },
-    JWT: {
-        SERIAL: JWTSerial,
-        HEADER: '----jwt----',
-        ALGORITHM:  'HS512'
     }
 };
