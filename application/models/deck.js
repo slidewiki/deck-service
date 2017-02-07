@@ -62,8 +62,7 @@ const deckRevision = {
             type: 'string'
         },
         timestamp: {
-            type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
         parent: {
@@ -204,8 +203,7 @@ const deck = {
     type: 'object',
     properties: {
         timestamp: {
-            type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
         // kind: {
@@ -220,10 +218,9 @@ const deck = {
         // translation: {
         //     type: 'object'
         // },
-        lastUpdate: {
-            type: 'string',
-            format: 'datetime'
-        },
+        // lastUpdate: {
+        //     format: 'date-time'
+        // },
         revisions: {
             type: 'array',
             items: deckRevision

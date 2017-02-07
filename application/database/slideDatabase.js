@@ -109,7 +109,7 @@ module.exports = {
                 slide._id = newId;
                 let revisionCopied = slide.revisions[slideRevision];
                 let now = new Date();
-                let timestamp = now.toISOString();
+                let timestamp = now;
                 let parentArray = slide.parent.split('-');
                 if(parentArray.length > 1){
                     revisionCopied.parent = {'id': parseInt(parentArray[0]), 'revision': parseInt(parentArray[1])};
@@ -388,8 +388,8 @@ function convertToNewSlide(slide) {
         user: slide.user,
         //kind: 'slide',
         //deck: String(slide.root_deck.split('-')[0]),
-        timestamp: now.toISOString(),
-        lastUpdate: now.toISOString(),
+        timestamp: now,
+        lastUpdate: now,
         language: slide.language,
         license: slide.license,
         contributors: contributorsArray,
@@ -397,7 +397,7 @@ function convertToNewSlide(slide) {
         revisions: [{
             id: 1,
             usage: usageArray,
-            timestamp: now.toISOString(),
+            timestamp: now,
             user: slide.user,
             title: slide.title,
             content: slide.content,
@@ -421,13 +421,13 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
         //user: slide.user,
         //deck: slide.root_deck,
         //timestamp: now.toISOString(),
-        lastUpdate: now.toISOString(),
+        lastUpdate: now,
         language: slide.language,
         license: slide.license,
         revisions: [{
             id: newRevisionId,
             usage: usageArray,
-            timestamp: now.toISOString(),
+            timestamp: now,
             user: slide.user,
             title: slide.title,
             content: slide.content,
