@@ -1,12 +1,16 @@
 'use strict';
 
 //require
+const _ = require('lodash');
+
 let Ajv = require('ajv');
 let ajv = Ajv({
     verbose: true,
     allErrors: true
     //v5: true  //enable v5 proposal of JSON-schema standard
 }); // options can be passed, e.g. {allErrors: true}
+
+const deckchange = require('./deckchange');
 
 //build schema
 const objectid = {
@@ -51,15 +55,13 @@ const contentItem = {
     },
     required: ['kind', 'ref']
 };
+
 const deckRevision = {
     type: 'object',
-    properties: {
+    properties: _.merge({
         id: { //increment with every new revision
             type: 'number',
             minimum: 1
-        },
-        title: {
-            type: 'string'
         },
         timestamp: {
             type: 'string',
@@ -80,12 +82,6 @@ const deckRevision = {
         popularity: {
             type: 'number',
             minimum: 0
-        },
-        theme: {
-            type: 'object',
-            properties: {
-                default: objectid
-            }
         },
         transition: {
             type: 'object',
@@ -115,9 +111,6 @@ const deckRevision = {
         visibility: {
             type: 'boolean'
         },
-        language: {
-            type: 'string'
-        },
         translation: {
             type: 'object',
             properties: {
@@ -146,6 +139,12 @@ const deckRevision = {
             type: 'array',
             items: contentItem
         },
+
+        changeLog: {
+            type: 'array',
+            items: deckchange.deckRevisionChange
+        },
+
         dataSources: { //is filled out automatically from the slides
             type: 'array',
             items: {
@@ -166,7 +165,7 @@ const deckRevision = {
                 required: ['id','revision']
             }
         }
-    },
+    }, deckchange.trackedDeckRevisionProperties),
     translated_from: { //if this deck_revision is a result of translation
         type: 'object',
         properties: {
@@ -202,7 +201,7 @@ const deckRevision = {
 };
 const deck = {
     type: 'object',
-    properties: {
+    properties: _.merge({
         timestamp: {
             type: 'string',
             format: 'datetime'
@@ -211,9 +210,6 @@ const deck = {
         // kind: {
         //     type: 'string'
         // },
-        description: {
-            type: 'string'
-        },
         // language: {
         //     type: 'string'
         // },
@@ -224,6 +220,12 @@ const deck = {
             type: 'string',
             format: 'datetime'
         },
+
+        changeLog: {
+            type: 'array',
+            items: deckchange.deckChange
+        },
+
         revisions: {
             type: 'array',
             items: deckRevision
@@ -245,10 +247,6 @@ const deck = {
         },
         datasource: {
             type: 'string'
-        },
-        license: {
-            type: 'string',
-            enum: ['CC0', 'CC BY', 'CC BY-SA']
         },
         translations: { //put here all translations explicitly - deck ids
             type: 'array',
@@ -293,7 +291,7 @@ const deck = {
                 }
             }
         }
-    },
+    }, deckchange.trackedDeckProperties),
     required: ['timestamp', 'user']
 };
 

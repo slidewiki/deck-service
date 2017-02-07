@@ -1,5 +1,7 @@
 'use strict';
 
+const ChangeLog = require('../lib/ChangeLog');
+
 const helper = require('./helper'),
     oid = require('mongodb').ObjectID,
     striptags = require('striptags'),
@@ -122,6 +124,9 @@ let self = module.exports = {
                     activeRevisionIndex = getActiveRevision(existingDeck);
                 }
 
+                // start tracking changes
+                let deckTracker = ChangeLog.deckTracker(existingDeck, activeRevisionIndex);
+
                 const deckRevision = existingDeck.revisions[activeRevisionIndex];
                 deckRevision.title = deck.title;
                 deckRevision.language = deck.language;
@@ -130,6 +135,10 @@ let self = module.exports = {
                 //add comment, abstract, footer
                 deckRevision.tags = deck.tags;
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
+
+                // changes ended here
+                deckTracker.applyChangeLog();
+
                 try {
                     valid = deckModel(deckRevision);
 
@@ -153,7 +162,16 @@ let self = module.exports = {
         .then((db) => db.collection('decks'))
         .then((col) => col.findOne({_id: parseInt(deckId)})
         .then((deck) => {
-            deck.revisions[deck_id.split('-')[1]-1].title = newName;
+            let revisionIndex = deck_id.split('-')[1] - 1;
+
+            // start tracking changes
+            let deckTracker = ChangeLog.deckTracker(deck, revisionIndex);
+
+            deck.revisions[revisionIndex].title = newName;
+
+            // changes ended here
+            deckTracker.applyChangeLog();
+
             return col.findOneAndUpdate({_id: parseInt(deckId)}, deck);
         }));
     },
