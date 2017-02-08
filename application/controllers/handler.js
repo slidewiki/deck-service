@@ -353,6 +353,7 @@ let self = module.exports = {
     updateDeck: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         //or should be deckDB.replace?
+        console.log('payload', request.payload);
         let deckId = request.params.id;
         deckDB.update(encodeURIComponent(deckId.split('-')[0]), request.payload).then((replaced) => {
             //console.log('updated: ', replaced);
@@ -368,6 +369,7 @@ let self = module.exports = {
 
     updateDeckRevision: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
+        console.log('payload', request.payload);
         if(request.payload.new_revision){
             let root_deck ;
             if(request.payload.root_deck){

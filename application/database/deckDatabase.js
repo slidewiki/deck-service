@@ -703,6 +703,7 @@ let self = module.exports = {
             deck_id = decktreesplit[0];
             revision_id = decktreesplit[1]-1;
         }
+        //first we should check if the deck has an editors attribute and fill it accordingly
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -843,7 +844,8 @@ let self = module.exports = {
                             language: existingDeck.revisions[ind].language,
                             tags: existingDeck.revisions[ind].tags,
                             license: existingDeck.license,
-                            user: user_id
+                            user: user_id,
+                            editors: existingDeck.revisions[ind].editors
                         };
                         if(next_needs_revision.hasOwnProperty('parent_id')){
                             if(findWithAttrRev(revisions, 'id', next_needs_revision.parent_id) > -1){
@@ -1068,6 +1070,13 @@ function convertToNewDeck(deck){
     if(!deck.hasOwnProperty('tags') || deck.tags === null){
         deck.tags = [];
     }
+    if(deck.hasOwnProperty('editors') && deck.editors === null){
+        deck.editors = {users: [], groups: []};
+    }
+    else if(!deck.hasOwnProperty('editors')){
+        deck.editors = {users: [], groups: []};
+    }
+    //should we have a default accessLevel?
     const result = {
         _id: deck._id,
         user: deck.user,
@@ -1114,6 +1123,12 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
     }
     if(deck.language === null){
         deck.language = 'en_EN';
+    }
+    if(deck.hasOwnProperty('editors') && deck.editors === null){
+        deck.editors = {users: [], groups: []};
+    }
+    else if(!deck.hasOwnProperty('editors')){
+        deck.editors = {users: [], groups: []};
     }
     const result = {
         //user: deck.user,
