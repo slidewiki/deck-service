@@ -9,6 +9,5 @@ module.exports = {
     },
     'image': {
         uri: (!co.isEmpty(process.env.SERVICE_URL_IMAGE)) ? process.env.SERVICE_URL_IMAGE : 'http://imageservice',
-        port: 80
     }
 };
