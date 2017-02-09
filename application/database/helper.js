@@ -123,5 +123,19 @@ module.exports = {
 
     getNextIncrementationValueForCollection: function (dbconn, collectionName, fieldName) {
         return getNextId(dbconn, collectionName, fieldName);
-    }
+    },
+
+    applyFixtures: function(db, data, done) {
+        let async = require('async');
+        var names = Object.keys(data.collections);
+
+        async.eachSeries(names, function(name, cb) {
+            db.createCollection(name, function(err, collection) {
+                if (err) return cb(err);
+                // console.log(data.collections[name].length);
+                collection.insert(data.collections[name], cb);
+            });
+        }, done);
+    },
+
 };
