@@ -10,14 +10,42 @@ let ajv = Ajv({
     //v5: true  //enable v5 proposal of JSON-schema standard
 }); // options can be passed, e.g. {allErrors: true}
 
-const deckchange = require('./deckchange');
-
 //build schema
 const objectid = {
     type: 'integer',
     maxLength: 24,
     minLength: 1
 };
+
+// needed for tracking changes in decks properties
+const trackedDeckProperties = {
+    license: {
+        type: 'string',
+        enum: [ 'CC0', 'CC BY', 'CC BY-SA' ]
+    },
+    description: {
+        type: 'string'
+    },
+
+};
+
+// needed for tracking changes in deck revisions properties
+const trackedDeckRevisionProperties = {
+    title: {
+        type: 'string'
+    },
+    language: {
+        type: 'string'
+    },
+    theme: {
+        type: 'object',
+        properties: {
+            default: objectid
+        }
+    },
+
+};
+
 const contributor = {
     type: 'object',
     properties: {
@@ -29,6 +57,7 @@ const contributor = {
     },
     required: ['user']
 };
+
 //build schema
 const contentItem = {
     type: 'object',
@@ -54,6 +83,59 @@ const contentItem = {
         }
     },
     required: ['kind', 'ref']
+};
+
+// same as contentItem, just remove some 'required' type attributes
+// used in deck revision change log
+const contentItemPartial = {
+    type: 'object',
+    properties: {
+        order: {
+            type: 'integer',
+        },
+        kind: {
+            type: 'string',
+            enum: ['deck', 'slide'],
+        },
+        ref: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'integer',
+                },
+                revision: {
+                    type: 'integer',
+                },
+            },
+        },
+    },
+};
+
+// model how deck revision changes are saved in log
+const deckRevisionChange = {
+    type: 'object',
+    properties: {
+        operation: {
+            type: 'string',
+            enum: [ 'update', 'insert', 'delete', 'move' ],
+        },
+
+        timestamp: {
+            type: 'string',
+            format: 'datetime',
+        },
+
+        before: {
+            type: 'object',
+            properties: trackedDeckRevisionProperties,
+        },
+        after: {
+            type: 'object',
+            properties: trackedDeckRevisionProperties,
+        },
+
+    },
+
 };
 
 const deckRevision = {
@@ -142,7 +224,7 @@ const deckRevision = {
 
         changeLog: {
             type: 'array',
-            items: deckchange.deckRevisionChange
+            items: deckRevisionChange
         },
 
         dataSources: { //is filled out automatically from the slides
@@ -165,7 +247,7 @@ const deckRevision = {
                 required: ['id','revision']
             }
         }
-    }, deckchange.trackedDeckRevisionProperties),
+    }, trackedDeckRevisionProperties),
     translated_from: { //if this deck_revision is a result of translation
         type: 'object',
         properties: {
@@ -199,6 +281,50 @@ const deckRevision = {
     },
     required: ['id', 'timestamp', 'user']
 };
+
+
+// model how deck changes are saved in log
+const deckChange = {
+    type: 'object',
+    properties: {
+        operation: {
+            type: 'string',
+            enum: [ 'update', 'remove', 'insert' ],
+        },
+
+        timestamp: {
+            type: 'string',
+            format: 'datetime',
+        },
+
+        before: {
+            type: 'object',
+            properties: trackedDeckProperties,
+        },
+        after: {
+            type: 'object',
+            properties: trackedDeckProperties,
+        },
+
+        index: {
+            type: 'integer',
+        },
+
+        insert: contentItem,
+        remove: contentItem,
+
+        update: {
+            type: 'object',
+            properties: {
+                before: contentItemPartial,
+                after: contentItemPartial,
+            },
+        },
+
+    },
+
+};
+
 const deck = {
     type: 'object',
     properties: _.merge({
@@ -223,7 +349,7 @@ const deck = {
 
         changeLog: {
             type: 'array',
-            items: deckchange.deckChange
+            items: deckChange
         },
 
         revisions: {
@@ -291,9 +417,9 @@ const deck = {
                 }
             }
         }
-    }, deckchange.trackedDeckProperties),
+    }, trackedDeckProperties),
     required: ['timestamp', 'user']
 };
 
 //export
-module.exports = ajv.compile(deck);
+module.exports = { validateDeck: ajv.compile(deck), trackedDeckProperties, trackedDeckRevisionProperties };

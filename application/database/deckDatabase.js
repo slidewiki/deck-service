@@ -5,7 +5,7 @@ const ChangeLog = require('../lib/ChangeLog');
 const helper = require('./helper'),
     oid = require('mongodb').ObjectID,
     striptags = require('striptags'),
-    deckModel = require('../models/deck.js');
+    validateDeck = require('../models/deck').validateDeck;
 
 let async = require('async');
 
@@ -89,9 +89,9 @@ let self = module.exports = {
 
                 try {
                     const convertedDeck = convertToNewDeck(deck);
-                    valid = deckModel(convertedDeck);
+                    valid = validateDeck(convertedDeck);
                     if (!valid) {
-                        return deckModel.errors;
+                        return validateDeck.errors;
                     }
 
                     return col.insertOne(convertedDeck);
@@ -140,10 +140,10 @@ let self = module.exports = {
                 deckTracker.applyChangeLog();
 
                 try {
-                    valid = deckModel(deckRevision);
+                    valid = validateDeck(deckRevision);
 
                     if (!valid) {
-                        return deckModel.errors;
+                        return validateDeck.errors;
                     }
                     return col.findOneAndUpdate({
                         _id: parseInt(id)
@@ -235,6 +235,8 @@ let self = module.exports = {
                 const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
                 deckWithNewRevision.timestamp = existingDeck.timestamp;
                 deckWithNewRevision.user = existingDeck.user;
+                deckWithNewRevision.changeLog = existingDeck.changeLog;
+
                 if(existingDeck.hasOwnProperty('contributors')){
                     let contributors = existingDeck.contributors;
                     let existingUserContributorIndex = findWithAttr(contributors, 'user', deck.user);
@@ -247,10 +249,10 @@ let self = module.exports = {
                 }
 
                 try {
-                    valid = deckModel(deckWithNewRevision);
+                    valid = validateDeck(deckWithNewRevision);
 
                     if (!valid) {
-                        return deckModel.errors;
+                        return validateDeck.errors;
                     }
                     for(let i = 0; i < content_items.length; i++){
                         let citem = content_items[i];
@@ -273,6 +275,8 @@ let self = module.exports = {
                             });
                         }
                     }
+                    let deckTracker = ChangeLog.deckTracker(existingDeck);
+
                     let new_revisions = existingDeck.revisions;
                     new_revisions[activeRevisionIndex].usage = previousUsageArray;
                     new_revisions.push(deckWithNewRevision.revisions[0]);
@@ -280,6 +284,8 @@ let self = module.exports = {
                     // delete new_metadata.revisions;
                     // console.log(new_revisions);
                     deckWithNewRevision.revisions = new_revisions;
+
+                    deckTracker.applyChangeLog(deckWithNewRevision);
 
                     //col.save(existingDeck);
                     return col.findOneAndUpdate({
@@ -315,6 +321,9 @@ let self = module.exports = {
                 if(root_deck_path.length > 1){
                     activeRevisionId = root_deck_path[1];
                 }
+
+                let deckTracker = ChangeLog.deckTracker(existingDeck, activeRevisionId - 1);
+
                 if(position && position > 0){
                     let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
                     for(let i = position-1; i < citems.length; i++){
@@ -331,6 +340,8 @@ let self = module.exports = {
                     };
                     citems.splice(position-1, 0, newCitem);
                     existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+
+                    deckTracker.applyChangeLog();
                     col.save(existingDeck);
                 }
                 else{                    
@@ -368,6 +379,9 @@ let self = module.exports = {
                 if(root_deck_path.length > 1){
                     activeRevisionId = root_deck_path[1];
                 }
+
+                let deckTracker = ChangeLog.deckTracker(existingDeck, activeRevisionId - 1);
+
                 let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
                 for(let i = position-1; i < citems.length; i++){
                     citems[i].order = citems[i].order-1;
@@ -415,6 +429,9 @@ let self = module.exports = {
 
                 citems.splice(position-1, 1);
                 existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+
+                deckTracker.applyChangeLog();
+
                 col.save(existingDeck);
 
             });
@@ -500,6 +517,7 @@ let self = module.exports = {
             return col.findOne({_id: parseInt(rootArray[0])})
             .then((existingDeck) => {
                 //console.log('existingDeck', existingDeck);
+
                 let newRevId = getNewRevisionID(citem);
                 if(revertedRevId !== ''){
                     newRevId = revertedRevId;
@@ -509,6 +527,11 @@ let self = module.exports = {
                     rootRev = rootArray[1];
                 }
                 let old_rev_id = rootArray[1];
+
+                // pre-compute what the for loop does
+                let revisionIndex = existingDeck.revisions.findIndex((rev) => rev.id === parseInt(rootRev));
+                let deckTracker = ChangeLog.deckTracker(existingDeck, revisionIndex);
+
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
 
@@ -522,6 +545,7 @@ let self = module.exports = {
                     }
                     else continue;
                 }
+                deckTracker.applyChangeLog();
                 col.save(existingDeck);
                 return {'old_revision': old_rev_id, 'new_revision': newRevId};
             });
