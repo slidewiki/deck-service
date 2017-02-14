@@ -2,9 +2,8 @@
 [![Build Status](https://travis-ci.org/slidewiki/deck-service.svg?branch=master)](https://travis-ci.org/slidewiki/deck-service)
 [![License](https://img.shields.io/badge/License-MPL%202.0-green.svg)](https://github.com/slidewiki/deck-service/blob/master/LICENSE)
 [![Language](https://img.shields.io/badge/Language-Javascript%20ECMA2015-lightgrey.svg)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-[![Framework](https://img.shields.io/badge/Framework-NodeJS%206.2.0-blue.svg)](https://nodejs.org/)
-[![Webserver](https://img.shields.io/badge/Webserver-Hapi%2013.4.0-blue.svg)](http://hapijs.com/)
-[![LinesOfCode](https://img.shields.io/badge/LOC-1140-lightgrey.svg)](https://github.com/slidewiki/deck-service/blob/master/application/package.json)
+[![Framework](https://img.shields.io/badge/Framework-NodeJS%206.9.0-blue.svg)](https://nodejs.org/)
+[![Webserver](https://img.shields.io/badge/Webserver-Hapi%2016.1.0-blue.svg)](http://hapijs.com/)
 [![Coverage Status](https://coveralls.io/repos/github/slidewiki/deck-service/badge.svg?branch=master)](https://coveralls.io/github/slidewiki/deck-service?branch=master)
 
 This Microservice handles deck and slide management, backed by mongodb...
