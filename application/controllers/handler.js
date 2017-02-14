@@ -855,13 +855,17 @@ let self = module.exports = {
                     'top_root_deck' : request.payload.selector.id,
                     'language' : slide.language,
                     'license' : slide.license,
-                    'tags' : slide.revisions[0].tags
+                    'tags' : slide.revisions[0].tags,
+                    'dataSources' : slide.revisions[0].dataSources
                 };
                 if(new_slide.speakernotes === null){
                     new_slide.speakernotes = '';
                 }
                 if(new_slide.tags === null){
                     new_slide.tags = [];
+                }
+                if(new_slide.dataSources === null){
+                    new_slide.dataSources = [];
                 }
                 let new_request = {'params' : {'id' :encodeURIComponent(slide_id)}, 'payload' : new_slide};
                 module.exports.updateSlide(new_request, (updated) => {
