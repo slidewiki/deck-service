@@ -88,6 +88,35 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deck/{id}/forkAllowed',
+        handler: handlers.forkAllowed,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                query: {
+                    user: Joi.string()
+                }
+            },
+            tags: ['api'],
+            description: 'Decide if deck can be forked by the user.',
+            plugins: {
+                'hapi-swagger': {
+                    responses: {
+                        ' 200 ': {
+                            schema: Joi.object().keys({
+                                forkAllowed: Joi.boolean()
+                            }).required().description('Return schema')
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/handleChange',
         handler: handlers.handleChange,
         config: {

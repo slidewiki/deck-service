@@ -1452,6 +1452,22 @@
             "comment": null,
             "abstract": null,
             "footer": null,
+            "accessLevel": "public",
+            "editors": {
+              "users": [
+                {
+                  "id": 4
+                },
+                {
+                  "id": 5
+                }
+              ],
+              "groups": [
+                {
+                  "id": 2
+                }
+              ]
+            },
             "contentItems": [
               {
                 "order": 1,

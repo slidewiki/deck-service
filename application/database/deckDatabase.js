@@ -1,6 +1,7 @@
 'use strict';
 
 const _ = require('lodash');
+const userService = require('../services/user');
 
 const helper = require('./helper'),
     oid = require('mongodb').ObjectID,
@@ -847,6 +848,61 @@ let self = module.exports = {
                 request.log('error', error);
                 reply(boom.badImplementation());
             });
+        });
+    },
+
+    forkAllowed(deckId, userId) {
+        userId = parseInt(userId);
+        return self.get(deckId).then((deck) => {
+            // depending on the deckId format, this may have just one revision, or all revisions
+            let revision;
+            if (deck.revisions.length === 1) {
+                revision = deck.revisions[0];
+            } else {
+                // we need the active revision (?)
+                revision = deck.revisions.find((rev) => (rev.id === deck.active));
+            }
+
+            // next, we need to check the accessLevel, defaults to 'public'
+            let accessLevel = revision.accessLevel || 'public';
+
+            if (accessLevel === 'private') {
+                // no-one but the revision owner can fork it!!
+                return revision.user === userId;
+            }
+
+            if (accessLevel === 'restricted') {
+                // authorized users only can fork it !
+                return self.getDeckUsersGroups(deckId).then((editors) => {
+                    if (editors.users.includes(userId)) {
+                        // user is an editor
+                        return true;
+                    } else {
+                        // we also need to check if the groups allowed to edit the deck include the user
+                        if (_.isEmpty(editors.groups)) {
+                            // no groups defined
+                            return false;
+                        }
+
+                        return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
+                            if (groupsUsers.includes(userId)) {
+                                // user is an editor
+                                return true;
+                            }
+
+                            //user is not an editor or owner
+                            return false;
+                        }).catch((err) => {
+                            console.warn(`could not fetch usergroup info from service: ${err.message}`);
+                            // we're not sure, let's just not allow this user
+                            return false;
+                        });
+                    }
+                });
+            }
+
+            // defaults to being public, so anyone can fork it!
+            return true;
         });
     },
 

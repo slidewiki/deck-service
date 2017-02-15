@@ -1093,6 +1093,17 @@ let self = module.exports = {
         deckDB.needsNewRevision(request.params.id, request.query.user).then((needsNewRevision) => {
             //console.log(needsNewRevision);
             reply(needsNewRevision);
+        }).catch((err) => {
+            reply(boom.badImplementation());
+        });;
+    },
+
+    forkAllowed: function(request, reply){
+        deckDB.forkAllowed(request.params.id, request.query.user).then((forkAllowed) => {
+            //console.log(needsNewRevision);
+            reply({forkAllowed: forkAllowed});
+        }).catch((err) => {
+            reply(boom.badImplementation());
         });
     },
 
