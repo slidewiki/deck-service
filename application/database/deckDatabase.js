@@ -1,5 +1,7 @@
 'use strict';
 
+const _ = require('lodash');
+
 const helper = require('./helper'),
     oid = require('mongodb').ObjectID,
     striptags = require('striptags'),
@@ -130,8 +132,14 @@ let self = module.exports = {
                 existingDeck.license = deck.license;
                 //add comment, abstract, footer
                 deckRevision.tags = deck.tags;
-                deckRevision.accessLevel = deck.accessLevel;
-                deckRevision.editors = deck.editors;
+
+                if (!_.isEmpty(deck.accessLevel)) {
+                    deckRevision.accessLevel = deck.accessLevel;
+                }
+                if (!_.isEmpty(deck.editors) ){
+                    deckRevision.editors = deck.editors;
+                }
+
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
                 try {
                     valid = deckModel(deckRevision);
