@@ -93,25 +93,20 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
                 },
-                query: {
-                    user: Joi.string()
-                }
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
-            description: 'Decide if deck can be forked by the user.',
-            plugins: {
-                'hapi-swagger': {
-                    responses: {
-                        ' 200 ': {
-                            schema: Joi.object().keys({
-                                forkAllowed: Joi.boolean()
-                            }).required().description('Return schema')
-                        }
-                    }
-                }
-            }
+            auth: 'jwt',
+            description: 'Decide if deck can be forked by the user - JWT needed',
+            response: {
+                schema: Joi.object().keys({
+                    forkAllowed: Joi.boolean()
+                }).required().description('Return schema')
+            },
         }
     });
 
@@ -182,7 +177,7 @@ module.exports = function(server) {
     server.route({
         method: 'GET',
         path: '/deck/{id}/editAllowed',
-        handler: handlers.validateAuthorizationForDeck,
+        handler: handlers.editAllowed,
         config: {
             validate: {
                 params: {
@@ -193,13 +188,13 @@ module.exports = function(server) {
                 }).unknown()
             },
             tags: ['api'],
-            description: 'Check if user is allowed to edit the deck.',
+            auth: 'jwt',
+            description: 'Check if user is allowed to edit the deck - JWT needed',
             response: {
                 schema: Joi.object().keys({
                     allowed: Joi.boolean()
                 }).required('allowed')
             },
-            auth: 'jwt',
             plugins: {
                 'hapi-swagger': {
                     responses: {

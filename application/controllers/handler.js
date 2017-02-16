@@ -1098,10 +1098,22 @@ let self = module.exports = {
         });;
     },
 
-    forkAllowed: function(request, reply){
+    forkAllowed: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
         deckDB.forkAllowed(request.params.id, request.query.user).then((forkAllowed) => {
-            //console.log(needsNewRevision);
             reply({forkAllowed: forkAllowed});
+        }).catch((err) => {
+            reply(boom.badImplementation());
+        });
+    },
+
+    editAllowed: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
+        // TODO for now, editAllowed is equivalent to forkAllowed
+        deckDB.forkAllowed(request.params.id, userId).then((forkAllowed) => {
+            reply({allowed: forkAllowed});
         }).catch((err) => {
             reply(boom.badImplementation());
         });
