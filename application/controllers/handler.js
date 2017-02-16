@@ -1387,47 +1387,19 @@ let self = module.exports = {
 };
 
 function createThumbnail(slideContent, slideId, user) {
-    let http = require('http');
+    let rp = require('request-promise-native');
     let he = require('he');
 
     let encodedContent = he.encode(slideContent, {allowUnsafeSymbols: true});
 
-    let jsonData = {
-        userID: String(user),
-        html: encodedContent,
-        filename: slideId
-    };
-
-    let data = JSON.stringify(jsonData);
-
-    let options = {
-        host: Microservices.image.uri,
-        port: Microservices.image.port,
-        path: '/thumbnail',
-        method: 'POST',
-        headers : {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-            'Content-Length': data.length
-        }
-    };
-    let req = http.request(options, (res) => {
-        // console.log('STATUS: ' + res.statusCode);
-        // console.log('HEADERS: ' + JSON.stringify(res.headers));
-        res.setEncoding('utf8');
-        res.on('data', (chunk) => {
-        // console.log('Response: ', chunk);
-        // let newDeckTreeNode = JSON.parse(chunk);
-
-        // resolve(newDeckTreeNode);
-        });
-    });
-    req.on('error', (e) => {
+    rp.post({
+        uri: Microservices.image.uri + '/thumbnail',
+        body: JSON.stringify({
+            userID: String(user),
+            html: encodedContent,
+            filename: slideId
+        }),
+    }).catch((e) => {
         console.log('problem with request thumb: ' + e.message);
-        // reject(e);
     });
-    req.write(data);
-    req.end();
-
-    //console.log(slideId);
 }
