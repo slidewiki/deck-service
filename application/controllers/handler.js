@@ -1101,7 +1101,7 @@ let self = module.exports = {
     forkAllowed: function(request, reply) {
         let userId = request.auth.credentials.userid;
 
-        deckDB.forkAllowed(request.params.id, request.query.user).then((forkAllowed) => {
+        deckDB.forkAllowed(request.params.id, userId).then((forkAllowed) => {
             reply({forkAllowed: forkAllowed});
         }).catch((err) => {
             reply(boom.badImplementation());
