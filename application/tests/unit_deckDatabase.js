@@ -4,20 +4,17 @@ let chai = require('chai');
 let chaiAsPromised = require('chai-as-promised');
 chai.use(chaiAsPromised);
 
-let should = chai.should();
-
 let helper = require('../database/helper.js');
-let slideDB = require('../database/slideDatabase');
 let deckDB = require('../database/deckDatabase');
 
 describe('deckDatabase', function() {
 
-    beforeEach(function(done) {
-        helper.cleanDatabase().then(() => {
-            helper.connectToDatabase().then((db) => {
-                helper.applyFixtures(db, require('./fixtures/decktree-editors.json'), done);
-            });
-        });
+    beforeEach(function() {
+        return helper.cleanDatabase().then(() =>
+            helper.connectToDatabase().then((db) =>
+                helper.applyFixtures(db, require('./fixtures/decktree-editors.json'))
+            )
+        );
     });
 
     describe('#forkAllowed()', function() {
