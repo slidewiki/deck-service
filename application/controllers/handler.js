@@ -138,7 +138,7 @@ let self = module.exports = {
                 request.log('error', error);
                 reply(boom.badImplementation());
             });
-        });
+        }, request);
 
     },
 
@@ -409,7 +409,7 @@ let self = module.exports = {
                     request.log('error', error);
                     reply(boom.badImplementation());
                 });
-            });
+            }, request);
 
         }
         else{
@@ -596,7 +596,7 @@ let self = module.exports = {
                                 node.changeset = changeset;
                             }
                             reply(node);
-                        });
+                        }, request);
 
                     }
 
@@ -630,6 +630,12 @@ let self = module.exports = {
                 module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                 ,(changeset) => {
                   //console.log('changeset', changeset);
+                    if (changeset && changeset.hasOwnProperty('forkAllowed')) {
+                        if (changeset.forkAllowed === false) {
+                            return reply(boom.unauthorized());
+                        }
+                    }
+
                     if(changeset && changeset.hasOwnProperty('target_deck')){
                       //revisioning took place, we must update root deck
                         parentID = changeset.target_deck;
@@ -676,7 +682,7 @@ let self = module.exports = {
                     });
 
 
-                });
+                }, request);
 
             }
         }else{
@@ -726,7 +732,7 @@ let self = module.exports = {
                             }
                             reply(deckTree);
                         });
-                    });
+                    }, request);
 
 
                 });
@@ -793,7 +799,7 @@ let self = module.exports = {
                         });
                     });
 
-                });
+                }, request);
 
 
 
@@ -831,7 +837,7 @@ let self = module.exports = {
                     request.log('error', error);
                     reply(boom.badImplementation());
                 });
-            });
+            }, request);
 
         }else {
             let root_deck ;
@@ -935,7 +941,7 @@ let self = module.exports = {
                 }
                 reply(removed);
             });
-        });
+        }, request);
 
     },
 
@@ -1119,7 +1125,12 @@ let self = module.exports = {
         });
     },
 
-    handleChange: function(request, reply){
+    handleChange: function(request, reply, actualRequest) {
+        // HACK
+        if (!actualRequest) {
+            actualRequest = request;
+        }
+
         //console.log(request.query);
         if(!request.params.id){
             reply();
@@ -1157,17 +1168,17 @@ let self = module.exports = {
                                 reply(changeSet);
                             }
                         }).catch((e) => {
-                            request.log('error', e);
+                            actualRequest.log(e);
                             reply(boom.badImplementation());
-                        });;
+                        });
                     });
                 }).catch((err) => {
-                    request.log('error', err);
+                    actualRequest.log(err);
                     reply(boom.badImplementation());
-                });;
+                });
 
             }).catch((error) => {
-                request.log('error', error);
+                actualRequest.log(error);
                 reply(boom.badImplementation());
             });
         }
