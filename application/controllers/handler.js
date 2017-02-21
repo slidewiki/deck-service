@@ -101,41 +101,48 @@ let self = module.exports = {
                 request.payload.root_deck = changeset.target_deck;
             }
             //console.log('new payload', request.payload);
-            slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
-                if (co.isEmpty(replaced.value))
-                    throw replaced;
-                else{
-                    //we must update all decks in the 'usage' attribute
-                    slideDB.get(replaced.value._id).then((newSlide) => {
+            deckDB.getActiveRevisionFromDB(request.payload.root_deck).then((parentDeckId) => {
 
-                        //only update the root deck, i.e., direct parent
+                if(parentDeckId)
+                    request.payload.root_deck = parentDeckId;
 
-                        deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
-                        newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
-                        let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
-                        if(content === ''){
-                            content = '<h2>'+newSlide.revisions[0].title+'</h2>';
-                            //for now we use hardcoded template for new slides
-                            content = slidetemplate;
-                        }
-                        createThumbnail(content, newSlideId, user);
-                        if(changeset && changeset.hasOwnProperty('target_deck')){
-                            changeset.new_revisions.push(newSlideId);
-                            newSlide.changeset = changeset;
-                        }
-                        reply(newSlide);
+                slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
+                    if (co.isEmpty(replaced.value))
+                        throw replaced;
+                    else{
+                        //we must update all decks in the 'usage' attribute
+                        slideDB.get(replaced.value._id).then((newSlide) => {
 
-                    }).catch((error) => {
-                        request.log('error', error);
-                        reply(boom.badImplementation());
-                    });
+                            //only update the root deck, i.e., direct parent
 
-                  //reply(replaced.value);
-                }
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
+                            deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
+                            newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
+                            let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
+                            if(content === ''){
+                                content = '<h2>'+newSlide.revisions[0].title+'</h2>';
+                                //for now we use hardcoded template for new slides
+                                content = slidetemplate;
+                            }
+                            createThumbnail(content, newSlideId, user);
+                            if(changeset && changeset.hasOwnProperty('target_deck')){
+                                changeset.new_revisions.push(newSlideId);
+                                newSlide.changeset = changeset;
+                            }
+                            reply(newSlide);
+
+                        }).catch((error) => {
+                            request.log('error', error);
+                            reply(boom.badImplementation());
+                        });
+
+                      //reply(replaced.value);
+                    }
+                }).catch((error) => {
+                    request.log('error', error);
+                    reply(boom.badImplementation());
+                });
             });
+
         });
 
     },
