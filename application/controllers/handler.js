@@ -98,6 +98,12 @@ let self = module.exports = {
         module.exports.handleChange({'params': {'id':request.payload.root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck}}
         ,(changeset) => {
             //console.log('changeset', changeset);
+            if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                if (changeset.fork_allowed === false) {
+                    return reply(boom.unauthorized());
+                }
+            }
+
             if(changeset && changeset.hasOwnProperty('target_deck')){
                 //revisioning took place, we must update root deck
                 request.payload.root_deck = changeset.target_deck;
@@ -350,6 +356,7 @@ let self = module.exports = {
         });
     },
 
+    // TODO unused handler
     updateDeck: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         //or should be deckDB.replace?
@@ -367,6 +374,34 @@ let self = module.exports = {
         });
     },
 
+    // HACK this was introduced to help inject permission check in updateDeckRevision without refactoring much stuff
+    updateDeckRevisionWithCheck: function(request, reply) {
+        // first we need to find the permissions on the current deck for the current user
+        deckDB.needsNewRevision(request.params.id, request.payload.user).then((needs) => {
+            if (request.payload.new_revision) {
+                // save as new revision
+                if (needs.needs_revision && !needs.fork_allowed) {
+                    // means we can't edit it at all
+                    return reply(boom.unauthorized());
+                }
+
+            } else {
+                // direct save
+                if (needs.needs_revision) {
+                    // no good, you have to save as new revision
+                    return reply(boom.unauthorized());
+                }
+            }
+
+            // allow request to resolve as normal
+            return self.updateDeckRevision(request, reply);
+        }).catch((err) => {
+            request.log('error', err);
+            reply(err);
+        });
+
+    },
+
     updateDeckRevision: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         console.log('payload', request.payload);
@@ -378,6 +413,12 @@ let self = module.exports = {
             module.exports.handleChange({'params': {'id': root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck}}
             ,(changeset) => {
                 //console.log('changeset', changeset);
+                if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                    if (changeset.fork_allowed === false) {
+                        return reply(boom.unauthorized());
+                    }
+                }
+                
                 if(changeset && changeset.hasOwnProperty('target_deck')){
                     //revisioning took place, we must update root deck
                     request.payload.root_deck = changeset.target_deck;
@@ -423,6 +464,24 @@ let self = module.exports = {
                 reply(boom.badImplementation());
             });
         }
+
+    },
+
+    // HACK this was introduced to help inject forkAllowed check in updateDeckRevision without refactoring much stuff
+    forkDeckRevisionWithCheck: function(request, reply) {
+        return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
+        .then((forkAllowed) => {
+            if (!forkAllowed) {
+                return reply(boom.unauthorized());
+            }
+
+            // else return and continue with promise chain
+            return self.forkDeckRevision(request, reply);
+        })
+        .catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation(error));
+        });
 
     },
 
@@ -583,6 +642,12 @@ let self = module.exports = {
                         module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                         ,(changeset) => {
                           //console.log('changeset', changeset);
+                            if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                                if (changeset.fork_allowed === false) {
+                                    return reply(boom.unauthorized());
+                                }
+                            }
+
                             if(changeset && changeset.hasOwnProperty('target_deck')){
                               //revisioning took place, we must update root deck
                                 parentID = changeset.target_deck;
@@ -630,8 +695,8 @@ let self = module.exports = {
                 module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                 ,(changeset) => {
                   //console.log('changeset', changeset);
-                    if (changeset && changeset.hasOwnProperty('forkAllowed')) {
-                        if (changeset.forkAllowed === false) {
+                    if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                        if (changeset.fork_allowed === false) {
                             return reply(boom.unauthorized());
                         }
                     }
@@ -711,6 +776,12 @@ let self = module.exports = {
                     module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                     ,(changeset) => {
                       //console.log('changeset', changeset);
+                        if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                            if (changeset.fork_allowed === false) {
+                                return reply(boom.unauthorized());
+                            }
+                        }
+
                         //parentID = request.payload.selector.id;
                         if(request.payload.selector.stype === 'deck'){
                             parentID = request.payload.selector.sid;
@@ -764,6 +835,12 @@ let self = module.exports = {
                 module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                 ,(changeset) => {
                   //console.log('changeset', changeset);
+                    if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                        if (changeset.fork_allowed === false) {
+                            return reply(boom.unauthorized());
+                        }
+                    }
+
                     if(changeset && changeset.hasOwnProperty('target_deck')){
                       //revisioning took place, we must update root deck
                         parentID = changeset.target_deck;
@@ -818,6 +895,12 @@ let self = module.exports = {
             module.exports.handleChange({'params': {'id':request.payload.selector.sid}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
             ,(changeset) => {
               //console.log('changeset', changeset);
+                if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                    if (changeset.fork_allowed === false) {
+                        return reply(boom.unauthorized());
+                    }
+                }
+
                 if(changeset && changeset.hasOwnProperty('target_deck')){
                   //revisioning took place, we must update root deck
                     root_deck = changeset.target_deck;
@@ -926,6 +1009,12 @@ let self = module.exports = {
         module.exports.handleChange({'params': {'id': parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
         ,(changeset) => {
           //console.log('changeset', changeset);
+            if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                if (changeset.fork_allowed === false) {
+                    return reply(boom.unauthorized());
+                }
+            }
+
             if(changeset && changeset.hasOwnProperty('target_deck')){
               //revisioning took place, we must update root deck
                 parentID = changeset.target_deck;
@@ -1117,9 +1206,8 @@ let self = module.exports = {
     editAllowed: function(request, reply) {
         let userId = request.auth.credentials.userid;
 
-        // TODO for now, editAllowed is equivalent to forkAllowed
-        deckDB.forkAllowed(request.params.id, userId).then((forkAllowed) => {
-            reply({allowed: forkAllowed});
+        deckDB.editAllowed(request.params.id, userId).then((allowed) => {
+            reply({allowed: allowed});
         }).catch((err) => {
             reply(boom.badImplementation());
         });

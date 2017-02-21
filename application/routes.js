@@ -263,7 +263,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/deck/{id}',
-        handler: handlers.updateDeckRevision,
+        handler: handlers.updateDeckRevisionWithCheck,
         config: {
             validate: {
                 params: {
@@ -312,7 +312,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/deck/{id}/fork',
-        handler: handlers.forkDeckRevision,
+        handler: handlers.forkDeckRevisionWithCheck,
         config: {
             validate: {
                 params: {

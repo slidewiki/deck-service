@@ -911,6 +911,13 @@ let self = module.exports = {
         });
     },
 
+    // this is currently equivalent to `forkAllowed`, but could change in the future
+    // we include it here so that client code may use this instead of `forkAllowed` 
+    // when the semanticts are that of 'edit' and not 'fork'
+    editAllowed(deckId, userId) {
+        return self.forkAllowed(deckId, userId);
+    },
+
     needsNewRevision(deckId, user){
         let userId = parseInt(user);
 
@@ -943,13 +950,13 @@ let self = module.exports = {
                         } else {
                             // user is not an editor or owner
                             // also return if user can fork the deck (e.g. if it's public)
-                            return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'forkAllowed': (accessLevel === 'public') };
+                            return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel === 'public') };
                         }
 
                     }).catch((err) => {
                         console.warn(`could not fetch usergroup info from service: ${err.message}`);
                         // we're not sure, let's just not allow this user
-                        return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'forkAllowed': (accessLevel === 'public') };
+                        return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel === 'public') };
                     });
                 }
             });
@@ -984,7 +991,7 @@ let self = module.exports = {
                     if (!needs.needs_revision) {
                         // HACK we return the needs response as an error to break the series
                         callback(needs);
-                    } else if (!needs.forkAllowed) {
+                    } else if (!needs.fork_allowed) {
                         // cannot edit this at all!
                         // HACK we return the needs response as an error to break the series
                         callback(needs);
@@ -996,19 +1003,19 @@ let self = module.exports = {
             },function(err){
                 if (err) {
                     // err is needs result; means that either:
-                    // a) we've reached a deck we can't edit at all (forkAllowed: false)
+                    // a) we've reached a deck we can't edit at all (fork_allowed: false)
                     // b) we've reached a deck we can save without new revision (needs_revision: false)
 
-                    if (err.needs_revision && !err.forkAllowed) {
+                    if (err.needs_revision && !err.fork_allowed) {
                         // we cannot edit the deck! resolve the promise and inform caller of this
-                        return resolve({ needsRevision: true, forkAllowed: false });
+                        return resolve({ needs_revision: true, fork_allowed: false });
                     }
                     // else continue as normal
                     console.log(`stopped handleChange after reaching a deck we can save without new revision ${JSON.stringify(err)}`);
                 }
                 //console.log('revisions array', revisions);
                 if(revisions.length === 0){
-                    resolve({'needsRevision': false});
+                    resolve({needs_revision: false});
                 }
                 revisions.reverse(); //start from the innermost deck that needs revision
                 async.eachSeries(revisions, function(next_needs_revision, callback){
@@ -1092,7 +1099,7 @@ let self = module.exports = {
                     //console.log('final revisions', revisions);
                     //console.log('new revisions', new_revisions);
                     if(new_revisions.length === 0){
-                        resolve({'needsRevision': false});
+                        resolve({'needs_revision': false});
                     }
                     else{
                         if(new_revisions[0].hasOwnProperty('root_changed')){
