@@ -60,7 +60,7 @@ let self = module.exports = {
             .then((found) => {
                 if(found){
                     return new Promise(function(resolve, reject) {
-                        console.log('returning processed identifier', found._id+"-"+found.active);
+                        console.log('returning processed identifier', found._id+'-'+found.active);
                         resolve(found._id+"-"+found.active);
                     });
                 }
