@@ -299,7 +299,7 @@ module.exports = function(server) {
                             userid: Joi.number(),
                             username: Joi.string(),
                             joined: Joi.string(),
-                            picture: Joi.string()
+                            picture: Joi.string().allow('')
                         })).default([])
                     })
                 }).requiredKeys('user'),
