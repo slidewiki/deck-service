@@ -3,11 +3,25 @@
 const _ = require('lodash');
 const rp = require('request-promise-native');
 
+const config = require('../configuration');
 const Microservices = require('../configs/microservices');
+
 const deckDb = require('../database/deckDatabase');
 
 
 const self = module.exports = {
+    // promises user data using jwt (and optionally other info as well)
+    fetchUserData: function(authToken) {
+        let headers = {};
+        headers[config.JWT.HEADER] = authToken;
+
+        return rp.get({
+            uri: `${Microservices.user.uri}/userdata`,
+            json: true,
+            headers: headers,
+        });
+    },
+
     // checks with the user service to collect the user ids for all groups in groupIds
     fetchUsersForGroups: function(groupIds) {
         // return empty list if nothing provided
