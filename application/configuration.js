@@ -33,7 +33,7 @@ if (!co.isEmpty(process.env.JWT_SERIAL)){
     JWTSerial = process.env.JWT_SERIAL;
 }
 
-let slidewikiDbName = 'slidewiki'
+let slidewikiDbName = 'slidewiki';
 if (process.env.NODE_ENV === 'test') {
     slidewikiDbName = 'slidewiki_test';
 }

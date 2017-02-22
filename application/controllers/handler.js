@@ -109,40 +109,46 @@ let self = module.exports = {
                 request.payload.root_deck = changeset.target_deck;
             }
             //console.log('new payload', request.payload);
-            slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
-                if (co.isEmpty(replaced.value))
-                    throw replaced;
-                else{
-                    //we must update all decks in the 'usage' attribute
-                    slideDB.get(replaced.value._id).then((newSlide) => {
+            deckDB.getActiveRevisionFromDB(request.payload.root_deck).then((parentDeckId) => {
 
-                        //only update the root deck, i.e., direct parent
+                if(parentDeckId)
+                    request.payload.root_deck = parentDeckId;
 
-                        deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
-                        newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
-                        let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
-                        if(content === ''){
-                            content = '<h2>'+newSlide.revisions[0].title+'</h2>';
-                            //for now we use hardcoded template for new slides
-                            content = slidetemplate;
-                        }
-                        createThumbnail(content, newSlideId, user);
-                        if(changeset && changeset.hasOwnProperty('target_deck')){
-                            changeset.new_revisions.push(newSlideId);
-                            newSlide.changeset = changeset;
-                        }
-                        reply(newSlide);
+                slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
+                    if (co.isEmpty(replaced.value))
+                        throw replaced;
+                    else{
+                        //we must update all decks in the 'usage' attribute
+                        slideDB.get(replaced.value._id).then((newSlide) => {
 
-                    }).catch((error) => {
-                        request.log('error', error);
-                        reply(boom.badImplementation());
-                    });
+                            //only update the root deck, i.e., direct parent
 
-                  //reply(replaced.value);
-                }
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
+                            deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
+                            newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
+                            let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
+                            if(content === ''){
+                                content = '<h2>'+newSlide.revisions[0].title+'</h2>';
+                                //for now we use hardcoded template for new slides
+                                content = slidetemplate;
+                            }
+                            createThumbnail(content, newSlideId, user);
+                            if(changeset && changeset.hasOwnProperty('target_deck')){
+                                changeset.new_revisions.push(newSlideId);
+                                newSlide.changeset = changeset;
+                            }
+                            reply(newSlide);
+
+                        }).catch((error) => {
+                            request.log('error', error);
+                            reply(boom.badImplementation());
+                        });
+
+                      //reply(replaced.value);
+                    }
+                }).catch((error) => {
+                    request.log('error', error);
+                    reply(boom.badImplementation());
+                });
             });
         }, request);
 
@@ -948,13 +954,17 @@ let self = module.exports = {
                     'top_root_deck' : request.payload.selector.id,
                     'language' : slide.language,
                     'license' : slide.license,
-                    'tags' : slide.revisions[0].tags
+                    'tags' : slide.revisions[0].tags,
+                    'dataSources' : slide.revisions[0].dataSources
                 };
                 if(new_slide.speakernotes === null){
                     new_slide.speakernotes = '';
                 }
                 if(new_slide.tags === null){
                     new_slide.tags = [];
+                }
+                if(new_slide.dataSources === null){
+                    new_slide.dataSources = [];
                 }
                 let new_request = {'params' : {'id' :encodeURIComponent(slide_id)}, 'payload' : new_slide};
                 module.exports.updateSlide(new_request, (updated) => {
@@ -1543,49 +1553,21 @@ let self = module.exports = {
 };
 
 function createThumbnail(slideContent, slideId, user) {
-    let http = require('http');
+    let rp = require('request-promise-native');
     let he = require('he');
 
     let encodedContent = he.encode(slideContent, {allowUnsafeSymbols: true});
 
-    let jsonData = {
-        userID: String(user),
-        html: encodedContent,
-        filename: slideId
-    };
-
-    let data = JSON.stringify(jsonData);
-
-    let options = {
-        host: Microservices.image.uri,
-        port: Microservices.image.port,
-        path: '/thumbnail',
-        method: 'POST',
-        headers : {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-            'Content-Length': data.length
-        }
-    };
-    let req = http.request(options, (res) => {
-        // console.log('STATUS: ' + res.statusCode);
-        // console.log('HEADERS: ' + JSON.stringify(res.headers));
-        res.setEncoding('utf8');
-        res.on('data', (chunk) => {
-        // console.log('Response: ', chunk);
-        // let newDeckTreeNode = JSON.parse(chunk);
-
-        // resolve(newDeckTreeNode);
-        });
-    });
-    req.on('error', (e) => {
+    rp.post({
+        uri: Microservices.image.uri + '/thumbnail',
+        body: JSON.stringify({
+            userID: String(user),
+            html: encodedContent,
+            filename: slideId
+        }),
+    }).catch((e) => {
         console.log('problem with request thumb: ' + e.message);
-        // reject(e);
     });
-    req.write(data);
-    req.end();
-
-    //console.log(slideId);
 }
 
 //Checks with the user data and the deck revision, if the user is allowed to edit the deck
