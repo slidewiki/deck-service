@@ -45,6 +45,28 @@ let self = module.exports = {
       );
     },
 
+    getActiveRevisionFromDB: function(identifier) {
+
+        if(identifier.split('-').length > 1){
+            return Promise.resolve(identifier);
+        }
+        else{
+            //console.log('returning processed identifier', identifier);
+            return helper.connectToDatabase()
+            .then((db) => db.collection('decks'))
+            .then((col) => col.findOne({_id: parseInt(identifier)}))
+            .then((found) => {
+                if(found){                    
+                    return Promise.resolve(found._id+'-'+found.active);
+                }
+                else {
+                    return ;
+                }
+            });
+        }
+
+    },
+
     find: (collection, query) => {
         return helper.connectToDatabase()
         .then((db) => db.collection(collection))
@@ -315,7 +337,7 @@ let self = module.exports = {
                     existingDeck.revisions[activeRevisionId-1].contentItems = citems;
                     col.save(existingDeck);
                 }
-                else{                    
+                else{
                     col.findOneAndUpdate({
                         _id: parseInt(root_deck_path[0]),  revisions : {$elemMatch: {id: parseInt(activeRevisionId)}}  },
                         {
