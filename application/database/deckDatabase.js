@@ -48,9 +48,7 @@ let self = module.exports = {
     getActiveRevisionFromDB: function(identifier) {
 
         if(identifier.split('-').length > 1){
-            return new Promise(function(resolve, reject) {
-                resolve(identifier);
-            });
+            return Promise.resolve(identifier);
         }
         else{
             //console.log('returning processed identifier', identifier);
@@ -58,11 +56,8 @@ let self = module.exports = {
             .then((db) => db.collection('decks'))
             .then((col) => col.findOne({_id: parseInt(identifier)}))
             .then((found) => {
-                if(found){
-                    return new Promise(function(resolve, reject) {
-                        console.log('returning processed identifier', found._id+'-'+found.active);
-                        resolve(found._id+"-"+found.active);
-                    });
+                if(found){                    
+                    return Promise.resolve(found._id+'-'+found.active);
                 }
                 else {
                     return ;
