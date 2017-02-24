@@ -927,11 +927,11 @@ let self = module.exports = {
         });
     },
 
-    // this is currently equivalent to `forkAllowed`, but could change in the future
-    // we include it here so that client code may use this instead of `forkAllowed` 
-    // when the semanticts are that of 'edit' and not 'fork'
+    // this is now equivalent to needsNewRevision === false, as authorized users can now save a deck with or without revision regardless
+    // unauthorized users are not allowed to save with revision, but they will be allowed to fork with new copy mechanism
     editAllowed(deckId, userId) {
-        return self.forkAllowed(deckId, userId);
+        return self.needsNewRevision(deckId, userId)
+        .then((needs) => (needs.needs_revision === false));
     },
 
     needsNewRevision(deckId, user){

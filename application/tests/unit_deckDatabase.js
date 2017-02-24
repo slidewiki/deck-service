@@ -231,4 +231,56 @@ describe('deckDatabase', function() {
 
     });
 
+    describe('#editAllowed()', function() {
+
+        it('should return true for the deck revision owner regardless of access level', function() {
+            let userId = 46;
+            return Promise.all([
+                deckDB.editAllowed('54-12', userId)
+                .then((allowed) => {
+                    allowed.should.equal(true);
+                }),
+            ]);
+        });
+
+        context('if the deck revision is public', function() {
+
+            it('should return false for some unauthorized user', function() {
+                let someUserId = 666;
+                return deckDB.editAllowed('54-12', someUserId)
+                .then((allowed) => {
+                    allowed.should.equal(false);
+                });
+
+            });
+
+            it('should return true for a user implicitly authorized', function() {
+                return deckDB.editAllowed('54-12', 3)
+                .then((allowed) => {
+                    allowed.should.equal(true);
+                });
+
+            });
+
+            it('should return true for a user explicitly authorized', function() {
+                return deckDB.editAllowed('54-12', 4)
+                .then((allowed) => {
+                    allowed.should.equal(true);
+                });
+
+            });
+
+            // TODO properly setup a test for this, needs a mock for the user service
+            it.skip('should return true for a user explicitly authorized via groups', function() {
+                return deckDB.editAllowed('54-12', 6)
+                .then((allowed) => {
+                    allowed.should.equal(true);
+                });
+
+            });
+
+        });
+
+    });
+
 });
