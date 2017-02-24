@@ -12,7 +12,9 @@ const boom = require('boom'),
     co = require('../common'),
     Joi = require('joi'),
     async = require('async'),
-    Microservices = require('../configs/microservices');
+    Microservices = require('../configs/microservices'),
+    requestLib = require('request'),
+    config = require('../configuration');
 
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
         '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;">'+
@@ -96,6 +98,12 @@ let self = module.exports = {
         module.exports.handleChange({'params': {'id':request.payload.root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck}}
         ,(changeset) => {
             //console.log('changeset', changeset);
+            if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                if (changeset.fork_allowed === false) {
+                    return reply(boom.unauthorized());
+                }
+            }
+
             if(changeset && changeset.hasOwnProperty('target_deck')){
                 //revisioning took place, we must update root deck
                 request.payload.root_deck = changeset.target_deck;
@@ -142,8 +150,7 @@ let self = module.exports = {
                     reply(boom.badImplementation());
                 });
             });
-
-        });
+        }, request);
 
     },
 
@@ -355,9 +362,11 @@ let self = module.exports = {
         });
     },
 
+    // TODO unused handler
     updateDeck: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
         //or should be deckDB.replace?
+        console.log('payload', request.payload);
         let deckId = request.params.id;
         deckDB.update(encodeURIComponent(deckId.split('-')[0]), request.payload).then((replaced) => {
             //console.log('updated: ', replaced);
@@ -371,8 +380,37 @@ let self = module.exports = {
         });
     },
 
+    // HACK this was introduced to help inject permission check in updateDeckRevision without refactoring much stuff
+    updateDeckRevisionWithCheck: function(request, reply) {
+        // first we need to find the permissions on the current deck for the current user
+        deckDB.needsNewRevision(request.params.id, request.payload.user).then((needs) => {
+            if (request.payload.new_revision) {
+                // save as new revision
+                if (needs.needs_revision && !needs.fork_allowed) {
+                    // means we can't edit it at all
+                    return reply(boom.unauthorized());
+                }
+
+            } else {
+                // direct save
+                if (needs.needs_revision) {
+                    // no good, you have to save as new revision
+                    return reply(boom.unauthorized());
+                }
+            }
+
+            // allow request to resolve as normal
+            return self.updateDeckRevision(request, reply);
+        }).catch((err) => {
+            request.log('error', err);
+            reply(err);
+        });
+
+    },
+
     updateDeckRevision: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
+        console.log('payload', request.payload);
         if(request.payload.new_revision){
             let root_deck ;
             if(request.payload.root_deck){
@@ -381,6 +419,12 @@ let self = module.exports = {
             module.exports.handleChange({'params': {'id': root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck}}
             ,(changeset) => {
                 //console.log('changeset', changeset);
+                if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                    if (changeset.fork_allowed === false) {
+                        return reply(boom.unauthorized());
+                    }
+                }
+                
                 if(changeset && changeset.hasOwnProperty('target_deck')){
                     //revisioning took place, we must update root deck
                     request.payload.root_deck = changeset.target_deck;
@@ -412,7 +456,7 @@ let self = module.exports = {
                     request.log('error', error);
                     reply(boom.badImplementation());
                 });
-            });
+            }, request);
 
         }
         else{
@@ -426,6 +470,24 @@ let self = module.exports = {
                 reply(boom.badImplementation());
             });
         }
+
+    },
+
+    // HACK this was introduced to help inject forkAllowed check in updateDeckRevision without refactoring much stuff
+    forkDeckRevisionWithCheck: function(request, reply) {
+        return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
+        .then((forkAllowed) => {
+            if (!forkAllowed) {
+                return reply(boom.unauthorized());
+            }
+
+            // else return and continue with promise chain
+            return self.forkDeckRevision(request, reply);
+        })
+        .catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation(error));
+        });
 
     },
 
@@ -586,6 +648,12 @@ let self = module.exports = {
                         module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                         ,(changeset) => {
                           //console.log('changeset', changeset);
+                            if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                                if (changeset.fork_allowed === false) {
+                                    return reply(boom.unauthorized());
+                                }
+                            }
+
                             if(changeset && changeset.hasOwnProperty('target_deck')){
                               //revisioning took place, we must update root deck
                                 parentID = changeset.target_deck;
@@ -599,7 +667,7 @@ let self = module.exports = {
                                 node.changeset = changeset;
                             }
                             reply(node);
-                        });
+                        }, request);
 
                     }
 
@@ -633,6 +701,12 @@ let self = module.exports = {
                 module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                 ,(changeset) => {
                   //console.log('changeset', changeset);
+                    if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                        if (changeset.fork_allowed === false) {
+                            return reply(boom.unauthorized());
+                        }
+                    }
+
                     if(changeset && changeset.hasOwnProperty('target_deck')){
                       //revisioning took place, we must update root deck
                         parentID = changeset.target_deck;
@@ -679,7 +753,7 @@ let self = module.exports = {
                     });
 
 
-                });
+                }, request);
 
             }
         }else{
@@ -708,6 +782,12 @@ let self = module.exports = {
                     module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                     ,(changeset) => {
                       //console.log('changeset', changeset);
+                        if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                            if (changeset.fork_allowed === false) {
+                                return reply(boom.unauthorized());
+                            }
+                        }
+
                         //parentID = request.payload.selector.id;
                         if(request.payload.selector.stype === 'deck'){
                             parentID = request.payload.selector.sid;
@@ -729,7 +809,7 @@ let self = module.exports = {
                             }
                             reply(deckTree);
                         });
-                    });
+                    }, request);
 
 
                 });
@@ -761,6 +841,12 @@ let self = module.exports = {
                 module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
                 ,(changeset) => {
                   //console.log('changeset', changeset);
+                    if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                        if (changeset.fork_allowed === false) {
+                            return reply(boom.unauthorized());
+                        }
+                    }
+
                     if(changeset && changeset.hasOwnProperty('target_deck')){
                       //revisioning took place, we must update root deck
                         parentID = changeset.target_deck;
@@ -796,7 +882,7 @@ let self = module.exports = {
                         });
                     });
 
-                });
+                }, request);
 
 
 
@@ -815,6 +901,12 @@ let self = module.exports = {
             module.exports.handleChange({'params': {'id':request.payload.selector.sid}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
             ,(changeset) => {
               //console.log('changeset', changeset);
+                if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                    if (changeset.fork_allowed === false) {
+                        return reply(boom.unauthorized());
+                    }
+                }
+
                 if(changeset && changeset.hasOwnProperty('target_deck')){
                   //revisioning took place, we must update root deck
                     root_deck = changeset.target_deck;
@@ -834,7 +926,7 @@ let self = module.exports = {
                     request.log('error', error);
                     reply(boom.badImplementation());
                 });
-            });
+            }, request);
 
         }else {
             let root_deck ;
@@ -927,6 +1019,12 @@ let self = module.exports = {
         module.exports.handleChange({'params': {'id': parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
         ,(changeset) => {
           //console.log('changeset', changeset);
+            if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                if (changeset.fork_allowed === false) {
+                    return reply(boom.unauthorized());
+                }
+            }
+
             if(changeset && changeset.hasOwnProperty('target_deck')){
               //revisioning took place, we must update root deck
                 parentID = changeset.target_deck;
@@ -942,7 +1040,7 @@ let self = module.exports = {
                 }
                 reply(removed);
             });
-        });
+        }, request);
 
     },
 
@@ -1100,10 +1198,37 @@ let self = module.exports = {
         deckDB.needsNewRevision(request.params.id, request.query.user).then((needsNewRevision) => {
             //console.log(needsNewRevision);
             reply(needsNewRevision);
+        }).catch((err) => {
+            reply(boom.badImplementation());
+        });;
+    },
+
+    forkAllowed: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
+        deckDB.forkAllowed(request.params.id, userId).then((forkAllowed) => {
+            reply({forkAllowed: forkAllowed});
+        }).catch((err) => {
+            reply(boom.badImplementation());
         });
     },
 
-    handleChange: function(request, reply){
+    editAllowed: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
+        deckDB.editAllowed(request.params.id, userId).then((allowed) => {
+            reply({allowed: allowed});
+        }).catch((err) => {
+            reply(boom.badImplementation());
+        });
+    },
+
+    handleChange: function(request, reply, actualRequest) {
+        // HACK
+        if (!actualRequest) {
+            actualRequest = request;
+        }
+
         //console.log(request.query);
         if(!request.params.id){
             reply();
@@ -1141,17 +1266,17 @@ let self = module.exports = {
                                 reply(changeSet);
                             }
                         }).catch((e) => {
-                            request.log('error', e);
+                            actualRequest.log(e);
                             reply(boom.badImplementation());
-                        });;
+                        });
                     });
                 }).catch((err) => {
-                    request.log('error', err);
+                    actualRequest.log(err);
                     reply(boom.badImplementation());
-                });;
+                });
 
             }).catch((error) => {
-                request.log('error', error);
+                actualRequest.log(error);
                 reply(boom.badImplementation());
             });
         }
@@ -1392,9 +1517,39 @@ let self = module.exports = {
                 reply(slideCount);
             }
         });
+    },
+
+    validateAuthorizationForDeck: (request, reply) => {
+        let deckid = request.params.id;
+
+        return deckDB.get(deckid)
+            .then((result) => {
+                // console.log('validateAuthorizationForDeck: deckid, deck:', deckid, result);
+                if (result === null || result === undefined || result._id === undefined)
+                    return reply(boom.notFound());
+
+                //handle if no revision is given (result is a deck)
+                if (result.revisions) {
+                    result = result.revisions.filter((el) => {
+                        return el.id === result.active;
+                    }) || [{}];
+                    result = result[0];
+                }
+
+                return isUserAllowedToEditTheDeck(request, result)
+                    .then((isAllowed) => {
+                        return reply({allowed: isAllowed});
+                    })
+                    .catch((error) => {
+                        console.log('Error', error);
+                        return reply(boom.badImplementation());
+                    });
+            })
+            .catch((error) => {
+                console.log('Error', error);
+                return reply(boom.badImplementation());
+            });
     }
-
-
 };
 
 function createThumbnail(slideContent, slideId, user) {
@@ -1413,4 +1568,74 @@ function createThumbnail(slideContent, slideId, user) {
     }).catch((e) => {
         console.log('problem with request thumb: ' + e.message);
     });
+}
+
+//Checks with the user data and the deck revision, if the user is allowed to edit the deck
+function isUserAllowedToEditTheDeck(request, deckRevision) {
+    const JWT = request.auth.token;
+    const accessLevel = deckRevision.accessLevel || 'public';
+    if (deckRevision.editors === undefined)
+        deckRevision.editors = {
+            users: [],
+            groups: []
+        };
+    const users = deckRevision.editors.users || [];
+    const groups = deckRevision.editors.groups || [];
+
+    console.log('isUserAllowedToEditTheDeck: accessLevel, userid:', accessLevel, ',', request.auth.credentials.userid);
+
+    let promise = new Promise((resolve, reject) => {
+        if (deckRevision === {})
+            return resolve(false);
+
+        if (accessLevel === 'public')
+            return resolve(true);
+
+        if (deckRevision.user === request.auth.credentials.userid)
+            return resolve(true);
+
+        if (accessLevel === 'private') {
+            return resolve(false);
+        }
+
+        let isUserAnAuthorizedUser = (users.findIndex((user) => {
+            return user.id === request.auth.credentials.userid;
+        }) !== -1);
+
+        if (isUserAnAuthorizedUser)
+            return resolve(true);
+
+        let header = {};
+        header[config.JWT.HEADER] = JWT;
+        const options = {
+            url: Microservices.user.uri + ':' + Microservices.user.port + '/userdata',
+            method: 'GET',
+            json: true,
+            headers: header
+        };
+
+        function callback(error, response, body) {
+            console.log('/userdata: ', error, response.statusCode, body);
+
+            if (!error && (response.statusCode === 200)) {
+                if (body.groups === undefined || body.groups.length < 1)
+                    body.groups = [];
+
+                isUserAnAuthorizedUser = isUserAnAuthorizedUser || ( groups.findIndex((group) => {
+                    return (body.groups.findIndex((group2) => {
+                        return group2._id === group.id;
+                    }) !== -1);
+                }) !== -1 );
+
+                resolve(isUserAnAuthorizedUser);
+            } else {
+                if (response.statusCode === 404)
+                    return resolve(false);  //user not found
+                return reject(error);
+            }
+        }
+
+        requestLib(options, callback);
+    });
+    return promise;
 }

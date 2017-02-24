@@ -1,5 +1,8 @@
 'use strict';
 
+const _ = require('lodash');
+const userService = require('../services/user');
+
 const helper = require('./helper'),
     oid = require('mongodb').ObjectID,
     striptags = require('striptags'),
@@ -144,6 +147,7 @@ let self = module.exports = {
                     activeRevisionIndex = getActiveRevision(existingDeck);
                 }
 
+                //TODO check if all attributes are used from payload
                 const deckRevision = existingDeck.revisions[activeRevisionIndex];
                 deckRevision.title = deck.title;
                 deckRevision.language = deck.language;
@@ -151,6 +155,14 @@ let self = module.exports = {
                 existingDeck.license = deck.license;
                 //add comment, abstract, footer
                 deckRevision.tags = deck.tags;
+
+                if (!_.isEmpty(deck.accessLevel)) {
+                    deckRevision.accessLevel = deck.accessLevel;
+                }
+                if (!_.isEmpty(deck.editors) ){
+                    deckRevision.editors = deck.editors;
+                }
+
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
                 try {
                     valid = deckModel(deckRevision);
@@ -714,6 +726,7 @@ let self = module.exports = {
         });
     },
 
+    // return the set of contributors to the deck / revision
     getDeckEditors(deck_id, editorsList){
 
         let revision_id = -1;
@@ -722,6 +735,7 @@ let self = module.exports = {
             deck_id = decktreesplit[0];
             revision_id = decktreesplit[1]-1;
         }
+        //first we should check if the deck has an editors attribute and fill it accordingly
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -761,6 +775,7 @@ let self = module.exports = {
                             });
                         }
                     },function(err){
+                        if (err) return reject(err);
                         resolve(editorsList);
                     });
 
@@ -769,6 +784,67 @@ let self = module.exports = {
 
             });
         });
+    },
+
+    // return the set of users and groups with write access to the deck revision
+    getDeckUsersGroups(deckRevision, deckId) {
+        // TODO change this
+        // deckRevision is optional, so if deckId is missing, `deckRevision` holds the actual deckId
+        if (deckId === undefined) {
+            deckId = deckRevision;
+
+            return self.get(deckId).then((deck) => {
+                // depending on the deckId format, this may have just one revision, or all revisions
+                let revision;
+                if (deck.revisions.length === 1) {
+                    revision = deck.revisions[0];
+                } else {
+                    // we need the active revision (?)
+                    revision = deck.revisions.find((rev) => (rev.id === deck.active));
+                }
+
+                return self.getDeckUsersGroups(revision, deckId);
+            });
+        }
+
+        let accessLevel = deckRevision.accessLevel || 'public';
+
+        if (accessLevel === 'private') {
+            return Promise.resolve({
+                users: [deckRevision.user],
+                groups: [],
+            });
+
+        } else {
+            // we need all contributors
+            return self.getDeckEditors(deckId)
+            .then((contributors) => {
+
+                if (accessLevel === 'public' || accessLevel === 'restricted') {
+                    // we now read the editors property of the deckRevision, providing some defaults
+                    let users = [], groups = [];
+                    if (deckRevision.editors) {
+                        if (deckRevision.editors.users) {
+                            users = deckRevision.editors.users;
+                        }
+                        if (deckRevision.editors.groups) {
+                            groups = deckRevision.editors.groups;
+                        }
+                    }
+
+                    return {
+                        users: [...(new Set(users.map((u) => u.id))), ...contributors],
+                        groups: groups.map((g) => g.id),
+                    };
+
+                } else {
+                    throw new Error(`Unexpected accessLevel: ${accessLevel}`);
+                }
+
+            });
+
+        }
+
     },
 
     forkDeckRevision(deck){
@@ -796,21 +872,112 @@ let self = module.exports = {
         });
     },
 
-    needsNewRevision(deck, user){
-        return module.exports.getDeckEditors(deck).then((editorsList) => {
-            if(editorsList.includes(parseInt(user))){
-                //user is an editor
-                return new Promise(function(resolve, reject) {
-                    resolve({'target_deck': deck, 'user': user, 'needs_revision': false});
+    forkAllowed(deckId, userId) {
+        userId = parseInt(userId);
+        return self.get(deckId).then((deck) => {
+            // depending on the deckId format, this may have just one revision, or all revisions
+            let revision;
+            if (deck.revisions.length === 1) {
+                revision = deck.revisions[0];
+            } else {
+                // we need the active revision (?)
+                revision = deck.revisions.find((rev) => (rev.id === deck.active));
+            }
+
+            // next, we need to check the accessLevel, defaults to 'public'
+            let accessLevel = revision.accessLevel || 'public';
+
+            if (accessLevel === 'private') {
+                // no-one but the revision owner can fork it!!
+                return revision.user === userId;
+            }
+
+            if (accessLevel === 'restricted') {
+                // authorized users only can fork it !
+                return self.getDeckUsersGroups(revision, deckId).then((editors) => {
+                    if (editors.users.includes(userId)) {
+                        // user is an editor
+                        return true;
+                    } else {
+                        // we also need to check if the groups allowed to edit the deck include the user
+                        if (_.isEmpty(editors.groups)) {
+                            // no groups defined
+                            return false;
+                        }
+
+                        return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
+                            if (groupsUsers.includes(userId)) {
+                                // user is an editor
+                                return true;
+                            }
+
+                            //user is not an editor or owner
+                            return false;
+                        }).catch((err) => {
+                            console.warn(`could not fetch usergroup info from service: ${err.message}`);
+                            // we're not sure, let's just not allow this user
+                            return false;
+                        });
+                    }
                 });
             }
-            else{
-                //user is not an editor or owner
-                return new Promise(function(resolve, reject) {
-                    resolve({'target_deck': deck, 'user': user, 'needs_revision': true});
-                });
-            }
+
+            // defaults to being public, so anyone can fork it!
+            return true;
         });
+    },
+
+    // this is currently equivalent to `forkAllowed`, but could change in the future
+    // we include it here so that client code may use this instead of `forkAllowed` 
+    // when the semanticts are that of 'edit' and not 'fork'
+    editAllowed(deckId, userId) {
+        return self.forkAllowed(deckId, userId);
+    },
+
+    needsNewRevision(deckId, user){
+        let userId = parseInt(user);
+
+        return self.get(deckId)
+        .then((deck) => {
+            // we need the (active) revision document only
+            let revision;
+            if (deck.revisions.length === 1) {
+                revision = deck.revisions[0];
+            } else {
+                // we need the active revision (?)
+                revision = deck.revisions.find((rev) => (rev.id === deck.active));
+            }
+
+            // default is public
+            let accessLevel = revision.accessLevel || 'public';
+
+            return self.getDeckUsersGroups(revision, deckId)
+            .then((editors) => {
+                if (editors.users.includes(userId)) {
+                    // user is an editor
+                    return {'target_deck': deckId, 'user': user, 'needs_revision': false};
+                } else {
+                    // we also need to check if the groups allowed to edit the deck include the user
+                    return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
+
+                        if (groupsUsers.includes(userId)) {
+                            // user is an editor
+                            return {'target_deck': deckId, 'user': user, 'needs_revision': false};
+                        } else {
+                            // user is not an editor or owner
+                            // also return if user can fork the deck (e.g. if it's public)
+                            return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel === 'public') };
+                        }
+
+                    }).catch((err) => {
+                        console.warn(`could not fetch usergroup info from service: ${err.message}`);
+                        // we're not sure, let's just not allow this user
+                        return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel === 'public') };
+                    });
+                }
+            });
+        });
+
     },
 
     handleChange(decktree, deck, root_deck, user_id){
@@ -837,18 +1004,34 @@ let self = module.exports = {
             async.eachSeries(result, function(next_deck, callback){
                 module.exports.needsNewRevision(next_deck.id, user_id).then((needs) => {
                     //console.log(needs);
-                    if(!needs.needs_revision){
-                        callback();
-                    }
-                    else{
+                    if (!needs.needs_revision) {
+                        // HACK we return the needs response as an error to break the series
+                        callback(needs);
+                    } else if (!needs.fork_allowed) {
+                        // cannot edit this at all!
+                        // HACK we return the needs response as an error to break the series
+                        callback(needs);
+                    } else {
                         revisions.push(next_deck);
                         callback();
                     }
                 });
             },function(err){
+                if (err) {
+                    // err is needs result; means that either:
+                    // a) we've reached a deck we can't edit at all (fork_allowed: false)
+                    // b) we've reached a deck we can save without new revision (needs_revision: false)
+
+                    if (err.needs_revision && !err.fork_allowed) {
+                        // we cannot edit the deck! resolve the promise and inform caller of this
+                        return resolve({ needs_revision: true, fork_allowed: false });
+                    }
+                    // else continue as normal
+                    console.log(`stopped handleChange after reaching a deck we can save without new revision ${JSON.stringify(err)}`);
+                }
                 //console.log('revisions array', revisions);
                 if(revisions.length === 0){
-                    resolve({'needsRevision': false});
+                    resolve({needs_revision: false});
                 }
                 revisions.reverse(); //start from the innermost deck that needs revision
                 async.eachSeries(revisions, function(next_needs_revision, callback){
@@ -862,7 +1045,8 @@ let self = module.exports = {
                             language: existingDeck.revisions[ind].language,
                             tags: existingDeck.revisions[ind].tags,
                             license: existingDeck.license,
-                            user: user_id
+                            user: user_id,
+                            editors: existingDeck.revisions[ind].editors
                         };
                         if(next_needs_revision.hasOwnProperty('parent_id')){
                             if(findWithAttrRev(revisions, 'id', next_needs_revision.parent_id) > -1){
@@ -931,7 +1115,7 @@ let self = module.exports = {
                     //console.log('final revisions', revisions);
                     //console.log('new revisions', new_revisions);
                     if(new_revisions.length === 0){
-                        resolve({'needsRevision': false});
+                        resolve({'needs_revision': false});
                     }
                     else{
                         if(new_revisions[0].hasOwnProperty('root_changed')){
@@ -1087,6 +1271,13 @@ function convertToNewDeck(deck){
     if(!deck.hasOwnProperty('tags') || deck.tags === null){
         deck.tags = [];
     }
+    if(deck.hasOwnProperty('editors') && deck.editors === null){
+        deck.editors = {users: [], groups: []};
+    }
+    else if(!deck.hasOwnProperty('editors')){
+        deck.editors = {users: [], groups: []};
+    }
+    //should we have a default accessLevel?
     const result = {
         _id: deck._id,
         user: deck.user,
@@ -1116,7 +1307,9 @@ function convertToNewDeck(deck){
             comment: deck.comment,
             abstract: deck.abstract,
             footer: deck.footer,
-            contentItems: []
+            contentItems: [],
+            accessLevel: deck.accessLevel,
+            editors: deck.editors
         }]
     };
     //console.log('from', slide, 'to', result);
@@ -1131,6 +1324,12 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
     }
     if(deck.language === null){
         deck.language = 'en_EN';
+    }
+    if(deck.hasOwnProperty('editors') && deck.editors === null){
+        deck.editors = {users: [], groups: []};
+    }
+    else if(!deck.hasOwnProperty('editors')){
+        deck.editors = {users: [], groups: []};
     }
     const result = {
         //user: deck.user,
@@ -1153,7 +1352,9 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
             comment: deck.comment,
             abstract: deck.abstract,
             footer: deck.footer,
-            contentItems: content_items
+            contentItems: content_items,
+            accessLevel: deck.accessLevel,
+            editors: deck.editors
         }]
     };
     //console.log('from', slide, 'to', result);

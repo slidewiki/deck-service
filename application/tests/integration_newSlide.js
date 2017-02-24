@@ -17,8 +17,29 @@ describe('REST API', () => {
             host: 'localhost',
             port: 3000
         });
-        require('../routes.js')(server);
-        done();
+        let plugins = [
+            require('hapi-auth-jwt2')
+        ];
+        server.register(plugins, (err) => {
+            if (err) {
+                console.error(err);
+                global.process.exit();
+            } else {
+                server.auth.strategy('jwt', 'jwt', {
+                    key: 'dummy',
+                    validateFunc: (decoded, request, callback) => {callback(null, true);},
+                    verifyOptions: {
+                        ignoreExpiration: true
+                    }
+                });
+
+                server.start(() => {
+                    server.log('info', 'Server started at ' + server.info.uri);
+                    require('../routes.js')(server);
+                    done();
+                });
+            }
+        });
     });
 
     let slide = {

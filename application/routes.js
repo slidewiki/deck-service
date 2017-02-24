@@ -88,6 +88,30 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deck/{id}/forkAllowed',
+        handler: handlers.forkAllowed,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Decide if deck can be forked by the user - JWT needed',
+            response: {
+                schema: Joi.object().keys({
+                    forkAllowed: Joi.boolean()
+                }).required().description('Return schema')
+            },
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/handleChange',
         handler: handlers.handleChange,
         config: {
@@ -151,6 +175,43 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/editAllowed',
+        handler: handlers.editAllowed,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown()
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Check if user is allowed to edit the deck - JWT needed',
+            response: {
+                schema: Joi.object().keys({
+                    allowed: Joi.boolean()
+                }).required('allowed')
+            },
+            plugins: {
+                'hapi-swagger': {
+                    responses: {
+                        ' 200 ': {
+                            'description': 'Successful',
+                        },
+                        ' 404 ': {
+                            'description': 'Deck not found. Check the id.'
+                        }
+                    },
+                    payloadType: 'form'
+                }
+            }
+        }
+    });
+
+    server.route({
         method: 'POST',
         path: '/deck/new',
         handler: handlers.newDeck,
@@ -178,7 +239,20 @@ module.exports = function(server) {
                         title: Joi.string().allow(''),
                         speakernotes: Joi.string().allow('')
                     }),
-                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    editors: Joi.object().keys({
+                        groups: Joi.array().items(Joi.object().keys({
+                            id: Joi.number(),
+                            name: Joi.string(),
+                            joined: Joi.string()
+                        })).default([]),
+                        users: Joi.array().items(Joi.object().keys({
+                            userid: Joi.number(),
+                            username: Joi.string(),
+                            joined: Joi.string(),
+                            picture: Joi.string().allow('')
+                        })).default([])
+                    })
                 }).requiredKeys('user', 'license'),
             },
             tags: ['api'],
@@ -189,7 +263,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/deck/{id}',
-        handler: handlers.updateDeckRevision,
+        handler: handlers.updateDeckRevisionWithCheck,
         config: {
             validate: {
                 params: {
@@ -213,7 +287,21 @@ module.exports = function(server) {
                     comment: Joi.string().allow(''),
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
-                    new_revision: Joi.boolean()
+                    new_revision: Joi.boolean(),
+                    accessLevel: Joi.string().valid('public', 'restricted', 'private'),
+                    editors: Joi.object().keys({
+                        groups: Joi.array().items(Joi.object().keys({
+                            id: Joi.number(),
+                            name: Joi.string(),
+                            joined: Joi.string()
+                        })).default([]),
+                        users: Joi.array().items(Joi.object().keys({
+                            userid: Joi.number(),
+                            username: Joi.string(),
+                            joined: Joi.string(),
+                            picture: Joi.string().allow('')
+                        })).default([])
+                    })
                 }).requiredKeys('user'),
             },
             tags: ['api'],
@@ -224,7 +312,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/deck/{id}/fork',
-        handler: handlers.forkDeckRevision,
+        handler: handlers.forkDeckRevisionWithCheck,
         config: {
             validate: {
                 params: {
