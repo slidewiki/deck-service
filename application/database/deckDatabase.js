@@ -820,13 +820,7 @@ let self = module.exports = {
             return self.getDeckEditors(deckId)
             .then((contributors) => {
 
-                if (accessLevel === 'public') {
-                    return {
-                        users: contributors,
-                        groups: [],
-                    };
-
-                } else if (accessLevel === 'restricted') {
+                if (accessLevel === 'public' || accessLevel === 'restricted') {
                     // we now read the editors property of the deckRevision, providing some defaults
                     let users = [], groups = [];
                     if (deckRevision.editors) {

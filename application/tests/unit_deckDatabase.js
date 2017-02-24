@@ -19,7 +19,8 @@ describe('deckDatabase', function() {
         );
     });
 
-    describe('#forkAllowed()', function() {
+    // TODO forkAllowed functionality will not be used for now, so let's skip testing it for now
+    describe.skip('#forkAllowed()', function() {
 
         it('should return true for the deck revision owner regardless of access level', function() {
             let userId = 46;
@@ -94,6 +95,8 @@ describe('deckDatabase', function() {
 
     });
 
+    // TODO any tests involving restricted / private decks are commented out/skipped until feature is enabled
+
     describe('#needsNewRevision()', function() {
 
         it('should allow save without new revision for owner regardless of access level', function() {
@@ -102,43 +105,32 @@ describe('deckDatabase', function() {
                 .then((needs) => {
                     needs.should.have.property('needs_revision', false);
                 }),
-                deckDB.update('54-12', { accessLevel: 'private' })
-                .then(() => deckDB.needsNewRevision('54-12', 46))
-                .then((needs) => {
-                    needs.should.have.property('needs_revision', false);
-                }),
-                deckDB.update('54-12', { accessLevel: 'restricted' })
-                .then(() => deckDB.needsNewRevision('54-12', 46))
-                .then((needs) => {
-                    needs.should.have.property('needs_revision', false);
-                }),
+                // deckDB.update('54-12', { accessLevel: 'private' })
+                // .then(() => deckDB.needsNewRevision('54-12', 46))
+                // .then((needs) => {
+                //     needs.should.have.property('needs_revision', false);
+                // }),
+                // deckDB.update('54-12', { accessLevel: 'restricted' })
+                // .then(() => deckDB.needsNewRevision('54-12', 46))
+                // .then((needs) => {
+                //     needs.should.have.property('needs_revision', false);
+                // }),
             ]);
 
         });
 
-        context('if the deck revision is public or restricted', function() {
+        context('if the deck revision is public', function() {
 
             it('should allow save without new revision for a user implicitly authorized', function() {
-                return Promise.all([
-                    deckDB.needsNewRevision('54-12', 3)
-                    .then((needs) => {
-                        needs.should.have.property('needs_revision', false);
-                    }),
-                    deckDB.update('54-12', { accessLevel: 'restricted' })
-                    .then(() => deckDB.needsNewRevision('54-12', 3))
-                    .then((needs) => {
-                        needs.should.have.property('needs_revision', false);
-                    }),
-                ]);
+                return deckDB.needsNewRevision('54-12', 3)
+                .then((needs) => {
+                    needs.should.have.property('needs_revision', false);
+                });
+
             });
 
-        });
-
-        context('if the deck revision is restricted', function() {
-
             it('should allow save without new revision for a user explicitly authorized', function() {
-                return deckDB.update('54-12', { accessLevel: 'restricted' })
-                .then((updated) => deckDB.needsNewRevision('54-12', 4))
+                return deckDB.needsNewRevision('54-12', 4)
                 .then((needs) => {
                     needs.should.have.property('needs_revision', false);
                 });
@@ -147,8 +139,39 @@ describe('deckDatabase', function() {
 
             // TODO properly setup a test for this, needs a mock for the user service
             it.skip('should allow save without new revision for a user explicitly authorized via groups', function() {
-                return deckDB.update('54-12', { accessLevel: 'restricted' })
-                .then((updated) => deckDB.needsNewRevision('54-12', 6))
+                return deckDB.needsNewRevision('54-12', 6)
+                .then((needs) => {
+                    needs.should.have.property('needs_revision', false);
+                });
+
+            });
+
+        });
+
+        context.skip('if the deck revision is restricted', function() {
+            beforeEach(function() {
+                return deckDB.update('54-12', { accessLevel: 'restricted' });
+            });
+
+            it('should allow save without new revision for a user implicitly authorized', function() {
+                return deckDB.needsNewRevision('54-12', 3)
+                .then((needs) => {
+                    needs.should.have.property('needs_revision', false);
+                });
+
+            });
+
+            it('should allow save without new revision for a user explicitly authorized', function() {
+                return deckDB.needsNewRevision('54-12', 4)
+                .then((needs) => {
+                    needs.should.have.property('needs_revision', false);
+                });
+
+            });
+
+            // TODO properly setup a test for this, needs a mock for the user service
+            it.skip('should allow save without new revision for a user explicitly authorized via groups', function() {
+                return deckDB.needsNewRevision('54-12', 6)
                 .then((needs) => {
                     needs.should.have.property('needs_revision', false);
                 });
@@ -168,16 +191,16 @@ describe('deckDatabase', function() {
                 .then((editors) => {
                     editors.users.should.include.members([ 9, 46, 26, 10, 3 ]);
                 }),
-                deckDB.update('54-12', { accessLevel: 'restricted' })
-                .then((updated) => deckDB.getDeckUsersGroups('54-12'))
-                .then((editors) => {
-                    editors.users.should.include.members([ 9, 46, 26, 10, 3 ]);
-                }),
+                // deckDB.update('54-12', { accessLevel: 'restricted' })
+                // .then((updated) => deckDB.getDeckUsersGroups('54-12'))
+                // .then((editors) => {
+                //     editors.users.should.include.members([ 9, 46, 26, 10, 3 ]);
+                // }),
             ]);
 
         });
 
-        it('should only include the owner and no groups for deck revisions that are private', function() {
+        it.skip('should only include the owner and no groups for deck revisions that are private', function() {
             // update first to private and recalculate
             return deckDB.update('54-12', { accessLevel: 'private' })
             .then((updated) => deckDB.getDeckUsersGroups('54-12'))
@@ -188,10 +211,18 @@ describe('deckDatabase', function() {
 
         });
 
-        it('should only include all implicitly or explicitly authorized users and authorized groups for restricted deck revisions', function() {
-            // update first to private and recalculate
+        it.skip('should exactly include all implicitly or explicitly authorized users and authorized groups for restricted deck revisions', function() {
+            // update first to restricted and recalculate
             return deckDB.update('54-12', { accessLevel: 'restricted' })
             .then((updated) => deckDB.getDeckUsersGroups('54-12'))
+            .then((editors) => {
+                editors.users.should.have.members([ 9, 46, 26, 10, 3, 4, 5 ]);
+                editors.groups.should.have.members([ 2 ]);
+            });
+        });
+
+        it('should exactly include all implicitly or explicitly authorized users and authorized groups for public deck revisions', function() {
+            return deckDB.getDeckUsersGroups('54-12')
             .then((editors) => {
                 editors.users.should.have.members([ 9, 46, 26, 10, 3, 4, 5 ]);
                 editors.groups.should.have.members([ 2 ]);
