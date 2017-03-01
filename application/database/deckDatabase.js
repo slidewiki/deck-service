@@ -892,37 +892,7 @@ let self = module.exports = {
                 return revision.user === userId;
             }
 
-            if (accessLevel === 'restricted') {
-                // authorized users only can fork it !
-                return self.getDeckUsersGroups(revision, deckId).then((editors) => {
-                    if (editors.users.includes(userId)) {
-                        // user is an editor
-                        return true;
-                    } else {
-                        // we also need to check if the groups allowed to edit the deck include the user
-                        if (_.isEmpty(editors.groups)) {
-                            // no groups defined
-                            return false;
-                        }
-
-                        return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
-                            if (groupsUsers.includes(userId)) {
-                                // user is an editor
-                                return true;
-                            }
-
-                            //user is not an editor or owner
-                            return false;
-                        }).catch((err) => {
-                            console.warn(`could not fetch usergroup info from service: ${err.message}`);
-                            // we're not sure, let's just not allow this user
-                            return false;
-                        });
-                    }
-                });
-            }
-
-            // defaults to being public, so anyone can fork it!
+            // any other access level means you can fork it always
             return true;
         });
     },
@@ -966,13 +936,13 @@ let self = module.exports = {
                         } else {
                             // user is not an editor or owner
                             // also return if user can fork the deck (e.g. if it's public)
-                            return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel === 'public') };
+                            return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel !== 'private') };
                         }
 
                     }).catch((err) => {
                         console.warn(`could not fetch usergroup info from service: ${err.message}`);
                         // we're not sure, let's just not allow this user
-                        return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel === 'public') };
+                        return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel !== 'private') };
                     });
                 }
             });
