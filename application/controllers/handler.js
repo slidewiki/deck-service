@@ -1188,10 +1188,68 @@ let self = module.exports = {
     },
 
     getEditors: function(request, reply){
-        deckDB.getDeckEditors(request.params.id)
-        .then((editorsList) => {
-            reply(editorsList);
+        let deckId = request.params.id;
+
+        // we need the explicit editors in the revision object
+        deckDB.getRevision(deckId)
+        .then((revision) => {
+            if (!revision) return reply(boom.notFound());
+
+            // keep only the id in the response object
+            // TODO specify the final API response schema
+            let editors = revision.editors || { users: [], groups: [] };
+            editors.users = (editors.users || []).map((u) => ({id: u.id}) );
+            editors.groups = (editors.groups || []).map((g) => ({id: g.id}) );
+
+            // we also need the implicit editors (AKA contributors)...
+            deckDB.getDeckEditors(deckId)
+            .then((contributors) => {
+                contributors = contributors.map((id) => ({ id }) );
+                reply({ contributors,  editors });
+            });
+
+        }).catch((err) => reply(boom.badImplementation(err)) );
+
+    },
+
+    replaceEditors: function(request, reply) {
+        let deckId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        deckDB.get(deckId)
+        .then((deck) => {
+            // permit deck owner only to use this
+            if (userId !== deck.user) return reply(boom.forbidden());
+
+            return deckDB.update(deckId, request.payload)
+            .then((replaced) => {
+                if (co.isEmpty(replaced.value)) throw replaced;
+                else reply();
+            });
+
+        }).catch((err) => reply(boom.badImplementation(err)) );
+
+    },
+
+    userPermissions: function(request, reply) {
+        let deckId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        deckDB.needsNewRevision(deckId, userId).then((needs) => {
+            if (!needs) return reply(boom.notFound());
+
+            let fork = (needs.fork_allowed === undefined) ? true : needs.fork_allowed;
+            let edit = (needs.needs_revision === false);
+            let admin = needs.admin_allowed;
+
+            reply({
+                fork, edit, admin,
+            });
+
+        }).catch((err) => {
+            reply(boom.badImplementation(err));
         });
+
     },
 
     needsNewRevision: function(request, reply){

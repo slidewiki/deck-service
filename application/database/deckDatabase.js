@@ -33,8 +33,7 @@ let self = module.exports = {
                 let revision = found.revisions[parseInt(idArray[1])-1];
                 if(typeof revision === 'undefined'){
                     console.log('Deck not found.');
-                    console.log('err', err);
-                    return ;
+                    return;
                 }
                 else{
                     found.revisions = [revision];
@@ -46,6 +45,24 @@ let self = module.exports = {
             console.log('err', err);
         })
       );
+    },
+
+    // returns the deck revision subdocument, either the one specified in identifier, or the active one
+    getRevision: function(identifier) {
+        return self.get(identifier)
+        .then((deck) => {
+            // return nothing if not found
+            if (!deck) return;
+
+            // depending on the identifier format, this may have just one revision, or all revisions
+            if (deck.revisions.length === 1) {
+                return deck.revisions[0];
+            } else {
+                // we need the active revision (?)
+                return deck.revisions.find((rev) => (rev.id === deck.active));
+            }
+        });
+
     },
 
     getActiveRevisionFromDB: function(identifier) {
@@ -909,6 +926,11 @@ let self = module.exports = {
 
         return self.get(deckId)
         .then((deck) => {
+            if (!deck) return;
+
+            // set the admin role permission
+            let adminAllowed = (deck.user === userId);
+
             // we need the (active) revision document only
             let revision;
             if (deck.revisions.length === 1) {
@@ -925,24 +947,24 @@ let self = module.exports = {
             .then((editors) => {
                 if (editors.users.includes(userId)) {
                     // user is an editor
-                    return {'target_deck': deckId, 'user': user, 'needs_revision': false};
+                    return {'target_deck': deckId, 'user': user, 'needs_revision': false, 'admin_allowed': adminAllowed };
                 } else {
                     // we also need to check if the groups allowed to edit the deck include the user
                     return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
 
                         if (groupsUsers.includes(userId)) {
                             // user is an editor
-                            return {'target_deck': deckId, 'user': user, 'needs_revision': false};
+                            return {'target_deck': deckId, 'user': user, 'needs_revision': false, 'admin_allowed': adminAllowed };
                         } else {
                             // user is not an editor or owner
                             // also return if user can fork the deck (e.g. if it's public)
-                            return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel !== 'private') };
+                            return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel !== 'private'), 'admin_allowed': adminAllowed };
                         }
 
                     }).catch((err) => {
                         console.warn(`could not fetch usergroup info from service: ${err.message}`);
                         // we're not sure, let's just not allow this user
-                        return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel !== 'private') };
+                        return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel !== 'private'), 'admin_allowed': adminAllowed };
                     });
                 }
             });

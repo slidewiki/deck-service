@@ -140,8 +140,90 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Get editors (owners and contributors) of a deck and its sub-components'
-        }
+            description: 'Get the users and groups authorized for editing the deck (includes contributors)',
+            response: {
+                schema: Joi.object().keys({
+                    contributors: Joi.array().items(
+                        Joi.object().keys({
+                            id: Joi.number(),
+                        })),
+                    editors: Joi.object().keys({
+                        users: Joi.array().items(
+                            Joi.object().keys({
+                                id: Joi.number(),
+                            })),
+                        groups: Joi.array().items(
+                            Joi.object().keys({
+                                id: Joi.number(),
+                            })),
+                    }),
+                }),
+            },
+        },
+    });
+
+    server.route({
+        method: 'PUT',
+        path: '/deck/{id}/editors',
+        handler: handlers.replaceEditors,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                payload: Joi.object({
+                    editors: Joi.object().keys({
+                        groups: Joi.array().items(Joi.object().keys({
+                            id: Joi.number().required(),
+                            name: Joi.string(),
+                            joined: Joi.string()
+                        })).default([]),
+                        users: Joi.array().items(Joi.object().keys({
+                            id: Joi.number().required(),
+                            username: Joi.string(),
+                            joined: Joi.string(),
+                            picture: Joi.string().allow('')
+                        })).default([])
+                    }).required(),
+                }),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Replace the users and groups authorized for editing the deck - JWT needed',
+            response: {
+                emptyStatusCode: 204,
+                status: { '204' : false }
+            },
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/permissions',
+        handler: handlers.userPermissions,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().regex(/[0-9]+/),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Get the permissions the current user has on the deck (revision) - JWT needed',
+            response: {
+                schema: Joi.object({
+                    fork: Joi.boolean().default(true),
+                    edit: Joi.boolean().default(false),
+                    admin: Joi.boolean().default(false),
+                }),
+            }
+        },
     });
 
     server.route({
@@ -289,19 +371,6 @@ module.exports = function(server) {
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     new_revision: Joi.boolean(),
                     accessLevel: Joi.string().valid('public', 'restricted', 'private'),
-                    editors: Joi.object().keys({
-                        groups: Joi.array().items(Joi.object().keys({
-                            id: Joi.number(),
-                            name: Joi.string(),
-                            joined: Joi.string()
-                        })).default([]),
-                        users: Joi.array().items(Joi.object().keys({
-                            userid: Joi.number(),
-                            username: Joi.string(),
-                            joined: Joi.string(),
-                            picture: Joi.string().allow('')
-                        })).default([])
-                    })
                 }).requiredKeys('user'),
             },
             tags: ['api'],
