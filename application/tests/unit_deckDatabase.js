@@ -297,4 +297,15 @@ describe('deckDatabase', function() {
 
     });
 
+    describe('#getSubdeckIds', function() {
+        it('should return all the subdecks under a root deck', function() {
+            return deckDB.getSubdeckIds('54')
+            .then((subdeckIds) => {
+                subdeckIds.should.have.members([ 54, 55, 91, 92, 101, 56, 57 ]);
+            });
+
+        });
+
+    });
+
 });

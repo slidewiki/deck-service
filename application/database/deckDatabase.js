@@ -682,6 +682,54 @@ let self = module.exports = {
         });
     },
 
+    getSubdeckIds: function(deckId) {
+        return self.get(deckId)
+        .then((deck) => {
+            // return nothing if not found
+            if (!deck) return;
+
+            let deckRevision;
+            // need to read contentItems from active revision
+            // depending on the identifier format, this may have just one revision, or all revisions
+            if (deck.revisions.length === 1) {
+                deckRevision = deck.revisions[0];
+            } else {
+                // we need the active revision
+                deckRevision = deck.revisions.find((rev) => (rev.id === deck.active));
+            }
+
+            let currentResult = [deck._id];
+
+            let subdeckIds = deckRevision.contentItems
+            .filter((citem) => citem.kind === 'deck')
+            .map((citem) => `${citem.ref.id}-${citem.ref.revision}`);
+
+            if (subdeckIds.length) {
+
+                // after recursively getting all the subdecks, return the list including current deck (currentResult items)
+                return new Promise((resolve, reject) => {
+                    async.concatSeries(
+                        subdeckIds,
+                        (subdeckId, callback) => {
+                            self.getSubdeckIds(subdeckId)
+                            .then((nestedResult) => callback(null, nestedResult));
+                        },
+                        (error, results) => {
+                            if (error) reject(error)
+                            else resolve(currentResult.concat(results));
+                        }
+                    );
+
+                });
+
+            } else {
+                // just return the current deckId
+                return currentResult;
+            }
+
+        });
+    },
+
     getUsernameById: function(user_id){
         return helper.connectToDatabase()
         .then((db) => db.collection('users'))
