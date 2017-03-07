@@ -100,7 +100,7 @@ let self = module.exports = {
             //console.log('changeset', changeset);
             if (changeset && changeset.hasOwnProperty('fork_allowed')) {
                 if (changeset.fork_allowed === false) {
-                    return reply(boom.unauthorized());
+                    return reply(boom.forbidden());
                 }
             }
 
@@ -388,14 +388,14 @@ let self = module.exports = {
                 // save as new revision
                 if (needs.needs_revision && !needs.fork_allowed) {
                     // means we can't edit it at all
-                    return reply(boom.unauthorized());
+                    return reply(boom.forbidden());
                 }
 
             } else {
                 // direct save
                 if (needs.needs_revision) {
                     // no good, you have to save as new revision
-                    return reply(boom.unauthorized());
+                    return reply(boom.forbidden());
                 }
             }
 
@@ -421,7 +421,7 @@ let self = module.exports = {
                 //console.log('changeset', changeset);
                 if (changeset && changeset.hasOwnProperty('fork_allowed')) {
                     if (changeset.fork_allowed === false) {
-                        return reply(boom.unauthorized());
+                        return reply(boom.forbidden());
                     }
                 }
                 
@@ -478,7 +478,7 @@ let self = module.exports = {
         return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
         .then((forkAllowed) => {
             if (!forkAllowed) {
-                return reply(boom.unauthorized());
+                return reply(boom.forbidden());
             }
 
             // else return and continue with promise chain
@@ -650,7 +650,7 @@ let self = module.exports = {
                           //console.log('changeset', changeset);
                             if (changeset && changeset.hasOwnProperty('fork_allowed')) {
                                 if (changeset.fork_allowed === false) {
-                                    return reply(boom.unauthorized());
+                                    return reply(boom.forbidden());
                                 }
                             }
 
@@ -703,7 +703,7 @@ let self = module.exports = {
                   //console.log('changeset', changeset);
                     if (changeset && changeset.hasOwnProperty('fork_allowed')) {
                         if (changeset.fork_allowed === false) {
-                            return reply(boom.unauthorized());
+                            return reply(boom.forbidden());
                         }
                     }
 
@@ -784,7 +784,7 @@ let self = module.exports = {
                       //console.log('changeset', changeset);
                         if (changeset && changeset.hasOwnProperty('fork_allowed')) {
                             if (changeset.fork_allowed === false) {
-                                return reply(boom.unauthorized());
+                                return reply(boom.forbidden());
                             }
                         }
 
@@ -843,7 +843,7 @@ let self = module.exports = {
                   //console.log('changeset', changeset);
                     if (changeset && changeset.hasOwnProperty('fork_allowed')) {
                         if (changeset.fork_allowed === false) {
-                            return reply(boom.unauthorized());
+                            return reply(boom.forbidden());
                         }
                     }
 
@@ -903,7 +903,7 @@ let self = module.exports = {
               //console.log('changeset', changeset);
                 if (changeset && changeset.hasOwnProperty('fork_allowed')) {
                     if (changeset.fork_allowed === false) {
-                        return reply(boom.unauthorized());
+                        return reply(boom.forbidden());
                     }
                 }
 
@@ -1021,7 +1021,7 @@ let self = module.exports = {
           //console.log('changeset', changeset);
             if (changeset && changeset.hasOwnProperty('fork_allowed')) {
                 if (changeset.fork_allowed === false) {
-                    return reply(boom.unauthorized());
+                    return reply(boom.forbidden());
                 }
             }
 
