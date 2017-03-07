@@ -13,7 +13,6 @@ const boom = require('boom'),
     Joi = require('joi'),
     async = require('async'),
     Microservices = require('../configs/microservices'),
-    requestLib = require('request'),
     config = require('../configuration');
 
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
@@ -1190,14 +1189,14 @@ let self = module.exports = {
     getEditors: function(request, reply){
         let deckId = request.params.id;
 
-        // we need the explicit editors in the revision object
-        deckDB.getRevision(deckId)
-        .then((revision) => {
-            if (!revision) return reply(boom.notFound());
+        // we need the explicit editors in the deck object
+        deckDB.get(deckId)
+        .then((deck) => {
+            if (!deck) return reply(boom.notFound());
 
             // keep only the id in the response object
             // TODO specify the final API response schema
-            let editors = revision.editors || { users: [], groups: [] };
+            let editors = deck.editors || { users: [], groups: [] };
             editors.users = (editors.users || []).map((u) => ({id: u.id}) );
             editors.groups = (editors.groups || []).map((g) => ({id: g.id}) );
 
@@ -1577,37 +1576,6 @@ let self = module.exports = {
         });
     },
 
-    validateAuthorizationForDeck: (request, reply) => {
-        let deckid = request.params.id;
-
-        return deckDB.get(deckid)
-            .then((result) => {
-                // console.log('validateAuthorizationForDeck: deckid, deck:', deckid, result);
-                if (result === null || result === undefined || result._id === undefined)
-                    return reply(boom.notFound());
-
-                //handle if no revision is given (result is a deck)
-                if (result.revisions) {
-                    result = result.revisions.filter((el) => {
-                        return el.id === result.active;
-                    }) || [{}];
-                    result = result[0];
-                }
-
-                return isUserAllowedToEditTheDeck(request, result)
-                    .then((isAllowed) => {
-                        return reply({allowed: isAllowed});
-                    })
-                    .catch((error) => {
-                        console.log('Error', error);
-                        return reply(boom.badImplementation());
-                    });
-            })
-            .catch((error) => {
-                console.log('Error', error);
-                return reply(boom.badImplementation());
-            });
-    }
 };
 
 function createThumbnail(slideContent, slideId, user) {
@@ -1626,74 +1594,4 @@ function createThumbnail(slideContent, slideId, user) {
     }).catch((e) => {
         console.log('problem with request thumb: ' + e.message);
     });
-}
-
-//Checks with the user data and the deck revision, if the user is allowed to edit the deck
-function isUserAllowedToEditTheDeck(request, deckRevision) {
-    const JWT = request.auth.token;
-    const accessLevel = deckRevision.accessLevel || 'public';
-    if (deckRevision.editors === undefined)
-        deckRevision.editors = {
-            users: [],
-            groups: []
-        };
-    const users = deckRevision.editors.users || [];
-    const groups = deckRevision.editors.groups || [];
-
-    console.log('isUserAllowedToEditTheDeck: accessLevel, userid:', accessLevel, ',', request.auth.credentials.userid);
-
-    let promise = new Promise((resolve, reject) => {
-        if (deckRevision === {})
-            return resolve(false);
-
-        if (accessLevel === 'public')
-            return resolve(true);
-
-        if (deckRevision.user === request.auth.credentials.userid)
-            return resolve(true);
-
-        if (accessLevel === 'private') {
-            return resolve(false);
-        }
-
-        let isUserAnAuthorizedUser = (users.findIndex((user) => {
-            return user.id === request.auth.credentials.userid;
-        }) !== -1);
-
-        if (isUserAnAuthorizedUser)
-            return resolve(true);
-
-        let header = {};
-        header[config.JWT.HEADER] = JWT;
-        const options = {
-            url: Microservices.user.uri + ':' + Microservices.user.port + '/userdata',
-            method: 'GET',
-            json: true,
-            headers: header
-        };
-
-        function callback(error, response, body) {
-            console.log('/userdata: ', error, response.statusCode, body);
-
-            if (!error && (response.statusCode === 200)) {
-                if (body.groups === undefined || body.groups.length < 1)
-                    body.groups = [];
-
-                isUserAnAuthorizedUser = isUserAnAuthorizedUser || ( groups.findIndex((group) => {
-                    return (body.groups.findIndex((group2) => {
-                        return group2._id === group.id;
-                    }) !== -1);
-                }) !== -1 );
-
-                resolve(isUserAnAuthorizedUser);
-            } else {
-                if (response.statusCode === 404)
-                    return resolve(false);  //user not found
-                return reject(error);
-            }
-        }
-
-        requestLib(options, callback);
-    });
-    return promise;
 }

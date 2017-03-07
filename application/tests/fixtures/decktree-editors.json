@@ -3,7 +3,23 @@
     "decks": [
       {
         "_id": 54,
-        "user": 9,
+        "user": 46,
+        "accessLevel": "public",
+        "editors": {
+          "users": [
+            {
+              "id": 4
+            },
+            {
+              "id": 5
+            }
+          ],
+          "groups": [
+            {
+              "id": 2
+            }
+          ]
+        },
         "timestamp": "2016-10-04T10:34:03.315Z",
         "description": "empty",
         "translated_from": null,
@@ -1452,22 +1468,6 @@
             "comment": null,
             "abstract": null,
             "footer": null,
-            "accessLevel": "public",
-            "editors": {
-              "users": [
-                {
-                  "id": 4
-                },
-                {
-                  "id": 5
-                }
-              ],
-              "groups": [
-                {
-                  "id": 2
-                }
-              ]
-            },
             "contentItems": [
               {
                 "order": 1,

@@ -108,11 +108,6 @@ const deckRevision = {
             format: 'date-time'
         },
         user: objectid,
-        accessLevel: {
-            type: 'string',
-            enum: ['public', 'restricted', 'private']
-        },
-        editors: editors,
         parent: {
             type: 'object',
             // properties: {
@@ -255,6 +250,11 @@ const deck = {
             format: 'date-time'
         },
         user: objectid,
+        accessLevel: {
+            type: 'string',
+            enum: ['public', 'restricted', 'private']
+        },
+        editors: editors,
         // kind: {
         //     type: 'string'
         // },

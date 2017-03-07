@@ -143,6 +143,26 @@ let self = module.exports = {
         });
     },
 
+    // TODO only used for accessLevel tests right now, should be removed or properly integrated 
+    // once a decision re: access level is made
+    _adminUpdate: function(id, deckPatch) {
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(id)})
+            .then((existingDeck) => {
+                if (!_.isEmpty(deckPatch.accessLevel)) {
+                    existingDeck.accessLevel = deckPatch.accessLevel;
+                }
+
+                return col.findOneAndReplace({ _id: parseInt(id) }, existingDeck, { returnOriginal: false } )
+                .then((updated) => updated.value);
+            });
+
+        });
+
+    },
+
     update: function(id, deck) {    //when no new revision is needed..
         // return helper.connectToDatabase()
         // .then((db) => db.collection('decks'))
@@ -173,11 +193,8 @@ let self = module.exports = {
                 //add comment, abstract, footer
                 deckRevision.tags = deck.tags;
 
-                if (!_.isEmpty(deck.accessLevel)) {
-                    deckRevision.accessLevel = deck.accessLevel;
-                }
                 if (!_.isEmpty(deck.editors) ){
-                    deckRevision.editors = deck.editors;
+                    existingDeck.editors = deck.editors;
                 }
 
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
@@ -803,32 +820,22 @@ let self = module.exports = {
         });
     },
 
-    // return the set of users and groups with write access to the deck revision
-    getDeckUsersGroups(deckRevision, deckId) {
+    // return the set of users and groups with write access to the deck
+    getDeckUsersGroups(deck, deckId) {
         // TODO change this
-        // deckRevision is optional, so if deckId is missing, `deckRevision` holds the actual deckId
+        // deck is optional, so if deckId is missing, `deck` holds the actual deckId
         if (deckId === undefined) {
-            deckId = deckRevision;
+            deckId = deck;
 
-            return self.get(deckId).then((deck) => {
-                // depending on the deckId format, this may have just one revision, or all revisions
-                let revision;
-                if (deck.revisions.length === 1) {
-                    revision = deck.revisions[0];
-                } else {
-                    // we need the active revision (?)
-                    revision = deck.revisions.find((rev) => (rev.id === deck.active));
-                }
-
-                return self.getDeckUsersGroups(revision, deckId);
-            });
+            return self.get(deckId)
+            .then((deck) => self.getDeckUsersGroups(deck, deckId));
         }
 
-        let accessLevel = deckRevision.accessLevel || 'public';
+        let accessLevel = deck.accessLevel || 'public';
 
         if (accessLevel === 'private') {
             return Promise.resolve({
-                users: [deckRevision.user],
+                users: [deck.user],
                 groups: [],
             });
 
@@ -838,14 +845,14 @@ let self = module.exports = {
             .then((contributors) => {
 
                 if (accessLevel === 'public' || accessLevel === 'restricted') {
-                    // we now read the editors property of the deckRevision, providing some defaults
+                    // we now read the editors property of the deck, providing some defaults
                     let users = [], groups = [];
-                    if (deckRevision.editors) {
-                        if (deckRevision.editors.users) {
-                            users = deckRevision.editors.users;
+                    if (deck.editors) {
+                        if (deck.editors.users) {
+                            users = deck.editors.users;
                         }
-                        if (deckRevision.editors.groups) {
-                            groups = deckRevision.editors.groups;
+                        if (deck.editors.groups) {
+                            groups = deck.editors.groups;
                         }
                     }
 
@@ -892,21 +899,12 @@ let self = module.exports = {
     forkAllowed(deckId, userId) {
         userId = parseInt(userId);
         return self.get(deckId).then((deck) => {
-            // depending on the deckId format, this may have just one revision, or all revisions
-            let revision;
-            if (deck.revisions.length === 1) {
-                revision = deck.revisions[0];
-            } else {
-                // we need the active revision (?)
-                revision = deck.revisions.find((rev) => (rev.id === deck.active));
-            }
-
             // next, we need to check the accessLevel, defaults to 'public'
-            let accessLevel = revision.accessLevel || 'public';
+            let accessLevel = deck.accessLevel || 'public';
 
             if (accessLevel === 'private') {
-                // no-one but the revision owner can fork it!!
-                return revision.user === userId;
+                // no-one but the deck owner can fork it!!
+                return deck.user === userId;
             }
 
             // any other access level means you can fork it always
@@ -931,19 +929,10 @@ let self = module.exports = {
             // set the admin role permission
             let adminAllowed = (deck.user === userId);
 
-            // we need the (active) revision document only
-            let revision;
-            if (deck.revisions.length === 1) {
-                revision = deck.revisions[0];
-            } else {
-                // we need the active revision (?)
-                revision = deck.revisions.find((rev) => (rev.id === deck.active));
-            }
-
             // default is public
-            let accessLevel = revision.accessLevel || 'public';
+            let accessLevel = deck.accessLevel || 'public';
 
-            return self.getDeckUsersGroups(revision, deckId)
+            return self.getDeckUsersGroups(deck, deckId)
             .then((editors) => {
                 if (editors.users.includes(userId)) {
                     // user is an editor
@@ -1038,7 +1027,7 @@ let self = module.exports = {
                             tags: existingDeck.revisions[ind].tags,
                             license: existingDeck.license,
                             user: user_id,
-                            editors: existingDeck.revisions[ind].editors
+                            editors: existingDeck.editors,
                         };
                         if(next_needs_revision.hasOwnProperty('parent_id')){
                             if(findWithAttrRev(revisions, 'id', next_needs_revision.parent_id) > -1){
@@ -1273,6 +1262,8 @@ function convertToNewDeck(deck){
     const result = {
         _id: deck._id,
         user: deck.user,
+        accessLevel: deck.accessLevel,
+        editors: deck.editors,
         //deck: deck.root_deck,
         //kind: 'deck',
         timestamp: now.toISOString(),
@@ -1300,8 +1291,6 @@ function convertToNewDeck(deck){
             abstract: deck.abstract,
             footer: deck.footer,
             contentItems: [],
-            accessLevel: deck.accessLevel,
-            editors: deck.editors
         }]
     };
     //console.log('from', slide, 'to', result);
@@ -1332,6 +1321,10 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
         datasource: deck.datasource,
         license: deck.license,
         active: newRevisionId,
+
+        accessLevel: deck.accessLevel,
+        editors: deck.editors,
+
         revisions: [{
             id: newRevisionId,
             usage: usageArray,
@@ -1345,8 +1338,6 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
             abstract: deck.abstract,
             footer: deck.footer,
             contentItems: content_items,
-            accessLevel: deck.accessLevel,
-            editors: deck.editors
         }]
     };
     //console.log('from', slide, 'to', result);
