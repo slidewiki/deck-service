@@ -1215,15 +1215,32 @@ let self = module.exports = {
         let deckId = request.params.id;
         let userId = request.auth.credentials.userid;
 
-        deckDB.get(deckId)
-        .then((deck) => {
+        deckDB.get(deckId).then((deck) => {
             // permit deck owner only to use this
             if (userId !== deck.user) return reply(boom.forbidden());
 
-            return deckDB.update(deckId, request.payload)
-            .then((replaced) => {
-                if (co.isEmpty(replaced.value)) throw replaced;
-                else reply();
+            // TODO for now all subdecks should have the same owner, so no further authorization required
+            return deckDB.getSubdeckIds(deckId).then((subdeckIds) => {
+                async.eachSeries(subdeckIds, (subdeckId, done) => {
+                    // #update accepts strings
+                    deckDB.update(subdeckId.toString(), request.payload)
+                    .then((replaced) => {
+                        if (replaced.ok !== 1) {
+                            done(replaced);
+                        } else {
+                            done();
+                        }
+                    });
+
+                }, (error) => {
+                    if (error) {
+                        request.log('error', error);
+                        reply(boom.badImplementation(error));
+                    } else {
+                        reply();
+                    }
+                });
+
             });
 
         }).catch((err) => reply(boom.badImplementation(err)) );

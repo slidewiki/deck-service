@@ -715,8 +715,11 @@ let self = module.exports = {
                             .then((nestedResult) => callback(null, nestedResult));
                         },
                         (error, results) => {
-                            if (error) reject(error)
-                            else resolve(currentResult.concat(results));
+                            if (error) {
+                                reject(error);
+                            } else {
+                                resolve(currentResult.concat(results));
+                            }
                         }
                     );
 

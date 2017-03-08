@@ -250,11 +250,12 @@ const deck = {
             format: 'date-time'
         },
         user: objectid,
-        accessLevel: {
-            type: 'string',
-            enum: ['public', 'restricted', 'private']
-        },
-        editors: editors,
+        // // TODO include these here after validation is fixed across the service 
+        // accessLevel: {
+        //     type: 'string',
+        //     enum: ['public', 'restricted', 'private']
+        // },
+        // editors: editors,
         // kind: {
         //     type: 'string'
         // },
