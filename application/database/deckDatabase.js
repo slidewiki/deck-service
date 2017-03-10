@@ -836,12 +836,16 @@ let self = module.exports = {
             for(let i = 0; i < res.children.length; i++){
                 flatDeckArray.push(res.children[i].id); //push next sub-deck into array
             }
+            //init maps for new ids
             let id_map = {}, id_noRev_map = {};
             //reverse in order to iterate from bottom to top
             flatDeckArray.reverse();
             //feed the array for serial processing
-            let new_decks = ["sadsad"];
+
+
+            let new_decks = [];
             return new Promise(function(resolve, reject) {
+                //first we generate all the new ids for the copied decks, and hold them in a map for future reference
                 async.eachSeries(flatDeckArray, function(next_deck, callback){
                     return helper.connectToDatabase()
                     .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
@@ -850,89 +854,68 @@ let self = module.exports = {
                         id_noRev_map[next_deck.split('-')[0]] = newId;
                         callback();
                     });
-
                 },function(err){
+                    //iterate the flat decktree and copy each deck, referring to the new ids in its content items and usage
+                    async.eachSeries(flatDeckArray, function(next_deck, callback){
+                        return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                        .then((db2) => db2.collection('decks'))
+                        .then((col) => {
+                            col.findOne({_id: parseInt(next_deck.split('-')[0])})
+                            .then((found) => {
+                                let ind = parseInt(next_deck.split('-')[1])-1;
+                                let copiedDeck = {
+                                    _id: id_noRev_map[found._id],
+                                    description: found.description,
+                                    language: found.revisions[ind].language,
+                                    tags: found.revisions[ind].tags,
+                                    license: found.license,
+                                    user: parseInt(user),
+                                    translated_from: found.translated_from,
+                                    contributors: found.contributors,
+                                    active: 1
+                                };
 
-                        async.eachSeries(flatDeckArray, function(next_deck, callback){
-                            return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
-                            .then((db2) => db2.collection('decks'))
-                            .then((col) => {
-                                col.findOne({_id: parseInt(next_deck.split('-')[0])})
-                                .then((found) => {
-                                    let ind = parseInt(next_deck.split('-')[1])-1;
-                                    //console.log('id', id_map);
-                                    let copiedDeck = {
-                                        //title: found.revisions[ind].title,
-                                        _id: id_noRev_map[found._id],
-                                        description: found.description,
-                                        language: found.revisions[ind].language,
-                                        tags: found.revisions[ind].tags,
-                                        license: found.license,
-                                        user: parseInt(user),
-                                        translated_from: found.translated_from,
-                                        contributors: found.contributors,
-                                        active: 1
-                                    };
-                                    //console.log('copiedDeck', copiedDeck);
-                                    let now = new Date();
-                                    let timestamp = now.toISOString();
-                                    copiedDeck.timestamp = timestamp;
-                                    copiedDeck.lastUpdate = timestamp;
-                                    if(found.hasOwnProperty('datasource')){
-                                        copiedDeck.datasource = found.datasource;
-                                    }
-                                    else{
-                                        copiedDeck.datasource = null;
-                                    }
-                                    copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
-                                    copiedDeck.revisions = [found.revisions[ind]];
-                                    //update id map
-                                    //id_map[next_deck] = newId+'-'+1;
-                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                        for(let j in id_map){
-                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
-                                                copiedDeck.revisions[0].contentItems[i].ref.id = id_map[j].split('-')[0];
-                                                copiedDeck.revisions[0].contentItems[i].ref.revision = id_map[j].split('-')[1];
-                                            }
+                                let now = new Date();
+                                let timestamp = now.toISOString();
+                                copiedDeck.timestamp = timestamp;
+                                copiedDeck.lastUpdate = timestamp;
+                                if(found.hasOwnProperty('datasource')){
+                                    copiedDeck.datasource = found.datasource;
+                                }
+                                else{
+                                    copiedDeck.datasource = null;
+                                }
+                                copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
+                                copiedDeck.revisions = [found.revisions[ind]];
+
+                                for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                    for(let j in id_map){
+                                        if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
+                                            copiedDeck.revisions[0].contentItems[i].ref.id = id_map[j].split('-')[0];
+                                            copiedDeck.revisions[0].contentItems[i].ref.revision = id_map[j].split('-')[1];
                                         }
                                     }
-                                    for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
-                                        for(let j in id_map){
-                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                                copiedDeck.revisions[0].usage[i].id = id_map[j].split('-')[0];
-                                                copiedDeck.revisions[0].usage[i].revision = id_map[j].split('-')[1];
-                                            }
+                                }
+                                for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
+                                    for(let j in id_map){
+                                        if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                            copiedDeck.revisions[0].usage[i].id = id_map[j].split('-')[0];
+                                            copiedDeck.revisions[0].usage[i].revision = id_map[j].split('-')[1];
                                         }
                                     }
-                                    console.log('next_deck', next_deck);
-                                    console.log('id_map', id_map);
-                                    // console.log('copiedDeck', copiedDeck);
-                                    // console.log('copiedDeck revisons', copiedDeck.revisions);
-                                    console.log('copiedDeck citems', copiedDeck.revisions[0].contentItems);
-                                    console.log('copiedDeck usage', copiedDeck.revisions[0].usage);
-                                    //console.log('col', col);
-                                    //let converted_deck = convertToNewDeck(copiedDeck);
-                                    //console.log('converted_deck', converted_deck);
-                                    //col.insertOne(copiedDeck);
-                                    new_decks.push(copiedDeck);
-                                    col.insertOne(copiedDeck);
-                                    callback();
-
-                                });
-
+                                }
+                                new_decks.push(copiedDeck);
+                                col.insertOne(copiedDeck);
+                                callback();
                             });
-
-                        },
-                        function(err2){
-                            resolve(new_decks);
                         });
-
+                    },
+                    function(err2){
+                        resolve(new_decks);
+                    });
                 });
             });
-
-
         });
-
     },
 
     needsNewRevision(deck, user){
