@@ -91,8 +91,7 @@ let self = module.exports = {
             .then((db2) => db2.collection('decks'))
             .then((col) => {
                 let valid = false;
-                deck._id = newId;
-                
+                deck._id = newId;                
                 if(typeof deck.root_deck === 'undefined'){
                     deck.root_deck = null;
                 }
