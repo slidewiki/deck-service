@@ -23,10 +23,6 @@ let self = module.exports = {
                 return found;
             }
             else{
-                // let revision = found.revisions[parseInt(parsed[1])-1];
-                // revision.id = identifier;
-                // revision.kind = 'deck';
-                // return revision;
                 let revision = found.revisions[parseInt(idArray[1])-1];
                 if(typeof revision === 'undefined'){
                     console.log('Deck not found.');
@@ -51,7 +47,6 @@ let self = module.exports = {
             return Promise.resolve(identifier);
         }
         else{
-            //console.log('returning processed identifier', identifier);
             return helper.connectToDatabase()
             .then((db) => db.collection('decks'))
             .then((col) => col.findOne({_id: parseInt(identifier)}))
@@ -97,12 +92,7 @@ let self = module.exports = {
             .then((col) => {
                 let valid = false;
                 deck._id = newId;
-                // if(typeof deck.root_deck !== 'undefined'){
-                //     deck.root_deck = deck.root_deck.split('-')[0];
-                // }
-                // else {
-                //     deck.root_deck = null;
-                // }
+                
                 if(typeof deck.root_deck === 'undefined'){
                     deck.root_deck = null;
                 }
@@ -1148,20 +1138,6 @@ function getNewRevisionID(citem){
 }
 
 //returns the max order of appearance (i.e., position) of a content item inside a deck, or 0 if it is empty
-// function getOrder(activeRevision){
-//   if(activeRevision.revisions[0].contentItems.length > 0){
-//     return Math.max.apply(
-//       Math,activeRevision.revisions[0].contentItems.map(
-//         function(o){
-//           return o.order;
-//         }
-//       )
-//     );
-//   }
-//   else return 0;
-// }
-
-//returns the max order of appearance (i.e., position) of a content item inside a deck, or 0 if it is empty
 function getOrder(activeRevision){
     if(activeRevision.contentItems.length > 0){
         return Math.max.apply(
@@ -1174,24 +1150,6 @@ function getOrder(activeRevision){
     }
     else return 0;
 }
-//
-// function convertDeck(deck) {
-//     let now = new Date();
-//     return {
-//         user: deck.user,
-//         deck: deck.root_deck,
-//         timestamp: now,
-//         lastUpdate: now,
-//         license: deck.license,
-//         revisions: [{
-//             title: deck.title,
-//             timestamp: now,
-//             user: deck.user,
-//             visibility: false,
-//             contentItems: deck.content_items
-//         }]
-//     };
-// }
 
 function convertToNewDeck(deck){
     let now = new Date();
