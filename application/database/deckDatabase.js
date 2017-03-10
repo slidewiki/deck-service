@@ -56,7 +56,7 @@ let self = module.exports = {
             .then((db) => db.collection('decks'))
             .then((col) => col.findOne({_id: parseInt(identifier)}))
             .then((found) => {
-                if(found){                    
+                if(found){
                     return Promise.resolve(found._id+'-'+found.active);
                 }
                 else {
@@ -578,7 +578,7 @@ let self = module.exports = {
     },
 
 
-    getDeckTreeFromDB: function(deck_id){
+    getDeckTreeFromDB: function(deck_id, onlyDecks){
         let deckTree;
         let revision_id = -1;
         let decktreesplit = String(deck_id).split('-');
@@ -596,26 +596,29 @@ let self = module.exports = {
                 }
                 deckTree = { title: striptags(deck.revisions[revision_id].title), id: deck_id+'-'+(revision_id+1), type: 'deck', children: []};
 
-
                 return new Promise(function(resolve, reject) {
                     async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
                         if(citem.kind === 'slide'){
-                            helper.connectToDatabase()
-                            .then((db) => db.collection('slides'))
-                            .then((col) => {
-                                col.findOne({_id: parseInt(citem.ref.id)})
-                                .then((slide) => {
-                                    let slide_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: striptags(slide.revisions[slide_revision].title), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
-                                    callback();
+                            if(!onlyDecks){
+                                helper.connectToDatabase()
+                                .then((db) => db.collection('slides'))
+                                .then((col) => {
+                                    col.findOne({_id: parseInt(citem.ref.id)})
+                                    .then((slide) => {
+                                        let slide_revision = citem.ref.revision-1;
+                                        deckTree.children.push({title: striptags(slide.revisions[slide_revision].title), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                                        callback();
+                                    });
                                 });
-                            });
+                            }
+                            else{
+                                callback();
+                            }
                         }
                         else{
                             col.findOne({_id: parseInt(citem.ref.id)})
                             .then((innerDeck) => {
-
-                                module.exports.getDeckTreeFromDB(innerDeck._id+'-'+citem.ref.revision)
+                                module.exports.getDeckTreeFromDB(innerDeck._id+'-'+citem.ref.revision, onlyDecks)
                                 .then((res) => {
                                     deckTree.children.push(res);
                                     callback();
@@ -714,6 +717,58 @@ let self = module.exports = {
         });
     },
 
+    getFlatDecksFromDB: function(deck_id, deckTree){
+
+        let revision_id = -1;
+        let decktreesplit = deck_id.split('-');
+        if(decktreesplit.length > 1){
+            deck_id = decktreesplit[0];
+            revision_id = decktreesplit[1]-1;
+        }
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deck_id)})
+            .then((deck) => {
+                //console.log(deck);
+                if(revision_id === -1){
+                    revision_id = deck.active-1;
+                }
+                if(!deckTree){
+                    deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), children: []};
+                }
+
+                return new Promise(function(resolve, reject) {
+                    async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
+
+                        if(citem.kind === 'slide'){
+                            callback();
+                        }
+                        else{
+                            col.findOne({_id: parseInt(citem.ref.id)})
+                            .then((innerDeck) => {
+                                let deck_revision = citem.ref.revision-1;
+                                deckTree.children.push({title: innerDeck.revisions[deck_revision].title, user: String(innerDeck.revisions[deck_revision].user), id: innerDeck._id+'-'+innerDeck.revisions[deck_revision].id, type: 'deck'});
+
+                                module.exports.getFlatDecksFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree)
+                                .then((res) => {
+                                    callback();
+                                });
+                            });
+                        }
+                    },function(err){
+                        resolve(deckTree);
+                    });
+
+                });
+
+
+            }).catch((error) => {
+                return ;
+            });
+        });
+    },
+
     getDeckEditors(deck_id, editorsList){
 
         let revision_id = -1;
@@ -771,29 +826,113 @@ let self = module.exports = {
         });
     },
 
-    forkDeckRevision(deck){
-        module.exports.get(encodeURIComponent(deck.id)).then((existingDeck) => {
-            let ind = existingDeck.revisions.length-1;
-            let payload = {
-                title: existingDeck.revisions[ind].title,
-                description: existingDeck.description,
-                language: existingDeck.revisions[ind].language,
-                tags: existingDeck.revisions[ind].tags,
-                license: existingDeck.license,
-                user: request.payload.user,
-                fork: true
-            };
-            module.exports.replace(encodeURIComponent(deck.id), payload).then((replaced) => {
-                if (co.isEmpty(replaced.value))
-                    throw replaced;
-                else{
-                    return replaced;
-                }
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
+    forkDeckRevision(deck_id, user){
+
+        return module.exports.getFlatDecksFromDB(deck_id)
+        .then((res) => {
+            //we have a flat sub-deck structure
+            let flatDeckArray = [];
+            flatDeckArray.push(res.id); //push root deck into array
+            for(let i = 0; i < res.children.length; i++){
+                flatDeckArray.push(res.children[i].id); //push next sub-deck into array
+            }
+            let id_map = {}, id_noRev_map = {};
+            //reverse in order to iterate from bottom to top
+            flatDeckArray.reverse();
+            //feed the array for serial processing
+            let new_decks = ["sadsad"];
+            return new Promise(function(resolve, reject) {
+                async.eachSeries(flatDeckArray, function(next_deck, callback){
+                    return helper.connectToDatabase()
+                    .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
+                    .then((newId) => {
+                        id_map[next_deck] = newId+'-'+1;
+                        id_noRev_map[next_deck.split('-')[0]] = newId;
+                        callback();
+                    });
+
+                },function(err){
+
+                        async.eachSeries(flatDeckArray, function(next_deck, callback){
+                            return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                            .then((db2) => db2.collection('decks'))
+                            .then((col) => {
+                                col.findOne({_id: parseInt(next_deck.split('-')[0])})
+                                .then((found) => {
+                                    let ind = parseInt(next_deck.split('-')[1])-1;
+                                    //console.log('id', id_map);
+                                    let copiedDeck = {
+                                        //title: found.revisions[ind].title,
+                                        _id: id_noRev_map[found._id],
+                                        description: found.description,
+                                        language: found.revisions[ind].language,
+                                        tags: found.revisions[ind].tags,
+                                        license: found.license,
+                                        user: parseInt(user),
+                                        translated_from: found.translated_from,
+                                        contributors: found.contributors,
+                                        active: 1
+                                    };
+                                    //console.log('copiedDeck', copiedDeck);
+                                    let now = new Date();
+                                    let timestamp = now.toISOString();
+                                    copiedDeck.timestamp = timestamp;
+                                    copiedDeck.lastUpdate = timestamp;
+                                    if(found.hasOwnProperty('datasource')){
+                                        copiedDeck.datasource = found.datasource;
+                                    }
+                                    else{
+                                        copiedDeck.datasource = null;
+                                    }
+                                    copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
+                                    copiedDeck.revisions = [found.revisions[ind]];
+                                    //update id map
+                                    //id_map[next_deck] = newId+'-'+1;
+                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].contentItems[i].ref.id = id_map[j].split('-')[0];
+                                                copiedDeck.revisions[0].contentItems[i].ref.revision = id_map[j].split('-')[1];
+                                            }
+                                        }
+                                    }
+                                    for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].usage[i].id = id_map[j].split('-')[0];
+                                                copiedDeck.revisions[0].usage[i].revision = id_map[j].split('-')[1];
+                                            }
+                                        }
+                                    }
+                                    console.log('next_deck', next_deck);
+                                    console.log('id_map', id_map);
+                                    // console.log('copiedDeck', copiedDeck);
+                                    // console.log('copiedDeck revisons', copiedDeck.revisions);
+                                    console.log('copiedDeck citems', copiedDeck.revisions[0].contentItems);
+                                    console.log('copiedDeck usage', copiedDeck.revisions[0].usage);
+                                    //console.log('col', col);
+                                    //let converted_deck = convertToNewDeck(copiedDeck);
+                                    //console.log('converted_deck', converted_deck);
+                                    //col.insertOne(copiedDeck);
+                                    new_decks.push(copiedDeck);
+                                    col.insertOne(copiedDeck);
+                                    callback();
+
+                                });
+
+                            });
+
+                        },
+                        function(err2){
+                            resolve(new_decks);
+                        });
+
+                });
             });
+
+
         });
+
     },
 
     needsNewRevision(deck, user){

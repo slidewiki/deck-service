@@ -75,7 +75,8 @@ let self = module.exports = {
                     //for now we use hardcoded template for new slides
                     content = slidetemplate;
                 }
-                createThumbnail(content, slideId, user);
+                //console.log('inserted', inserted);
+                //createThumbnail(content, slideId, user);
 
                 reply(co.rewriteID(inserted.ops[0]));
             }
@@ -431,32 +432,36 @@ let self = module.exports = {
 
     forkDeckRevision: function(request, reply) {
         //NOTE shall the payload and/or response be cleaned or enhanced with values?
-        deckDB.get(encodeURIComponent(request.params.id)).then((existingDeck) => {
-            let ind = existingDeck.revisions.length-1;
-            let payload = {
-                title: existingDeck.revisions[ind].title,
-                description: existingDeck.description,
-                language: existingDeck.revisions[ind].language,
-                tags: existingDeck.revisions[ind].tags,
-                license: existingDeck.license,
-                user: request.payload.user,
-                fork: true
-            };
-            //console.log(payload);
-            deckDB.replace(encodeURIComponent(request.params.id), payload).then((replaced) => {
-                if (co.isEmpty(replaced.value))
-                    throw replaced;
-                else{
-                    deckDB.get(replaced.value._id).then((newDeck) => {
-                        newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
-                        reply(newDeck);
-                    });
-                }
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
-            });
+        deckDB.forkDeckRevision(encodeURIComponent(request.params.id), request.payload.user).then((decktree) => {
+            //console.log('decktree', decktree);
+            reply(decktree);
         });
+        // deckDB.get(encodeURIComponent(request.params.id)).then((existingDeck) => {
+        //     let ind = existingDeck.revisions.length-1;
+        //     let payload = {
+        //         title: existingDeck.revisions[ind].title,
+        //         description: existingDeck.description,
+        //         language: existingDeck.revisions[ind].language,
+        //         tags: existingDeck.revisions[ind].tags,
+        //         license: existingDeck.license,
+        //         user: request.payload.user,
+        //         fork: true
+        //     };
+        //     //console.log(payload);
+        //     deckDB.replace(encodeURIComponent(request.params.id), payload).then((replaced) => {
+        //         if (co.isEmpty(replaced.value))
+        //             throw replaced;
+        //         else{
+        //             deckDB.get(replaced.value._id).then((newDeck) => {
+        //                 newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
+        //                 reply(newDeck);
+        //             });
+        //         }
+        //     }).catch((error) => {
+        //         request.log('error', error);
+        //         reply(boom.badImplementation());
+        //     });
+        // });
 
     },
 
