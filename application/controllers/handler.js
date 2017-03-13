@@ -93,8 +93,14 @@ let self = module.exports = {
         //must handle changes here.
         //console.log('request payload', request.payload);
         //if(true) reply(true);
-        module.exports.handleChange({'params': {'id':request.payload.root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck}}
+        self.handleChange({
+            'params': {'id':request.payload.root_deck},
+            'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck},
+            'log': request.log.bind(request),
+        }
         ,(changeset) => {
+            if (changeset.isBoom) return reply(changeset);
+
             //console.log('changeset', changeset);
             if(changeset && changeset.hasOwnProperty('target_deck')){
                 //revisioning took place, we must update root deck
@@ -378,8 +384,14 @@ let self = module.exports = {
             if(request.payload.root_deck){
                 root_deck = request.payload.root_deck;
             }
-            module.exports.handleChange({'params': {'id': root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck}}
+            self.handleChange({
+                'params': {'id': root_deck},
+                'query': {'user': request.payload.user, 'root_deck': request.payload.top_root_deck},
+                'log': request.log.bind(request),
+            }
             ,(changeset) => {
+                if (changeset.isBoom) return reply(changeset);
+
                 //console.log('changeset', changeset);
                 if(changeset && changeset.hasOwnProperty('target_deck')){
                     //revisioning took place, we must update root deck
@@ -528,6 +540,9 @@ let self = module.exports = {
             else{
                 reply(deckTree);
             }
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
     },
 
@@ -556,7 +571,12 @@ let self = module.exports = {
                 let slideArrayPath = spathArray[spathArray.length-1].split(':');
                 slidePosition = parseInt(slideArrayPath[1])+1;
                 let slideRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
-                module.exports.getSlide({'params' : {'id' : request.payload.nodeSpec.id.split('-')[0]}}, (slide) => {
+                self.getSlide({
+                    'params' : {'id' : request.payload.nodeSpec.id.split('-')[0]},
+                    'log': request.log.bind(request),
+                }, (slide) => {
+                    if (slide.isBoom) return reply(slide);
+
                     //console.log('inserting slide', slide);
                     if(request.payload.nodeSpec.id === request.payload.selector.sid){
                         //we must duplicate the slide
@@ -583,8 +603,14 @@ let self = module.exports = {
                         //NOTE must also update usage
                         slide.id = slide._id;
                         //console.log(request.payload.selector);
-                        module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+                        self.handleChange({
+                            'params': {'id':parentID},
+                            'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
+                            'log': request.log.bind(request),
+                        }
                         ,(changeset) => {
+                            if (changeset.isBoom) return reply(changeset);
+
                           //console.log('changeset', changeset);
                             if(changeset && changeset.hasOwnProperty('target_deck')){
                               //revisioning took place, we must update root deck
@@ -630,14 +656,24 @@ let self = module.exports = {
 
                 //handle revisioning here
                 //console.log(request.payload.selector);
-                module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+                self.handleChange({
+                    'params': {'id':parentID},
+                    'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
+                    'log': request.log.bind(request),
+                }
                 ,(changeset) => {
+                    if (changeset.isBoom) return reply(changeset);
                   //console.log('changeset', changeset);
                     if(changeset && changeset.hasOwnProperty('target_deck')){
                       //revisioning took place, we must update root deck
                         parentID = changeset.target_deck;
                     }
-                    module.exports.getDeck({'params': {'id':parentID}}, (parentDeck) => {
+                    self.getDeck({
+                        'params': {'id':parentID},
+                        'log': request.log.bind(request),
+                    }, (parentDeck) => {
+                        if (parentDeck.isBoom) return reply(parentDeck);
+
                         //NOTE we should call /slide/new
                         let slide = {
                             'title': 'New slide', //NOTE add title
@@ -667,7 +703,12 @@ let self = module.exports = {
                         }
 
                         //NOTE update positions accordingly
-                        module.exports.newSlide({'payload' : slide}, (createdSlide) => {
+                        self.newSlide({
+                            'payload' : slide,
+                            'log': request.log.bind(request),
+                        }, (createdSlide) => {
+                            if (createdSlide.isBoom) return reply(createdSlide);
+
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
                             deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide');
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
@@ -703,10 +744,21 @@ let self = module.exports = {
                 deckPosition = parseInt(deckArrayPath[1])+1;
                 let deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
 
-                module.exports.getDeck({'params': {'id' : request.payload.nodeSpec.id}}, (deck) => {
+                self.getDeck({
+                    'params': {'id' : request.payload.nodeSpec.id},
+                    'log': request.log.bind(request),
+                }, (deck) => {
+                    if (deck.isBoom) return reply(deck);
+
                     deck.id = deck._id;
-                    module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+                    self.handleChange({
+                        'params': {'id':parentID},
+                        'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
+                        'log': request.log.bind(request),
+                    }
                     ,(changeset) => {
+                        if (changeset.isBoom) return reply(changeset);
+
                       //console.log('changeset', changeset);
                         //parentID = request.payload.selector.id;
                         if(request.payload.selector.stype === 'deck'){
@@ -723,7 +775,12 @@ let self = module.exports = {
                         //TODO not tested update usage
                         deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
                         //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                        module.exports.getDeckTree({'params': {'id' : deck.id}}, (deckTree) => {
+                        self.getDeckTree({
+                            'params': {'id' : deck.id},
+                            'log': request.log.bind(request),
+                        }, (deckTree) => {
+                            if (deckTree.isBoom) return reply(deckTree);
+
                             if(changeset && changeset.hasOwnProperty('target_deck')){
                                 deckTree.changeset = changeset;
                             }
@@ -758,14 +815,25 @@ let self = module.exports = {
                 let deckArrayPath = spathArray[spathArray.length-1].split(':');
                 deckPosition = parseInt(deckArrayPath[1])+1;
 
-                module.exports.handleChange({'params': {'id':parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+                self.handleChange({
+                    'params': {'id':parentID},
+                    'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
+                    'log': request.log.bind(request),
+                }
                 ,(changeset) => {
+                    if (changeset.isBoom) return reply(changeset);
+
                   //console.log('changeset', changeset);
                     if(changeset && changeset.hasOwnProperty('target_deck')){
                       //revisioning took place, we must update root deck
                         parentID = changeset.target_deck;
                     }
-                    module.exports.getDeck({'params': {'id':parentID}}, (parentDeck) => {
+                    self.getDeck({
+                        'params': {'id':parentID},
+                        'log': request.log.bind(request),
+                    }, (parentDeck) => {
+                        if (parentDeck.isBoom) return reply(parentDeck);
+
                         //NOTE we should call /slide/new
                         let deck = {
                             'description': '',
@@ -782,11 +850,21 @@ let self = module.exports = {
                         };
 
                         //NOTE update positions accordingly
-                        module.exports.newDeck({'payload' : deck}, (createdDeck) => {
+                        self.newDeck({
+                            'payload' : deck,
+                            'log': request.log.bind(request),
+                        }, (createdDeck) => {
+                            if (createdDeck.isBoom) return reply(createdDeck);
+
                             if(typeof parentID !== 'undefined')
                                 deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck');
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                            module.exports.getDeckTree({'params': {'id' : createdDeck.id}}, (deckTree) => {
+                            self.getDeckTree({
+                                'params': {'id' : createdDeck.id},
+                                'log': request.log.bind(request),
+                            }, (deckTree) => {
+                                if (deckTree.isBoom) return reply(deckTree);
+
                                 if(changeset && changeset.hasOwnProperty('target_deck')){
                                     deckTree.changeset = changeset;
                                 }
@@ -812,8 +890,14 @@ let self = module.exports = {
 
         if(request.payload.selector.stype === 'deck'){
             let root_deck = request.payload.selector.sid;
-            module.exports.handleChange({'params': {'id':request.payload.selector.sid}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+            self.handleChange({
+                'params': {'id':request.payload.selector.sid},
+                'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
+                'log': request.log.bind(request),
+            }
             ,(changeset) => {
+                if (changeset.isBoom) return reply(changeset);
+
               //console.log('changeset', changeset);
                 if(changeset && changeset.hasOwnProperty('target_deck')){
                   //revisioning took place, we must update root deck
@@ -850,7 +934,11 @@ let self = module.exports = {
                 root_deck = request.payload.selector.id;
             }
             //we must create a new slide revision as well, because of renaming it
-            module.exports.getSlide({'params' : {'id' : slide_id}}, (slide) => {
+            self.getSlide({
+                'params' : {'id' : slide_id},
+                'log': request.log.bind(request),
+            }, (slide) => {
+                if (slide.isBoom) return reply(slide);
               //console.log('existing', slide);
 
                 let new_slide = {
@@ -874,13 +962,21 @@ let self = module.exports = {
                 if(new_slide.dataSources === null){
                     new_slide.dataSources = [];
                 }
-                let new_request = {'params' : {'id' :encodeURIComponent(slide_id)}, 'payload' : new_slide};
-                module.exports.updateSlide(new_request, (updated) => {
+                let new_request = {
+                    'params' : {'id' :encodeURIComponent(slide_id)},
+                    'payload' : new_slide,
+                    'log': request.log.bind(request),
+                };
+                self.updateSlide(new_request, (updated) => {
                     reply(updated);
                 });
             });
 
-          // module.exports.handleChange({'params': {'id': root_deck}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+          // self.handleChange({
+          //   'params': {'id': root_deck},
+          //   'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
+          //   'log': request.log.bind(request),
+          // }
           // ,(changeset) => {
           //   //console.log('changeset', changeset);
           //     if(changeset && changeset.hasOwnProperty('target_deck')){
@@ -924,8 +1020,14 @@ let self = module.exports = {
         let itemArrayPath = spathArray[spathArray.length-1].split(':');
         itemPosition = itemArrayPath[1];
 
-        module.exports.handleChange({'params': {'id': parentID}, 'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id}}
+        self.handleChange({
+            'params': {'id': parentID},
+            'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
+            'log': request.log.bind(request),
+        }
         ,(changeset) => {
+            if (changeset.isBoom) return reply(changeset);
+
           //console.log('changeset', changeset);
             if(changeset && changeset.hasOwnProperty('target_deck')){
               //revisioning took place, we must update root deck
@@ -948,8 +1050,13 @@ let self = module.exports = {
 
     moveDeckTreeNode: function(request, reply) {
         console.log('original payload', request.payload);
-        module.exports.deleteDeckTreeNode({'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user}},
+        self.deleteDeckTreeNode({
+            'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user},
+            'log': request.log.bind(request),
+        },
         (removed) => {
+            if (removed.isBoom) return reply(removed);
+
             let nodeSpec = {'id': request.payload.sourceSelector.sid, 'type': request.payload.sourceSelector.stype};
             let sourceParentDeck = request.payload.sourceSelector.id;
             let spathArray = request.payload.sourceSelector.spath.split(';');
@@ -1024,11 +1131,14 @@ let self = module.exports = {
                 request.payload.targetSelector.id = request.payload.targetSelector.sid;
             }
             let payload  = {'payload': {
-                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user}};
+                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user},
+                'log': request.log.bind(request),
+            };
             //console.log('nodeSpec', nodeSpec);
             console.log('payload', payload);
-            module.exports.createDeckTreeNode(payload,
+            self.createDeckTreeNode(payload,
             (inserted) => {
+                if (inserted.isBoom) return reply(inserted);
 
                 // if(inserted.hasOwnProperty('changeset')){
                 //     inserted_changeset = inserted.changeset;
@@ -1131,7 +1241,12 @@ let self = module.exports = {
                     request.query.root_deck = rootIdArray[0]+'-'+activeRoot;
                     //console.log('deck', request.params.id);
                     //console.log('root_deck', request.query.root_deck);
-                    module.exports.getDeckTree({'params': {'id' : request.query.root_deck}}, (decktree) => {
+                    self.getDeckTree({
+                        'params': {'id' : request.query.root_deck},
+                        'log': request.log.bind(request),
+                    }, (decktree) => {
+                        if (decktree.isBoom) return reply(decktree);
+
                         deckDB.handleChange(decktree, request.params.id, request.query.root_deck, request.query.user).then((changeSet) => {
                             //console.log(changeSet);
                             if(!changeSet){
@@ -1157,12 +1272,6 @@ let self = module.exports = {
         }
 
 
-    },
-
-    findUserById: (id) => {
-        return userDB.findOneById((id), (err, found) => {
-            return found.username;
-        });
     },
 
     getAllRecent: (request, reply) => {
