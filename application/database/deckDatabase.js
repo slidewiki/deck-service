@@ -163,6 +163,32 @@ let self = module.exports = {
 
     },
 
+    // TODO properly implement a PATCH-like method for partial updates
+    replaceEditors: function(id, payload) {
+        let deckId = parseInt(id);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((decks) => {
+            return decks.findOne({ _id: deckId })
+            .then((existingDeck) => {
+                if (!_.isEmpty(payload.editors) ) {
+                    existingDeck.editors = payload.editors;
+                }
+
+                // TODO validation is BROKEN needs update here as well
+                // let valid = deckModel(deckRevision);
+                // if (!valid) {
+                //     throw deckModel.errors;
+                // }
+
+                return decks.findOneAndReplace( { _id: deckId }, existingDeck, { returnOriginal: false });
+            });
+
+        });
+
+    },
+
     update: function(id, deck) {    //when no new revision is needed..
         // return helper.connectToDatabase()
         // .then((db) => db.collection('decks'))

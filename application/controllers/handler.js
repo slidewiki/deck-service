@@ -1222,8 +1222,8 @@ let self = module.exports = {
             // TODO for now all subdecks should have the same owner, so no further authorization required
             return deckDB.getSubdeckIds(deckId).then((subdeckIds) => {
                 async.eachSeries(subdeckIds, (subdeckId, done) => {
-                    // #update accepts strings
-                    deckDB.update(subdeckId.toString(), request.payload)
+                    // #replaceEditors accepts string for deck id
+                    deckDB.replaceEditors(subdeckId.toString(), request.payload)
                     .then((replaced) => {
                         if (replaced.ok !== 1) {
                             done(replaced);
