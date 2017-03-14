@@ -458,8 +458,7 @@ let self = module.exports = {
     },
 
     addToUsage: function(itemToAdd, root_deck_path){
-        console.log('itemToAdd', itemToAdd);
-        console.log('root_deck_path', root_deck_path);
+
         let itemId = itemToAdd.ref.id;
         let itemRevision = itemToAdd.ref.revision;
         let usageToPush = {id: parseInt(root_deck_path[0]), revision: parseInt(root_deck_path[1])};
@@ -832,7 +831,7 @@ let self = module.exports = {
             //reverse in order to iterate from bottom to top
             flatDeckArray.reverse();
             //feed the array for serial processing
-
+            console.log('flatDeckArray', flatDeckArray);
 
             let new_decks = [];
             return new Promise(function(resolve, reject) {
@@ -848,6 +847,7 @@ let self = module.exports = {
                 },function(err){
                     //iterate the flat decktree and copy each deck, referring to the new ids in its content items and usage
                     async.eachSeries(flatDeckArray, function(next_deck, callback){
+                        console.log('next_deck', next_deck);
                         return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
                         .then((db2) => db2.collection('decks'))
                         .then((col) => {
@@ -876,22 +876,22 @@ let self = module.exports = {
                                 else{
                                     copiedDeck.datasource = null;
                                 }
-                                copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
+                                //copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
                                 copiedDeck.revisions = [found.revisions[ind]];
-
+                                copiedDeck.revisions[0].parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
                                         if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
-                                            copiedDeck.revisions[0].contentItems[i].ref.id = id_map[j].split('-')[0];
-                                            copiedDeck.revisions[0].contentItems[i].ref.revision = id_map[j].split('-')[1];
+                                            copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
+                                            copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
                                         }
                                     }
                                 }
                                 for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
                                     for(let j in id_map){
                                         if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                            copiedDeck.revisions[0].usage[i].id = id_map[j].split('-')[0];
-                                            copiedDeck.revisions[0].usage[i].revision = id_map[j].split('-')[1];
+                                            copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                            copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
                                         }
                                     }
                                 }
@@ -906,6 +906,7 @@ let self = module.exports = {
                                         continue;
                                     }
                                 }
+
                                 new_decks.push(copiedDeck);
                                 col.insertOne(copiedDeck);
                                 callback();
