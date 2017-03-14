@@ -91,7 +91,7 @@ let self = module.exports = {
             .then((db2) => db2.collection('decks'))
             .then((col) => {
                 let valid = false;
-                deck._id = newId;                
+                deck._id = newId;
                 if(typeof deck.root_deck === 'undefined'){
                     deck.root_deck = null;
                 }
@@ -458,6 +458,8 @@ let self = module.exports = {
     },
 
     addToUsage: function(itemToAdd, root_deck_path){
+        console.log('itemToAdd', itemToAdd);
+        console.log('root_deck_path', root_deck_path);
         let itemId = itemToAdd.ref.id;
         let itemRevision = itemToAdd.ref.revision;
         let usageToPush = {id: parseInt(root_deck_path[0]), revision: parseInt(root_deck_path[1])};
@@ -893,6 +895,17 @@ let self = module.exports = {
                                         }
                                     }
                                 }
+                                for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                    let nextSlide = copiedDeck.revisions[0].contentItems[i];
+                                    if(nextSlide.kind === 'slide'){
+                                        let root_deck_path = [copiedDeck._id, '1'];
+                                        //console.log('outside root_deck_path', root_deck_path);
+                                        module.exports.addToUsage(nextSlide, root_deck_path);
+                                    }
+                                    else{
+                                        continue;
+                                    }
+                                }
                                 new_decks.push(copiedDeck);
                                 col.insertOne(copiedDeck);
                                 callback();
@@ -900,7 +913,7 @@ let self = module.exports = {
                         });
                     },
                     function(err2){
-                        resolve(new_decks);
+                        resolve(id_map);
                     });
                 });
             });
