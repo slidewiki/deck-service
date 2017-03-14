@@ -69,13 +69,13 @@ let self = module.exports = {
                 throw inserted;
             else{
                 //deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'slide');
-                let content = inserted.ops[0].revisions[0].content, user = request.payload.user, slideId = inserted.ops[0]._id+'-'+1;
+                let content = inserted.ops[0].revisions[0].content, slideId = inserted.ops[0]._id+'-'+1;
                 if(content === ''){
                     content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
                     //for now we use hardcoded template for new slides
                     content = slidetemplate;
                 }
-                createThumbnail(content, slideId, user);
+                createThumbnail(content, slideId);
 
                 reply(co.rewriteID(inserted.ops[0]));
             }
@@ -123,13 +123,13 @@ let self = module.exports = {
 
                             deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide');
                             newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
-                            let content = newSlide.revisions[0].content, user = request.payload.user, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
+                            let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
                             if(content === ''){
                                 content = '<h2>'+newSlide.revisions[0].title+'</h2>';
                                 //for now we use hardcoded template for new slides
                                 content = slidetemplate;
                             }
-                            createThumbnail(content, newSlideId, user);
+                            createThumbnail(content, newSlideId);
                             if(changeset && changeset.hasOwnProperty('target_deck')){
                                 changeset.new_revisions.push(newSlideId);
                                 newSlide.changeset = changeset;
@@ -343,14 +343,14 @@ let self = module.exports = {
                         //   deckDB.insertNewContentItem(inserted.ops[0], request.payload.position, request.payload.root_deck, 'deck');
                         reply(co.rewriteID(inserted.ops[0]));
                     });
-                    let content = newSlide.content, user = inserted.ops[0].user, slideId = insertedSlide.ops[0].id+'-'+1;
+                    let content = newSlide.content, slideId = insertedSlide.ops[0].id+'-'+1;
                     if(content === ''){
                         content = '<h2>'+newSlide.title+'</h2>';
                         //for now we use hardcoded template for new slides
                         content = slidetemplate;
                     }
 
-                    createThumbnail(content, slideId, user);
+                    createThumbnail(content, slideId);
                 });
                 //check if a root deck is defined, if yes, update its content items to reflect the new sub-deck
 
@@ -1506,19 +1506,15 @@ let self = module.exports = {
 
 };
 
-function createThumbnail(slideContent, slideId, user) {
+function createThumbnail(slideContent, slideId) {
     let rp = require('request-promise-native');
     let he = require('he');
 
     let encodedContent = he.encode(slideContent, {allowUnsafeSymbols: true});
 
     rp.post({
-        uri: Microservices.image.uri + '/thumbnail',
-        body: JSON.stringify({
-            userID: String(user),
-            html: encodedContent,
-            filename: slideId
-        }),
+        uri: Microservices.file.uri + '/slideThumbnail/' + slideId,
+        body: encodedContent
     }).catch((e) => {
         console.log('problem with request thumb: ' + e.message);
     });
