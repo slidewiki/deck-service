@@ -913,7 +913,7 @@ let self = module.exports = {
                         });
                     },
                     function(err2){
-                        resolve(id_map);
+                        resolve({'root_deck': id_map[res.id], 'id_map': id_map});
                     });
                 });
             });
