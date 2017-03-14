@@ -1195,10 +1195,16 @@ let self = module.exports = {
             if (!deck) return reply(boom.notFound());
 
             // keep only the id in the response object
-            // TODO specify the final API response schema
+            // TODO fetch extra info from user service
             let editors = deck.editors || { users: [], groups: [] };
-            editors.users = (editors.users || []).map((u) => ({id: u.id}) );
-            editors.groups = (editors.groups || []).map((g) => ({id: g.id}) );
+            editors.users = (editors.users || []).map((u) => ({
+                id: u.id,
+                joined: u.joined,
+            }) );
+            editors.groups = (editors.groups || []).map((g) => ({
+                id: g.id,
+                joined: g.joined,
+            }) );
 
             // we also need the implicit editors (AKA contributors)...
             deckDB.getDeckEditors(deckId)

@@ -151,10 +151,15 @@ module.exports = function(server) {
                         users: Joi.array().items(
                             Joi.object().keys({
                                 id: Joi.number(),
+                                joined: Joi.string(),
+                                name: Joi.string(),
+                                picture: Joi.string().allow(''),
                             })),
                         groups: Joi.array().items(
                             Joi.object().keys({
                                 id: Joi.number(),
+                                joined: Joi.string(),
+                                name: Joi.string(),
                             })),
                     }),
                 }),
@@ -178,14 +183,11 @@ module.exports = function(server) {
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number().required(),
-                            name: Joi.string(),
-                            joined: Joi.string()
+                            joined: Joi.string().required(),
                         })).default([]),
                         users: Joi.array().items(Joi.object().keys({
                             id: Joi.number().required(),
-                            username: Joi.string(),
-                            joined: Joi.string(),
-                            picture: Joi.string().allow('')
+                            joined: Joi.string().required(),
                         })).default([])
                     }).required(),
                 }),
