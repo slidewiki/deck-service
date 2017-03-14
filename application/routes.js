@@ -329,7 +329,7 @@ module.exports = function(server) {
                             joined: Joi.string()
                         })).default([]),
                         users: Joi.array().items(Joi.object().keys({
-                            userid: Joi.number(),
+                            id: Joi.number(),
                             username: Joi.string(),
                             joined: Joi.string(),
                             picture: Joi.string().allow('')
