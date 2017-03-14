@@ -211,6 +211,10 @@ let self = module.exports = {
 
                 const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
                 deckWithNewRevision.timestamp = existingDeck.timestamp;
+
+                // TODO remove this once migration process is fixed and/or revised
+                if (deckWithNewRevision.timestamp instanceof Date) deckWithNewRevision.timestamp = deckWithNewRevision.timestamp.toISOString();
+
                 deckWithNewRevision.user = existingDeck.user;
 
                 deckWithNewRevision.origin = existingDeck.origin;
