@@ -1,3 +1,4 @@
+/* eslint-env mocha */
 /* eslint dot-notation: 0, no-unused-vars: 0 */
 'use strict';
 
