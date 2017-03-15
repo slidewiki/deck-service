@@ -75,7 +75,7 @@ let self = module.exports = {
                     //for now we use hardcoded template for new slides
                     content = slidetemplate;
                 }
-                //createThumbnail(content, slideId, user);
+                createThumbnail(content, slideId, user);
 
                 reply(co.rewriteID(inserted.ops[0]));
             }
@@ -129,7 +129,7 @@ let self = module.exports = {
                                 //for now we use hardcoded template for new slides
                                 content = slidetemplate;
                             }
-                            //createThumbnail(content, newSlideId, user);
+                            createThumbnail(content, newSlideId, user);
                             if(changeset && changeset.hasOwnProperty('target_deck')){
                                 changeset.new_revisions.push(newSlideId);
                                 newSlide.changeset = changeset;
@@ -350,7 +350,7 @@ let self = module.exports = {
                         content = slidetemplate;
                     }
 
-                    //createThumbnail(content, slideId, user);
+                    createThumbnail(content, slideId, user);
                 });
                 //check if a root deck is defined, if yes, update its content items to reflect the new sub-deck
 
