@@ -579,7 +579,7 @@ module.exports = function(server) {
     });
 
     server.route({
-        method: 'PUT',
+        method: 'POST',
         path: '/deck/{id}/tags',
         handler: handlers.updateTags,
         config: {

@@ -1096,74 +1096,88 @@ let self = module.exports = {
         });
     },
 
-    getTags(deck_id){
+    getTags(deckId){
 
-        let revision_id = -1;
-        let decktreesplit = deck_id.split('-');
+        let revisionId = -1;
+        let decktreesplit = deckId.split('-');
         if(decktreesplit.length > 1){
-            deck_id = decktreesplit[0];
-            revision_id = decktreesplit[1]-1;
+            deckId = decktreesplit[0];
+            revisionId = decktreesplit[1]-1;
         }
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
-            return col.findOne({_id: parseInt(deck_id)})
+            return col.findOne({_id: parseInt(deckId)})
             .then((deck) => {
-                if(revision_id === -1){
-                    revision_id = deck.active-1;
+
+                if(!deck) return;
+
+                if(revisionId === -1){
+                    revisionId = getActiveRevision(deck);
                 }
 
-                return Promise.resolve(deck.revisions[revision_id].tags);
-            }).catch( (err) => {
-                return Promise.reject(err);
+                if(!deck.revisions[revisionId]) return;
+
+                return deck.revisions[revisionId].tags;
             });
         });
     },
 
-    addTag: function(deck_id, tagName) {
-        let revision_id = -1;
-        let decktreesplit = deck_id.split('-');
+    addTag: function(deckId, tagName) {
+        let revisionId = -1;
+        let decktreesplit = deckId.split('-');
         if(decktreesplit.length > 1){
-            deck_id = decktreesplit[0];
-            revision_id = decktreesplit[1]-1;
+            deckId = decktreesplit[0];
+            revisionId = decktreesplit[1]-1;
         }
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
-            return col.findOne({_id: parseInt(deck_id)})
+            return col.findOne({_id: parseInt(deckId)})
             .then((deck) => {
-                if(revision_id === -1){
-                    revision_id = deck.active-1;
+
+                if(!deck) return;
+
+                if(revisionId === -1){
+                    revisionId = getActiveRevision(deck);
                 }
 
-                deck.revisions[revision_id].tags.push({ tagName: tagName });
+                if(!deck.revisions[revisionId]) return;
+
+                deck.revisions[revisionId].tags.push({ tagName: tagName });
                 col.save(deck);
-                return Promise.resolve(deck.revisions[revision_id].tags);
+                return deck.revisions[revisionId].tags;
             });
         });
     },
 
-    removeTag: function(deck_id, tagName){
-        let revision_id = -1;
-        let decktreesplit = deck_id.split('-');
+    removeTag: function(deckId, tagName){
+        let revisionId = -1;
+        let decktreesplit = deckId.split('-');
         if(decktreesplit.length > 1){
-            deck_id = decktreesplit[0];
-            revision_id = decktreesplit[1]-1;
+            deckId = decktreesplit[0];
+            revisionId = decktreesplit[1]-1;
         }
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
-            return col.findOne({_id: parseInt(deck_id)})
+            return col.findOne({_id: parseInt(deckId)})
             .then((deck) => {
-                if(revision_id === -1){
-                    revision_id = deck.active-1;
-                }
 
-                deck.revisions[revision_id].tags = deck.revisions[revision_id].tags.filter( (el) => {
+                if(!deck) return;
+
+                if(revisionId === -1){
+                    revisionId = getActiveRevision(deck);
+                }
+                
+                if(!deck.revisions[revisionId]) return;
+
+                deck.revisions[revisionId].tags = deck.revisions[revisionId].tags.filter( (el) => {
                     return el.tagName !== tagName;
                 });
+
                 col.save(deck);
-                return Promise.resolve(deck.revisions[revision_id].tags);
+                return deck.revisions[revisionId].tags;
             });
         });
     }

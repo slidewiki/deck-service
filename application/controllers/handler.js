@@ -1465,19 +1465,26 @@ let self = module.exports = {
 
     getTags: function(request, reply){
         deckDB.getTags(request.params.id).then( (tagsList) => {
+            if(!tagsList){
+                reply(boom.notFound());
+            }
+
             reply(tagsList);
         }).catch( (err) => {
             request.log(err);
-            reply(boom.notFound);
+            reply(boom.badImplementation());
         });
     },
 
     updateTags: function(request, reply) {
-        let deckId = request.params.id;
-        let operation = (request.payload.operation === 'add') ? deckDB.addTag : deckDB.removeTag;
+        let operation = (request.payload.operation === 'add') ? deckDB.addTag.bind(deckDB) : deckDB.removeTag.bind(deckDB);
 
-        operation(encodeURIComponent(deckId), request.payload.tagName).then( (replaced) => {
-            reply(replaced);
+        operation(request.params.id, request.payload.tagName).then( (tagsList) => {
+            if(!tagsList){
+                reply(boom.notFound());
+            }
+
+            reply(tagsList);
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
