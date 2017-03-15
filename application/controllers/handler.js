@@ -100,7 +100,7 @@ let self = module.exports = {
             'log': request.log.bind(request),
         }
         ,(changeset) => {
-            if (changeset.isBoom) return reply(changeset);
+            if (changeset && changeset.isBoom) return reply(changeset);
 
             //console.log('changeset', changeset);
             if (changeset && changeset.hasOwnProperty('fork_allowed')) {
@@ -427,7 +427,7 @@ let self = module.exports = {
                 'log': request.log.bind(request),
             }
             ,(changeset) => {
-                if (changeset.isBoom) return reply(changeset);
+                if (changeset && changeset.isBoom) return reply(changeset);
 
                 //console.log('changeset', changeset);
                 if (changeset && changeset.hasOwnProperty('fork_allowed')) {
@@ -630,7 +630,7 @@ let self = module.exports = {
                             'log': request.log.bind(request),
                         }
                         ,(changeset) => {
-                            if (changeset.isBoom) return reply(changeset);
+                            if (changeset && changeset.isBoom) return reply(changeset);
 
                           //console.log('changeset', changeset);
                             if (changeset && changeset.hasOwnProperty('fork_allowed')) {
@@ -689,7 +689,7 @@ let self = module.exports = {
                     'log': request.log.bind(request),
                 }
                 ,(changeset) => {
-                    if (changeset.isBoom) return reply(changeset);
+                    if (changeset && changeset.isBoom) return reply(changeset);
                   //console.log('changeset', changeset);
                     if (changeset && changeset.hasOwnProperty('fork_allowed')) {
                         if (changeset.fork_allowed === false) {
@@ -790,7 +790,7 @@ let self = module.exports = {
                         'log': request.log.bind(request),
                     }
                     ,(changeset) => {
-                        if (changeset.isBoom) return reply(changeset);
+                        if (changeset && changeset.isBoom) return reply(changeset);
 
                       //console.log('changeset', changeset);
                         if (changeset && changeset.hasOwnProperty('fork_allowed')) {
@@ -860,7 +860,7 @@ let self = module.exports = {
                     'log': request.log.bind(request),
                 }
                 ,(changeset) => {
-                    if (changeset.isBoom) return reply(changeset);
+                    if (changeset && changeset.isBoom) return reply(changeset);
 
                   //console.log('changeset', changeset);
                     if (changeset && changeset.hasOwnProperty('fork_allowed')) {
@@ -941,7 +941,7 @@ let self = module.exports = {
                 'log': request.log.bind(request),
             }
             ,(changeset) => {
-                if (changeset.isBoom) return reply(changeset);
+                if (changeset && changeset.isBoom) return reply(changeset);
 
               //console.log('changeset', changeset);
                 if (changeset && changeset.hasOwnProperty('fork_allowed')) {
@@ -1077,7 +1077,7 @@ let self = module.exports = {
             'log': request.log.bind(request),
         }
         ,(changeset) => {
-            if (changeset.isBoom) return reply(changeset);
+            if (changeset && changeset.isBoom) return reply(changeset);
 
           //console.log('changeset', changeset);
             if (changeset && changeset.hasOwnProperty('fork_allowed')) {
