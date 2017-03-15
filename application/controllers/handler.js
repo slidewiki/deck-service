@@ -155,7 +155,7 @@ let self = module.exports = {
                     reply(boom.badImplementation());
                 });
             });
-        }, request);
+        });
 
     },
 
@@ -467,7 +467,7 @@ let self = module.exports = {
                     request.log('error', error);
                     reply(boom.badImplementation());
                 });
-            }, request);
+            });
 
         }
         else{
@@ -652,7 +652,7 @@ let self = module.exports = {
                                 node.changeset = changeset;
                             }
                             reply(node);
-                        }, request);
+                        });
 
                     }
 
@@ -753,7 +753,7 @@ let self = module.exports = {
                     });
 
 
-                }, request);
+                });
 
             }
         }else{
@@ -825,7 +825,7 @@ let self = module.exports = {
                             }
                             reply(deckTree);
                         });
-                    }, request);
+                    });
 
 
                 });
@@ -919,7 +919,7 @@ let self = module.exports = {
                         });
                     });
 
-                }, request);
+                });
 
 
 
@@ -969,7 +969,7 @@ let self = module.exports = {
                     request.log('error', error);
                     reply(boom.badImplementation());
                 });
-            }, request);
+            });
 
         }else {
             let root_deck ;
@@ -1101,7 +1101,7 @@ let self = module.exports = {
                 }
                 reply(removed);
             });
-        }, request);
+        });
 
     },
 
@@ -1373,12 +1373,7 @@ let self = module.exports = {
         });
     },
 
-    handleChange: function(request, reply, actualRequest) {
-        // HACK
-        if (!actualRequest) {
-            actualRequest = request;
-        }
-
+    handleChange: function(request, reply) {
         //console.log(request.query);
         if(!request.params.id){
             reply();
@@ -1421,17 +1416,17 @@ let self = module.exports = {
                                 reply(changeSet);
                             }
                         }).catch((e) => {
-                            actualRequest.log(e);
+                            request.log('error', e);
                             reply(boom.badImplementation());
                         });
                     });
                 }).catch((err) => {
-                    actualRequest.log(err);
+                    request.log('error', err);
                     reply(boom.badImplementation());
                 });
 
             }).catch((error) => {
-                actualRequest.log(error);
+                request.log('error', error);
                 reply(boom.badImplementation());
             });
         }
