@@ -171,6 +171,7 @@ module.exports = {
                         }
                     }
                 }
+                console.log('previousUsageArray', previousUsageArray);
 
                 let valid = false;
                 //should empty usage array and keep only the new root deck revision
