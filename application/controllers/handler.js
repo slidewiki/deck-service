@@ -442,51 +442,11 @@ let self = module.exports = {
     },
 
     forkDeckRevision: function(request, reply) {
-        //NOTE shall the payload and/or response be cleaned or enhanced with values?
-        deckDB.get(encodeURIComponent(request.params.id)).then((existingDeck) => {
-            let ind = existingDeck.revisions.length-1;
-            let payload = {
-                title: existingDeck.revisions[ind].title,
-                description: existingDeck.description,
-                language: existingDeck.revisions[ind].language,
-                tags: existingDeck.revisions[ind].tags,
-                license: existingDeck.license,
-                user: request.payload.user,
-                fork: true
-            };
-            //console.log(payload);
-            deckDB.replace(encodeURIComponent(request.params.id), payload).then((replaced) => {
-                if (co.isEmpty(replaced.value))
-                    throw replaced;
-                else{
-                    deckDB.get(replaced.value._id).then((newDeck) => {
-                        newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
-                        reply(newDeck);
-                    });
-                }
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
-            });
+        //forks the deck revision by copying all of the decks in the decktree
+        deckDB.forkDeckRevision(encodeURIComponent(request.params.id), request.payload.user).then((id_map) => {
+            reply(id_map);
         });
-
     },
-
-    // revertDeckRevision: function(request, reply) {
-    //     deckDB.revert(encodeURIComponent(request.params.id), request.payload).then((reverted) => {
-    //         if (co.isEmpty(reverted))
-    //             throw reverted;
-    //         else{
-    //             if(reverted.value.deck !== null){
-    //                 deckDB.updateContentItem(reverted.value, parseInt(request.payload.revision_id), reverted.value.deck, 'deck');
-    //             }
-    //             reply(reverted);
-    //         }
-    //     }).catch((error) => {
-    //         request.log('error', error);
-    //         reply(boom.badImplementation());
-    //     });
-    // },
 
     revertDeckRevision: function(request, reply) {
         if(request.payload.root_deck === null || !request.payload.hasOwnProperty('root_deck') || request.payload.root_deck.split('-')[0] === request.params.id.split('-')[0] ){
@@ -1516,6 +1476,6 @@ function createThumbnail(slideContent, slideId) {
         uri: Microservices.file.uri + '/slideThumbnail/' + slideId,
         body: encodedContent
     }).catch((e) => {
-        console.log('problem with request thumb: ' + e.message);
+        console.log('Can not create thumbnail of a slide: ' + e.message);
     });
 }
