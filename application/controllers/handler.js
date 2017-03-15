@@ -1461,9 +1461,28 @@ let self = module.exports = {
                 reply(slideCount);
             }
         });
-    }
+    },
 
+    getTags: function(request, reply){
+        deckDB.getTags(request.params.id).then( (tagsList) => {
+            reply(tagsList);
+        }).catch( (err) => {
+            request.log(err);
+            reply(boom.notFound);
+        });
+    },
 
+    updateTags: function(request, reply) {
+        let deckId = request.params.id;
+        let operation = (request.payload.operation === 'add') ? deckDB.addTag : deckDB.removeTag;
+
+        operation(encodeURIComponent(deckId), request.payload.tagName).then( (replaced) => {
+            reply(replaced);
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
 };
 
 function createThumbnail(slideContent, slideId, user) {

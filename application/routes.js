@@ -561,4 +561,41 @@ module.exports = function(server) {
             description: 'Move a node (slide/deck) in a different position in the deck tree'
         }
     });
+
+    //------------------------------- Tag Routes -----------------------------//
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/tags',
+        handler: handlers.getTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Get tags of a deck'
+        }
+    });
+
+    server.route({
+        method: 'PUT',
+        path: '/deck/{id}/tags',
+        handler: handlers.updateTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                payload:
+                    Joi.object().keys({
+                        operation: Joi.string().valid('add', 'remove'),
+                        tagName: Joi.string()
+                    }).requiredKeys('operation', 'tagName'),
+            },
+            tags: ['api'],
+            description: 'Add/Remove a tag from a deck'
+        }
+    });
+
 };
