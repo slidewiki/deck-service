@@ -51,19 +51,19 @@ describe('Database', () => {
 
         it('should return the deck when inserting one', () => {
             let deck = {
-              'description': 'New Deck',
-              'language': 'en_EN',
-              'translation': {
-                'status': 'original'
-              },
-              'tags': [],
-              'title': 'New Deck',
-              'user': 1,
-              'abstract': '',
-              'comment': '',
-              'footer': '',
-              'license': 'CC0'
-          };
+                'description': 'New Deck',
+                'language': 'en_EN',
+                'translation': {
+                    'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
+            };
             let res = deckdb.insert(deck);
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
@@ -77,19 +77,19 @@ describe('Database', () => {
 
         it('should get a previously inserted deck', () => {
             let deck = {
-              'description': 'New Deck',
-              'language': 'en_EN',
-              'translation': {
-                'status': 'original'
-              },
-              'tags': [],
-              'title': 'New Deck',
-              'user': 1,
-              'abstract': '',
-              'comment': '',
-              'footer': '',
-              'license': 'CC0'
-          };
+                'description': 'New Deck',
+                'language': 'en_EN',
+                'translation': {
+                  'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
+            };
             let ins = deckdb.insert(deck);
             let res = ins.then((ins) => deckdb.get(ins.ops[0]._id));
             return Promise.all([
@@ -146,7 +146,21 @@ describe('Database', () => {
 
         it('should be able to replace an previously inserted deck', () => {
             let deck = {
-              'description': 'New Deck',
+                'description': 'New Deck',
+                'language': 'en_EN',
+                'translation': {
+                  'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
+            };
+            let deck2 = {
+              'description': 'New Deck Replaced',
               'language': 'en_EN',
               'translation': {
                 'status': 'original'
@@ -158,21 +172,7 @@ describe('Database', () => {
               'comment': '',
               'footer': '',
               'license': 'CC0'
-          };
-          let deck2 = {
-            'description': 'New Deck Replaced',
-            'language': 'en_EN',
-            'translation': {
-              'status': 'original'
-            },
-            'tags': [],
-            'title': 'New Deck',
-            'user': 1,
-            'abstract': '',
-            'comment': '',
-            'footer': '',
-            'license': 'CC0'
-        };
+            };
             let ins = deckdb.insert(deck);
             let res = ins.then((ins) => deckdb.replace(ins.ops[0]._id+'-1', deck2));
             return Promise.all([
