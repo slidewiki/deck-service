@@ -146,20 +146,22 @@ module.exports = function(server) {
                     contributors: Joi.array().items(
                         Joi.object().keys({
                             id: Joi.number(),
+                            name: Joi.string(),
+                            picture: Joi.string().allow(''),
                         })),
                     editors: Joi.object().keys({
                         users: Joi.array().items(
                             Joi.object().keys({
                                 id: Joi.number(),
-                                joined: Joi.string(),
                                 name: Joi.string(),
                                 picture: Joi.string().allow(''),
+                                joined: Joi.string().isoDate(),
                             })),
                         groups: Joi.array().items(
                             Joi.object().keys({
                                 id: Joi.number(),
-                                joined: Joi.string(),
                                 name: Joi.string(),
+                                joined: Joi.string().isoDate(),
                             })),
                     }),
                 }),
@@ -179,15 +181,15 @@ module.exports = function(server) {
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),
-                payload: Joi.object({
+                payload: Joi.object().keys({
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number().required(),
-                            joined: Joi.string().required(),
+                            joined: Joi.string().isoDate().required(),
                         })).default([]),
                         users: Joi.array().items(Joi.object().keys({
                             id: Joi.number().required(),
-                            joined: Joi.string().required(),
+                            joined: Joi.string().isoDate().required(),
                         })).default([])
                     }).required(),
                 }),

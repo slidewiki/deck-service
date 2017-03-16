@@ -22,11 +22,39 @@ const self = module.exports = {
         });
     },
 
+    // promises user public info for a list of user ids
+    fetchUserInfo: function(userIds) {
+        // return empty list if nothing provided
+        if (_.isEmpty(userIds)) {
+            return Promise.resolve([]);
+        }
+
+        return rp.post({
+            uri: `${Microservices.user.uri}/users`,
+            json: true,
+            body: userIds,
+        }).then(users => users.map((u) => ({id: u._id, name: u.username, picture: u.picture}) ) );
+    },
+
+    // promises group public info for a list of group ids (not the users in the groups)
+    fetchGroupInfo: function(groupIds) {
+        // return empty list if nothing provided
+        if (_.isEmpty(groupIds)) {
+            return Promise.resolve([]);
+        }
+
+        return rp.post({
+            uri: `${Microservices.user.uri}/usergroups`,
+            json: true,
+            body: groupIds,
+        }).then(groups => groups.map((g) => ({id: g.id, name: g.name}) ));
+    },
+
     // checks with the user service to collect the user ids for all groups in groupIds
     fetchUsersForGroups: function(groupIds) {
         // return empty list if nothing provided
         if (_.isEmpty(groupIds)) {
-            return Promise.resolve([]);;
+            return Promise.resolve([]);
         }
 
         return rp.post({

@@ -6,6 +6,8 @@ Handles the requests by executing stuff and replying to the client. Uses promise
 
 'use strict';
 
+const _ = require('lodash');
+
 const boom = require('boom'),
     slideDB = require('../database/slideDatabase'),
     deckDB = require('../database/deckDatabase'),
@@ -14,6 +16,8 @@ const boom = require('boom'),
     async = require('async'),
     Microservices = require('../configs/microservices'),
     config = require('../configuration');
+
+const userService = require('../services/user');
 
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
         '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;">'+
@@ -1264,26 +1268,42 @@ let self = module.exports = {
         .then((deck) => {
             if (!deck) return reply(boom.notFound());
 
-            // keep only the id in the response object
-            // TODO fetch extra info from user service
             let editors = deck.editors || { users: [], groups: [] };
-            editors.users = (editors.users || []).map((u) => ({
-                id: u.id,
-                joined: u.joined,
-            }) );
-            editors.groups = (editors.groups || []).map((g) => ({
-                id: g.id,
-                joined: g.joined,
-            }) );
+            // editors.users = _.map(editors.users || [], ['id', 'joined']);
+            editors.users = editors.users || [];
+            // editors.groups = _.map(editors.groups || [], ['id', 'joined']);
+            editors.groups = editors.groups || [];
 
-            // we also need the implicit editors (AKA contributors)...
-            deckDB.getDeckEditors(deckId)
-            .then((contributors) => {
-                contributors = contributors.map((id) => ({ id }) );
-                reply({ contributors,  editors });
+            return Promise.all([
+                userService.fetchUserInfo(_.map(editors.users, 'id'))
+                .then(userInfo => assignToAllById(editors.users, userInfo)),
+
+                userService.fetchGroupInfo(_.map(editors.groups, 'id'))
+                .then(groupInfo => assignToAllById(editors.groups, groupInfo)),
+
+                // we also need the implicit editors (AKA contributors)...
+                deckDB.getDeckEditors(deckId)
+                .then(contribIds => {
+                    return userService.fetchUserInfo(contribIds)
+                    .then(contribInfo => assignToAllById(contribIds.map((id) => ({ id }) ), contribInfo))
+                }),
+
+            ]).then(([users, groups, contributors]) => {
+                request.log('info', {
+                    contributors,
+                    editors: { users, groups }
+                });
+                reply({
+                    contributors,
+                    editors: { users, groups }
+                });
+
             });
 
-        }).catch((err) => reply(boom.badImplementation(err)) );
+        }).catch(err => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
 
     },
 
@@ -1664,6 +1684,17 @@ let self = module.exports = {
     },
 
 };
+
+// TODO move these to services / utility libs
+
+// updates the elements in original by assigning values from update using id property to match elements in arrays
+function assignToAllById(original, update) {
+    original.forEach((val) => {
+        // if not found does nothing :)
+        Object.assign(val, update.find(el => el.id === val.id) );
+    });
+    return original;
+}
 
 function createThumbnail(slideContent, slideId, user) {
     let rp = require('request-promise-native');
