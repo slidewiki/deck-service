@@ -1276,16 +1276,16 @@ let self = module.exports = {
 
             return Promise.all([
                 userService.fetchUserInfo(_.map(editors.users, 'id'))
-                .then(userInfo => assignToAllById(editors.users, userInfo)),
+                .then((userInfo) => assignToAllById(editors.users, userInfo)),
 
                 userService.fetchGroupInfo(_.map(editors.groups, 'id'))
-                .then(groupInfo => assignToAllById(editors.groups, groupInfo)),
+                .then((groupInfo) => assignToAllById(editors.groups, groupInfo)),
 
                 // we also need the implicit editors (AKA contributors)...
                 deckDB.getDeckEditors(deckId)
-                .then(contribIds => {
+                .then((contribIds) => {
                     return userService.fetchUserInfo(contribIds)
-                    .then(contribInfo => assignToAllById(contribIds.map((id) => ({ id }) ), contribInfo))
+                    .then((contribInfo) => assignToAllById(contribIds.map((id) => ({ id }) ), contribInfo));
                 }),
 
             ]).then(([users, groups, contributors]) => {
@@ -1300,7 +1300,7 @@ let self = module.exports = {
 
             });
 
-        }).catch(err => {
+        }).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -1691,7 +1691,7 @@ let self = module.exports = {
 function assignToAllById(original, update) {
     original.forEach((val) => {
         // if not found does nothing :)
-        Object.assign(val, update.find(el => el.id === val.id) );
+        Object.assign(val, update.find((el) => el.id === val.id) );
     });
     return original;
 }
