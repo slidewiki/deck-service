@@ -208,6 +208,24 @@ const deck = {
             format: 'datetime'
         },
         user: objectid,
+
+        // points to fork origin (only for forked decks)
+        origin: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'number',
+                },
+                revision: {
+                    type: 'number',
+                },
+                title: {
+                    type: 'string',
+                },
+            },
+            required: ['id', 'revision'],
+        },
+
         // kind: {
         //     type: 'string'
         // },
