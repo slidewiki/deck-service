@@ -570,11 +570,18 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string().regex(/[0-9]+/).description('Identifier of deck in the form: deckId-deckRevisionId')
                 },
             },
             tags: ['api'],
-            description: 'Get tags of a deck'
+            description: 'Get tags of a deck',
+            response: {
+                schema: Joi.array().items(
+                    Joi.object().keys({
+                        tagName: Joi.string()
+                    })
+                )
+            },
         }
     });
 
@@ -585,16 +592,25 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string().regex(/[0-9]+/).description('Identifier of deck in the form: deckId-deckRevisionId')
                 },
                 payload:
                     Joi.object().keys({
                         operation: Joi.string().valid('add', 'remove'),
-                        tagName: Joi.string()
-                    }).requiredKeys('operation', 'tagName'),
+                        tag: Joi.object().keys({
+                            tagName: Joi.string()
+                        }).requiredKeys('tagName')
+                    }).requiredKeys('operation', 'tag')
             },
             tags: ['api'],
-            description: 'Add/Remove a tag from a deck'
+            description: 'Add/Remove a tag from a deck',
+            response: {
+                schema: Joi.array().items(
+                    Joi.object().keys({
+                        tagName: Joi.string()
+                    })
+                )
+            },
         }
     });
 
@@ -605,11 +621,18 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string().regex(/[0-9]+-[0-9]+/).description('Identifier of slide in the form: slideId-slideRevisionId')
                 },
             },
             tags: ['api'],
-            description: 'Get tags of a slide'
+            description: 'Get tags of a slide',
+            response: {
+                schema: Joi.array().items(
+                    Joi.object().keys({
+                        tagName: Joi.string()
+                    })
+                )
+            },
         }
     });
 
@@ -620,16 +643,25 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string().regex(/[0-9]+-[0-9]+/).description('Identifier of slide in the form: slideId-slideRevisionId')
                 },
                 payload:
                     Joi.object().keys({
                         operation: Joi.string().valid('add', 'remove'),
-                        tagName: Joi.string()
-                    }).requiredKeys('operation', 'tagName'),
+                        tag: Joi.object().keys({
+                            tagName: Joi.string()
+                        }).requiredKeys('tagName')
+                    }).requiredKeys('operation', 'tag'),
             },
             tags: ['api'],
-            description: 'Add/Remove a tag from a slide'
+            description: 'Add/Remove a tag from a slide',
+            response: {
+                schema: Joi.array().items(
+                    Joi.object().keys({
+                        tagName: Joi.string()
+                    })
+                )
+            },
         }
     });
 

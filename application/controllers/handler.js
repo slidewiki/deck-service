@@ -1511,7 +1511,7 @@ let self = module.exports = {
     updateDeckTags: function(request, reply) {
         let operation = (request.payload.operation === 'add') ? deckDB.addTag.bind(deckDB) : deckDB.removeTag.bind(deckDB);
 
-        operation(request.params.id, request.payload.tagName).then( (tagsList) => {
+        operation(request.params.id, request.payload.tag).then( (tagsList) => {
             if(!tagsList){
                 reply(boom.notFound());
             }
@@ -1541,7 +1541,7 @@ let self = module.exports = {
     updateSlideTags: function(request, reply) {
         let operation = (request.payload.operation === 'add') ? slideDB.addTag.bind(slideDB) : slideDB.removeTag.bind(slideDB);
 
-        operation(request.params.id, request.payload.tagName).then( (tagsList) => {
+        operation(request.params.id, request.payload.tag).then( (tagsList) => {
             if(!tagsList){
                 reply(boom.notFound());
             }

@@ -1123,7 +1123,7 @@ let self = module.exports = {
         });
     },
 
-    addTag: function(deckId, tagName) {
+    addTag: function(deckId, tag) {
         let revisionId = -1;
         let decktreesplit = deckId.split('-');
         if(decktreesplit.length > 1){
@@ -1148,14 +1148,14 @@ let self = module.exports = {
                     deck.revisions[revisionId].tags = [];
                 }
 
-                deck.revisions[revisionId].tags.push({ tagName: tagName });
+                deck.revisions[revisionId].tags.push(tag);
                 col.save(deck);
                 return deck.revisions[revisionId].tags;
             });
         });
     },
 
-    removeTag: function(deckId, tagName){
+    removeTag: function(deckId, tag){
         let revisionId = -1;
         let decktreesplit = deckId.split('-');
         if(decktreesplit.length > 1){
@@ -1177,7 +1177,7 @@ let self = module.exports = {
                 if(!deck.revisions[revisionId]) return;
 
                 deck.revisions[revisionId].tags = (deck.revisions[revisionId].tags || []).filter( (el) => {
-                    return el.tagName !== tagName;
+                    return el.tagName !== tag.tagName;
                 });
 
                 col.save(deck);

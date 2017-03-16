@@ -388,7 +388,7 @@ module.exports = {
         });
     },
 
-    addTag: function(slideId, tagName) {
+    addTag: function(slideId, tag) {
         let revisionId = -1;
         let tokens = slideId.split('-');
         if(tokens.length > 1){
@@ -407,14 +407,14 @@ module.exports = {
                     slide.revisions[revisionId].tags = [];
                 }
 
-                slide.revisions[revisionId].tags.push({ tagName: tagName });
+                slide.revisions[revisionId].tags.push(tag);
                 col.save(slide);
                 return slide.revisions[revisionId].tags;
             });
         });
     },
 
-    removeTag: function(slideId, tagName){
+    removeTag: function(slideId, tag){
         let revisionId = -1;
         let tokens = slideId.split('-');
         if(tokens.length > 1){
@@ -430,9 +430,9 @@ module.exports = {
                 if(!slide || revisionId === -1 || !slide.revisions[revisionId]) return;
 
                 slide.revisions[revisionId].tags = (slide.revisions[revisionId].tags || []).filter( (el) => {
-                    return el.tagName !== tagName;
+                    return el.tagName !== tag.tagName;
                 });
-                
+
                 col.save(slide);
                 return slide.revisions[revisionId].tags;
             });
