@@ -407,7 +407,7 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
             dataSources: slide.dataSources,
             license: slide.license
         }]
-    };    
+    };
     return result;
 }
 
