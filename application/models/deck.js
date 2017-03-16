@@ -256,6 +256,24 @@ const deck = {
         //     enum: ['public', 'restricted', 'private']
         // },
         // editors: editors,
+
+        // points to fork origin (only for forked decks)
+        origin: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'number',
+                },
+                revision: {
+                    type: 'number',
+                },
+                title: {
+                    type: 'string',
+                },
+            },
+            required: ['id', 'revision'],
+        },
+
         // kind: {
         //     type: 'string'
         // },

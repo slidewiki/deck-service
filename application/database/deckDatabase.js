@@ -300,6 +300,9 @@ let self = module.exports = {
                 const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
                 deckWithNewRevision.timestamp = existingDeck.timestamp;
                 deckWithNewRevision.user = existingDeck.user;
+
+                deckWithNewRevision.origin = existingDeck.origin;
+
                 if(existingDeck.hasOwnProperty('contributors')){
                     let contributors = existingDeck.contributors;
                     let existingUserContributorIndex = findWithAttr(contributors, 'user', deck.user);
@@ -1036,6 +1039,11 @@ let self = module.exports = {
                                 let ind = parseInt(next_deck.split('-')[1])-1;
                                 let copiedDeck = {
                                     _id: id_noRev_map[found._id],
+                                    origin: {
+                                        id: found._id,
+                                        revision: found.revisions[ind].id,
+                                        title: found.revisions[ind].title,
+                                    },
                                     description: found.description,
                                     language: found.revisions[ind].language,
                                     tags: found.revisions[ind].tags,
@@ -1058,7 +1066,9 @@ let self = module.exports = {
                                 }
                                 //copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
                                 copiedDeck.revisions = [found.revisions[ind]];
-                                copiedDeck.revisions[0].parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
+                                // own the revision as well!
+                                copiedDeck.revisions[0].user = copiedDeck.user;
+
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
                                         if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
