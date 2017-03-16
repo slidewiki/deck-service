@@ -183,6 +183,45 @@ describe('Database', () => {
             ]);
         });
 
+        it('should be able to replace an previously inserted deck without a new revision', () => {
+            let deck = {
+                'description': 'New Deck',
+                'language': 'en_EN',
+                'translation': {
+                    'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
+            };
+            let deck2 = {
+                'description': 'New Deck Replaced',
+                'language': 'en_EN',
+                'translation': {
+                    'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
+            };
+            let ins = deckdb.insert(deck);
+            let res = ins.then((ins) => deckdb.update(ins.ops[0]._id+'-1', deck2));
+            return Promise.all([
+                res.should.be.fulfilled.and.eventually.not.be.empty,
+                //res.should.eventually.have.property('value').that.contains.all.keys('_id', 'language'),
+                //res.should.eventually.have.property('value').that.has.property('language', slide.language) // FIXME returns old object
+                //ins.then((slide) => res.should.eventually.have.deep.property('value._id', slide.ops[0]._id))//FIXME works, but fails because of .... santa
+            ]);
+        });
+
         it('should copy an existing slide', () => {
             let slide = {
                 title: 'Dummy',
@@ -272,5 +311,102 @@ describe('Database', () => {
                 res.should.be.fulfilled
             ]);
         });
+
+        it('should return the decktree of an existing deck', () => {
+            let deck = {
+                'description': 'New Deck',
+                'language': 'en_EN',
+                'translation': {
+                    'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
+            };
+            let ins = deckdb.insert(deck);
+            let res = ins.then((ins) => deckdb.getDeckTreeFromDB(ins.ops[0]._id+'-1'));
+            res.then((data) => console.log('resolved', data));
+            return Promise.all([
+                res.should.be.fulfilled.and.eventually.not.be.empty,
+                res.should.eventually.have.property('title').that.is.not.empty,
+                //res.should.eventually.have.deep.property('ops[0]').that.has.all.keys('_id', 'user'),
+                //res.should.eventually.have.deep.property('ops[0]', _id)
+            ]);
+        });
+
+        it('should return the active revision of an existing deck', () => {
+            let deck = {
+                'description': 'New Deck',
+                'language': 'en_EN',
+                'translation': {
+                    'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
+            };
+            let ins = deckdb.insert(deck);
+            let res = ins.then((ins) => deckdb.getActiveRevisionFromDB(ins.ops[0]._id+'-1'));
+            res.then((data) => console.log('resolved', data));
+            return Promise.all([
+                res.should.be.fulfilled.and.eventually.not.be.empty,
+                //res.should.eventually.have.deep.property('ops[0]').that.has.all.keys('_id', 'user'),
+                //res.should.eventually.have.deep.property('ops[0]', _id)
+            ]);
+        });
+
+        it('should rename an existing deck', () => {
+            let deck = {
+                'description': 'New Deck',
+                'language': 'en_EN',
+                'translation': {
+                    'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
+            };
+            let ins = deckdb.insert(deck);
+            let res = ins.then((ins) => deckdb.rename(ins.ops[0]._id+'-1', 'new name'));
+            return Promise.all([
+                res.should.be.fulfilled.and.eventually.not.be.empty,
+                res.should.eventually.have.property('value').that.is.not.empty
+            ]);
+        });
+
+        it('should insert a content item into an existing deck', () => {
+            let deck = {
+                'description': 'New Deck',
+                'language': 'en_EN',
+                'translation': {
+                    'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
+            };
+            let ins = deckdb.insert(deck);
+            let res = ins.then((ins) => deckdb.insertNewContentItem({id: '1'}, '2', ins.ops[0]._id+'-1', 'slide', '3'));
+            return Promise.all([
+                res.should.be.fulfilled
+            ]);
+        });
+    
     });
 });

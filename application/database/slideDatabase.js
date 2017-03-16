@@ -241,8 +241,7 @@ module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
               .then((existingSlide) => {
-                  //first remove usage of deck from old revision
-                  console.log('existingSlide', existingSlide);
+                  //first remove usage of deck from old revision                  
                   let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
                   for(let i = 0; i < usageArray.length; i++){
                       if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
