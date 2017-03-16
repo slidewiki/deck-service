@@ -367,7 +367,80 @@ module.exports = {
                 );
             });
         }
-    }
+    },
+
+    getTags(slideId){
+
+        let revisionId = -1;
+        let tokens = slideId.split('-');
+        if(tokens.length > 1){
+            slideId = tokens[0];
+            revisionId = tokens[1]-1;
+        }
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(slideId)})
+            .then((slide) => {
+
+                if(!slide || revisionId === -1 || !slide.revisions[revisionId])
+                    return;
+
+                return (slide.revisions[revisionId].tags || []);
+            });
+        });
+    },
+
+    addTag: function(slideId, tagName) {
+        let revisionId = -1;
+        let tokens = slideId.split('-');
+        if(tokens.length > 1){
+            slideId = tokens[0];
+            revisionId = tokens[1]-1;
+        }
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(slideId)})
+            .then((slide) => {
+
+                if(!slide || revisionId === -1 || !slide.revisions[revisionId]) return;
+
+                if(!slide.revisions[revisionId].tags){
+                    slide.revisions[revisionId].tags = [];
+                }
+
+                slide.revisions[revisionId].tags.push({ tagName: tagName });
+                col.save(slide);
+                return slide.revisions[revisionId].tags;
+            });
+        });
+    },
+
+    removeTag: function(slideId, tagName){
+        let revisionId = -1;
+        let tokens = slideId.split('-');
+        if(tokens.length > 1){
+            slideId = tokens[0];
+            revisionId = tokens[1]-1;
+        }
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(slideId)})
+            .then((slide) => {
+
+                if(!slide || revisionId === -1 || !slide.revisions[revisionId]) return;
+
+                slide.revisions[revisionId].tags = (slide.revisions[revisionId].tags || []).filter( (el) => {
+                    return el.tagName !== tagName;
+                });
+                
+                col.save(slide);
+                return slide.revisions[revisionId].tags;
+            });
+        });
+    },
 };
 
 function convertToNewSlide(slide) {

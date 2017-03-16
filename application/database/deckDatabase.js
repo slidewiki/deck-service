@@ -138,7 +138,7 @@ let self = module.exports = {
                 existingDeck.description = deck.description;
                 existingDeck.license = deck.license;
                 //add comment, abstract, footer
-                deckRevision.tags = deck.tags;
+                // deckRevision.tags = deck.tags;
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
                 try {
                     valid = deckModel(deckRevision);
@@ -1118,7 +1118,7 @@ let self = module.exports = {
 
                 if(!deck.revisions[revisionId]) return;
 
-                return deck.revisions[revisionId].tags;
+                return (deck.revisions[revisionId].tags || []);
             });
         });
     },
@@ -1143,6 +1143,10 @@ let self = module.exports = {
                 }
 
                 if(!deck.revisions[revisionId]) return;
+
+                if(!deck.revisions[revisionId].tags){
+                    deck.revisions[revisionId].tags = [];
+                }
 
                 deck.revisions[revisionId].tags.push({ tagName: tagName });
                 col.save(deck);
@@ -1169,10 +1173,10 @@ let self = module.exports = {
                 if(revisionId === -1){
                     revisionId = getActiveRevision(deck);
                 }
-                
+
                 if(!deck.revisions[revisionId]) return;
 
-                deck.revisions[revisionId].tags = deck.revisions[revisionId].tags.filter( (el) => {
+                deck.revisions[revisionId].tags = (deck.revisions[revisionId].tags || []).filter( (el) => {
                     return el.tagName !== tagName;
                 });
 
@@ -1180,7 +1184,8 @@ let self = module.exports = {
                 return deck.revisions[revisionId].tags;
             });
         });
-    }
+    },
+
 };
 
 

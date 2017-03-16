@@ -566,7 +566,7 @@ module.exports = function(server) {
     server.route({
         method: 'GET',
         path: '/deck/{id}/tags',
-        handler: handlers.getTags,
+        handler: handlers.getDeckTags,
         config: {
             validate: {
                 params: {
@@ -581,7 +581,7 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/deck/{id}/tags',
-        handler: handlers.updateTags,
+        handler: handlers.updateDeckTags,
         config: {
             validate: {
                 params: {
@@ -595,6 +595,41 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Add/Remove a tag from a deck'
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/tags',
+        handler: handlers.getSlideTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Get tags of a slide'
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/slide/{id}/tags',
+        handler: handlers.updateSlideTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                payload:
+                    Joi.object().keys({
+                        operation: Joi.string().valid('add', 'remove'),
+                        tagName: Joi.string()
+                    }).requiredKeys('operation', 'tagName'),
+            },
+            tags: ['api'],
+            description: 'Add/Remove a tag from a slide'
         }
     });
 
