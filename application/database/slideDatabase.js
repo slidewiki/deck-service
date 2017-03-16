@@ -192,36 +192,6 @@ module.exports = {
         });
     },
 
-    replaceNoRevision: function(id, slide) {
-        let idArray = id.split('-');
-
-        return helper.connectToDatabase()
-        .then((db) => db.collection('slides'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(idArray[0])})
-            .then((existingSlide) => {
-
-                let valid = false;
-                const slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(idArray[1]));
-
-                try {
-                    valid = slideModel(slideWithNewRevision);
-
-                    if (!valid) {
-                        return slideModel.errors;
-                    }
-                    slideWithNewRevision.revisions[0].usage = existingSlide.revisions[idArray[1]-1].usage;
-                    existingSlide.revisions[parseInt(idArray[1])-1] = slideWithNewRevision.revisions[0];
-                    col.save(existingSlide);
-                    return slideWithNewRevision;
-                } catch (e) {
-                    console.log('validation failed', e);
-                }
-                return;
-            });
-        });
-    },
-
     saveDataSources: function(id, dataSources) {
         let idArray = id.split('-');
 
@@ -263,31 +233,6 @@ module.exports = {
         }));
     },
 
-    revert: function(slide_id, slide){ //this can actually revert to past and future revisions
-        return helper.connectToDatabase()
-        .then((db) => db.collection('slides'))
-        .then((col) => {
-            col.findOne({_id: parseInt(slide_id)})
-            .then((existingSlide) => {
-                helper.connectToDatabase().collection('slides').findOne({_id: parseInt(existingSlide.deck)})
-                .then((root_deck) => {
-                    for(let i = 0; i < root_deck.revisions.length; i++) {
-                        if(root_deck.revisions[i].id === root_deck.active) {
-                            for(let j = 0; j < root_deck.revisions[i].contentItems.length; j++) {
-                                if(root_deck.revisions[i].contentItems[j].ref.id === String(slide_id)) {
-                                    root_deck.revisions[i].contentItems[j].ref.revision = parseInt(slide.revision_id);
-                                }
-                                else continue;
-                            }
-                        }
-                        else continue;
-                    }
-                    col.save(root_deck);
-                });
-            });
-        });
-    },
-
     updateUsage: function(slide, new_revision_id, root_deck){
         let idArray = slide.split('-');
         let rootDeckArray = root_deck.split('-');
@@ -297,6 +242,7 @@ module.exports = {
             return col.findOne({_id: parseInt(idArray[0])})
               .then((existingSlide) => {
                   //first remove usage of deck from old revision
+                  console.log('existingSlide', existingSlide);
                   let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
                   for(let i = 0; i < usageArray.length; i++){
                       if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){

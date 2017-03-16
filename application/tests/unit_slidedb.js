@@ -80,7 +80,7 @@ describe('Database', () => {
                 'description': 'New Deck',
                 'language': 'en_EN',
                 'translation': {
-                  'status': 'original'
+                    'status': 'original'
                 },
                 'tags': [],
                 'title': 'New Deck',
@@ -149,7 +149,7 @@ describe('Database', () => {
                 'description': 'New Deck',
                 'language': 'en_EN',
                 'translation': {
-                  'status': 'original'
+                    'status': 'original'
                 },
                 'tags': [],
                 'title': 'New Deck',
@@ -160,18 +160,18 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let deck2 = {
-              'description': 'New Deck Replaced',
-              'language': 'en_EN',
-              'translation': {
-                'status': 'original'
-              },
-              'tags': [],
-              'title': 'New Deck',
-              'user': 1,
-              'abstract': '',
-              'comment': '',
-              'footer': '',
-              'license': 'CC0'
+                'description': 'New Deck Replaced',
+                'language': 'en_EN',
+                'translation': {
+                    'status': 'original'
+                },
+                'tags': [],
+                'title': 'New Deck',
+                'user': 1,
+                'abstract': '',
+                'comment': '',
+                'footer': '',
+                'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
             let res = ins.then((ins) => deckdb.replace(ins.ops[0]._id+'-1', deck2));
@@ -180,6 +180,71 @@ describe('Database', () => {
                 //res.should.eventually.have.property('value').that.contains.all.keys('_id', 'language'),
                 //res.should.eventually.have.property('value').that.has.property('language', slide.language) // FIXME returns old object
                 //ins.then((slide) => res.should.eventually.have.deep.property('value._id', slide.ops[0]._id))//FIXME works, but fails because of .... santa
+            ]);
+        });
+
+        it('should copy an existing slide', () => {
+            let slide = {
+                title: 'Dummy',
+                content: 'dummy',
+                language: 'en',
+                license: 'CC0',
+                user: 1,
+                root_deck: '25-1'
+            };
+            let ins = db.insert(slide);
+            let res = ins.then((ins) => {ins.ops[0].parent = ins.ops[0]._id+'-1'; return db.copy(ins.ops[0], 0);});
+            //res.then((data) => console.log('resolved', data));
+            return Promise.all([
+                res.should.be.fulfilled.and.eventually.not.be.empty,
+                res.should.eventually.have.property('ops').that.is.not.empty,
+                //res.should.eventually.have.deep.property('ops[0]').that.has.all.keys('_id', 'language'),
+                //res.should.eventually.have.deep.property('ops[0].language', slide.language)
+            ]);
+        });
+
+        it('should rename an existing slide', () => {
+            let slide = {
+                title: 'Dummy',
+                content: 'dummy',
+                language: 'en',
+                license: 'CC0',
+                user: 1,
+                root_deck: '25-1'
+            };
+            let ins = db.insert(slide);
+            let res = ins.then((ins) => db.rename(ins.ops[0]._id+'-1', 'new name' ));
+            //res.then((data) => console.log('resolved', data));
+            return Promise.all([
+                res.should.be.fulfilled.and.eventually.not.be.empty,
+                res.should.eventually.have.property('value').that.is.not.empty,
+            ]);
+        });
+
+        it('should update usage of an existing slide', () => {
+            let slide = {
+                title: 'Dummy',
+                content: 'dummy',
+                language: 'en',
+                license: 'CC0',
+                user: 1,
+                root_deck: '25-1'
+            };
+            //let ins = db.insert(slide);
+            let slide2 = {
+                title: 'Dummy',
+                content: 'dummy',
+                language: 'en',
+                license: 'CC0',
+                user: 1,
+                root_deck: '25-1'
+            };
+            let ins = db.insert(slide);
+            let ins2 = ins.then((ins) => db.replace(ins.ops[0]._id+'-1', slide2));            
+            let res = ins2.then((ins2) => db.updateUsage(ins2.value._id+'-1','2', '25-1' ));
+            return Promise.all([
+                res.should.be.fulfilled.and.eventually.not.be.empty,
+                res.should.eventually.have.property('_id').that.is.not.empty,
             ]);
         });
     });
