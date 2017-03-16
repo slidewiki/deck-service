@@ -240,11 +240,36 @@ describe('Database', () => {
                 root_deck: '25-1'
             };
             let ins = db.insert(slide);
-            let ins2 = ins.then((ins) => db.replace(ins.ops[0]._id+'-1', slide2));            
+            let ins2 = ins.then((ins) => db.replace(ins.ops[0]._id+'-1', slide2));
             let res = ins2.then((ins2) => db.updateUsage(ins2.value._id+'-1','2', '25-1' ));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('_id').that.is.not.empty,
+            ]);
+        });
+
+        it('should add to usage of an existing slide', () => {
+            let slide = {
+                title: 'Dummy',
+                content: 'dummy',
+                language: 'en',
+                license: 'CC0',
+                user: 1,
+                root_deck: '25-1'
+            };
+            let ins = db.insert(slide);
+            let res = ins.then((ins) => {
+                let itemToAdd = {
+                    ref: {
+                        id:ins.ops[0]._id,
+                        revision: 1
+                    },
+                    kind: 'slide'
+                };
+                db.addToUsage(itemToAdd, [25,1] );});
+            //res.then((data) => console.log('resolved', data));
+            return Promise.all([
+                res.should.be.fulfilled
             ]);
         });
     });
