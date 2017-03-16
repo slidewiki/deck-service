@@ -99,7 +99,7 @@ let self = module.exports = {
             'log': request.log.bind(request),
         }
         ,(changeset) => {
-            if (changeset.isBoom) return reply(changeset);
+            if (changeset && changeset.isBoom) return reply(changeset);
 
             //console.log('changeset', changeset);
             if(changeset && changeset.hasOwnProperty('target_deck')){
@@ -390,7 +390,7 @@ let self = module.exports = {
                 'log': request.log.bind(request),
             }
             ,(changeset) => {
-                if (changeset.isBoom) return reply(changeset);
+                if (changeset && changeset.isBoom) return reply(changeset);
 
                 //console.log('changeset', changeset);
                 if(changeset && changeset.hasOwnProperty('target_deck')){
@@ -569,7 +569,7 @@ let self = module.exports = {
                             'log': request.log.bind(request),
                         }
                         ,(changeset) => {
-                            if (changeset.isBoom) return reply(changeset);
+                            if (changeset && changeset.isBoom) return reply(changeset);
 
                           //console.log('changeset', changeset);
                             if(changeset && changeset.hasOwnProperty('target_deck')){
@@ -622,7 +622,7 @@ let self = module.exports = {
                     'log': request.log.bind(request),
                 }
                 ,(changeset) => {
-                    if (changeset.isBoom) return reply(changeset);
+                    if (changeset && changeset.isBoom) return reply(changeset);
                   //console.log('changeset', changeset);
                     if(changeset && changeset.hasOwnProperty('target_deck')){
                       //revisioning took place, we must update root deck
@@ -717,7 +717,7 @@ let self = module.exports = {
                         'log': request.log.bind(request),
                     }
                     ,(changeset) => {
-                        if (changeset.isBoom) return reply(changeset);
+                        if (changeset && changeset.isBoom) return reply(changeset);
 
                       //console.log('changeset', changeset);
                         //parentID = request.payload.selector.id;
@@ -781,7 +781,7 @@ let self = module.exports = {
                     'log': request.log.bind(request),
                 }
                 ,(changeset) => {
-                    if (changeset.isBoom) return reply(changeset);
+                    if (changeset && changeset.isBoom) return reply(changeset);
 
                   //console.log('changeset', changeset);
                     if(changeset && changeset.hasOwnProperty('target_deck')){
@@ -856,7 +856,7 @@ let self = module.exports = {
                 'log': request.log.bind(request),
             }
             ,(changeset) => {
-                if (changeset.isBoom) return reply(changeset);
+                if (changeset && changeset.isBoom) return reply(changeset);
 
               //console.log('changeset', changeset);
                 if(changeset && changeset.hasOwnProperty('target_deck')){
@@ -986,7 +986,7 @@ let self = module.exports = {
             'log': request.log.bind(request),
         }
         ,(changeset) => {
-            if (changeset.isBoom) return reply(changeset);
+            if (changeset && changeset.isBoom) return reply(changeset);
 
           //console.log('changeset', changeset);
             if(changeset && changeset.hasOwnProperty('target_deck')){
@@ -1473,8 +1473,11 @@ function createThumbnail(slideContent, slideId) {
     let encodedContent = he.encode(slideContent, {allowUnsafeSymbols: true});
 
     rp.post({
-        uri: Microservices.file.uri + '/slideThumbnail/' + slideId,
-        body: encodedContent
+        uri: Microservices.file.uri + '/slideThumbnail/' + slideId, //is created as slideId.jpeg
+        body: encodedContent,
+        headers: {
+            'Content-Type': 'text/plain'
+        }
     }).catch((e) => {
         console.log('Can not create thumbnail of a slide: ' + e.message);
     });
