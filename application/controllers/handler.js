@@ -7,6 +7,7 @@ Handles the requests by executing stuff and replying to the client. Uses promise
 'use strict';
 
 const _ = require('lodash');
+const util = require('../lib/util');
 
 const boom = require('boom'),
     slideDB = require('../database/slideDatabase'),
@@ -1276,16 +1277,16 @@ let self = module.exports = {
 
             return Promise.all([
                 userService.fetchUserInfo(_.map(editors.users, 'id'))
-                .then((userInfo) => assignToAllById(editors.users, userInfo)),
+                .then((userInfo) => util.assignToAllById(editors.users, userInfo)),
 
                 userService.fetchGroupInfo(_.map(editors.groups, 'id'))
-                .then((groupInfo) => assignToAllById(editors.groups, groupInfo)),
+                .then((groupInfo) => util.assignToAllById(editors.groups, groupInfo)),
 
                 // we also need the implicit editors (AKA contributors)...
                 deckDB.getDeckEditors(deckId)
                 .then((contribIds) => {
                     return userService.fetchUserInfo(contribIds)
-                    .then((contribInfo) => assignToAllById(contribIds.map((id) => ({ id }) ), contribInfo));
+                    .then((contribInfo) => util.assignToAllById(contribIds.map((id) => ({ id }) ), contribInfo));
                 }),
 
             ]).then(([users, groups, contributors]) => {
@@ -1686,15 +1687,6 @@ let self = module.exports = {
 };
 
 // TODO move these to services / utility libs
-
-// updates the elements in original by assigning values from update using id property to match elements in arrays
-function assignToAllById(original, update) {
-    original.forEach((val) => {
-        // if not found does nothing :)
-        Object.assign(val, update.find((el) => el.id === val.id) );
-    });
-    return original;
-}
 
 function createThumbnail(slideContent, slideId, user) {
     let rp = require('request-promise-native');
