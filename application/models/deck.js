@@ -252,12 +252,6 @@ const deck = {
             type: 'array',
             items: deckRevision
         },
-        tags: {
-            type: 'array',
-            items: {
-                type: 'string'
-            }
-        },
         contributors: {
             type: 'array',
             items: {

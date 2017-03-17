@@ -3,6 +3,11 @@
 const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
+// TODO better organize joi validation models
+const apiModels = {};
+apiModels.tag = Joi.object().keys({
+    tagName: Joi.string(),
+}).requiredKeys('tagName');
 
 module.exports = function(server) {
 
@@ -162,7 +167,7 @@ module.exports = function(server) {
                     translation: Joi.object().keys({
                         status: Joi.string().valid('original', 'google', 'revised')
                     }),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
                     user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string().alphanum().lowercase(),
@@ -199,7 +204,7 @@ module.exports = function(server) {
                     description: Joi.string(),
                     language: Joi.string(),
                     translation: Joi.string().alphanum().lowercase(),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
                     user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string(),
@@ -331,7 +336,7 @@ module.exports = function(server) {
                     language: Joi.string(),
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
                 }).requiredKeys('user', 'content', 'root_deck', 'license'),
             },
@@ -366,7 +371,7 @@ module.exports = function(server) {
                     }),
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
@@ -574,11 +579,7 @@ module.exports = function(server) {
             tags: ['api'],
             description: 'Get tags of a deck',
             response: {
-                schema: Joi.array().items(
-                    Joi.object().keys({
-                        tagName: Joi.string()
-                    })
-                )
+                schema: Joi.array().items(apiModels.tag),
             },
         }
     });
@@ -595,19 +596,13 @@ module.exports = function(server) {
                 payload:
                     Joi.object().keys({
                         operation: Joi.string().valid('add', 'remove'),
-                        tag: Joi.object().keys({
-                            tagName: Joi.string()
-                        }).requiredKeys('tagName')
+                        tag: apiModels.tag,
                     }).requiredKeys('operation', 'tag')
             },
             tags: ['api'],
             description: 'Add/Remove a tag from a deck',
             response: {
-                schema: Joi.array().items(
-                    Joi.object().keys({
-                        tagName: Joi.string()
-                    })
-                )
+                schema: Joi.array().items(apiModels.tag),
             },
         }
     });
@@ -625,11 +620,7 @@ module.exports = function(server) {
             tags: ['api'],
             description: 'Get tags of a slide',
             response: {
-                schema: Joi.array().items(
-                    Joi.object().keys({
-                        tagName: Joi.string()
-                    })
-                )
+                schema: Joi.array().items(apiModels.tag),
             },
         }
     });
@@ -646,19 +637,13 @@ module.exports = function(server) {
                 payload:
                     Joi.object().keys({
                         operation: Joi.string().valid('add', 'remove'),
-                        tag: Joi.object().keys({
-                            tagName: Joi.string()
-                        }).requiredKeys('tagName')
+                        tag: apiModels.tag,
                     }).requiredKeys('operation', 'tag'),
             },
             tags: ['api'],
             description: 'Add/Remove a tag from a slide',
             response: {
-                schema: Joi.array().items(
-                    Joi.object().keys({
-                        tagName: Joi.string()
-                    })
-                )
+                schema: Joi.array().items(apiModels.tag),
             },
         }
     });

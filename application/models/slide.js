@@ -233,12 +233,6 @@ const slide = {
                 contributor
             }
         },
-        tags: {
-            type: 'array',
-            items: {
-                type: 'string'
-            }
-        },
         //active: objectid,
         datasource: {
             type: 'string'

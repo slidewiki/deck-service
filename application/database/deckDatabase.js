@@ -133,7 +133,7 @@ let self = module.exports = {
                 existingDeck.description = deck.description;
                 existingDeck.license = deck.license;
                 //add comment, abstract, footer
-                // deckRevision.tags = deck.tags;
+                deckRevision.tags = deck.tags;
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
                 try {
                     valid = deckModel(deckRevision);
