@@ -522,7 +522,7 @@ describe('Database', () => {
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 //res.should.eventually.have.property('root_deck').that.is.not.empty,
-                res.should.eventually.have.property('needsRevision'),
+                res.should.eventually.have.property('needs_revision'),
             ]);
         });
 
