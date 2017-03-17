@@ -3,6 +3,11 @@
 const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
+// TODO better organize joi validation models
+const apiModels = {};
+apiModels.tag = Joi.object().keys({
+    tagName: Joi.string(),
+}).requiredKeys('tagName');
 
 module.exports = function(server) {
 
@@ -309,7 +314,7 @@ module.exports = function(server) {
                     translation: Joi.object().keys({
                         status: Joi.string().valid('original', 'google', 'revised')
                     }),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
                     user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string().alphanum().lowercase(),
@@ -359,7 +364,7 @@ module.exports = function(server) {
                     description: Joi.string(),
                     language: Joi.string(),
                     translation: Joi.string().alphanum().lowercase(),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
                     user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string(),
@@ -491,7 +496,7 @@ module.exports = function(server) {
                     language: Joi.string(),
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
                 }).requiredKeys('user', 'content', 'root_deck', 'license'),
             },
@@ -500,11 +505,9 @@ module.exports = function(server) {
         }
     });
 
-// TODO Altered API from Alis proposal
     server.route({
         method: 'PUT',
-        path: '/slide/{id}',
-        //for now, no new revision on replace
+        path: '/slide/{id}',        
         handler: handlers.updateSlide,
         config: {
             validate: {
@@ -528,7 +531,7 @@ module.exports = function(server) {
                     }),
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
@@ -721,4 +724,88 @@ module.exports = function(server) {
             description: 'Move a node (slide/deck) in a different position in the deck tree'
         }
     });
+
+    //------------------------------- Tag Routes -----------------------------//
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/tags',
+        handler: handlers.getDeckTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                },
+            },
+            tags: ['api'],
+            description: 'Get tags of a deck',
+            response: {
+                schema: Joi.array().items(apiModels.tag),
+            },
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/deck/{id}/tags',
+        handler: handlers.updateDeckTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                },
+                payload:
+                    Joi.object().keys({
+                        operation: Joi.string().valid('add', 'remove'),
+                        tag: apiModels.tag,
+                    }).requiredKeys('operation', 'tag')
+            },
+            tags: ['api'],
+            description: 'Add/Remove a tag from a deck',
+            response: {
+                schema: Joi.array().items(apiModels.tag),
+            },
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/tags',
+        handler: handlers.getSlideTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                },
+            },
+            tags: ['api'],
+            description: 'Get tags of a slide',
+            response: {
+                schema: Joi.array().items(apiModels.tag),
+            },
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/slide/{id}/tags',
+        handler: handlers.updateSlideTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                },
+                payload:
+                    Joi.object().keys({
+                        operation: Joi.string().valid('add', 'remove'),
+                        tag: apiModels.tag,
+                    }).requiredKeys('operation', 'tag'),
+            },
+            tags: ['api'],
+            description: 'Add/Remove a tag from a slide',
+            response: {
+                schema: Joi.array().items(apiModels.tag),
+            },
+        }
+    });
+
 };
