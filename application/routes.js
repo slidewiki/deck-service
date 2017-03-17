@@ -559,4 +559,108 @@ module.exports = function(server) {
             description: 'Move a node (slide/deck) in a different position in the deck tree'
         }
     });
+
+    //------------------------------- Tag Routes -----------------------------//
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/tags',
+        handler: handlers.getDeckTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                },
+            },
+            tags: ['api'],
+            description: 'Get tags of a deck',
+            response: {
+                schema: Joi.array().items(
+                    Joi.object().keys({
+                        tagName: Joi.string()
+                    })
+                )
+            },
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/deck/{id}/tags',
+        handler: handlers.updateDeckTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                },
+                payload:
+                    Joi.object().keys({
+                        operation: Joi.string().valid('add', 'remove'),
+                        tag: Joi.object().keys({
+                            tagName: Joi.string()
+                        }).requiredKeys('tagName')
+                    }).requiredKeys('operation', 'tag')
+            },
+            tags: ['api'],
+            description: 'Add/Remove a tag from a deck',
+            response: {
+                schema: Joi.array().items(
+                    Joi.object().keys({
+                        tagName: Joi.string()
+                    })
+                )
+            },
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/tags',
+        handler: handlers.getSlideTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                },
+            },
+            tags: ['api'],
+            description: 'Get tags of a slide',
+            response: {
+                schema: Joi.array().items(
+                    Joi.object().keys({
+                        tagName: Joi.string()
+                    })
+                )
+            },
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/slide/{id}/tags',
+        handler: handlers.updateSlideTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                },
+                payload:
+                    Joi.object().keys({
+                        operation: Joi.string().valid('add', 'remove'),
+                        tag: Joi.object().keys({
+                            tagName: Joi.string()
+                        }).requiredKeys('tagName')
+                    }).requiredKeys('operation', 'tag'),
+            },
+            tags: ['api'],
+            description: 'Add/Remove a tag from a slide',
+            response: {
+                schema: Joi.array().items(
+                    Joi.object().keys({
+                        tagName: Joi.string()
+                    })
+                )
+            },
+        }
+    });
+
 };

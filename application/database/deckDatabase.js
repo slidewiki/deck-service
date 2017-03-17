@@ -133,7 +133,7 @@ let self = module.exports = {
                 existingDeck.description = deck.description;
                 existingDeck.license = deck.license;
                 //add comment, abstract, footer
-                deckRevision.tags = deck.tags;
+                // deckRevision.tags = deck.tags;
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
                 try {
                     valid = deckModel(deckRevision);
@@ -1023,10 +1023,98 @@ let self = module.exports = {
                 });
             });
         });
-    }
+    },
+
+    getTags(deckIdParam){
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deckId)})
+            .then((deck) => {
+
+                if(!deck) return;
+
+                if(revisionId === null){
+                    revisionId = getActiveRevision(deck);
+                }
+
+                if(!deck.revisions[revisionId]) return;
+
+                return (deck.revisions[revisionId].tags || []);
+            });
+        });
+    },
+
+    addTag: function(deckIdParam, tag) {
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deckId)})
+            .then((deck) => {
+
+                if(!deck) return;
+
+                if(revisionId === null){
+                    revisionId = getActiveRevision(deck);
+                }
+
+                if(!deck.revisions[revisionId]) return;
+
+                if(!deck.revisions[revisionId].tags){
+                    deck.revisions[revisionId].tags = [];
+                }
+
+                deck.revisions[revisionId].tags.push(tag);
+                col.save(deck);
+                return deck.revisions[revisionId].tags;
+            });
+        });
+    },
+
+    removeTag: function(deckIdParam, tag){
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deckId)})
+            .then((deck) => {
+
+                if(!deck) return;
+
+                if(revisionId === null){
+                    revisionId = getActiveRevision(deck);
+                }
+
+                if(!deck.revisions[revisionId]) return;
+
+                deck.revisions[revisionId].tags = (deck.revisions[revisionId].tags || []).filter( (el) => {
+                    return el.tagName !== tag.tagName;
+                });
+
+                col.save(deck);
+                return deck.revisions[revisionId].tags;
+            });
+        });
+    },
+
 };
 
+// split deck id given as parameter to deck id and revision id
+function splitDeckIdParam(deckId){
+    let revisionId = null;
+    let decktreesplit = deckId.split('-');
+    if(decktreesplit.length > 1){
+        deckId = decktreesplit[0];
+        revisionId = decktreesplit[1]-1;
+    }
 
+    return {deckId, revisionId};
+}
 
 function findDeckInDeckTree(decktree, deck, path){
     if (decktree) {
