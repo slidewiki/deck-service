@@ -340,11 +340,9 @@ module.exports = function(server) {
         }
     });
 
-// TODO Altered API from Alis proposal
     server.route({
         method: 'PUT',
-        path: '/slide/{id}',
-        //for now, no new revision on replace
+        path: '/slide/{id}',        
         handler: handlers.updateSlide,
         config: {
             validate: {

@@ -33,9 +33,6 @@ module.exports = {
                     found.revisions = [revision];
                     return found;
                 }
-                // revision.id = identifier;
-                // revision.kind = 'slide';
-                // return revision;
             }
         }).catch((error) => {
             throw error;
@@ -43,7 +40,7 @@ module.exports = {
 
     },
 
-    getAll: function(identifier) { //TODO Darya: is this function in use?
+    getAll: function(identifier) {
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => col.find({ content_id: String(oid(identifier)) }))//TODO use id TODO cast to String?
@@ -68,7 +65,6 @@ module.exports = {
     },
 
     insert: function(slide) {
-        //TODO check for root and parent deck ids to be existant, otherwise create these
         return helper.connectToDatabase()
         .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
         .then((newId) => {
@@ -80,18 +76,16 @@ module.exports = {
                 try {
                     const convertedSlide = convertToNewSlide(slide);
                     valid = slideModel(convertedSlide);
-                    // console.log('validated slidemodel', valid);
                     if (!valid) {
                         return slideModel.errors;
                     }
-                    //create thumbnail here
 
                     return col.insertOne(convertedSlide);
                 } catch (e) {
                     console.log('validation failed', e);
                 }
                 return;
-            }); //id is created and concatinated automatically
+            });
         });
     },
 
@@ -119,14 +113,6 @@ module.exports = {
                 revisionCopied.timestamp = timestamp;
                 slide.revisions = [revisionCopied];
                 slide.timestamp = timestamp;
-                // let contributors = slide.contributors;
-                // let existingUserContributorIndex = findWithAttr(contributors, 'user', slide.user);
-                // if(existingUserContributorIndex > -1)
-                //     contributors[existingUserContributorIndex].count++;
-                // else{
-                //     contributors.push({'user': slide.user, 'count': 1});
-                // }
-                // slide.contributors = contributors;
                 delete slide.parent;
                 delete slide.comment;
                 try {
@@ -135,7 +121,7 @@ module.exports = {
                     console.log('validation failed', e);
                 }
                 return;
-            }); //id is created and concatinated automatically
+            });
         });
     },
 
@@ -159,7 +145,6 @@ module.exports = {
                 //we should remove the usage of the previous revision in the root deck
                 let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
                 if(slide.root_deck){
-                    //console.log(slide.root_deck);
 
                     for(let i = 0; i < previousUsageArray.length; i++){
                         if(previousUsageArray[i].id === parseInt(slide.root_deck.split('-')[0]) && previousUsageArray[i].revision === parseInt(slide.root_deck.split('-')[1])){
@@ -168,7 +153,6 @@ module.exports = {
                         }
                     }
                 }
-                console.log('previousUsageArray', previousUsageArray);
 
                 let valid = false;
                 //should empty usage array and keep only the new root deck revision
@@ -199,38 +183,7 @@ module.exports = {
                     slideWithNewRevision.revisions = new_revisions;
                     return col.findOneAndUpdate({
                         _id: parseInt(id)
-                    //}, { $push: { revisions: slideWithNewRevision.revisions[0] } }, {new: true});
                     }, { $set: slideWithNewRevision }, {new: true});
-                } catch (e) {
-                    console.log('validation failed', e);
-                }
-                return;
-            });
-        });
-    },
-
-    replaceNoRevision: function(id, slide) {
-        let idArray = id.split('-');
-
-        return helper.connectToDatabase()
-        .then((db) => db.collection('slides'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(idArray[0])})
-            .then((existingSlide) => {
-
-                let valid = false;
-                const slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(idArray[1]));
-
-                try {
-                    valid = slideModel(slideWithNewRevision);
-
-                    if (!valid) {
-                        return slideModel.errors;
-                    }
-                    slideWithNewRevision.revisions[0].usage = existingSlide.revisions[idArray[1]-1].usage;
-                    existingSlide.revisions[parseInt(idArray[1])-1] = slideWithNewRevision.revisions[0];
-                    col.save(existingSlide);
-                    return slideWithNewRevision;
                 } catch (e) {
                     console.log('validation failed', e);
                 }
@@ -280,33 +233,6 @@ module.exports = {
         }));
     },
 
-    revert: function(slide_id, slide){ //this can actually revert to past and future revisions
-        //NOTE must add validation on id
-        return helper.connectToDatabase()
-        .then((db) => db.collection('slides'))
-        .then((col) => {
-            col.findOne({_id: parseInt(slide_id)})
-            .then((existingSlide) => {
-                helper.connectToDatabase().collection('slides').findOne({_id: parseInt(existingSlide.deck)})
-                .then((root_deck) => {
-                    //console.log(root_deck);
-                    for(let i = 0; i < root_deck.revisions.length; i++) {
-                        if(root_deck.revisions[i].id === root_deck.active) {
-                            for(let j = 0; j < root_deck.revisions[i].contentItems.length; j++) {
-                                if(root_deck.revisions[i].contentItems[j].ref.id === String(slide_id)) {
-                                    root_deck.revisions[i].contentItems[j].ref.revision = parseInt(slide.revision_id);
-                                }
-                                else continue;
-                            }
-                        }
-                        else continue;
-                    }
-                    col.save(root_deck);
-                });
-            });
-        });
-    },
-
     updateUsage: function(slide, new_revision_id, root_deck){
         let idArray = slide.split('-');
         let rootDeckArray = root_deck.split('-');
@@ -315,7 +241,7 @@ module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
               .then((existingSlide) => {
-                  //first remove usage of deck from old revision
+                  //first remove usage of deck from old revision                  
                   let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
                   for(let i = 0; i < usageArray.length; i++){
                       if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
@@ -333,7 +259,6 @@ module.exports = {
                   }
                   if(!contains)
                       existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
-                  //existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
                   col.save(existingSlide);
                   return existingSlide;
               });
@@ -441,7 +366,6 @@ function splitSlideIdParam(slideId){
 
 function convertToNewSlide(slide) {
     let now = new Date();
-    //let root_deck = String(slide.root_deck.split('-')[0]); //we should put the deck revision in the usage as well...
     slide.user = parseInt(slide.user);
     let root_deck_array = slide.root_deck.split('-');
     let usageArray = [];
@@ -456,8 +380,6 @@ function convertToNewSlide(slide) {
     const result = {
         _id: slide._id,
         user: slide.user,
-        //kind: 'slide',
-        //deck: String(slide.root_deck.split('-')[0]),
         timestamp: now.toISOString(),
         lastUpdate: now.toISOString(),
         language: slide.language,
@@ -477,7 +399,6 @@ function convertToNewSlide(slide) {
             license: slide.license,
         }]
     };
-    //console.log('from', slide, 'to', result);
     return result;
 }
 
@@ -488,9 +409,6 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
         slide.language = 'en_EN';
     }
     const result = {
-        //user: slide.user,
-        //deck: slide.root_deck,
-        //timestamp: now.toISOString(),
         lastUpdate: now.toISOString(),
         language: slide.language,
         license: slide.license,
@@ -505,10 +423,8 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
             tags: slide.tags,
             dataSources: slide.dataSources,
             license: slide.license
-            //parent: slide.parent_slide
         }]
     };
-    //console.log('from', slide, 'to', result);
     return result;
 }
 
