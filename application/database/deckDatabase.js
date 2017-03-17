@@ -110,7 +110,8 @@ let self = module.exports = {
         });
     },
 
-    update: function(id, deck) {    //when no new revision is needed..
+    //updates a deck's metadata when no new revision is needed
+    update: function(id, deck) {
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -151,6 +152,7 @@ let self = module.exports = {
         });
     },
 
+    //renames a deck
     rename: function(deck_id, newName){
         let deckId = deck_id.split('-')[0];
         return helper.connectToDatabase()
@@ -162,7 +164,7 @@ let self = module.exports = {
         }));
     },
 
-
+    //updates a deck by creating a new revision
     replace: function(id, deck) {
         let idArray = String(id).split('-');
         if(idArray.length > 1){
@@ -265,6 +267,7 @@ let self = module.exports = {
         });
     },
 
+    //inserts a content item (slide or deck) into a deck at the specified position, or appends it at the end if no position is given
     insertNewContentItem: function(citem, position, root_deck, ckind, citem_revision_id){
         if(typeof citem_revision_id === 'undefined'){
             citem_revision_id = parseInt(1);
@@ -323,6 +326,7 @@ let self = module.exports = {
 
     },
 
+    //removes (unlinks) a content item from a given deck
     removeContentItem: function(position, root_deck){
         let root_deck_path = root_deck.split('-');
         return helper.connectToDatabase()
@@ -349,6 +353,7 @@ let self = module.exports = {
         });
     },
 
+    //removes an item from the usage of a given deck
     removeFromUsage: function(itemToRemove, root_deck_path){
         let itemId = itemToRemove.ref.id;
         let itemRevision = itemToRemove.ref.revision;
@@ -392,6 +397,7 @@ let self = module.exports = {
         }
     },
 
+    //adds an item to the usage of a given deck
     addToUsage: function(itemToAdd, root_deck_path){
 
         let itemId = itemToAdd.ref.id;
@@ -419,6 +425,7 @@ let self = module.exports = {
         }
     },
 
+    //updates an existing content item's revision
     updateContentItem: function(citem, revertedRevId, root_deck, ckind){ //can be used for reverting or updating
         let rootArray = root_deck.split('-');
         return helper.connectToDatabase()
@@ -454,7 +461,7 @@ let self = module.exports = {
         });
     },
 
-
+    //reverts a deck's active revision to a new given one
     revert: function(deck_id, deck){ //this can actually revert to past and future revisions
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
@@ -562,6 +569,7 @@ let self = module.exports = {
         });
     },
 
+    //returns the username of a user by the user's id (why is this here?)
     getUsernameById: function(user_id){
         return helper.connectToDatabase()
         .then((db) => db.collection('users'))
@@ -577,6 +585,7 @@ let self = module.exports = {
         );
     },
 
+    //returns a flattened structure of a deck's slides, and optionally its sub-decks
     getFlatSlidesFromDB: function(deck_id, deckTree, return_decks){
 
         let revision_id = -1;
@@ -634,6 +643,7 @@ let self = module.exports = {
         });
     },
 
+    //returns a flattened structure of a deck's sub-decks
     getFlatDecksFromDB: function(deck_id, deckTree){
 
         let revision_id = -1;
@@ -685,6 +695,7 @@ let self = module.exports = {
         });
     },
 
+    //returns an implicit list of editors of a given deck
     getDeckEditors(deck_id, editorsList){
 
         let revision_id = -1;
@@ -742,6 +753,7 @@ let self = module.exports = {
         });
     },
 
+    //forks a given deck revision by copying all of its sub-decks into new decks
     forkDeckRevision(deck_id, user){
 
         return module.exports.getFlatDecksFromDB(deck_id)
@@ -845,6 +857,7 @@ let self = module.exports = {
         });
     },
 
+    //checks if a new revision is needed
     needsNewRevision(deck, user){
         return self.getDeckEditors(deck).then((editorsList) => {
             if(editorsList.includes(parseInt(user))){
@@ -862,6 +875,7 @@ let self = module.exports = {
         });
     },
 
+    //performs recursive revisioning up to the top-most deck that is not owned/editable by the user
     handleChange(decktree, deck, root_deck, user_id){
         if(!root_deck){
             return new Promise(function(resolve, reject) {
@@ -1137,7 +1151,7 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
             footer: deck.footer,
             contentItems: content_items
         }]
-    };    
+    };
     return result;
 }
 
