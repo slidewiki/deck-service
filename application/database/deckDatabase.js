@@ -1096,14 +1096,9 @@ let self = module.exports = {
         });
     },
 
-    getTags(deckId){
+    getTags(deckIdParam){
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
 
-        let revisionId = -1;
-        let decktreesplit = deckId.split('-');
-        if(decktreesplit.length > 1){
-            deckId = decktreesplit[0];
-            revisionId = decktreesplit[1]-1;
-        }
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -1112,7 +1107,7 @@ let self = module.exports = {
 
                 if(!deck) return;
 
-                if(revisionId === -1){
+                if(revisionId === null){
                     revisionId = getActiveRevision(deck);
                 }
 
@@ -1123,13 +1118,9 @@ let self = module.exports = {
         });
     },
 
-    addTag: function(deckId, tag) {
-        let revisionId = -1;
-        let decktreesplit = deckId.split('-');
-        if(decktreesplit.length > 1){
-            deckId = decktreesplit[0];
-            revisionId = decktreesplit[1]-1;
-        }
+    addTag: function(deckIdParam, tag) {
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -1138,7 +1129,7 @@ let self = module.exports = {
 
                 if(!deck) return;
 
-                if(revisionId === -1){
+                if(revisionId === null){
                     revisionId = getActiveRevision(deck);
                 }
 
@@ -1155,13 +1146,9 @@ let self = module.exports = {
         });
     },
 
-    removeTag: function(deckId, tag){
-        let revisionId = -1;
-        let decktreesplit = deckId.split('-');
-        if(decktreesplit.length > 1){
-            deckId = decktreesplit[0];
-            revisionId = decktreesplit[1]-1;
-        }
+    removeTag: function(deckIdParam, tag){
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -1170,7 +1157,7 @@ let self = module.exports = {
 
                 if(!deck) return;
 
-                if(revisionId === -1){
+                if(revisionId === null){
                     revisionId = getActiveRevision(deck);
                 }
 
@@ -1188,7 +1175,17 @@ let self = module.exports = {
 
 };
 
+// split deck id given as parameter to deck id and revision id
+function splitDeckIdParam(deckId){
+    let revisionId = null;
+    let decktreesplit = deckId.split('-');
+    if(decktreesplit.length > 1){
+        deckId = decktreesplit[0];
+        revisionId = decktreesplit[1]-1;
+    }
 
+    return {deckId, revisionId};
+}
 
 function findDeckInDeckTree(decktree, deck, path){
     if (decktree) {

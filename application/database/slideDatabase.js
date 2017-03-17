@@ -366,21 +366,16 @@ module.exports = {
         }
     },
 
-    getTags(slideId){
+    getTags(slideIdParam){
+        let {slideId, revisionId} = splitSlideIdParam(slideIdParam);
 
-        let revisionId = -1;
-        let tokens = slideId.split('-');
-        if(tokens.length > 1){
-            slideId = tokens[0];
-            revisionId = tokens[1]-1;
-        }
         return helper.connectToDatabase()
         .then((db) => db.collection('slides'))
         .then((col) => {
             return col.findOne({_id: parseInt(slideId)})
             .then((slide) => {
 
-                if(!slide || revisionId === -1 || !slide.revisions[revisionId])
+                if(!slide || revisionId === null || !slide.revisions[revisionId])
                     return;
 
                 return (slide.revisions[revisionId].tags || []);
@@ -388,20 +383,16 @@ module.exports = {
         });
     },
 
-    addTag: function(slideId, tag) {
-        let revisionId = -1;
-        let tokens = slideId.split('-');
-        if(tokens.length > 1){
-            slideId = tokens[0];
-            revisionId = tokens[1]-1;
-        }
+    addTag: function(slideIdParam, tag) {
+        let {slideId, revisionId} = splitSlideIdParam(slideIdParam);
+
         return helper.connectToDatabase()
         .then((db) => db.collection('slides'))
         .then((col) => {
             return col.findOne({_id: parseInt(slideId)})
             .then((slide) => {
 
-                if(!slide || revisionId === -1 || !slide.revisions[revisionId]) return;
+                if(!slide || revisionId === null || !slide.revisions[revisionId]) return;
 
                 if(!slide.revisions[revisionId].tags){
                     slide.revisions[revisionId].tags = [];
@@ -414,20 +405,16 @@ module.exports = {
         });
     },
 
-    removeTag: function(slideId, tag){
-        let revisionId = -1;
-        let tokens = slideId.split('-');
-        if(tokens.length > 1){
-            slideId = tokens[0];
-            revisionId = tokens[1]-1;
-        }
+    removeTag: function(slideIdParam, tag){
+        let {slideId, revisionId} = splitSlideIdParam(slideIdParam);
+
         return helper.connectToDatabase()
         .then((db) => db.collection('slides'))
         .then((col) => {
             return col.findOne({_id: parseInt(slideId)})
             .then((slide) => {
 
-                if(!slide || revisionId === -1 || !slide.revisions[revisionId]) return;
+                if(!slide || revisionId === null || !slide.revisions[revisionId]) return;
 
                 slide.revisions[revisionId].tags = (slide.revisions[revisionId].tags || []).filter( (el) => {
                     return el.tagName !== tag.tagName;
@@ -439,6 +426,18 @@ module.exports = {
         });
     },
 };
+
+// split slide id given as parameter to slide id and revision id
+function splitSlideIdParam(slideId){
+    let revisionId = null;
+    let tokens = slideId.split('-');
+    if(tokens.length > 1){
+        slideId = tokens[0];
+        revisionId = tokens[1]-1;
+    }
+
+    return {slideId, revisionId};
+}
 
 function convertToNewSlide(slide) {
     let now = new Date();
