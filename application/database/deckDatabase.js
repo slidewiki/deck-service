@@ -120,14 +120,14 @@ let self = module.exports = {
                     const convertedDeck = convertToNewDeck(deck);
                     valid = deckModel(convertedDeck);
                     if (!valid) {
-                        return deckModel.errors;
+                        throw deckModel.errors;
                     }
 
                     return col.insertOne(convertedDeck);
                 } catch (e) {
                     console.log('validation failed', e);
+                    throw e;
                 }
-                return;
             });
         });
     },
@@ -397,6 +397,22 @@ let self = module.exports = {
                 if(root_deck_path.length > 1){
                     activeRevisionId = root_deck_path[1];
                 }
+
+                // copy edit rights from existingDeck to new
+                if (ckind === 'deck') {
+                    let attachedDeckId = `${parseInt(citem.id)}-${citem_revision_id}`;
+                    self.get(attachedDeckId).then((attachedDeck) => {
+                        // check if owner is the same, should be the same for now
+                        // TODO this might need to change in the future
+                        if (attachedDeck.user !== existingDeck.user) return;
+
+                        return self.deepReplaceEditors(attachedDeckId, { editors: existingDeck.editors });
+                    }).catch((err) => {
+                        console.warn(`could not properly set edit rights for ${attachedDeckId} when adding it to ${root_deck}; error was: ${err}`);
+                    });
+                }
+                // TODO some async updates happening here, need to handle errors to avoid data corruption
+
                 if(position && position > 0){
                     let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
                     for(let i = position-1; i < citems.length; i++){

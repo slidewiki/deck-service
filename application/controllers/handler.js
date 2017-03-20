@@ -345,11 +345,11 @@ let self = module.exports = {
                     }
                 }
                 //insert the slide into the database
-                slideDB.insert(newSlide)
+                return slideDB.insert(newSlide)
                 .then((insertedSlide) => {
                     insertedSlide.ops[0].id = insertedSlide.ops[0]._id;
                     //update the content items of the new deck to contain the new slide
-                    deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide')
+                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide')
                     .then((insertedContentItem) => {
                         reply(co.rewriteID(inserted.ops[0]));
                     });
@@ -361,6 +361,8 @@ let self = module.exports = {
                         content = slidetemplate;
                     }
                     createThumbnail(content, slideId);
+
+                    return insertPromise;
                 });
             }
         }).catch((error) => {
