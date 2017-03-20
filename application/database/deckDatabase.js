@@ -269,13 +269,14 @@ let self = module.exports = {
                 let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
 
                 if(deck.root_deck){
+                    let root_deck_array = deck.root_deck.split('-');
                     for(let i = 0; i < previousUsageArray.length; i++){
-                        if(previousUsageArray[i].id === parseInt(deck.root_deck.split('-')[0]) && previousUsageArray[i].revision === parseInt(deck.root_deck.split('-')[1])){
+                        if(previousUsageArray[i].id === parseInt(root_deck_array[0]) && previousUsageArray[i].revision === parseInt(root_deck_array[1])){
                             previousUsageArray.splice(i,1);
                             break;
                         }
                     }
-                    usageArray = [{'id':parseInt(deck.root_deck.split('-')[0]), 'revision': parseInt(deck.root_deck.split('-')[1])}];
+                    usageArray = [{'id':parseInt(root_deck_array[0]), 'revision': parseInt(root_deck_array[1])}];
                 }
 
                 let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
@@ -1007,6 +1008,7 @@ let self = module.exports = {
                                 // own the revision as well!
                                 copiedDeck.revisions[0].user = copiedDeck.user;
 
+                                copiedDeck.revisions[0].id = 1;
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
                                         if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
