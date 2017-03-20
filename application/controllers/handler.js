@@ -1216,30 +1216,12 @@ let self = module.exports = {
             if (userId !== deck.user) return reply(boom.forbidden());
 
             // TODO for now all subdecks should have the same owner, so no further authorization required
-            return deckDB.getSubdeckIds(deckId).then((subdeckIds) => {
-                async.eachSeries(subdeckIds, (subdeckId, done) => {
-                    // #replaceEditors accepts string for deck id
-                    deckDB.replaceEditors(subdeckId.toString(), request.payload)
-                    .then((replaced) => {
-                        if (replaced.ok !== 1) {
-                            done(replaced);
-                        } else {
-                            done();
-                        }
-                    });
+            return deckDB.deepReplaceEditors(deckId, request.payload).then(() => reply());  
 
-                }, (error) => {
-                    if (error) {
-                        request.log('error', error);
-                        reply(boom.badImplementation(error));
-                    } else {
-                        reply();
-                    }
-                });
-
-            });
-
-        }).catch((err) => reply(boom.badImplementation(err)) );
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
 
     },
 

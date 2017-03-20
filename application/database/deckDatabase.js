@@ -178,6 +178,35 @@ let self = module.exports = {
 
     },
 
+    // same as replaceEditors, but applied to all subdecks under deck `id`
+    deepReplaceEditors: function(deckId, payload) {
+        // getSubdeckIds includes self (deckId)
+        return self.getSubdeckIds(deckId)
+        .then((subdeckIds) => {
+            if (!subdeckIds) return;
+
+            return new Promise((resolve, reject) => {
+                async.eachSeries(subdeckIds, (subdeckId, done) => {
+                    // #replaceEditors accepts string for deck id
+                    self.replaceEditors(subdeckId.toString(), payload)
+                    .then((replaced) => {
+                        if (replaced.ok !== 1) {
+                            done(replaced);
+                        } else {
+                            done();
+                        }
+                    });
+                }, (error) => {
+                    if (error) {
+                        reject(error);
+                    }  else {
+                        resolve();
+                    }
+                });
+            });
+        });
+    },
+
     //updates a deck's metadata when no new revision is needed
     update: function(id, deck) {
         return helper.connectToDatabase()
