@@ -289,8 +289,80 @@ module.exports = {
                 );
             });
         }
-    }
+    },
+
+    getTags(slideIdParam){
+        let {slideId, revisionId} = splitSlideIdParam(slideIdParam);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(slideId)})
+            .then((slide) => {
+
+                if(!slide || revisionId === null || !slide.revisions[revisionId])
+                    return;
+
+                return (slide.revisions[revisionId].tags || []);
+            });
+        });
+    },
+
+    addTag: function(slideIdParam, tag) {
+        let {slideId, revisionId} = splitSlideIdParam(slideIdParam);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(slideId)})
+            .then((slide) => {
+
+                if(!slide || revisionId === null || !slide.revisions[revisionId]) return;
+
+                if(!slide.revisions[revisionId].tags){
+                    slide.revisions[revisionId].tags = [];
+                }
+
+                slide.revisions[revisionId].tags.push(tag);
+                col.save(slide);
+                return slide.revisions[revisionId].tags;
+            });
+        });
+    },
+
+    removeTag: function(slideIdParam, tag){
+        let {slideId, revisionId} = splitSlideIdParam(slideIdParam);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('slides'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(slideId)})
+            .then((slide) => {
+
+                if(!slide || revisionId === null || !slide.revisions[revisionId]) return;
+
+                slide.revisions[revisionId].tags = (slide.revisions[revisionId].tags || []).filter( (el) => {
+                    return el.tagName !== tag.tagName;
+                });
+
+                col.save(slide);
+                return slide.revisions[revisionId].tags;
+            });
+        });
+    },
 };
+
+// split slide id given as parameter to slide id and revision id
+function splitSlideIdParam(slideId){
+    let revisionId = null;
+    let tokens = slideId.split('-');
+    if(tokens.length > 1){
+        slideId = tokens[0];
+        revisionId = tokens[1]-1;
+    }
+
+    return {slideId, revisionId};
+}
 
 function convertToNewSlide(slide) {
     let now = new Date();

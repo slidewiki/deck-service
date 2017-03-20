@@ -1361,6 +1361,66 @@ let self = module.exports = {
                 reply(slideCount);
             }
         });
+    },
+
+    getDeckTags: function(request, reply){
+        deckDB.getTags(request.params.id).then( (tagsList) => {
+            if(!tagsList){
+                reply(boom.notFound());
+            }
+            else{
+                reply(tagsList);
+            }
+        }).catch( (err) => {
+            request.log(err);
+            reply(boom.badImplementation());
+        });
+    },
+
+    updateDeckTags: function(request, reply) {
+        let operation = (request.payload.operation === 'add') ? deckDB.addTag.bind(deckDB) : deckDB.removeTag.bind(deckDB);
+
+        operation(request.params.id, request.payload.tag).then( (tagsList) => {
+            if(!tagsList){
+                reply(boom.notFound());
+            }
+            else{
+                reply(tagsList);
+            }
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
+    getSlideTags: function(request, reply){
+        slideDB.getTags(request.params.id).then( (tagsList) => {
+            if(!tagsList){
+                reply(boom.notFound());
+            }
+            else{
+                reply(tagsList);
+            }
+        }).catch( (err) => {
+            request.log(err);
+            reply(boom.badImplementation());
+        });
+    },
+
+    updateSlideTags: function(request, reply) {
+        let operation = (request.payload.operation === 'add') ? slideDB.addTag.bind(slideDB) : slideDB.removeTag.bind(slideDB);
+
+        operation(request.params.id, request.payload.tag).then( (tagsList) => {
+            if(!tagsList){
+                reply(boom.notFound());
+            }
+            else{
+                reply(tagsList);
+            }
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
     }
 };
 

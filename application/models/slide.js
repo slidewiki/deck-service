@@ -105,8 +105,14 @@ const slideRevision = {
         tags: {
             type: 'array',
             items: {
-                type: 'string'
-            }
+                type: 'object',
+                properties: {
+                    tagName: {
+                        type: 'string',
+                    },
+                    // TODO add other properties as well in sync with the tag-service
+                },
+            },
         },
         media: {
             type: 'array',
@@ -225,12 +231,6 @@ const slide = {
             type: 'array',
             items: {
                 contributor
-            }
-        },
-        tags: {
-            type: 'array',
-            items: {
-                type: 'string'
             }
         },
         //active: objectid,

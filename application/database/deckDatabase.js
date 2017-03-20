@@ -212,7 +212,14 @@ let self = module.exports = {
 
                 const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
                 deckWithNewRevision.timestamp = existingDeck.timestamp;
+
+                // TODO remove this once migration process is fixed and/or revised
+                if (deckWithNewRevision.timestamp instanceof Date) deckWithNewRevision.timestamp = deckWithNewRevision.timestamp.toISOString();
+
                 deckWithNewRevision.user = existingDeck.user;
+
+                deckWithNewRevision.origin = existingDeck.origin;
+
                 if(existingDeck.hasOwnProperty('contributors')){
                     let contributors = existingDeck.contributors;
                     let existingUserContributorIndex = findWithAttr(contributors, 'user', deck.user);
@@ -793,6 +800,11 @@ let self = module.exports = {
                                 let ind = parseInt(next_deck.split('-')[1])-1;
                                 let copiedDeck = {
                                     _id: id_noRev_map[found._id],
+                                    origin: {
+                                        id: found._id,
+                                        revision: found.revisions[ind].id,
+                                        title: found.revisions[ind].title,
+                                    },
                                     description: found.description,
                                     language: found.revisions[ind].language,
                                     tags: found.revisions[ind].tags,
@@ -816,7 +828,8 @@ let self = module.exports = {
                                 //copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
                                 copiedDeck.revisions = [found.revisions[ind]];
                                 copiedDeck.revisions[0].id = 1;
-                                copiedDeck.revisions[0].parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
+                                // own the revision as well!
+                                copiedDeck.revisions[0].user = copiedDeck.user;
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
                                         if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
@@ -1015,10 +1028,98 @@ let self = module.exports = {
                 });
             });
         });
-    }
+    },
+
+    getTags(deckIdParam){
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deckId)})
+            .then((deck) => {
+
+                if(!deck) return;
+
+                if(revisionId === null){
+                    revisionId = getActiveRevision(deck);
+                }
+
+                if(!deck.revisions[revisionId]) return;
+
+                return (deck.revisions[revisionId].tags || []);
+            });
+        });
+    },
+
+    addTag: function(deckIdParam, tag) {
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deckId)})
+            .then((deck) => {
+
+                if(!deck) return;
+
+                if(revisionId === null){
+                    revisionId = getActiveRevision(deck);
+                }
+
+                if(!deck.revisions[revisionId]) return;
+
+                if(!deck.revisions[revisionId].tags){
+                    deck.revisions[revisionId].tags = [];
+                }
+
+                deck.revisions[revisionId].tags.push(tag);
+                col.save(deck);
+                return deck.revisions[revisionId].tags;
+            });
+        });
+    },
+
+    removeTag: function(deckIdParam, tag){
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deckId)})
+            .then((deck) => {
+
+                if(!deck) return;
+
+                if(revisionId === null){
+                    revisionId = getActiveRevision(deck);
+                }
+
+                if(!deck.revisions[revisionId]) return;
+
+                deck.revisions[revisionId].tags = (deck.revisions[revisionId].tags || []).filter( (el) => {
+                    return el.tagName !== tag.tagName;
+                });
+
+                col.save(deck);
+                return deck.revisions[revisionId].tags;
+            });
+        });
+    },
+
 };
 
+// split deck id given as parameter to deck id and revision id
+function splitDeckIdParam(deckId){
+    let revisionId = null;
+    let decktreesplit = deckId.split('-');
+    if(decktreesplit.length > 1){
+        deckId = decktreesplit[0];
+        revisionId = decktreesplit[1]-1;
+    }
 
+    return {deckId, revisionId};
+}
 
 function findDeckInDeckTree(decktree, deck, path){
     if (decktree) {

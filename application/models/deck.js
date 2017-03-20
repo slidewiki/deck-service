@@ -133,8 +133,14 @@ const deckRevision = {
         tags: {
             type: 'array',
             items: {
-                type: 'string'
-            }
+                type: 'object',
+                properties: {
+                    tagName: {
+                        type: 'string',
+                    },
+                    // TODO add other properties as well in sync with the tag-service
+                },
+            },
         },
         preferences: {
             type: 'array',
@@ -208,6 +214,24 @@ const deck = {
             format: 'datetime'
         },
         user: objectid,
+
+        // points to fork origin (only for forked decks)
+        origin: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'number',
+                },
+                revision: {
+                    type: 'number',
+                },
+                title: {
+                    type: 'string',
+                },
+            },
+            required: ['id', 'revision'],
+        },
+
         // kind: {
         //     type: 'string'
         // },
@@ -227,12 +251,6 @@ const deck = {
         revisions: {
             type: 'array',
             items: deckRevision
-        },
-        tags: {
-            type: 'array',
-            items: {
-                type: 'string'
-            }
         },
         contributors: {
             type: 'array',
