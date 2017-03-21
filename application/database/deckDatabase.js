@@ -17,10 +17,10 @@ let self = module.exports = {
         let idArray = identifier.split('-');
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
-        .then((col) => col.findOne({
-            _id: parseInt(idArray[0])
-        })
+        .then((col) => col.findOne({ _id: parseInt(idArray[0]) }))
         .then((found) => {
+            if (!found) return;
+
             let parsed = identifier.split('-');
             if(parsed.length === 1 || idArray[1] === ''){
                 return found;
@@ -35,11 +35,8 @@ let self = module.exports = {
                     return found;
                 }
             }
-        }).catch((err) => {
-            console.log('Deck not found.');
-            console.log('err', err);
-        })
-      );
+        });
+
     },
 
     // returns the deck revision subdocument, either the one specified in identifier, or the active one
