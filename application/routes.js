@@ -151,14 +151,14 @@ module.exports = function(server) {
                     contributors: Joi.array().items(
                         Joi.object().keys({
                             id: Joi.number(),
-                            name: Joi.string(),
+                            username: Joi.string(),
                             picture: Joi.string().allow(''),
                         })),
                     editors: Joi.object().keys({
                         users: Joi.array().items(
                             Joi.object().keys({
                                 id: Joi.number(),
-                                name: Joi.string(),
+                                username: Joi.string(),
                                 picture: Joi.string().allow(''),
                                 joined: Joi.string().isoDate(),
                             })),
@@ -333,15 +333,12 @@ module.exports = function(server) {
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
-                            id: Joi.number(),
-                            name: Joi.string(),
-                            joined: Joi.string()
+                            id: Joi.number().required(),
+                            joined: Joi.string().isoDate().required(),
                         })).default([]),
                         users: Joi.array().items(Joi.object().keys({
-                            id: Joi.number(),
-                            username: Joi.string(),
-                            joined: Joi.string(),
-                            picture: Joi.string().allow('')
+                            id: Joi.number().required(),
+                            joined: Joi.string().isoDate().required(),
                         })).default([])
                     })
                 }).requiredKeys('user', 'license'),
