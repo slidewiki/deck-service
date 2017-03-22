@@ -401,7 +401,7 @@ let self = module.exports = {
                     self.get(attachedDeckId).then((attachedDeck) => {
                         // check if owner is the same, should be the same for now
                         // TODO this might need to change in the future
-                        if (attachedDeck.user !== existingDeck.user) return;
+                        // if (attachedDeck.user !== existingDeck.user) return;
 
                         return self.deepReplaceEditors(attachedDeckId, { editors: existingDeck.editors });
                     }).catch((err) => {
