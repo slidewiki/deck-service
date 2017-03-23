@@ -1093,9 +1093,56 @@ let self = module.exports = {
         });
     },
 
+    // computes all deck permissions the user has been granted
+    userPermissions(deckId, userId) {
+        userId = parseInt(userId);
+        return self.get(deckId)
+        .then((deck) => {
+            if (!deck) return;
+
+            if (deck.user === userId) {
+                // deck owner, return all
+                return { fork: true, edit: true, admin: true };
+            }
+
+            // default level is public
+            let accessLevel = deck.accessLevel || 'public';
+
+            return self.getDeckUsersGroups(deck, deckId)
+            .then((editors) => {
+                if (editors.users.includes(userId)) {
+                    // user is an editor
+                    return { fork: true, edit: true, admin: false };
+                } else {
+                    // we also need to check if the groups allowed to edit the deck include the user
+                    return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
+
+                        if (groupsUsers.includes(userId)) {
+                            // user is an editor
+                            return { fork: true, edit: true, admin: false };
+                        } else {
+                            // user is not an editor or owner
+                            // also return if user can fork the deck (e.g. if it's public)
+                            return { fork: (accessLevel !== 'private'), edit: false, admin: false };
+                        }
+
+                    }).catch((err) => {
+                        console.warn(`could not fetch usergroup info from service: ${err.message}`);
+                        // we're not sure, let's just not allow this user
+                        return { fork: (accessLevel !== 'private'), edit: false, admin: false };
+                    });
+                }
+            });
+        });
+
+    },
+
+    // computes fork permission only
     forkAllowed(deckId, userId) {
         userId = parseInt(userId);
         return self.get(deckId).then((deck) => {
+            if (!deck) return;
+
             // next, we need to check the accessLevel, defaults to 'public'
             let accessLevel = deck.accessLevel || 'public';
 
@@ -1109,13 +1156,25 @@ let self = module.exports = {
         });
     },
 
-    // this is now equivalent to needsNewRevision === false, as authorized users can now save a deck with or without revision regardless
-    // unauthorized users are not allowed to save with revision, but they will be allowed to fork with new copy mechanism
+    // computes edit permission
     editAllowed(deckId, userId) {
-        return self.needsNewRevision(deckId, userId)
-        .then((needs) => (needs.needs_revision === false));
+        userId = parseInt(userId);
+        return self.userPermissions(deckId, userId).then((perm) => {
+            if (!perm) return;
+            return (perm.edit === true);
+        });
     },
 
+    // computes admin permission only
+    adminAllowed(deckId, userId) {
+        userId = parseInt(userId);
+        return self.get(deckId).then((deck) => {
+            if (!deck) return;
+            return (deck.user === userId);
+        });
+    },
+
+    // TODO REMOVE
     //checks if a new revision is needed
     needsNewRevision(deckId, user){
         let userId = parseInt(user);

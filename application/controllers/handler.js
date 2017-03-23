@@ -1231,18 +1231,12 @@ let self = module.exports = {
         let deckId = request.params.id;
         let userId = request.auth.credentials.userid;
 
-        deckDB.needsNewRevision(deckId, userId).then((needs) => {
-            if (!needs) return reply(boom.notFound());
+        deckDB.userPermissions(deckId, userId).then((perm) => {
+            if (!perm) return reply(boom.notFound());
 
-            let fork = (needs.fork_allowed === undefined) ? true : needs.fork_allowed;
-            let edit = (needs.needs_revision === false);
-            let admin = needs.admin_allowed;
-
-            reply({
-                fork, edit, admin,
-            });
-
+            reply(perm);
         }).catch((err) => {
+            request.log('error', err);
             reply(boom.badImplementation(err));
         });
 
