@@ -494,6 +494,38 @@ let self = module.exports = {
         });
     },
 
+    // simply creates a new deck revision without updating anything
+    createDeckRevision: function(request, reply) {
+        let deckId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        // first we need to find the permissions for the current user...
+        // both for parent deck (if provided) and current
+        let parentDeckId = request.payload.parent;
+        Promise.all([
+            deckDB.userPermissions(deckId, userId),
+            deckDB.userPermissions(parentDeckId, userId),
+        ]).then(([perms, parentPerms]) => {
+            // return 404 with priority
+            if (!perms) return boom.notFound();
+            // could not find parentDeckId; not part of path, so return 422 instead of 404
+            if (parentDeckId && !parentPerms) return boom.badData();
+
+            // check auth
+            if (!perms.edit || (parentPerms && !parentPerms.edit)) return boom.forbidden();
+
+            return deckDB.createDeckRevision(deckId, userId, parentDeckId);
+
+        }).then((response) => {
+            // response is either the new deck revision or boom
+            reply(response);
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+
+    },
+
     //reverts a deck into a different revision (past or future)
     revertDeckRevision: function(request, reply) {
         if(request.payload.root_deck === null || !request.payload.hasOwnProperty('root_deck') || request.payload.root_deck.split('-')[0] === request.params.id.split('-')[0] ){

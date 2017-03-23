@@ -403,6 +403,28 @@ module.exports = function(server) {
 
     server.route({
         method: 'POST',
+        path: '/deck/{id}/revision',
+        handler: handlers.createDeckRevision,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string(),
+                },
+                payload: Joi.object().keys({
+                    parent: Joi.string(),
+                }),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Create a new revision for the deck, and optionally update reference of parent deck - JWT needed',
+        },
+    });
+
+    server.route({
+        method: 'POST',
         path: '/deck/revert/{id}',
         handler: handlers.revertDeckRevision,
         config: {

@@ -983,6 +983,54 @@ let self = module.exports = {
 
     },
 
+    // simply creates a new deck revision without updating anything
+    createDeckRevision(deckId, userId, parentDeckId) {
+        return self.get(deckId).then((existingDeck) => {
+            if (!existingDeck) return;
+
+            // ready to copy stuff to new revision
+            let [lastRevision] = existingDeck.revisions.slice(-1);
+            let replacePayload = {
+                title: lastRevision.title,
+                description: existingDeck.description,
+                language: lastRevision.language,
+                tags: lastRevision.tags,
+                license: existingDeck.license,
+                user: userId,
+                root_deck: parentDeckId,
+            };
+
+            // create the new revision
+            return self.replace(deckId, replacePayload)
+            .then((replaced) => {
+                if (replaced.ok !== 1) {
+                    throw replaced;
+                }
+
+                // if deck is a sub-deck, update its parent's content items
+                // HACK replaced.value._id is used instead of parsing deckId and getting the deck id (wo/ revision)
+                // we do this because we want to get the full deck (with all revisions)
+                return self.get(replaced.value._id).then((fullDeck) => {
+                    if (parentDeckId) {
+                        // update parent deck first before returning
+                        return self.updateContentItem(fullDeck, '', parentDeckId, 'deck')
+                        .then((updated) => fullDeck);
+                    } else {
+                        return fullDeck;
+                    }
+                });
+            });
+
+        }).then((fullDeck) => {
+            if (!fullDeck) return;
+
+            // only return the last (new) revision for the fullDeck in the revisions array
+            fullDeck.revisions = fullDeck.revisions.slice(-1);
+            return fullDeck;
+        });
+
+    },
+
     //forks a given deck revision by copying all of its sub-decks into new decks
     forkDeckRevision(deck_id, user){
 
