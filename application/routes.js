@@ -351,7 +351,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/deck/{id}',
-        handler: handlers.updateDeckRevisionWithCheck,
+        handler: handlers.updateDeck,
         config: {
             validate: {
                 params: {

@@ -371,7 +371,41 @@ let self = module.exports = {
         });
     },
 
+    // new simpler implementation of deck update with permission checking and NO new_revision: true option
+    updateDeck: function(request, reply) {
+        let userId = request.payload.user; // use JWT for this
+
+        let deckId = request.params.id;
+        // TODO we should keep this required, no fall-back values!
+        let rootDeckId = request.payload.top_root_deck;
+
+        authorizeUser(userId, deckId, rootDeckId).then((boom) => {
+            // authorizeUser returns nothing if all's ok
+            if (boom) return boom;
+            
+            // force ignore new_revision
+            delete request.payload.new_revision;
+
+            // update the deck without creating a new revision
+            return deckDB.update(deckId, request.payload).then((replaced) => {
+                if (!replaced) return boom.notFound();
+
+                if (replaced.ok !== 1) throw replaced;
+                return replaced.value;
+            });
+
+        }).then((response) => {
+            // response is either the deck update response or boom
+            reply(response);
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+
+    },
+
     // HACK this was introduced to help inject permission check in updateDeckRevision without refactoring much stuff
+    // TODO deprecated
     updateDeckRevisionWithCheck: function(request, reply) {
         // first we need to find the permissions on the current deck for the current user
         deckDB.needsNewRevision(request.params.id, request.payload.user).then((needs) => {
@@ -400,6 +434,7 @@ let self = module.exports = {
     },
 
     //update a deck's metadata either by creating a new revision or not
+    // TODO deprecated
     updateDeckRevision: function(request, reply) {
         //check if new revision is needed
         if(request.payload.new_revision){

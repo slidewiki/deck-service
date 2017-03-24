@@ -275,6 +275,8 @@ let self = module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(id)})
             .then((existingDeck) => {
+                if (!existingDeck) return;
+
                 const maxRevisionId = existingDeck.revisions.reduce((prev, curr) => {
                     if (curr.id > prev)
                         return curr.id;
