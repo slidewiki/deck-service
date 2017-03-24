@@ -411,6 +411,7 @@ module.exports = function(server) {
                     id: Joi.string(),
                 },
                 payload: Joi.object().keys({
+                    root: Joi.string().required(),
                     parent: Joi.string(),
                 }),
                 headers: Joi.object({

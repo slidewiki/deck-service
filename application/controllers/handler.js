@@ -496,26 +496,18 @@ let self = module.exports = {
 
     // simply creates a new deck revision without updating anything
     createDeckRevision: function(request, reply) {
-        let deckId = request.params.id;
         let userId = request.auth.credentials.userid;
 
-        // first we need to find the permissions for the current user...
-        // both for parent deck (if provided) and current
-        let parentDeckId = request.payload.parent;
-        Promise.all([
-            deckDB.userPermissions(deckId, userId),
-            deckDB.userPermissions(parentDeckId, userId),
-        ]).then(([perms, parentPerms]) => {
-            // return 404 with priority
-            if (!perms) return boom.notFound();
-            // could not find parentDeckId; not part of path, so return 422 instead of 404
-            if (parentDeckId && !parentPerms) return boom.badData();
+        let deckId = request.params.id;
+        let rootDeckId = request.payload.root;
 
-            // check auth
-            if (!perms.edit || (parentPerms && !parentPerms.edit)) return boom.forbidden();
+        let parentDeckId = request.payload.parent;
+
+        authorizeUser(userId, deckId, rootDeckId).then((boom) => {
+            // authorizeUser returns nothing if all's ok
+            if (boom) return boom;
 
             return deckDB.createDeckRevision(deckId, userId, parentDeckId);
-
         }).then((response) => {
             // response is either the new deck revision or boom
             reply(response);
@@ -1654,6 +1646,26 @@ let self = module.exports = {
 };
 
 // TODO move these to services / utility libs
+
+// reusable method that authorizes user for a given permission key on the set of deck, rootDeck
+function authorizeUser(userId, deckId, rootDeckId, permissionKey = 'edit') {
+    let permissionChecks = _.uniq([deckId, rootDeckId])
+    .map((id) => deckDB.userPermissions(id, userId));
+
+    return Promise.all(permissionChecks).then((perms) => {
+        // return 404 for deckId missing as it's on the path
+        if (!perms[0]) return boom.notFound();
+
+        // if others are not found return 422 instead of 404 (not part of path)
+        if (perms.some((p) => p === undefined)) return boom.badData();
+
+        // check auth
+        if (perms.some((p) => !p[permissionKey])) return boom.forbidden();
+
+        // return nothing if all's ok :)
+    });
+
+}
 
 //creates a thumbnail for a given slide
 function createThumbnail(slideContent, slideId) {
