@@ -211,6 +211,8 @@ let self = module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(id)})
             .then((existingDeck) => {
+                if (!existingDeck) return;
+
                 let valid = false;
                 let idArray = id.split('-');
                 let activeRevisionIndex ;
@@ -647,10 +649,14 @@ let self = module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(deck_id)})
             .then((deck) => {
+                if (!deck) return;
 
                 if(revision_id === -1){
                     revision_id = deck.active-1;
                 }
+                // detect wrong revision id
+                if (!deck.revisions[revision_id]) return;
+
                 deckTree = { title: striptags(deck.revisions[revision_id].title), id: deck_id+'-'+(revision_id+1), type: 'deck', children: []};
 
                 return new Promise(function(resolve, reject) {
@@ -660,7 +666,7 @@ let self = module.exports = {
                                 helper.connectToDatabase()
                                 .then((db) => db.collection('slides'))
                                 .then((col) => {
-                                    col.findOne({_id: parseInt(citem.ref.id)})
+                                    return col.findOne({_id: parseInt(citem.ref.id)})
                                     .then((slide) => {
                                         let slide_revision = citem.ref.revision-1;
                                         deckTree.children.push({title: striptags(slide.revisions[slide_revision].title), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});

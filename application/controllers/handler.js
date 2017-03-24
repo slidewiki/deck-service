@@ -492,6 +492,8 @@ let self = module.exports = {
         else{
             //update the deck without creating a new revision
             deckDB.update(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
+                if (!replaced) return reply(boom.notFound());
+
                 if (co.isEmpty(replaced.value))
                     throw replaced;
                 else
@@ -601,6 +603,8 @@ let self = module.exports = {
     getDeckTree: function(request, reply) {
         deckDB.getDeckTreeFromDB(request.params.id)
         .then((deckTree) => {
+            if (!deckTree) reply(boom.notFound());
+
             if (co.isEmpty(deckTree))
                 reply(boom.notFound());
             else{
