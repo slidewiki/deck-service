@@ -435,10 +435,15 @@ module.exports = function(server) {
                 },
                 payload: Joi.object().keys({
                     revision_id: Joi.string().alphanum().lowercase(),
-                    root_deck: Joi.string()
-                }).requiredKeys('revision_id'),
+                    root_deck: Joi.string(),
+                    top_root_deck: Joi.string(),
+                }).requiredKeys('revision_id', 'top_root_deck'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Revert a deck to an old revision'
         }
     });
@@ -581,10 +586,15 @@ module.exports = function(server) {
                 },
                 payload: Joi.object().keys({
                     revision_id: Joi.string().alphanum().lowercase(),
-                    root_deck: Joi.string()
-                }).requiredKeys('revision_id', 'root_deck'),
+                    root_deck: Joi.string(),
+                    top_root_deck: Joi.string(),
+                }).requiredKeys('revision_id', 'root_deck', 'top_root_deck'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Revert a slide to an old revision'
         }
     });
