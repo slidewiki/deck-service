@@ -169,14 +169,14 @@ let self = module.exports = {
             else{
                 let revision_id = parseInt(request.payload.revision_id);
                 //update the content items of the root deck to reflect the slide revert
-                deckDB.updateContentItem(slide, revision_id, request.payload.root_deck, 'slide')
+                return deckDB.updateContentItem(slide, revision_id, request.payload.root_deck, 'slide')
                 .then((updatedIds) => {
                     let fullId = request.params.id;
                     if(fullId.split('-').length < 2){
                         fullId += '-'+updatedIds.old_revision;
                     }
                     //update the usage of the reverted slide to point to the root deck
-                    slideDB.updateUsage(fullId, revision_id, request.payload.root_deck).then((updatedSlide) => {
+                    return slideDB.updateUsage(fullId, revision_id, request.payload.root_deck).then((updatedSlide) => {
                         let revisionArray = [updatedSlide.revisions[revision_id-1]];
                         updatedSlide.revisions = revisionArray;
                         reply(updatedSlide);
@@ -187,6 +187,25 @@ let self = module.exports = {
             request.log('error', error);
             reply(boom.badImplementation());
         });
+    },
+
+    // HACK added this to do the checking and keep original handler intact
+    revertSlideRevisionWithCheck: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
+        let parentDeckId = request.payload.root_deck;
+        let rootDeckId = request.payload.top_root_deck;
+
+        authorizeUser(userId, parentDeckId, rootDeckId).then((boom) => {
+            if (boom) return reply(boom);
+
+            // continue as normal
+            self.revertSlideRevision(request, reply);
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+
     },
 
     //saves the data sources of a slide in the database
@@ -596,6 +615,25 @@ let self = module.exports = {
                 reply(boom.badImplementation());
             });
         }
+
+    },
+
+    // HACK added this to do the checking and keep original handler intact
+    revertDeckRevisionWithCheck: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
+        let deckId = request.params.id;
+        let rootDeckId = request.payload.top_root_deck;
+
+        authorizeUser(userId, deckId, rootDeckId).then((boom) => {
+            if (boom) return reply(boom);
+
+            // else continue as normal
+            self.revertDeckRevision(request, reply);
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
 
     },
 
