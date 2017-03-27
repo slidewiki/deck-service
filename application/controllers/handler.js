@@ -119,7 +119,7 @@ let self = module.exports = {
 
                         // send tags to tag-service
                         if(request.payload.tags && request.payload.tags.length > 0){
-                            tagService.upload(request.payload.tags).catch( (e) => {
+                            tagService.upload(request.payload.tags, request.payload.user).catch( (e) => {
                                 request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
                             });
                         }
@@ -395,7 +395,7 @@ let self = module.exports = {
 
                         // send tags to tag-service
                         if(request.payload.tags && request.payload.tags.length > 0){
-                            tagService.upload(request.payload.tags).catch( (e) => {
+                            tagService.upload(request.payload.tags, request.payload.user).catch( (e) => {
                                 request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id + ': ' + e.message);
                             });
                         }
@@ -432,7 +432,7 @@ let self = module.exports = {
                 else{
                     // send tags to tag-service
                     if(request.payload.tags && request.payload.tags.length > 0){
-                        tagService.upload(request.payload.tags).catch( (e) => {
+                        tagService.upload(request.payload.tags, request.payload.user).catch( (e) => {
                             request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id + ': ' + e.message);
                         });
                     }
@@ -1413,7 +1413,7 @@ let self = module.exports = {
             else{
                 // send tags to tag-service
                 if(tagsList && tagsList.length > 0){
-                    tagService.upload(tagsList).catch( (e) => {
+                    tagService.upload(tagsList, request.payload.user).catch( (e) => {
                         request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id + ': ' + e.message);
                     });
                 }
@@ -1450,7 +1450,7 @@ let self = module.exports = {
             else{
                 // send tags to tag-service
                 if(tagsList && tagsList.length > 0){
-                    tagService.upload(tagsList).catch( (e) => {
+                    tagService.upload(tagsList, request.payload.user).catch( (e) => {
                         request.log('warning', 'Could not save tags to tag-service for slide ' + request.params.id + ': ' + e.message);
                     });
                 }

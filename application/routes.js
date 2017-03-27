@@ -347,7 +347,7 @@ module.exports = function(server) {
 
     server.route({
         method: 'PUT',
-        path: '/slide/{id}',        
+        path: '/slide/{id}',
         handler: handlers.updateSlide,
         config: {
             validate: {
@@ -596,8 +596,9 @@ module.exports = function(server) {
                 payload:
                     Joi.object().keys({
                         operation: Joi.string().valid('add', 'remove'),
+                        user: Joi.number().integer(),
                         tag: apiModels.tag,
-                    }).requiredKeys('operation', 'tag')
+                    }).requiredKeys('operation', 'user', 'tag')
             },
             tags: ['api'],
             description: 'Add/Remove a tag from a deck',
@@ -637,8 +638,9 @@ module.exports = function(server) {
                 payload:
                     Joi.object().keys({
                         operation: Joi.string().valid('add', 'remove'),
+                        user: Joi.number().integer(),
                         tag: apiModels.tag,
-                    }).requiredKeys('operation', 'tag'),
+                    }).requiredKeys('operation', 'user', 'tag'),
             },
             tags: ['api'],
             description: 'Add/Remove a tag from a slide',
