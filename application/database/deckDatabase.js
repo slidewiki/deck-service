@@ -218,7 +218,7 @@ let self = module.exports = {
 
                 deckWithNewRevision.user = existingDeck.user;
 
-                deckWithNewRevision.origin = existingDeck.origin;
+                if (existingDeck.origin) deckWithNewRevision.origin = existingDeck.origin;
 
                 if(existingDeck.hasOwnProperty('contributors')){
                     let contributors = existingDeck.contributors;
