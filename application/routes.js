@@ -596,7 +596,7 @@ module.exports = function(server) {
                 payload:
                     Joi.object().keys({
                         operation: Joi.string().valid('add', 'remove'),
-                        user: Joi.number().integer(),
+                        user: Joi.string().alphanum().lowercase(),
                         tag: apiModels.tag,
                     }).requiredKeys('operation', 'user', 'tag')
             },
@@ -638,7 +638,7 @@ module.exports = function(server) {
                 payload:
                     Joi.object().keys({
                         operation: Joi.string().valid('add', 'remove'),
-                        user: Joi.number().integer(),
+                        user: Joi.string().alphanum().lowercase(),
                         tag: apiModels.tag,
                     }).requiredKeys('operation', 'user', 'tag'),
             },
