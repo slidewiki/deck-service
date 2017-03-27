@@ -20,6 +20,8 @@ describe('deckDatabase', function() {
         );
     });
 
+    // TODO any tests involving restricted / private decks are commented out/skipped until feature is enabled
+
     describe('#forkAllowed()', function() {
 
         it('should return true for the deck owner regardless of access level', function() {
@@ -102,93 +104,6 @@ describe('deckDatabase', function() {
                 return deckDB.forkAllowed('54', 6)
                 .then((forkAllowed) => {
                     forkAllowed.should.equal(true);
-                });
-
-            });
-
-        });
-
-    });
-
-    // TODO any tests involving restricted / private decks are commented out/skipped until feature is enabled
-
-    describe('#needsNewRevision()', function() {
-
-        it('should allow save without new revision for owner regardless of access level', function() {
-            return Promise.all([
-                deckDB.needsNewRevision('54', 46)
-                .then((needs) => {
-                    needs.should.have.property('needs_revision', false);
-                }),
-                // deckDB._adminUpdate('54', { accessLevel: 'private' })
-                // .then(() => deckDB.needsNewRevision('54', 46))
-                // .then((needs) => {
-                //     needs.should.have.property('needs_revision', false);
-                // }),
-                // deckDB._adminUpdate('54', { accessLevel: 'restricted' })
-                // .then(() => deckDB.needsNewRevision('54', 46))
-                // .then((needs) => {
-                //     needs.should.have.property('needs_revision', false);
-                // }),
-            ]);
-
-        });
-
-        context('if the deck is public', function() {
-
-            it('should allow save without new revision for a user implicitly authorized', function() {
-                return deckDB.needsNewRevision('54', 3)
-                .then((needs) => {
-                    needs.should.have.property('needs_revision', false);
-                });
-
-            });
-
-            it('should allow save without new revision for a user explicitly authorized', function() {
-                return deckDB.needsNewRevision('54', 4)
-                .then((needs) => {
-                    needs.should.have.property('needs_revision', false);
-                });
-
-            });
-
-            // TODO properly setup a test for this, needs a mock for the user service
-            it.skip('should allow save without new revision for a user explicitly authorized via groups', function() {
-                return deckDB.needsNewRevision('54', 6)
-                .then((needs) => {
-                    needs.should.have.property('needs_revision', false);
-                });
-
-            });
-
-        });
-
-        context.skip('if the deck is restricted', function() {
-            beforeEach(function() {
-                return deckDB._adminUpdate('54', { accessLevel: 'restricted' });
-            });
-
-            it('should allow save without new revision for a user implicitly authorized', function() {
-                return deckDB.needsNewRevision('54', 3)
-                .then((needs) => {
-                    needs.should.have.property('needs_revision', false);
-                });
-
-            });
-
-            it('should allow save without new revision for a user explicitly authorized', function() {
-                return deckDB.needsNewRevision('54', 4)
-                .then((needs) => {
-                    needs.should.have.property('needs_revision', false);
-                });
-
-            });
-
-            // TODO properly setup a test for this, needs a mock for the user service
-            it.skip('should allow save without new revision for a user explicitly authorized via groups', function() {
-                return deckDB.needsNewRevision('54', 6)
-                .then((needs) => {
-                    needs.should.have.property('needs_revision', false);
                 });
 
             });
@@ -292,6 +207,54 @@ describe('deckDatabase', function() {
                     allowed.should.equal(true);
                 });
 
+            });
+
+        });
+
+    });
+
+    describe('#adminAllowed()', function() {
+
+        it('should return true for the deck owner', function() {
+            let userId = 46;
+            return Promise.all([
+                deckDB.adminAllowed('54', userId)
+                .then((allowed) => {
+                    allowed.should.equal(true);
+                }),
+            ]);
+        });
+
+        it('should return false for some unauthorized user', function() {
+            let someUserId = 666;
+            return deckDB.adminAllowed('54', someUserId)
+            .then((allowed) => {
+                allowed.should.equal(false);
+            });
+
+        });
+
+        it('should return false for a user implicitly authorized', function() {
+            return deckDB.adminAllowed('54', 3)
+            .then((allowed) => {
+                allowed.should.equal(false);
+            });
+
+        });
+
+        it('should return false for a user explicitly authorized', function() {
+            return deckDB.adminAllowed('54', 4)
+            .then((allowed) => {
+                allowed.should.equal(false);
+            });
+
+        });
+
+        // TODO properly setup a test for this, needs a mock for the user service
+        it.skip('should return false for a user explicitly authorized via groups', function() {
+            return deckDB.adminAllowed('54', 6)
+            .then((allowed) => {
+                allowed.should.equal(false);
             });
 
         });
