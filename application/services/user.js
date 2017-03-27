@@ -63,7 +63,11 @@ const self = module.exports = {
             body: groupIds,
         }).then((response) => {
             // response should be an array
-            let userIds = response.map((group) => group.members.map((member) => member.userid));
+            let userIds = response.map((group) => {
+                // also add the creator id for each group
+                return (group.members.concat([group.creator])).map((member) => member.userid);
+            });
+
             // we get an array of arrays, let's flat it out and also get rid of duplicates
             return _.uniq(_.flatten(userIds));
         });
