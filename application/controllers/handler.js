@@ -14,6 +14,8 @@ const boom = require('boom'),
     async = require('async'),
     Microservices = require('../configs/microservices');
 
+const tagService = require('../services/tag');
+
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
         '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;">'+
         '<h3 class="h-mid"><span class="text-block" style="color: #000; font-size: 44pt; font-family: Calibri Light; font-weight: initial; font-style: normal; text-decoration: initial; vertical-align: ;">Title</span></h3>'+
@@ -114,6 +116,14 @@ let self = module.exports = {
                     if (co.isEmpty(replaced.value))
                         throw replaced;
                     else{
+
+                        // send tags to tag-service
+                        if(request.payload.tags && request.payload.tags.length > 0){
+                            tagService.upload(request.payload.tags).catch( () => {
+                                request.log('warning', 'Could not save tags to tag-service for slide ' + slideId);
+                            });
+                        }
+
                         //we must update all decks in the 'usage' attribute
                         slideDB.get(replaced.value._id).then((newSlide) => {
 
@@ -382,6 +392,14 @@ let self = module.exports = {
                     if (co.isEmpty(replaced.value))
                         throw replaced;
                     else{
+
+                        // send tags to tag-service
+                        if(request.payload.tags && request.payload.tags.length > 0){
+                            tagService.upload(request.payload.tags).catch( () => {
+                                request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id);
+                            });
+                        }
+
                         deckDB.get(replaced.value._id).then((newDeck) => {
                             if(changeset && changeset.hasOwnProperty('target_deck')){
                                 newDeck.changeset = changeset;
@@ -411,8 +429,16 @@ let self = module.exports = {
             deckDB.update(encodeURIComponent(request.params.id), request.payload).then((replaced) => {
                 if (co.isEmpty(replaced.value))
                     throw replaced;
-                else
-                reply(replaced.value);
+                else{
+                    // send tags to tag-service
+                    if(request.payload.tags && request.payload.tags.length > 0){
+                        tagService.upload(request.payload.tags).catch( () => {
+                            request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id);
+                        });
+                    }
+
+                    reply(replaced.value);
+                }
             }).catch((error) => {
                 request.log('error', error);
                 reply(boom.badImplementation());
@@ -1385,6 +1411,13 @@ let self = module.exports = {
                 reply(boom.notFound());
             }
             else{
+                // send tags to tag-service
+                if(tagsList && tagsList.length > 0){
+                    tagService.upload(tagsList).catch( () => {
+                        request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id);
+                    });
+                }
+
                 reply(tagsList);
             }
         }).catch((error) => {
@@ -1415,6 +1448,13 @@ let self = module.exports = {
                 reply(boom.notFound());
             }
             else{
+                // send tags to tag-service
+                if(tagsList && tagsList.length > 0){
+                    tagService.upload(tagsList).catch( () => {
+                        request.log('warning', 'Could not save tags to tag-service for slide ' + request.params.id);
+                    });
+                }
+
                 reply(tagsList);
             }
         }).catch((error) => {
