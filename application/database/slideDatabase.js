@@ -323,9 +323,6 @@ module.exports = {
                     slide.revisions[revisionId].tags = [];
                 }
 
-                console.log(slide.revisions[revisionId].tags.filter((dbTag) => {
-                    return dbTag.tagName === tag.tagName;
-                }));
                 // check if new tag already exists in tags array
                 if(slide.revisions[revisionId].tags.filter((dbTag) => {
                     return dbTag.tagName === tag.tagName;
