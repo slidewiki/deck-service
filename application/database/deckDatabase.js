@@ -1074,9 +1074,9 @@ let self = module.exports = {
                 }
 
                 // check if new tag already exists in tags array
-                if(deck.revisions[revisionId].tags.filter((dbTag) => {
-                    return dbTag.tagName === tag.tagName;
-                }).length === 0){
+                if(!deck.revisions[revisionId].tags.some((element) => {
+                    return element.tagName === tag.tagName;
+                })){
                     deck.revisions[revisionId].tags.push(tag);
                     col.save(deck);
                 }

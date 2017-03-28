@@ -324,9 +324,9 @@ module.exports = {
                 }
 
                 // check if new tag already exists in tags array
-                if(slide.revisions[revisionId].tags.filter((dbTag) => {
-                    return dbTag.tagName === tag.tagName;
-                }).length === 0){
+                if(!slide.revisions[revisionId].tags.some((element) => {
+                    return element.tagName === tag.tagName;
+                })){
                     slide.revisions[revisionId].tags.push(tag);
                     col.save(slide);
                 }
