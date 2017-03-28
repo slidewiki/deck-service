@@ -1105,10 +1105,9 @@ let self = module.exports = {
                                 }
                                 //copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
                                 copiedDeck.revisions = [found.revisions[ind]];
+                                copiedDeck.revisions[0].id = 1;
                                 // own the revision as well!
                                 copiedDeck.revisions[0].user = copiedDeck.user;
-
-                                copiedDeck.revisions[0].id = 1;
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
                                         if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
@@ -1477,8 +1476,14 @@ let self = module.exports = {
                     deck.revisions[revisionId].tags = [];
                 }
 
-                deck.revisions[revisionId].tags.push(tag);
-                col.save(deck);
+                // check if new tag already exists in tags array
+                if(!deck.revisions[revisionId].tags.some((element) => {
+                    return element.tagName === tag.tagName;
+                })){
+                    deck.revisions[revisionId].tags.push(tag);
+                    col.save(deck);
+                }
+
                 return deck.revisions[revisionId].tags;
             });
         });
