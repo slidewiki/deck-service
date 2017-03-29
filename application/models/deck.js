@@ -51,6 +51,48 @@ const contentItem = {
     },
     required: ['kind', 'ref']
 };
+const editors = {
+    type: 'object',
+    properties: {
+        groups: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: {
+                        type: 'number'
+                    },
+                    name: {
+                        type: 'string'
+                    },
+                    joined: {
+                        type: 'string',
+                        format: 'date-time'
+                    }
+                }
+            }
+        },
+        users: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: objectid,
+                    username: {
+                        type: 'string'
+                    },
+                    joined: {
+                        type: 'string',
+                        format: 'date-time'
+                    },
+                    picture: {
+                        type: 'string'
+                    }
+                }
+            }
+        }
+    }
+};
 const deckRevision = {
     type: 'object',
     properties: {
@@ -63,7 +105,7 @@ const deckRevision = {
         },
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
         parent: {
@@ -211,9 +253,15 @@ const deck = {
     properties: {
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
+        // // TODO include these here after validation is fixed across the service 
+        // accessLevel: {
+        //     type: 'string',
+        //     enum: ['public', 'restricted', 'private']
+        // },
+        // editors: editors,
 
         // points to fork origin (only for forked decks)
         origin: {
@@ -246,7 +294,7 @@ const deck = {
         // },
         lastUpdate: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         revisions: {
             type: 'array',
