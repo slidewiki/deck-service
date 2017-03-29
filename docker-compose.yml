@@ -12,4 +12,5 @@ deckservice:
     - LETSENCRYPT_HOST=deckservice.experimental.slidewiki.org
     - LETSENCRYPT_EMAIL=meissner@informatik.uni-leipzig.de
     - SERVICE_URL_FILE=https://fileservice.experimental.slidewiki.org
+    - SERVICE_URL_TAG=https://tagservice.experimental.slidewiki.org
     - DATABASE_URL=mongodb # use a url or the name, defined in the docker-compose file
