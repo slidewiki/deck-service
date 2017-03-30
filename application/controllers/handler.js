@@ -1307,11 +1307,17 @@ let self = module.exports = {
             return Promise.all([
                 userService.fetchUserInfo(_.map(editors.users, 'id'))
                 .then((userInfo) => util.assignToAllById(editors.users, userInfo))
-                .catch(() => editors.users),
+                .catch((err) => {
+                    request.log('warn', `could not fetch user info: ${err.message || err}`);
+                    return editors.users;
+                }),
 
                 userService.fetchGroupInfo(_.map(editors.groups, 'id'))
                 .then((groupInfo) => util.assignToAllById(editors.groups, groupInfo))
-                .catch(() => editors.groups),
+                .catch((err) => {
+                    request.log('warn', `could not fetch group info: ${err.message || err}`);
+                    return editors.groups;
+                }),
 
                 // we also need the implicit editors (AKA contributors)...
                 deckDB.getDeckEditors(deckId)
@@ -1319,19 +1325,17 @@ let self = module.exports = {
                     let contributors = contribIds.map((id) => ({ id }) );
                     return userService.fetchUserInfo(contribIds)
                     .then((contribInfo) => util.assignToAllById(contributors, contribInfo))
-                    .catch(() => contributors);
+                    .catch((err) => {
+                    request.log('warn', `could not fetch group info: ${err.message || err}`);
+                        return contributors;
+                    });
                 }),
 
             ]).then(([users, groups, contributors]) => {
-                request.log('info', {
-                    contributors,
-                    editors: { users, groups }
-                });
                 reply({
                     contributors,
                     editors: { users, groups }
                 });
-
             });
 
         }).catch((err) => {
