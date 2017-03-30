@@ -1326,7 +1326,7 @@ let self = module.exports = {
                     return userService.fetchUserInfo(contribIds)
                     .then((contribInfo) => util.assignToAllById(contributors, contribInfo))
                     .catch((err) => {
-                    request.log('warn', `could not fetch group info: ${err.message || err}`);
+                        request.log('warn', `could not fetch group info: ${err.message || err}`);
                         return contributors;
                     });
                 }),
