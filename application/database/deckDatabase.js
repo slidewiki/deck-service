@@ -232,24 +232,19 @@ let self = module.exports = {
                 //add comment, abstract, footer
                 deckRevision.tags = deck.tags;
 
+                // lastUpdated update
+                existingDeck.lastUpdate = (new Date()).toISOString();
+
                 if (!_.isEmpty(deck.editors) ){
                     existingDeck.editors = deck.editors;
                 }
 
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
-                try {
-                    valid = deckModel(deckRevision);
-
-                    if (!valid) {
-                        return deckModel.errors;
-                    }
-                    return col.findOneAndUpdate({
-                        _id: parseInt(id)
-                    }, existingDeck, {new: true});
-                } catch (e) {
-                    console.log('validation failed', e);
+                if (!deckModel(deckRevision)) {
+                    throw deckModel.errors;
                 }
-                return;
+
+                return col.findOneAndReplace({ _id: parseInt(id) }, existingDeck, { returnOriginal: false });
             });
         });
     },
@@ -261,8 +256,17 @@ let self = module.exports = {
         .then((db) => db.collection('decks'))
         .then((col) => col.findOne({_id: parseInt(deckId)})
         .then((deck) => {
-            deck.revisions[deck_id.split('-')[1]-1].title = newName;
-            return col.findOneAndUpdate({_id: parseInt(deckId)}, deck);
+            if (!deck) return;
+
+            let deckRevision = deck.revisions[deck_id.split('-')[1]-1];
+            if (!deckRevision) return;
+
+            deckRevision.title = newName;
+
+            // lastUpdated update
+            deck.lastUpdate = (new Date()).toISOString();
+
+            return col.findOneAndReplace({_id: parseInt(deckId)}, deck);
         }));
     },
 
