@@ -1309,22 +1309,24 @@ let self = module.exports = {
                         callback();
                     }
                 });
-            },function(err){
-                if (err) {
-                    // err is needs result; means that either:
+            },function(errorOrNeedsResult){
+                if (errorOrNeedsResult) {
+                    // errorOrNeedsResult is needs result; means that either:
                     // a) we've reached a deck we can't edit at all (fork_allowed: false)
                     // b) we've reached a deck we can save without new revision (needs_revision: false)
 
-                    if (err.needs_revision && !err.fork_allowed) {
+                    if (errorOrNeedsResult.needs_revision && !errorOrNeedsResult.fork_allowed) {
                         // we cannot edit the deck! resolve the promise and inform caller of this
                         return resolve({ needs_revision: true, fork_allowed: false });
                     }
                     // else continue as normal
-                    console.log(`stopped handleChange after reaching a deck we can save without new revision ${JSON.stringify(err)}`);
+                    console.log(`stopped handleChange after reaching a deck we can save without new revision ${JSON.stringify(errorOrNeedsResult)}`);
                 }
 
                 if(revisions.length === 0){
-                    resolve({needs_revision: false});
+                    // include as parent_deck to resolve revision if missing in request
+                    // avoid using `target_deck` because it implies elsewhere that a revision was performed
+                    resolve({parent_deck: errorOrNeedsResult.target_deck, needs_revision: false});
                 }
                 revisions.reverse(); //start from the innermost deck that needs revision
                 async.eachSeries(revisions, function(next_needs_revision, callback){
@@ -1391,6 +1393,7 @@ let self = module.exports = {
                     if (error) return reject(error);
 
                     if(new_revisions.length === 0){
+                        // TODO should never come to this ????
                         resolve({'needs_revision': false});
                     }
                     else{

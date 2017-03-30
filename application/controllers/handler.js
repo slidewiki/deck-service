@@ -745,10 +745,11 @@ let self = module.exports = {
                                 }
                             }
 
-                            if(changeset && changeset.hasOwnProperty('target_deck')){
-                              //revisioning took place, we must update root deck
-                                parentID = changeset.target_deck;
+                            if (changeset) {
+                                // revisioning may have taken place, we must update root deck
+                                parentID = changeset.target_deck || changeset.parent_deck || parentID;
                             }
+
                             deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1);
                             node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
                             slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
@@ -799,10 +800,11 @@ let self = module.exports = {
                         }
                     }
 
-                    if(changeset && changeset.hasOwnProperty('target_deck')){
-                      //revisioning took place, we must update root deck
-                        parentID = changeset.target_deck;
+                    if (changeset) {
+                        // revisioning may have taken place, we must update root deck
+                        parentID = changeset.target_deck || changeset.parent_deck || parentID;
                     }
+
                     self.getDeck({
                         'params': {'id':parentID},
                         'log': request.log.bind(request),
@@ -900,10 +902,12 @@ let self = module.exports = {
                         else{
                             parentID = request.payload.selector.id;
                         }
-                        if(changeset && changeset.hasOwnProperty('target_deck')){
-                          //revisioning took place, we must update root deck
-                            parentID = changeset.target_deck;
+
+                        if (changeset) {
+                            // revisioning may have taken place, we must update root deck
+                            parentID = changeset.target_deck || changeset.parent_deck || parentID;
                         }
+
                         deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
                         deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
                         //we have to return from the callback, else empty node is returned because it is updated asynchronously
@@ -957,10 +961,11 @@ let self = module.exports = {
                         }
                     }
 
-                    if(changeset && changeset.hasOwnProperty('target_deck')){
-                      //revisioning took place, we must update root deck
-                        parentID = changeset.target_deck;
+                    if (changeset) {
+                        // revisioning may have taken place, we must update root deck
+                        parentID = changeset.target_deck || changeset.parent_deck || parentID;
                     }
+
                     self.getDeck({
                         'params': {'id':parentID},
                         'log': request.log.bind(request),
