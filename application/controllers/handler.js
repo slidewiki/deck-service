@@ -667,7 +667,7 @@ let self = module.exports = {
     getDeckTree: function(request, reply) {
         deckDB.getDeckTreeFromDB(request.params.id)
         .then((deckTree) => {
-            if (!deckTree) reply(boom.notFound());
+            if (!deckTree) return reply(boom.notFound());
 
             if (co.isEmpty(deckTree))
                 reply(boom.notFound());
