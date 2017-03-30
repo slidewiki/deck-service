@@ -384,6 +384,24 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/forks',
+        handler: handlers.getDeckForks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().options({convert:true}).description('The deck id (without revision)'),
+                },
+                query: {
+                    user: Joi.number().integer().options({convert:true}).description('The id of the user the forks returned will be owned by'),
+                },
+            },
+            tags: ['api'],
+            description: 'List all decks that fork current deck, optionally filtered by fork owner',
+        },
+    });
+
+    server.route({
         method: 'PUT',
         path: '/deck/{id}/fork',
         handler: handlers.forkDeckRevisionWithCheck,

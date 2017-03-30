@@ -551,6 +551,32 @@ let self = module.exports = {
 
     },
 
+    getDeckForks: function(request, reply) {
+        let deckId = request.params.id;
+        let userId = request.query.user || undefined;
+
+        deckDB.getDeckForks(deckId, userId).then((forks) => {
+            if (!forks) return reply(boom.notFound());
+
+            // do some formatting
+            reply(forks.map((fork) => {
+                let [latestRevision] = fork.revisions.slice(-1);
+
+                fork.id = fork._id;
+                fork.title = latestRevision.title;
+
+                return _.pick(fork, [
+                    'id', 'origin', 'description', 'languange', 'license',
+                    'user', 'timestamp', 'lastUpdate', 'active', 'title',
+                ]);
+
+            }));
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
     // HACK this was introduced to help inject forkAllowed check in updateDeckRevision without refactoring much stuff
     forkDeckRevisionWithCheck: function(request, reply) {
         return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)

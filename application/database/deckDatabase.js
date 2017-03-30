@@ -1158,6 +1158,24 @@ let self = module.exports = {
         });
     },
 
+    getDeckForks(deckId, userId) {
+        if (userId) userId = parseInt(userId);
+        deckId = parseInt(deckId);
+
+        // check for 404 first
+        return self.get(deckId).then((deck) => {
+            if (!deck) return;
+
+            let query = { 'origin.id': deckId };
+            if (userId) {
+                query.user = userId;
+            };
+
+            // then run the query itself
+            return self.find('decks', query);
+        });
+    },
+
     // computes all deck permissions the user has been granted
     userPermissions(deckId, userId) {
         userId = parseInt(userId);
