@@ -1303,18 +1303,23 @@ let self = module.exports = {
             // editors.groups = _.map(editors.groups || [], ['id', 'joined']);
             editors.groups = editors.groups || [];
 
+            // connecting to userService might fail, in that case response will include what the deck service can provide
             return Promise.all([
                 userService.fetchUserInfo(_.map(editors.users, 'id'))
-                .then((userInfo) => util.assignToAllById(editors.users, userInfo)),
+                .then((userInfo) => util.assignToAllById(editors.users, userInfo))
+                .catch(() => editors.users),
 
                 userService.fetchGroupInfo(_.map(editors.groups, 'id'))
-                .then((groupInfo) => util.assignToAllById(editors.groups, groupInfo)),
+                .then((groupInfo) => util.assignToAllById(editors.groups, groupInfo))
+                .catch(() => editors.groups),
 
                 // we also need the implicit editors (AKA contributors)...
                 deckDB.getDeckEditors(deckId)
                 .then((contribIds) => {
+                    let contributors = contribIds.map((id) => ({ id }) );
                     return userService.fetchUserInfo(contribIds)
-                    .then((contribInfo) => util.assignToAllById(contribIds.map((id) => ({ id }) ), contribInfo));
+                    .then((contribInfo) => util.assignToAllById(contributors, contribInfo))
+                    .catch(() => contributors);
                 }),
 
             ]).then(([users, groups, contributors]) => {
