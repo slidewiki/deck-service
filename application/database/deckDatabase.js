@@ -865,7 +865,7 @@ let self = module.exports = {
                                 let deck_revision = citem.ref.revision-1;
                                 deckTree.children.push({title: innerDeck.revisions[deck_revision].title, user: String(innerDeck.revisions[deck_revision].user), id: innerDeck._id+'-'+innerDeck.revisions[deck_revision].id, type: 'deck'});
 
-                                module.exports.getFlatDecksFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree)
+                                self.getFlatDecksFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree)
                                 .then((res) => {
                                     callback();
                                 });
@@ -1046,7 +1046,7 @@ let self = module.exports = {
     //forks a given deck revision by copying all of its sub-decks into new decks
     forkDeckRevision(deck_id, user){
 
-        return module.exports.getFlatDecksFromDB(deck_id)
+        return self.getFlatDecksFromDB(deck_id)
         .then((res) => {
             //we have a flat sub-deck structure
             let flatDeckArray = [];
@@ -1112,6 +1112,10 @@ let self = module.exports = {
                                 copiedDeck.revisions[0].id = 1;
                                 // own the revision as well!
                                 copiedDeck.revisions[0].user = copiedDeck.user;
+
+                                // renew creation date for fresh revision
+                                copiedDeck.revisions[0].timestamp = timestamp;
+
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
                                         if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
@@ -1133,7 +1137,7 @@ let self = module.exports = {
                                     if(nextSlide.kind === 'slide'){
                                         let root_deck_path = [copiedDeck._id, '1'];
                                         //console.log('outside root_deck_path', root_deck_path);
-                                        module.exports.addToUsage(nextSlide, root_deck_path);
+                                        self.addToUsage(nextSlide, root_deck_path);
                                     }
                                     else{
                                         continue;
