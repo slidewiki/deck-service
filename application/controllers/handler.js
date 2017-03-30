@@ -1614,7 +1614,6 @@ let self = module.exports = {
                         revision = deck.revisions[key];
                 }
 
-                metadata.timestamp = revision.timestamp;
                 metadata.title = revision.title;
                 metadata.comment = revision.comment;
                 metadata.abstract = revision.abstract;
