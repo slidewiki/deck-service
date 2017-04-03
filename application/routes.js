@@ -237,6 +237,24 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deck/{id}/forkCount',
+        handler: handlers.countDeckForks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+                query: {
+                    user: Joi.number().integer().description('The id of the user the forks counted are owned by'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get total count of forks for this deck, optionally filtered by fork owner'
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/revisionCount',
         handler: handlers.countDeckRevisions,
         config: {
@@ -390,10 +408,10 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.number().integer().options({convert:true}).description('The deck id (without revision)'),
+                    id: Joi.number().integer().description('The deck id (without revision)'),
                 },
                 query: {
-                    user: Joi.number().integer().options({convert:true}).description('The id of the user the forks returned will be owned by'),
+                    user: Joi.number().integer().description('The id of the user the forks returned are owned by'),
                 },
             },
             tags: ['api'],

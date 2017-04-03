@@ -566,11 +566,25 @@ let self = module.exports = {
                 fork.title = latestRevision.title;
 
                 return _.pick(fork, [
-                    'id', 'origin', 'description', 'languange', 'license',
-                    'user', 'timestamp', 'lastUpdate', 'active', 'title',
+                    'id', 'title', 'user',
+                    'timestamp', 'lastUpdate', 'current', 'origin',
                 ]);
 
             }));
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
+    countDeckForks: function(request, reply) {
+        let deckId = request.params.id;
+        let userId = request.query.user || undefined;
+
+        deckDB.countDeckForks(deckId, userId).then((forkCount) => {
+            if (_.isNil(forkCount)) return reply(boom.notFound());
+
+            reply(forkCount);
         }).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());

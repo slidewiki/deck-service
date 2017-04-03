@@ -99,6 +99,12 @@ let self = module.exports = {
         .then((cursor) => cursor.toArray());
     },
 
+    count: (collection, query) => {
+        return helper.connectToDatabase()
+        .then((db) => db.collection(collection))
+        .then((col) => col.count(query));
+    },
+
     //inserts a deck into the database
     insert: function(deck) {
         return helper.connectToDatabase()
@@ -1173,6 +1179,23 @@ let self = module.exports = {
 
             // then run the query itself
             return self.find('decks', query);
+        });
+    },
+
+    countDeckForks(deckId, userId) {
+        if (userId) userId = parseInt(userId);
+        deckId = parseInt(deckId);
+
+        // check for 404 first
+        return self.get(deckId).then((deck) => {
+            if (!deck) return;
+
+            let query = { 'origin.id': deckId };
+            if (userId) {
+                query.user = userId;
+            }
+
+            return self.count('decks', query);
         });
     },
 
