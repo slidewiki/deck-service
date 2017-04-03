@@ -1086,6 +1086,7 @@ let self = module.exports = {
                                         id: found._id,
                                         revision: found.revisions[ind].id,
                                         title: found.revisions[ind].title,
+                                        user: found.user,
                                     },
                                     description: found.description,
                                     language: found.revisions[ind].language,
