@@ -129,7 +129,7 @@ let self = module.exports = {
         });
     },
 
-    // TODO only used for accessLevel tests right now, should be removed or properly integrated 
+    // TODO only used for accessLevel tests right now, should be removed or properly integrated
     // once a decision re: access level is made
     _adminUpdate: function(id, deckPatch) {
         return helper.connectToDatabase()
@@ -599,8 +599,17 @@ let self = module.exports = {
     revert: function(deck_id, deck){ //this can actually revert to past and future revisions
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
-        .then((col) => {
-            return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(deck.revision_id)}}, {new: true});
+        .then((col) => {            
+            let targetRevisionIndex = parseInt(deck.revision_id)-1;
+            return col.findOne({_id: parseInt(deck_id)})
+            .then((existingDeck) => {
+                let targetRevision = existingDeck.revisions[targetRevisionIndex];
+                targetRevision.timestamp = new Date();
+                targetRevision.lastUpdate = targetRevision.timestamp;
+                targetRevision.id = existingDeck.revisions.length+1;
+                return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(targetRevision.id)}, '$push': {"revisions": targetRevision}}, {new: true});
+            });
+
         });
     },
 
