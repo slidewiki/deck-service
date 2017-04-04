@@ -129,7 +129,7 @@ let self = module.exports = {
         });
     },
 
-    // TODO only used for accessLevel tests right now, should be removed or properly integrated 
+    // TODO only used for accessLevel tests right now, should be removed or properly integrated
     // once a decision re: access level is made
     _adminUpdate: function(id, deckPatch) {
         return helper.connectToDatabase()
@@ -231,11 +231,15 @@ let self = module.exports = {
                 existingDeck.license = deck.license;
                 //add comment, abstract, footer
                 deckRevision.tags = deck.tags;
-
+                if(!deck.hasOwnProperty('theme') || deck.theme === null){
+                    deckRevision.theme = 'default';
+                }
+                else{
+                    deckRevision.theme = deck.theme;
+                }
                 if (!_.isEmpty(deck.editors) ){
                     existingDeck.editors = deck.editors;
                 }
-
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
                 try {
                     valid = deckModel(deckRevision);
@@ -1152,6 +1156,8 @@ let self = module.exports = {
 
     // computes all deck permissions the user has been granted
     userPermissions(deckId, userId) {
+        console.log('deckId', deckId);
+        console.log('userId', userId);
         userId = parseInt(userId);
         return self.get(deckId)
         .then((deck) => {
@@ -1164,7 +1170,6 @@ let self = module.exports = {
 
             // default level is public
             let accessLevel = deck.accessLevel || 'public';
-
             return self.getDeckUsersGroups(deck, deckId)
             .then((editors) => {
                 if (editors.users.includes(userId)) {
@@ -1605,6 +1610,9 @@ function convertToNewDeck(deck){
     if(!deck.hasOwnProperty('tags') || deck.tags === null){
         deck.tags = [];
     }
+    if(!deck.hasOwnProperty('theme') || deck.theme === null){
+        deck.theme = 'default';
+    }
     if(deck.hasOwnProperty('editors') && deck.editors === null){
         deck.editors = {users: [], groups: []};
     }
@@ -1638,6 +1646,7 @@ function convertToNewDeck(deck){
             abstract: deck.abstract,
             footer: deck.footer,
             contentItems: [],
+            theme: deck.theme
         }]
     };
     return result;
@@ -1651,6 +1660,9 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
     }
     if(deck.language === null){
         deck.language = 'en_EN';
+    }
+    if(!deck.hasOwnProperty('theme') || deck.theme === null){
+        deck.theme = 'default';
     }
     if(deck.hasOwnProperty('editors') && deck.editors === null){
         deck.editors = {users: [], groups: []};
@@ -1681,6 +1693,7 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
             abstract: deck.abstract,
             footer: deck.footer,
             contentItems: content_items,
+            theme: deck.theme
         }]
     };
     return result;

@@ -407,11 +407,10 @@ let self = module.exports = {
         let deckId = request.params.id;
         // TODO we should keep this required, no fall-back values!
         let rootDeckId = request.payload.top_root_deck;
-
         authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             // authorizeUser returns nothing if all's ok
             if (boom) return boom;
-            
+
             // force ignore new_revision
             delete request.payload.new_revision;
 
@@ -485,7 +484,7 @@ let self = module.exports = {
                         return reply(boom.forbidden());
                     }
                 }
-                
+
                 if(changeset && changeset.hasOwnProperty('target_deck')){
                     //revisioning took place, we must update root deck
                     request.payload.root_deck = changeset.target_deck;
@@ -1345,7 +1344,7 @@ let self = module.exports = {
             if (userId !== deck.user) return reply(boom.forbidden());
 
             // TODO for now all subdecks should have the same owner, so no further authorization required
-            return deckDB.deepReplaceEditors(deckId, request.payload).then(() => reply());  
+            return deckDB.deepReplaceEditors(deckId, request.payload).then(() => reply());
 
         }).catch((err) => {
             request.log('error', err);
