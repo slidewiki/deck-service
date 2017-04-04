@@ -666,7 +666,7 @@ let self = module.exports = {
     getDeckTree: function(request, reply) {
         deckDB.getDeckTreeFromDB(request.params.id)
         .then((deckTree) => {
-            if (!deckTree) reply(boom.notFound());
+            if (!deckTree) return reply(boom.notFound());
 
             if (co.isEmpty(deckTree))
                 reply(boom.notFound());
@@ -744,10 +744,11 @@ let self = module.exports = {
                                 }
                             }
 
-                            if(changeset && changeset.hasOwnProperty('target_deck')){
-                              //revisioning took place, we must update root deck
-                                parentID = changeset.target_deck;
+                            if (changeset) {
+                                // revisioning may have taken place, we must update root deck
+                                parentID = changeset.target_deck || changeset.parent_deck || parentID;
                             }
+
                             deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1);
                             node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
                             slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
@@ -798,10 +799,11 @@ let self = module.exports = {
                         }
                     }
 
-                    if(changeset && changeset.hasOwnProperty('target_deck')){
-                      //revisioning took place, we must update root deck
-                        parentID = changeset.target_deck;
+                    if (changeset) {
+                        // revisioning may have taken place, we must update root deck
+                        parentID = changeset.target_deck || changeset.parent_deck || parentID;
                     }
+
                     self.getDeck({
                         'params': {'id':parentID},
                         'log': request.log.bind(request),
@@ -899,10 +901,12 @@ let self = module.exports = {
                         else{
                             parentID = request.payload.selector.id;
                         }
-                        if(changeset && changeset.hasOwnProperty('target_deck')){
-                          //revisioning took place, we must update root deck
-                            parentID = changeset.target_deck;
+
+                        if (changeset) {
+                            // revisioning may have taken place, we must update root deck
+                            parentID = changeset.target_deck || changeset.parent_deck || parentID;
                         }
+
                         deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
                         deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
                         //we have to return from the callback, else empty node is returned because it is updated asynchronously
@@ -956,10 +960,11 @@ let self = module.exports = {
                         }
                     }
 
-                    if(changeset && changeset.hasOwnProperty('target_deck')){
-                      //revisioning took place, we must update root deck
-                        parentID = changeset.target_deck;
+                    if (changeset) {
+                        // revisioning may have taken place, we must update root deck
+                        parentID = changeset.target_deck || changeset.parent_deck || parentID;
                     }
+
                     self.getDeck({
                         'params': {'id':parentID},
                         'log': request.log.bind(request),
@@ -1302,30 +1307,39 @@ let self = module.exports = {
             // editors.groups = _.map(editors.groups || [], ['id', 'joined']);
             editors.groups = editors.groups || [];
 
+            // connecting to userService might fail, in that case response will include what the deck service can provide
             return Promise.all([
                 userService.fetchUserInfo(_.map(editors.users, 'id'))
-                .then((userInfo) => util.assignToAllById(editors.users, userInfo)),
+                .then((userInfo) => util.assignToAllById(editors.users, userInfo))
+                .catch((err) => {
+                    request.log('warn', `could not fetch user info: ${err.message || err}`);
+                    return editors.users;
+                }),
 
                 userService.fetchGroupInfo(_.map(editors.groups, 'id'))
-                .then((groupInfo) => util.assignToAllById(editors.groups, groupInfo)),
+                .then((groupInfo) => util.assignToAllById(editors.groups, groupInfo))
+                .catch((err) => {
+                    request.log('warn', `could not fetch group info: ${err.message || err}`);
+                    return editors.groups;
+                }),
 
                 // we also need the implicit editors (AKA contributors)...
                 deckDB.getDeckEditors(deckId)
                 .then((contribIds) => {
+                    let contributors = contribIds.map((id) => ({ id }) );
                     return userService.fetchUserInfo(contribIds)
-                    .then((contribInfo) => util.assignToAllById(contribIds.map((id) => ({ id }) ), contribInfo));
+                    .then((contribInfo) => util.assignToAllById(contributors, contribInfo))
+                    .catch((err) => {
+                        request.log('warn', `could not fetch group info: ${err.message || err}`);
+                        return contributors;
+                    });
                 }),
 
             ]).then(([users, groups, contributors]) => {
-                request.log('info', {
-                    contributors,
-                    editors: { users, groups }
-                });
                 reply({
                     contributors,
                     editors: { users, groups }
                 });
-
             });
 
         }).catch((err) => {
@@ -1604,7 +1618,6 @@ let self = module.exports = {
                         revision = deck.revisions[key];
                 }
 
-                metadata.timestamp = revision.timestamp;
                 metadata.title = revision.title;
                 metadata.comment = revision.comment;
                 metadata.abstract = revision.abstract;
