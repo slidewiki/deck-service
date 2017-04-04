@@ -1165,9 +1165,7 @@ let self = module.exports = {
     },
 
     // computes all deck permissions the user has been granted
-    userPermissions(deckId, userId) {
-        console.log('deckId', deckId);
-        console.log('userId', userId);
+    userPermissions(deckId, userId) {        
         userId = parseInt(userId);
         return self.get(deckId)
         .then((deck) => {
