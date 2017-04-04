@@ -349,6 +349,7 @@ module.exports = function(server) {
                         speakernotes: Joi.string().allow('')
                     }),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    theme: Joi.string(),
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number().required(),
@@ -393,6 +394,7 @@ module.exports = function(server) {
                     comment: Joi.string().allow(''),
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    theme: Joi.string(),
                     new_revision: Joi.boolean(),
                 }).requiredKeys('user'),
             },

@@ -123,11 +123,9 @@ const deckRevision = {
             type: 'number',
             minimum: 0
         },
+        //NOTE: temporarily store themes with their name
         theme: {
-            type: 'object',
-            properties: {
-                default: objectid
-            }
+            type: 'string',
         },
         transition: {
             type: 'object',
@@ -256,7 +254,7 @@ const deck = {
             format: 'date-time'
         },
         user: objectid,
-        // // TODO include these here after validation is fixed across the service 
+        // // TODO include these here after validation is fixed across the service
         // accessLevel: {
         //     type: 'string',
         //     enum: ['public', 'restricted', 'private']
