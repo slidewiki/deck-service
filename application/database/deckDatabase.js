@@ -599,7 +599,7 @@ let self = module.exports = {
     revert: function(deck_id, deck){ //this can actually revert to past and future revisions
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
-        .then((col) => {            
+        .then((col) => {
             let targetRevisionIndex = parseInt(deck.revision_id)-1;
             return col.findOne({_id: parseInt(deck_id)})
             .then((existingDeck) => {
@@ -607,7 +607,7 @@ let self = module.exports = {
                 targetRevision.timestamp = new Date();
                 targetRevision.lastUpdate = targetRevision.timestamp;
                 targetRevision.id = existingDeck.revisions.length+1;
-                return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(targetRevision.id)}, '$push': {"revisions": targetRevision}}, {new: true});
+                return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(targetRevision.id)}, '$push': {'revisions': targetRevision}}, {returnOriginal: false});
             });
 
         });
