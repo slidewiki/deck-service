@@ -607,11 +607,32 @@ let self = module.exports = {
     },
 
     //reverts a deck's active revision to a new given one
-    revert: function(deck_id, deck){ //this can actually revert to past and future revisions
+    revert: function(deck_id, deck){
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
-            return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(deck.revision_id)}}, {new: true});
+            let targetRevisionIndex = parseInt(deck.revision_id)-1;
+            return col.findOne({_id: parseInt(deck_id)})
+            .then((existingDeck) => {
+                let targetRevision = existingDeck.revisions[targetRevisionIndex];
+                let now = (new Date()).toISOString();
+                targetRevision.timestamp = now;
+                targetRevision.user = parseInt(deck.user);
+
+                targetRevision.id = existingDeck.revisions.length+1;
+                return col.findOneAndUpdate(
+                    { _id: parseInt(deck_id) },
+                    {
+                        '$set': {
+                            'active': targetRevision.id,
+                            'lastUpdate': now,
+                        },
+                        '$push': { 'revisions': targetRevision },
+                    },
+                    { returnOriginal: false }
+                );
+            });
+
         });
     },
 

@@ -646,7 +646,8 @@ let self = module.exports = {
                 if (co.isEmpty(reverted))
                     throw reverted;
                 else{
-                    reverted.value.revisions = [reverted.value.revisions[parseInt(request.payload.revision_id)-1]];
+                    //reply with the newly created revision that is actually a copy of the reverted one
+                    reverted.value.revisions = [reverted.value.revisions[reverted.value.revisions.length-1]];
                     reply(reverted.value);
                 }
             }).catch((error) => {
@@ -655,24 +656,38 @@ let self = module.exports = {
             });
         }
         else{
+
             deckDB.get(encodeURIComponent(request.params.id.split('-')[0]), request.payload).then((deck) => {
                 if (co.isEmpty(deck))
                     throw deck;
                 else{
-                    let revision_id = parseInt(request.payload.revision_id);
-                    deckDB.updateContentItem(deck, revision_id, request.payload.root_deck, 'deck')
-                    .then((updatedIds) => {
-                        let fullId = request.params.id;
-                        if(fullId.split('-').length < 2){
-                            fullId += '-'+updatedIds.old_revision;
-                        }
-                        deckDB.updateUsage(fullId, revision_id, request.payload.root_deck).then((updatedDeck) => {
-                            let revisionArray = [updatedDeck.revisions[revision_id-1]];
-                            updatedDeck.revisions = revisionArray;
-                            reply(updatedDeck);
-                        });
+                    deckDB.revert(encodeURIComponent(request.params.id), request.payload).then((reverted) => {
+                        if (co.isEmpty(reverted))
+                            throw reverted;
+                        else{
+                            let revision_id = parseInt(reverted.value.revisions.length);
+                            return deckDB.updateContentItem(deck, revision_id, request.payload.root_deck, 'deck')
+                            .then((updatedIds) => {
+                                let fullId = request.params.id;
+                                if(fullId.split('-').length < 2){
+                                    fullId += '-'+updatedIds.old_revision;
+                                }
+                                return deckDB.updateUsage(fullId, revision_id, request.payload.root_deck).then((updatedDeck) => {
+                                    let revisionArray = [updatedDeck.revisions[revision_id-1]];
+                                    updatedDeck.revisions = revisionArray;
+                                    reply(updatedDeck);
+                                });
 
+                            });
+                            //reply with the newly created revision that is actually a copy of the reverted one
+                            // reverted.value.revisions = [reverted.value.revisions[reverted.value.revisions.length-1]];
+                            // reply(reverted.value);
+                        }
+                    }).catch((error) => {
+                        request.log('error', error);
+                        reply(boom.badImplementation());
                     });
+
 
                 }
             }).catch((error) => {
@@ -692,6 +707,9 @@ let self = module.exports = {
 
         authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             if (boom) return reply(boom);
+
+            // include userId in payload
+            request.payload.user = userId;
 
             // else continue as normal
             self.revertDeckRevision(request, reply);
