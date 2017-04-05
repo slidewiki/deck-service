@@ -669,6 +669,9 @@ let self = module.exports = {
         authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             if (boom) return reply(boom);
 
+            // include userId in payload
+            request.payload.user = userId;
+
             // else continue as normal
             self.revertDeckRevision(request, reply);
         }).catch((err) => {

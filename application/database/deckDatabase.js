@@ -596,7 +596,7 @@ let self = module.exports = {
     },
 
     //reverts a deck's active revision to a new given one
-    revert: function(deck_id, deck){ //this can actually revert to past and future revisions
+    revert: function(deck_id, deck){
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -605,7 +605,8 @@ let self = module.exports = {
             .then((existingDeck) => {
                 let targetRevision = existingDeck.revisions[targetRevisionIndex];
                 targetRevision.timestamp = (new Date()).toISOString();
-                targetRevision.lastUpdate = targetRevision.timestamp;
+                targetRevision.user = parseInt(deck.user);
+
                 targetRevision.id = existingDeck.revisions.length+1;
                 return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(targetRevision.id)}, '$push': {'revisions': targetRevision}}, {returnOriginal: false});
             });
