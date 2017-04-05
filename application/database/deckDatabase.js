@@ -604,7 +604,7 @@ let self = module.exports = {
             return col.findOne({_id: parseInt(deck_id)})
             .then((existingDeck) => {
                 let targetRevision = existingDeck.revisions[targetRevisionIndex];
-                targetRevision.timestamp = new Date();
+                targetRevision.timestamp = (new Date()).toISOString();
                 targetRevision.lastUpdate = targetRevision.timestamp;
                 targetRevision.id = existingDeck.revisions.length+1;
                 return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(targetRevision.id)}, '$push': {'revisions': targetRevision}}, {returnOriginal: false});
