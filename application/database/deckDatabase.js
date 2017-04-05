@@ -604,11 +604,22 @@ let self = module.exports = {
             return col.findOne({_id: parseInt(deck_id)})
             .then((existingDeck) => {
                 let targetRevision = existingDeck.revisions[targetRevisionIndex];
-                targetRevision.timestamp = (new Date()).toISOString();
+                let now = (new Date()).toISOString();
+                targetRevision.timestamp = now;
                 targetRevision.user = parseInt(deck.user);
 
                 targetRevision.id = existingDeck.revisions.length+1;
-                return col.findOneAndUpdate({_id: parseInt(deck_id)}, {'$set' : {'active' : parseInt(targetRevision.id)}, '$push': {'revisions': targetRevision}}, {returnOriginal: false});
+                return col.findOneAndUpdate(
+                    { _id: parseInt(deck_id) },
+                    {
+                        '$set': {
+                            'active': targetRevision.id,
+                            'lastUpdate': now,
+                        },
+                        '$push': { 'revisions': targetRevision },
+                    },
+                    { returnOriginal: false }
+                );
             });
 
         });
