@@ -248,6 +248,9 @@ let self = module.exports = {
                         }else{
                             deck.language = 'en';
                         }
+
+                        // add first slide id-revision
+                        deckRevision.firstSlide = getFirstSlide(deckRevision);
                         // get dataSources for the deck
                         let dataSources = [];
                         if (deckRevision.contentItems !== undefined) {
@@ -1552,6 +1555,8 @@ let self = module.exports = {
                 }else{
                     metadata.language = 'en';
                 }
+                metadata.firstSlide = getFirstSlide(revision);
+
                 metadata.revision_to_show = revision.id;
                 deckDB.getUsernameById(deck.user) //get username
                 .then((username) => {
@@ -1609,6 +1614,8 @@ let self = module.exports = {
                 }else{
                     metadata.language = 'en';
                 }
+
+                metadata.firstSlide = getFirstSlide(revision);
                 metadata.revision_to_show = revision.id;
                 deckDB.getUsernameById(deck.user) //get username
                 .then((username) => {
@@ -1684,17 +1691,8 @@ let self = module.exports = {
                 metadata.tags = revision.tags;
                 metadata.parent = revision.parent;
 
-                //get first slide
-                let firstSlide = undefined;
-                for (let key in revision.contentItems) {
-                    if (revision.contentItems[key].order === 1
-                      && revision.contentItems[key].kind === 'slide') {
-                        firstSlide = revision.contentItems[key].ref.id;
-                        if (revision.contentItems[key].ref.revision)
-                            firstSlide += '-' + revision.contentItems[key].ref.revision;
-                    }
-                };
-                metadata.firstSlide = firstSlide;
+                // get first slide
+                metadata.firstSlide = getFirstSlide(revision);
 
                 result.push(metadata);
             });
@@ -1845,6 +1843,27 @@ function authorizeUser(userId, deckId, rootDeckId, permissionKey = 'edit') {
         // return nothing if all's ok :)
     });
 
+}
+
+// get first slide
+function getFirstSlide(revision) {
+    // TODO two bugs in this code just by looking at it,
+    // (1) it assumes first contentItem is slide
+    // (2) it assumes there's at least one slide in contentItems, could be in subdecks
+    // (3) it keeps iteration even though it found it
+    let firstSlide;
+    for (let key in revision.contentItems) {
+        if (revision.contentItems[key].order === 1
+            && revision.contentItems[key].kind === 'slide') {
+            firstSlide = revision.contentItems[key].ref.id;
+
+            if (revision.contentItems[key].ref.revision) {
+                firstSlide += '-' + revision.contentItems[key].ref.revision;
+            } 
+        }
+    }
+
+    return firstSlide;
 }
 
 //creates a thumbnail for a given slide
