@@ -926,6 +926,9 @@ let self = module.exports = {
                 else{
                     parentID = request.payload.selector.sid;
                 }
+                if(request.payload.selector.stype === 'slide'){
+                    parentID = request.payload.selector.id;
+                }
 
                 let deckArrayPath = spathArray[spathArray.length-1].split(':');
                 deckPosition = parseInt(deckArrayPath[1])+1;
@@ -989,13 +992,12 @@ let self = module.exports = {
                         //console.log('id_map', id_map);
                         //console.log('request payload before', request.payload);
                         request.payload.nodeSpec.id = id_map.id_map[request.payload.nodeSpec.id];
-                        //console.log('request payload after', request.payload);
+
                         deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
                         self.getDeck({
                             'params': {'id' : request.payload.nodeSpec.id},
                             'log': request.log.bind(request),
                         }, (deck) => {
-                            //console.log('deck', deck);
                             if (deck.isBoom) return reply(deck);
 
                             deck.id = deck._id;
@@ -1551,7 +1553,7 @@ let self = module.exports = {
                     active = foundDeck.active;
                 }
                 request.params.id = idArray[0]+'-'+active;
-                deckDB.get(request.query.root_deck).then((foundRootDeck) => {
+                deckDB.get(request.query.root_deck).then((foundRootDeck) => {                    
                     let activeRoot = -1;
                     let rootIdArray = request.query.root_deck.split('-');
                     if(rootIdArray.length > 1){
