@@ -948,7 +948,7 @@ let self = module.exports = {
                 // figure out the subdecks by id and revision
                 let contentItems = deckRevisions.map((rev) => rev.contentItems);
                 contentItems = _.flatten(contentItems).filter((citem) => citem.kind === 'deck');
-                contentItems = _.uniqBy(contentItems, (citem) => `${citem.ref.id}-${citem.ref.revision}`)
+                contentItems = _.uniqBy(contentItems, (citem) => `${citem.ref.id}-${citem.ref.revision}`);
 
                 return new Promise(function(resolve, reject) {
                     async.eachSeries(contentItems, (citem, callback) => {
