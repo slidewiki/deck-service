@@ -240,6 +240,11 @@ let self = module.exports = {
                 const deckRevisionId = (deckIdParts.length > 1) ? deckIdParts[deckIdParts.length - 1] : deck.active;
 
                 if (deck.revisions !== undefined && deck.revisions.length > 0 && deck.revisions[0] !== null) {
+                    // add first slide id-revision for all revisions
+                    deck.revisions.forEach((rev) => {
+                        rev.firstSlide = getFirstSlide(rev);
+                    });
+
                     let deckRevision = deck.revisions.find((revision) => String(revision.id) === String(deckRevisionId));
                     if (deckRevision !== undefined) {
                         //add language of the active revision to the deck
@@ -249,8 +254,6 @@ let self = module.exports = {
                             deck.language = 'en';
                         }
 
-                        // add first slide id-revision
-                        deckRevision.firstSlide = getFirstSlide(deckRevision);
                         // get dataSources for the deck
                         let dataSources = [];
                         if (deckRevision.contentItems !== undefined) {
