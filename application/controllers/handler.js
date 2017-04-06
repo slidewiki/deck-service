@@ -1320,7 +1320,7 @@ let self = module.exports = {
         deckDB.getFlatSlidesFromDB(request.params.id, undefined)
         .then((deckTree) => {
             if (co.isEmpty(deckTree)){
-                reply(boom.notFound());
+                return reply(boom.notFound());
             }
             if(typeof request.query.limit !== 'undefined' || typeof request.query.offset !== 'undefined'){
                 let limit = request.query.limit, offset = request.query.offset;
@@ -1649,13 +1649,6 @@ let self = module.exports = {
         });
 
         decksPromise.then((decks) => {
-            //console.log('handler getAllDecks: found decks:', decks);
-
-            if (decks.length < 1) {
-                reply(boom.notFound());
-                return;
-            }
-
             let result = [];
 
             decks.forEach((deck) => {

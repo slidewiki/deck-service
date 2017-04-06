@@ -916,8 +916,9 @@ let self = module.exports = {
         });
     },
 
-    //returns an implicit list of editors of a given deck
+    // returns an implicit list of editors of a given deck
     getDeckEditors(deck_id, editorsList){
+        if (!editorsList) editorsList = [];
 
         let revision_id = -1;
         let decktreesplit = deck_id.split('-');
@@ -925,7 +926,7 @@ let self = module.exports = {
             deck_id = decktreesplit[0];
             revision_id = decktreesplit[1]-1;
         }
-        //first we should check if the deck has an editors attribute and fill it accordingly
+
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -934,44 +935,35 @@ let self = module.exports = {
                 if(revision_id === -1){
                     revision_id = deck.active-1;
                 }
-                if(!editorsList){
-                    editorsList = [deck.user];
-                    pushIfNotExist(editorsList, deck.revisions[revision_id].user);
-                }
+
+                // take all revisions older than revision_id (including revision_id)
+                let deckRevisions = deck.revisions.slice(0, revision_id + 1);
+
+                // add all deck revision owners up to and including this revision
+                deckRevisions.forEach((rev) => {
+                    pushIfNotExist(editorsList, rev.user);
+                });
+                pushIfNotExist(editorsList, deck.user);
+
+                // figure out the subdecks by id and revision
+                let contentItems = deckRevisions.map((rev) => rev.contentItems);
+                contentItems = _.flatten(contentItems).filter((citem) => citem.kind === 'deck');
+                contentItems = _.uniqBy(contentItems, (citem) => `${citem.ref.id}-${citem.ref.revision}`);
 
                 return new Promise(function(resolve, reject) {
-                    async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
-
-                        if(citem.kind === 'slide'){
-                            helper.connectToDatabase()
-                            .then((db) => db.collection('slides'))
-                            .then((col) => {
-                                col.findOne({_id: parseInt(citem.ref.id)})
-                                .then((slide) => {
-                                    let slide_revision = citem.ref.revision-1;
-                                    pushIfNotExist(editorsList, slide.user);
-                                    pushIfNotExist(editorsList, slide.revisions[slide_revision].user);
-                                    callback();
-                                });
-                            });
+                    async.eachSeries(contentItems, (citem, callback) => {
+                        col.findOne({_id: parseInt(citem.ref.id)})
+                        .then((innerDeck) => self.getDeckEditors(innerDeck._id+'-'+citem.ref.revision, editorsList))
+                        .then(() => callback())
+                        .catch(callback);
+                    }, (err) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(editorsList);
                         }
-                        else{
-                            col.findOne({_id: parseInt(citem.ref.id)})
-                            .then((innerDeck) => {
-                                self.getDeckEditors(innerDeck._id+'-'+citem.ref.revision, editorsList)
-                                .then((res) => {
-                                    callback();
-                                });
-                            });
-                        }
-                    },function(err){
-                        if (err) return reject(err);
-                        resolve(editorsList);
                     });
-
                 });
-
-
             });
         });
     },
