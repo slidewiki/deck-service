@@ -2502,14 +2502,6 @@
                   "id": 4871,
                   "revision": 2
                 }
-              },
-              {
-                "order": 4,
-                "kind": "deck",
-                "ref": {
-                  "id": 568,
-                  "revision": 1
-                }
               }
             ]
           }

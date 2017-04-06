@@ -119,12 +119,12 @@ describe('deckDatabase', function() {
             return Promise.all([
                 deckDB.getDeckUsersGroups('54')
                 .then((editors) => {
-                    editors.users.should.include.members([ 9, 46, 26, 10, 3 ]);
+                    editors.users.should.include.members([ 9, 46, 10, 3 ]);
                 }),
                 // deckDB._adminUpdate('54', { accessLevel: 'restricted' })
                 // .then((updated) => deckDB.getDeckUsersGroups('54'))
                 // .then((editors) => {
-                //     editors.users.should.include.members([ 9, 46, 26, 10, 3 ]);
+                //     editors.users.should.include.members([ 9, 46, 10, 3 ]);
                 // }),
             ]);
 
@@ -146,7 +146,7 @@ describe('deckDatabase', function() {
             return deckDB._adminUpdate('54', { accessLevel: 'restricted' })
             .then((updated) => deckDB.getDeckUsersGroups('54'))
             .then((editors) => {
-                editors.users.should.have.members([ 9, 46, 26, 10, 3, 4, 5 ]);
+                editors.users.should.have.members([ 9, 46, 10, 3, 4, 5 ]);
                 editors.groups.should.have.members([ 2 ]);
             });
         });
@@ -154,7 +154,7 @@ describe('deckDatabase', function() {
         it('should exactly include all implicitly or explicitly authorized users and authorized groups for public decks', function() {
             return deckDB.getDeckUsersGroups('54')
             .then((editors) => {
-                editors.users.should.have.members([ 9, 46, 26, 10, 3, 4, 5 ]);
+                editors.users.should.have.members([ 9, 46, 10, 3, 4, 5 ]);
                 editors.groups.should.have.members([ 2 ]);
             });
         });
