@@ -33,7 +33,7 @@ const self = module.exports = {
             uri: `${Microservices.user.uri}/users`,
             json: true,
             body: userIds,
-        }).then((users) => users.map((u) => ({id: u._id, username: u.username, picture: u.picture}) ) );
+        }).then((users) => users.map((u) => ({id: u._id, username: u.username, picture: u.picture, country: u.country, organization: u.organization}) ) );
     },
 
     // promises group public info for a list of group ids (not the users in the groups)

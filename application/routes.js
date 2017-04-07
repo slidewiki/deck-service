@@ -153,6 +153,8 @@ module.exports = function(server) {
                             id: Joi.number(),
                             username: Joi.string(),
                             picture: Joi.string().allow(''),
+                            country: Joi.string().allow(''),
+                            organization: Joi.string().allow('')
                         })),
                     editors: Joi.object().keys({
                         users: Joi.array().items(
@@ -161,6 +163,8 @@ module.exports = function(server) {
                                 username: Joi.string(),
                                 picture: Joi.string().allow(''),
                                 joined: Joi.string().isoDate(),
+                                country: Joi.string().allow(''),
+                                organization: Joi.string().allow('')
                             })),
                         groups: Joi.array().items(
                             Joi.object().keys({
