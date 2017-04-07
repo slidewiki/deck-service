@@ -402,7 +402,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.insertNewContentItem({id: '1', user: 2}, '2', ins.ops[0]._id+'-1', 'slide', '3'));
+            let res = ins.then((ins) => deckdb.insertNewContentItem({id: '1', revisions: [{},{},{user:2}]}, '2', ins.ops[0]._id+'-1', 'slide', '3'));
             return Promise.all([
                 res.should.be.fulfilled
             ]);
