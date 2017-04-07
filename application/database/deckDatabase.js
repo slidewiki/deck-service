@@ -251,6 +251,16 @@ let self = module.exports = {
                     existingDeck.editors = deck.editors;
                 }
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
+                if(existingDeck.hasOwnProperty('contributors')){
+                    let contributors = existingDeck.contributors;
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', deck.user);
+                    if(existingUserContributorIndex > -1)
+                        contributors[existingUserContributorIndex].count++;
+                    else{
+                        contributors.push({'user': deck.user, 'count': 1});
+                    }
+                    existingDeck.contributors = contributors;
+                }
                 if (!deckModel(deckRevision)) {
                     throw deckModel.errors;
                 }
@@ -447,6 +457,16 @@ let self = module.exports = {
                     };
                     citems.splice(position-1, 0, newCitem);
                     existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+                    if(existingDeck.hasOwnProperty('contributors')){
+                        let contributors = existingDeck.contributors;
+                        let existingUserContributorIndex = findWithAttr(contributors, 'user', citem.revisions[parseInt(citem_revision_id)-1].user);
+                        if(existingUserContributorIndex > -1)
+                            contributors[existingUserContributorIndex].count++;
+                        else{
+                            contributors.push({'user': citem.revisions[parseInt(citem_revision_id)-1].user, 'count': 1});
+                        }
+                        existingDeck.contributors = contributors;
+                    }
                     col.save(existingDeck);
                 }
                 else{
@@ -599,6 +619,16 @@ let self = module.exports = {
                         }
                     }
                     else continue;
+                }
+                if(existingDeck.hasOwnProperty('contributors')){
+                    let contributors = existingDeck.contributors;
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', citem.revisions[parseInt(newRevId)-1].user);
+                    if(existingUserContributorIndex > -1)
+                        contributors[existingUserContributorIndex].count++;
+                    else{
+                        contributors.push({'user': citem.revisions[parseInt(newRevId)-1].user, 'count': 1});
+                    }
+                    existingDeck.contributors = contributors;
                 }
                 col.save(existingDeck);
                 return {'old_revision': old_rev_id, 'new_revision': newRevId};
@@ -1172,7 +1202,7 @@ let self = module.exports = {
                                 new_decks.push(copiedDeck);
                                 col.insertOne(copiedDeck).then((insertedOne) => {
                                     callback();
-                                });                                
+                                });
                             });
                         });
                     },
