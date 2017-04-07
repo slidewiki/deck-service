@@ -932,61 +932,129 @@ let self = module.exports = {
                 else{
                     parentID = request.payload.selector.sid;
                 }
+                if(request.payload.selector.stype === 'slide'){
+                    parentID = request.payload.selector.id;
+                }
 
                 let deckArrayPath = spathArray[spathArray.length-1].split(':');
                 deckPosition = parseInt(deckArrayPath[1])+1;
                 let deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
 
-                self.getDeck({
-                    'params': {'id' : request.payload.nodeSpec.id},
-                    'log': request.log.bind(request),
-                }, (deck) => {
-                    if (deck.isBoom) return reply(deck);
-
-                    deck.id = deck._id;
-                    //handle recursive revisioning
-                    self.handleChange({
-                        'params': {'id':parentID},
-                        'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
+                //NOTE must check if it is a move action, if not, we are appending an external subdeck and we need to fork it
+                if(request.payload.isMove){
+                    self.getDeck({
+                        'params': {'id' : request.payload.nodeSpec.id},
                         'log': request.log.bind(request),
-                    }
-                    ,(changeset) => {
-                        if (changeset && changeset.isBoom) return reply(changeset);
+                    }, (deck) => {
+                        if (deck.isBoom) return reply(deck);
 
-                        if (changeset && changeset.hasOwnProperty('fork_allowed')) {
-                            if (changeset.fork_allowed === false) {
-                                return reply(boom.forbidden());
-                            }
-                        }
-
-                        if(request.payload.selector.stype === 'deck'){
-                            parentID = request.payload.selector.sid;
-                        }
-                        else{
-                            parentID = request.payload.selector.id;
-                        }
-
-                        if (changeset) {
-                            // revisioning may have taken place, we must update root deck
-                            parentID = changeset.target_deck || changeset.parent_deck || parentID;
-                        }
-
-                        deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
-                        deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
-                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                        self.getDeckTree({
-                            'params': {'id' : deck.id},
+                        deck.id = deck._id;
+                        //handle recursive revisioning
+                        self.handleChange({
+                            'params': {'id':parentID},
+                            'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
                             'log': request.log.bind(request),
-                        }, (deckTree) => {
-                            if (deckTree.isBoom) return reply(deckTree);
+                        }
+                        ,(changeset) => {
+                            if (changeset && changeset.isBoom) return reply(changeset);
 
-                            if(changeset && changeset.hasOwnProperty('target_deck')){
-                                deckTree.changeset = changeset;
+                            if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                                if (changeset.fork_allowed === false) {
+                                    return reply(boom.forbidden());
+                                }
                             }
-                            reply(deckTree);
+
+                            if(request.payload.selector.stype === 'deck'){
+                                parentID = request.payload.selector.sid;
+                            }
+                            else{
+                                parentID = request.payload.selector.id;
+                            }
+
+                            if (changeset) {
+                                // revisioning may have taken place, we must update root deck
+                                parentID = changeset.target_deck || changeset.parent_deck || parentID;
+                            }
+
+                            deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
+                            deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
+                            //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                            self.getDeckTree({
+                                'params': {'id' : deck.id},
+                                'log': request.log.bind(request),
+                            }, (deckTree) => {
+                                if (deckTree.isBoom) return reply(deckTree);
+
+                                if(changeset && changeset.hasOwnProperty('target_deck')){
+                                    deckTree.changeset = changeset;
+                                }
+                                reply(deckTree);
+                            });
                         });
                     });
-                });
+                }
+                else{
+                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, request.payload.user).then((id_map) => {
+                        //console.log('id_map', id_map);
+                        //console.log('request payload before', request.payload);
+                        request.payload.nodeSpec.id = id_map.id_map[request.payload.nodeSpec.id];
+
+                        deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
+                        self.getDeck({
+                            'params': {'id' : request.payload.nodeSpec.id},
+                            'log': request.log.bind(request),
+                        }, (deck) => {
+                            if (deck.isBoom) return reply(deck);
+
+                            deck.id = deck._id;
+                            //handle recursive revisioning
+                            self.handleChange({
+                                'params': {'id':parentID},
+                                'query': {'user': request.payload.user, 'root_deck': request.payload.selector.id},
+                                'log': request.log.bind(request),
+                            }
+                            ,(changeset) => {
+                                if (changeset && changeset.isBoom) return reply(changeset);
+
+                                if (changeset && changeset.hasOwnProperty('fork_allowed')) {
+                                    if (changeset.fork_allowed === false) {
+                                        return reply(boom.forbidden());
+                                    }
+                                }
+
+                                if(request.payload.selector.stype === 'deck'){
+                                    parentID = request.payload.selector.sid;
+                                }
+                                else{
+                                    parentID = request.payload.selector.id;
+                                }
+
+                                if (changeset) {
+                                    // revisioning may have taken place, we must update root deck
+                                    parentID = changeset.target_deck || changeset.parent_deck || parentID;
+                                }
+
+                                deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1);
+                                deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
+                                //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                                self.getDeckTree({
+                                    'params': {'id' : deck.id},
+                                    'log': request.log.bind(request),
+                                }, (deckTree) => {
+                                    if (deckTree.isBoom) return reply(deckTree);
+
+                                    if(changeset && changeset.hasOwnProperty('target_deck')){
+                                        deckTree.changeset = changeset;
+                                    }
+                                    reply(deckTree);
+                                });
+                            });
+                        });
+                        //reply(id_map);
+                    });
+                }
+
+
 
             }else{
                 //id is not specified, we need to make a new deck
@@ -1221,7 +1289,7 @@ let self = module.exports = {
     moveDeckTreeNode: function(request, reply) {
         //first delete the node from its current position
         self.deleteDeckTreeNode({
-            'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user},
+            'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user, 'isMove' : true},
             'log': request.log.bind(request),
         },
         (removed) => {
@@ -1296,7 +1364,7 @@ let self = module.exports = {
                 request.payload.targetSelector.id = request.payload.targetSelector.sid;
             }
             let payload  = {'payload': {
-                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user},
+                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user, 'isMove' : true},
                 'log': request.log.bind(request),
             };
             //append the node (revised or not) in the new position
@@ -1491,7 +1559,7 @@ let self = module.exports = {
                     active = foundDeck.active;
                 }
                 request.params.id = idArray[0]+'-'+active;
-                deckDB.get(request.query.root_deck).then((foundRootDeck) => {
+                deckDB.get(request.query.root_deck).then((foundRootDeck) => {                    
                     let activeRoot = -1;
                     let rootIdArray = request.query.root_deck.split('-');
                     if(rootIdArray.length > 1){

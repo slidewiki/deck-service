@@ -1170,8 +1170,9 @@ let self = module.exports = {
                                 }
 
                                 new_decks.push(copiedDeck);
-                                col.insertOne(copiedDeck);
-                                callback();
+                                col.insertOne(copiedDeck).then((insertedOne) => {
+                                    callback();
+                                });                                
                             });
                         });
                     },
@@ -1219,7 +1220,7 @@ let self = module.exports = {
     },
 
     // computes all deck permissions the user has been granted
-    userPermissions(deckId, userId) {        
+    userPermissions(deckId, userId) {
         userId = parseInt(userId);
         return self.get(deckId)
         .then((deck) => {
