@@ -21,6 +21,9 @@ let self = module.exports = {
         .then((found) => {
             if (!found) return;
 
+            let [latestRevision] = found.revisions.slice(-1);
+            found.latestRevisionId = latestRevision.id;
+
             let parsed = identifier.split('-');
             if(parsed.length === 1 || idArray[1] === ''){
                 return found;
@@ -693,7 +696,17 @@ let self = module.exports = {
                 // detect wrong revision id
                 if (!deck.revisions[revision_id]) return;
 
-                deckTree = { title: striptags(deck.revisions[revision_id].title), id: deck_id+'-'+(revision_id+1), type: 'deck', children: []};
+                let [latestRevision] = deck.revisions.slice(-1);
+
+                deckTree = {
+                    id: deck_id+'-'+(revision_id+1),
+                    revisionId: (revision_id + 1),
+                    activeRevisionId: deck.active,
+                    latestRevisionId: latestRevision.id,
+                    title: striptags(deck.revisions[revision_id].title),
+                    type: 'deck',
+                    children: [],
+                };
 
                 return new Promise(function(resolve, reject) {
                     async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){

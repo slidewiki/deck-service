@@ -246,6 +246,11 @@ let self = module.exports = {
                     });
 
                     let deckRevision = deck.revisions.find((revision) => String(revision.id) === String(deckRevisionId));
+
+                    // add some extra revision metadata
+                    deck.revisionId = deckRevisionId;
+                    deck.activeRevisionId = deck.active;
+
                     if (deckRevision !== undefined) {
                         //add language of the active revision to the deck
                         if (deckRevision.language){
