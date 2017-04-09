@@ -824,7 +824,7 @@ let self = module.exports = {
                     revision_id = deck.active-1;
                 }
                 if(!deckTree){
-                    deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), deck.revisions[revision_id].theme children: []};
+                    deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), String(deck.revisions[revision_id].theme), children: []};
                 }
                 return new Promise(function(resolve, reject) {
                     async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
