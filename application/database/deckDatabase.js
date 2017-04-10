@@ -251,6 +251,16 @@ let self = module.exports = {
                     existingDeck.editors = deck.editors;
                 }
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
+                if(existingDeck.hasOwnProperty('contributors')){
+                    let contributors = existingDeck.contributors;
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(deck.user));
+                    if(existingUserContributorIndex > -1)
+                        contributors[existingUserContributorIndex].count++;
+                    else{
+                        contributors.push({'user': parseInt(deck.user), 'count': 1});
+                    }
+                    existingDeck.contributors = contributors;
+                }
                 if (!deckModel(deckRevision)) {
                     throw deckModel.errors;
                 }
@@ -343,11 +353,11 @@ let self = module.exports = {
 
                 if(existingDeck.hasOwnProperty('contributors')){
                     let contributors = existingDeck.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', deck.user);
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(deck.user));
                     if(existingUserContributorIndex > -1)
                         contributors[existingUserContributorIndex].count++;
                     else{
-                        contributors.push({'user': deck.user, 'count': 1});
+                        contributors.push({'user': parseInt(deck.user), 'count': 1});
                     }
                     deckWithNewRevision.contributors = contributors;
                 }
@@ -431,6 +441,21 @@ let self = module.exports = {
                 }
                 // TODO some async updates happening here, need to handle errors to avoid data corruption
 
+                if(existingDeck.hasOwnProperty('contributors')){
+                    let revIndex = 0;
+                    if(citem.revisions.length > 1){
+                        revIndex = parseInt(citem_revision_id)-1;
+                    }
+                    let contributors = existingDeck.contributors;
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(citem.revisions[revIndex].user));
+                    if(existingUserContributorIndex > -1)
+                        contributors[existingUserContributorIndex].count++;
+                    else{
+                        contributors.push({'user': parseInt(citem.revisions[revIndex].user), 'count': 1});
+                    }
+                    existingDeck.contributors = contributors;
+                }
+
                 if(position && position > 0){
                     let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
                     for(let i = position-1; i < citems.length; i++){
@@ -447,6 +472,8 @@ let self = module.exports = {
                     };
                     citems.splice(position-1, 0, newCitem);
                     existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+
+
                     col.save(existingDeck);
                 }
                 else{
@@ -462,6 +489,9 @@ let self = module.exports = {
                                         revision:citem_revision_id
                                     }
                                 }
+                            },
+                            $set: {
+                                'contributors': existingDeck.contributors
                             }
                         }
                     );
@@ -599,6 +629,20 @@ let self = module.exports = {
                         }
                     }
                     else continue;
+                }
+                if(existingDeck.hasOwnProperty('contributors')){
+                    let revIndex = 0;
+                    if(citem.revisions.length > 1){
+                        revIndex = parseInt(newRevId)-1;
+                    }
+                    let contributors = existingDeck.contributors;
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(citem.revisions[revIndex].user));
+                    if(existingUserContributorIndex > -1)
+                        contributors[existingUserContributorIndex].count++;
+                    else{
+                        contributors.push({'user': parseInt(citem.revisions[revIndex].user), 'count': 1});
+                    }
+                    existingDeck.contributors = contributors;
                 }
                 col.save(existingDeck);
                 return {'old_revision': old_rev_id, 'new_revision': newRevId};
