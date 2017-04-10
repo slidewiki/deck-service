@@ -253,7 +253,7 @@ let self = module.exports = {
                 existingDeck.revisions[activeRevisionIndex] = deckRevision;
                 if(existingDeck.hasOwnProperty('contributors')){
                     let contributors = existingDeck.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', deck.user);
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(deck.user));
                     if(existingUserContributorIndex > -1)
                         contributors[existingUserContributorIndex].count++;
                     else{
@@ -353,7 +353,7 @@ let self = module.exports = {
 
                 if(existingDeck.hasOwnProperty('contributors')){
                     let contributors = existingDeck.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', deck.user);
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(deck.user));
                     if(existingUserContributorIndex > -1)
                         contributors[existingUserContributorIndex].count++;
                     else{
@@ -461,9 +461,9 @@ let self = module.exports = {
                         let revIndex = 0;
                         if(citem.revisions.length > 1){
                             revIndex = parseInt(citem_revision_id)-1;
-                        }
+                        }                        
                         let contributors = existingDeck.contributors;
-                        let existingUserContributorIndex = findWithAttr(contributors, 'user', citem.revisions[revIndex].user);
+                        let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(citem.revisions[revIndex].user));
                         if(existingUserContributorIndex > -1)
                             contributors[existingUserContributorIndex].count++;
                         else{
@@ -630,7 +630,7 @@ let self = module.exports = {
                         revIndex = parseInt(newRevId)-1;
                     }
                     let contributors = existingDeck.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', citem.revisions[revIndex].user);
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(citem.revisions[revIndex].user));
                     if(existingUserContributorIndex > -1)
                         contributors[existingUserContributorIndex].count++;
                     else{
