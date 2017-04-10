@@ -247,10 +247,6 @@ let self = module.exports = {
 
                     let deckRevision = deck.revisions.find((revision) => String(revision.id) === String(deckRevisionId));
 
-                    // add some extra revision metadata
-                    deck.revisionId = deckRevisionId;
-                    deck.activeRevisionId = deck.active;
-
                     if (deckRevision !== undefined) {
                         //add language of the active revision to the deck
                         if (deckRevision.language){
@@ -1901,8 +1897,8 @@ let self = module.exports = {
 
 // TODO move these to services / utility libs
 
-// reusable method that authorizes user for a given permission key on the set of deck, rootDeck
-function authorizeUser(userId, deckId, rootDeckId, permissionKey = 'edit') {
+// reusable method that authorizes user for editing a deck given the deck tree root deck
+function authorizeUser(userId, deckId, rootDeckId) {
     let permissionChecks = _.uniq([deckId, rootDeckId])
     .map((id) => deckDB.userPermissions(id, userId));
 
@@ -1913,8 +1909,11 @@ function authorizeUser(userId, deckId, rootDeckId, permissionKey = 'edit') {
         // if others are not found return 422 instead of 404 (not part of path)
         if (perms.some((p) => p === undefined)) return boom.badData();
 
-        // check auth
-        if (perms.some((p) => !p[permissionKey])) return boom.forbidden();
+        // check edit permission
+        if (perms.some((p) => !p.edit)) return boom.forbidden();
+
+        // check readOnly status
+        if (perms.some((p) => p.readOnly)) return boom.forbidden();
 
         // return nothing if all's ok :)
     });

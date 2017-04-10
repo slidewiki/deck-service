@@ -227,9 +227,10 @@ module.exports = function(server) {
             description: 'Get the permissions the current user has on the deck (revision) - JWT needed',
             response: {
                 schema: Joi.object({
-                    fork: Joi.boolean().default(true),
-                    edit: Joi.boolean().default(false),
-                    admin: Joi.boolean().default(false),
+                    fork: Joi.boolean(),
+                    edit: Joi.boolean(),
+                    admin: Joi.boolean(),
+                    readOnly: Joi.boolean(),
                 }),
             }
         },
