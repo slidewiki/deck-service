@@ -257,7 +257,7 @@ let self = module.exports = {
                     if(existingUserContributorIndex > -1)
                         contributors[existingUserContributorIndex].count++;
                     else{
-                        contributors.push({'user': deck.user, 'count': 1});
+                        contributors.push({'user': parseInt(deck.user), 'count': 1});
                     }
                     existingDeck.contributors = contributors;
                 }
@@ -357,7 +357,7 @@ let self = module.exports = {
                     if(existingUserContributorIndex > -1)
                         contributors[existingUserContributorIndex].count++;
                     else{
-                        contributors.push({'user': deck.user, 'count': 1});
+                        contributors.push({'user': parseInt(deck.user), 'count': 1});
                     }
                     deckWithNewRevision.contributors = contributors;
                 }
@@ -458,12 +458,16 @@ let self = module.exports = {
                     citems.splice(position-1, 0, newCitem);
                     existingDeck.revisions[activeRevisionId-1].contentItems = citems;
                     if(existingDeck.hasOwnProperty('contributors')){
+                        let revIndex = 0;
+                        if(citem.revisions.length > 1){
+                            revIndex = parseInt(citem_revision_id)-1;
+                        }
                         let contributors = existingDeck.contributors;
-                        let existingUserContributorIndex = findWithAttr(contributors, 'user', citem.revisions[parseInt(citem_revision_id)-1].user);
+                        let existingUserContributorIndex = findWithAttr(contributors, 'user', citem.revisions[revIndex].user);
                         if(existingUserContributorIndex > -1)
                             contributors[existingUserContributorIndex].count++;
                         else{
-                            contributors.push({'user': citem.revisions[parseInt(citem_revision_id)-1].user, 'count': 1});
+                            contributors.push({'user': parseInt(citem.revisions[revIndex].user), 'count': 1});
                         }
                         existingDeck.contributors = contributors;
                     }
@@ -621,12 +625,16 @@ let self = module.exports = {
                     else continue;
                 }
                 if(existingDeck.hasOwnProperty('contributors')){
+                    let revIndex = 0;
+                    if(citem.revisions.length > 1){
+                        revIndex = parseInt(newRevId)-1;
+                    }
                     let contributors = existingDeck.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', citem.revisions[parseInt(newRevId)-1].user);
+                    let existingUserContributorIndex = findWithAttr(contributors, 'user', citem.revisions[revIndex].user);
                     if(existingUserContributorIndex > -1)
                         contributors[existingUserContributorIndex].count++;
                     else{
-                        contributors.push({'user': citem.revisions[parseInt(newRevId)-1].user, 'count': 1});
+                        contributors.push({'user': parseInt(citem.revisions[revIndex].user), 'count': 1});
                     }
                     existingDeck.contributors = contributors;
                 }
