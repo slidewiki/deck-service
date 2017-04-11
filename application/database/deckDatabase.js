@@ -1148,6 +1148,15 @@ let self = module.exports = {
                             col.findOne({_id: parseInt(next_deck.split('-')[0])})
                             .then((found) => {
                                 let ind = parseInt(next_deck.split('-')[1])-1;
+                                let contributorsArray = found.contributors;
+                                //contributorsArray.push({'user': parseInt(user), 'count': 1});
+                                let existingUserContributorIndex = findWithAttr(contributorsArray, 'user', parseInt(user));
+                                if(existingUserContributorIndex > -1)
+                                    contributorsArray[existingUserContributorIndex].count++;
+                                else{
+                                    contributorsArray.push({'user': parseInt(user), 'count': 1});
+                                }
+
                                 let copiedDeck = {
                                     _id: id_noRev_map[found._id],
                                     origin: {
@@ -1162,7 +1171,7 @@ let self = module.exports = {
                                     license: found.license,
                                     user: parseInt(user),
                                     translated_from: found.translated_from,
-                                    contributors: found.contributors,
+                                    contributors: contributorsArray,
                                     active: 1
                                 };
 
