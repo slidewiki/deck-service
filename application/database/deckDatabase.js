@@ -21,11 +21,20 @@ let self = module.exports = {
         .then((found) => {
             if (!found) return;
 
+            // add some extra revision metadata
+            let [latestRevision] = found.revisions.slice(-1);
+            found.latestRevisionId = latestRevision.id;
+
             let parsed = identifier.split('-');
             if(parsed.length === 1 || idArray[1] === ''){
+                // this is the requested revision, if not set it is the 'active' revision
+                found.revisionId = found.active;
                 return found;
             }
             else{
+                // this is the requested revision
+                found.revisionId = parseInt(idArray[1]);
+
                 let revision = found.revisions[parseInt(idArray[1])-1];
                 if(typeof revision === 'undefined'){
                     return;
@@ -737,7 +746,16 @@ let self = module.exports = {
                 // detect wrong revision id
                 if (!deck.revisions[revision_id]) return;
 
-                deckTree = { title: striptags(deck.revisions[revision_id].title), id: deck_id+'-'+(revision_id+1), type: 'deck', children: []};
+                let [latestRevision] = deck.revisions.slice(-1);
+
+                deckTree = {
+                    id: deck_id+'-'+(revision_id+1),
+                    revisionId: (revision_id + 1),
+                    latestRevisionId: latestRevision.id,
+                    title: striptags(deck.revisions[revision_id].title),
+                    type: 'deck',
+                    children: [],
+                };
 
                 return new Promise(function(resolve, reject) {
                     async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
@@ -1279,9 +1297,13 @@ let self = module.exports = {
         .then((deck) => {
             if (!deck) return;
 
+            // return {readOnly: true} if requesting any revision other than the latest
+            // depending on `deckId` format, the deck may include just the requested revision or all of them
+            let readOnly = (deck.revisionId !== deck.latestRevisionId);
+
             if (deck.user === userId) {
                 // deck owner, return all
-                return { fork: true, edit: true, admin: true };
+                return { fork: true, edit: true, admin: true, readOnly };
             }
 
             // default level is public
@@ -1290,24 +1312,24 @@ let self = module.exports = {
             .then((editors) => {
                 if (editors.users.includes(userId)) {
                     // user is an editor
-                    return { fork: true, edit: true, admin: false };
+                    return { fork: true, edit: true, admin: false, readOnly };
                 } else {
                     // we also need to check if the groups allowed to edit the deck include the user
                     return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
 
                         if (groupsUsers.includes(userId)) {
                             // user is an editor
-                            return { fork: true, edit: true, admin: false };
+                            return { fork: true, edit: true, admin: false, readOnly };
                         } else {
                             // user is not an editor or owner
                             // also return if user can fork the deck (e.g. if it's public)
-                            return { fork: (accessLevel !== 'private'), edit: false, admin: false };
+                            return { fork: (accessLevel !== 'private'), edit: false, admin: false, readOnly };
                         }
 
                     }).catch((err) => {
                         console.warn(`could not fetch usergroup info from service: ${err.message}`);
                         // we're not sure, let's just not allow this user
-                        return { fork: (accessLevel !== 'private'), edit: false, admin: false };
+                        return { fork: (accessLevel !== 'private'), edit: false, admin: false, readOnly };
                     });
                 }
             });
