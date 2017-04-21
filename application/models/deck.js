@@ -213,37 +213,6 @@ const deckRevision = {
             }
         }
     },
-    translated_from: { //if this deck_revision is a result of translation
-        type: 'object',
-        properties: {
-            status: {
-                type: 'string',
-                enum: ['original', 'google', 'revised', null]
-            },
-            source: {
-                type: 'object',
-                properties: {
-                    id: {
-                        type: 'number'
-                    },
-                    revision: {
-                        type: 'number'
-                    }
-                }
-            },
-            translator: {
-                type: 'object',
-                properties: {
-                    id: {
-                        type: 'number',
-                    },
-                    username:{
-                        type: 'string'
-                    }
-                }
-            }
-        }
-    },
     required: ['id', 'timestamp', 'user']
 };
 const deck = {
@@ -329,37 +298,38 @@ const deck = {
                 }
             }
         },
-        translated_from: { //if this deck is a result of translation
-            type: 'object',
-            properties: {
-                status: {
-                    type: 'string',
-                    enum: ['original', 'google', 'revised', null]
-                },
-                source: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number'
-                        },
-                        revision: {
-                            type: 'number'
-                        }
-                    }
-                },
-                translator: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number',
-                        },
-                        username:{
-                            type: 'string'
-                        }
-                    }
-                }
-            }
-        }
+        // TODO re-add some validation here after it is fixed on the service level, AND translation info schema is used
+        // translated_from: { //if this deck is a result of translation
+        //     type: 'object',
+        //     properties: {
+        //         status: {
+        //             type: 'string',
+        //             enum: ['original', 'google', 'revised', null]
+        //         },
+        //         source: {
+        //             type: 'object',
+        //             properties: {
+        //                 id: {
+        //                     type: 'number'
+        //                 },
+        //                 revision: {
+        //                     type: 'number'
+        //                 }
+        //             }
+        //         },
+        //         translator: {
+        //             type: 'object',
+        //             properties: {
+        //                 id: {
+        //                     type: 'number',
+        //                 },
+        //                 username:{
+        //                     type: 'string'
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     },
     required: ['timestamp', 'user']
 };
