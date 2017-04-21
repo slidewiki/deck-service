@@ -1185,7 +1185,6 @@ let self = module.exports = {
                                     },
                                     description: found.description,
                                     language: found.revisions[ind].language,
-                                    tags: found.revisions[ind].tags,
                                     license: found.license,
                                     user: parseInt(user),
                                     translated_from: found.translated_from,
