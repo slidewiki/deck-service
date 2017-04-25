@@ -152,14 +152,14 @@ module.exports = function(server) {
                         Joi.object().keys({
                             id: Joi.number(),
                             username: Joi.string(),
-                            picture: Joi.string().allow(''),
+                            picture: Joi.string().allow(['', null]),
                         })),
                     editors: Joi.object().keys({
                         users: Joi.array().items(
                             Joi.object().keys({
                                 id: Joi.number(),
                                 username: Joi.string(),
-                                picture: Joi.string().allow(''),
+                                picture: Joi.string().allow(['', null]),
                                 joined: Joi.string().isoDate(),
                             })),
                         groups: Joi.array().items(
