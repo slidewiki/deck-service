@@ -30,9 +30,9 @@
     "no-unexpected-multiline": 2,
     "no-var": 1,
     "no-warning-comments": 0,
+    "no-undef": 2,
     "promise/param-names": 1,
-    "promise/always-return": 0,
-    "promise/always-catch": 1
+    "promise/catch-or-return": 1
   },
   "plugins": [
         "promise"

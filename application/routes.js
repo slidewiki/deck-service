@@ -3,6 +3,11 @@
 const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
+// TODO better organize joi validation models
+const apiModels = {};
+apiModels.tag = Joi.object().keys({
+    tagName: Joi.string(),
+}).requiredKeys('tagName');
 
 module.exports = function(server) {
 
@@ -88,6 +93,30 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deck/{id}/forkAllowed',
+        handler: handlers.forkAllowed,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Decide if deck can be forked by the user - JWT needed',
+            response: {
+                schema: Joi.object().keys({
+                    forkAllowed: Joi.boolean()
+                }).required().description('Return schema')
+            },
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/handleChange',
         handler: handlers.handleChange,
         config: {
@@ -116,7 +145,112 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Get editors (owners and contributors) of a deck and its sub-components'
+            description: 'Get the users and groups authorized for editing the deck (includes contributors)',
+            response: {
+                schema: Joi.object().keys({
+                    contributors: Joi.array().items(
+                        Joi.object().keys({
+                            id: Joi.number(),
+                            username: Joi.string(),
+                            picture: Joi.string().allow(['', null]),
+                        })),
+                    editors: Joi.object().keys({
+                        users: Joi.array().items(
+                            Joi.object().keys({
+                                id: Joi.number(),
+                                username: Joi.string(),
+                                picture: Joi.string().allow(['', null]),
+                                joined: Joi.string().isoDate(),
+                            })),
+                        groups: Joi.array().items(
+                            Joi.object().keys({
+                                id: Joi.number(),
+                                name: Joi.string(),
+                                joined: Joi.string().isoDate(),
+                            })),
+                    }),
+                }),
+            },
+        },
+    });
+
+    server.route({
+        method: 'PUT',
+        path: '/deck/{id}/editors',
+        handler: handlers.replaceEditors,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                payload: Joi.object().keys({
+                    editors: Joi.object().keys({
+                        groups: Joi.array().items(Joi.object().keys({
+                            id: Joi.number().required(),
+                            joined: Joi.string().isoDate().required(),
+                        })).default([]),
+                        users: Joi.array().items(Joi.object().keys({
+                            id: Joi.number().required(),
+                            joined: Joi.string().isoDate().required(),
+                        })).default([])
+                    }).required(),
+                }),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Replace the users and groups authorized for editing the deck - JWT needed',
+            response: {
+                emptyStatusCode: 204,
+                status: { '204' : false }
+            },
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/permissions',
+        handler: handlers.userPermissions,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().regex(/[0-9]+/),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Get the permissions the current user has on the deck (revision) - JWT needed',
+            response: {
+                schema: Joi.object({
+                    fork: Joi.boolean(),
+                    edit: Joi.boolean(),
+                    admin: Joi.boolean(),
+                    readOnly: Joi.boolean(),
+                }),
+            }
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/forkCount',
+        handler: handlers.countDeckForks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+                query: {
+                    user: Joi.number().integer().description('The id of the user the forks counted are owned by'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get total count of forks for this deck, optionally filtered by fork owner'
         }
     });
 
@@ -151,6 +285,43 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/editAllowed',
+        handler: handlers.editAllowed,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown()
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Check if user is allowed to edit the deck - JWT needed',
+            response: {
+                schema: Joi.object().keys({
+                    allowed: Joi.boolean()
+                }).required('allowed')
+            },
+            plugins: {
+                'hapi-swagger': {
+                    responses: {
+                        ' 200 ': {
+                            'description': 'Successful',
+                        },
+                        ' 404 ': {
+                            'description': 'Deck not found. Check the id.'
+                        }
+                    },
+                    payloadType: 'form'
+                }
+            }
+        }
+    });
+
+    server.route({
         method: 'POST',
         path: '/deck/new',
         handler: handlers.newDeck,
@@ -162,7 +333,7 @@ module.exports = function(server) {
                     translation: Joi.object().keys({
                         status: Joi.string().valid('original', 'google', 'revised')
                     }),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
                     user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string().alphanum().lowercase(),
@@ -178,7 +349,18 @@ module.exports = function(server) {
                         title: Joi.string().allow(''),
                         speakernotes: Joi.string().allow('')
                     }),
-                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    theme: Joi.string().allow(''),
+                    editors: Joi.object().keys({
+                        groups: Joi.array().items(Joi.object().keys({
+                            id: Joi.number().required(),
+                            joined: Joi.string().isoDate().required(),
+                        })).default([]),
+                        users: Joi.array().items(Joi.object().keys({
+                            id: Joi.number().required(),
+                            joined: Joi.string().isoDate().required(),
+                        })).default([])
+                    })
                 }).requiredKeys('user', 'license'),
             },
             tags: ['api'],
@@ -189,7 +371,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/deck/{id}',
-        handler: handlers.updateDeckRevision,
+        handler: handlers.updateDeck,
         config: {
             validate: {
                 params: {
@@ -199,7 +381,7 @@ module.exports = function(server) {
                     description: Joi.string(),
                     language: Joi.string(),
                     translation: Joi.string().alphanum().lowercase(),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
                     user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string(),
@@ -213,7 +395,8 @@ module.exports = function(server) {
                     comment: Joi.string().allow(''),
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
-                    new_revision: Joi.boolean()
+                    theme: Joi.string().allow(''),
+                    new_revision: Joi.boolean(),
                 }).requiredKeys('user'),
             },
             tags: ['api'],
@@ -222,9 +405,27 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/forks',
+        handler: handlers.getDeckForks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+                query: {
+                    user: Joi.number().integer().description('The id of the user the forks returned are owned by'),
+                },
+            },
+            tags: ['api'],
+            description: 'List all decks that fork current deck, optionally filtered by fork owner',
+        },
+    });
+
+    server.route({
         method: 'PUT',
         path: '/deck/{id}/fork',
-        handler: handlers.forkDeckRevision,
+        handler: handlers.forkDeckRevisionWithCheck,
         config: {
             validate: {
                 params: {
@@ -241,8 +442,31 @@ module.exports = function(server) {
 
     server.route({
         method: 'POST',
+        path: '/deck/{id}/revision',
+        handler: handlers.createDeckRevision,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string(),
+                },
+                payload: Joi.object().keys({
+                    root: Joi.string().required(),
+                    parent: Joi.string(),
+                }),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Create a new revision for the deck, and optionally update reference of parent deck - JWT needed',
+        },
+    });
+
+    server.route({
+        method: 'POST',
         path: '/deck/revert/{id}',
-        handler: handlers.revertDeckRevision,
+        handler: handlers.revertDeckRevisionWithCheck,
         config: {
             validate: {
                 params: {
@@ -250,10 +474,15 @@ module.exports = function(server) {
                 },
                 payload: Joi.object().keys({
                     revision_id: Joi.string().alphanum().lowercase(),
-                    root_deck: Joi.string()
-                }).requiredKeys('revision_id'),
+                    root_deck: Joi.string(),
+                    top_root_deck: Joi.string(),
+                }).requiredKeys('revision_id', 'top_root_deck'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Revert a deck to an old revision'
         }
     });
@@ -331,7 +560,7 @@ module.exports = function(server) {
                     language: Joi.string(),
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
                 }).requiredKeys('user', 'content', 'root_deck', 'license'),
             },
@@ -340,11 +569,9 @@ module.exports = function(server) {
         }
     });
 
-// TODO Altered API from Alis proposal
     server.route({
         method: 'PUT',
         path: '/slide/{id}',
-        //for now, no new revision on replace
         handler: handlers.updateSlide,
         config: {
             validate: {
@@ -368,7 +595,7 @@ module.exports = function(server) {
                     }),
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
-                    tags: Joi.array().items(Joi.string()).default([]),
+                    tags: Joi.array().items(apiModels.tag).default([]),
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
@@ -390,7 +617,7 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/slide/revert/{id}',
-        handler: handlers.revertSlideRevision,
+        handler: handlers.revertSlideRevisionWithCheck,
         config: {
             validate: {
                 params: {
@@ -398,10 +625,15 @@ module.exports = function(server) {
                 },
                 payload: Joi.object().keys({
                     revision_id: Joi.string().alphanum().lowercase(),
-                    root_deck: Joi.string()
-                }).requiredKeys('revision_id', 'root_deck'),
+                    root_deck: Joi.string(),
+                    top_root_deck: Joi.string(),
+                }).requiredKeys('revision_id', 'root_deck', 'top_root_deck'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Revert a slide to an old revision'
         }
     });
@@ -561,4 +793,90 @@ module.exports = function(server) {
             description: 'Move a node (slide/deck) in a different position in the deck tree'
         }
     });
+
+    //------------------------------- Tag Routes -----------------------------//
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/tags',
+        handler: handlers.getDeckTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                },
+            },
+            tags: ['api'],
+            description: 'Get tags of a deck',
+            response: {
+                schema: Joi.array().items(apiModels.tag),
+            },
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/deck/{id}/tags',
+        handler: handlers.updateDeckTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                },
+                payload:
+                    Joi.object().keys({
+                        operation: Joi.string().valid('add', 'remove'),
+                        user: Joi.string().alphanum().lowercase(),
+                        tag: apiModels.tag,
+                    }).requiredKeys('operation', 'user', 'tag')
+            },
+            tags: ['api'],
+            description: 'Add/Remove a tag from a deck',
+            response: {
+                schema: Joi.array().items(apiModels.tag),
+            },
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/tags',
+        handler: handlers.getSlideTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                },
+            },
+            tags: ['api'],
+            description: 'Get tags of a slide',
+            response: {
+                schema: Joi.array().items(apiModels.tag),
+            },
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/slide/{id}/tags',
+        handler: handlers.updateSlideTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                },
+                payload:
+                    Joi.object().keys({
+                        operation: Joi.string().valid('add', 'remove'),
+                        user: Joi.string().alphanum().lowercase(),
+                        tag: apiModels.tag,
+                    }).requiredKeys('operation', 'user', 'tag'),
+            },
+            tags: ['api'],
+            description: 'Add/Remove a tag from a slide',
+            response: {
+                schema: Joi.array().items(apiModels.tag),
+            },
+        }
+    });
+
 };

@@ -1,9 +1,11 @@
 'use strict';
 
 const hapi = require('hapi'),
-    co = require('./common');
+    co = require('./common'),
+    config = require('./configuration'),
+    jwt = require('./controllers/jwt');
 
-const server = new hapi.Server({ connections: {routes: {validate: { options: {convert : false}}}}});
+const server = new hapi.Server();
 
 let port = (!co.isEmpty(process.env.APPLICATION_PORT)) ? process.env.APPLICATION_PORT : 3000;
 server.connection({
@@ -45,7 +47,8 @@ let plugins = [
                 version: '0.1.0'
             }
         }
-    }
+    },
+    require('hapi-auth-jwt2')
 ];
 
 server.register(plugins, (err) => {
@@ -53,6 +56,18 @@ server.register(plugins, (err) => {
         console.error(err);
         global.process.exit();
     } else {
+        server.auth.strategy('jwt', 'jwt', {
+            key: config.JWT.SERIAL,
+            validateFunc: jwt.validate,
+            verifyOptions: {
+                algorithms: [config.JWT.ALGORITHM],
+                ignoreExpiration: true
+            },
+            headerKey: config.JWT.HEADER
+        });
+
+        // server.auth.default('false');
+
         server.start(() => {
             server.log('info', 'Server started at ' + server.info.uri);
             require('./routes.js')(server);

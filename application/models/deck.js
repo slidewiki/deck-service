@@ -37,11 +37,10 @@ const trackedDeckRevisionProperties = {
     language: {
         type: 'string'
     },
+
+    //NOTE: temporarily store themes with their name
     theme: {
-        type: 'object',
-        properties: {
-            default: objectid
-        }
+        type: 'string',
     },
 
 };
@@ -111,6 +110,49 @@ const contentItemPartial = {
     },
 };
 
+const editors = {
+    type: 'object',
+    properties: {
+        groups: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: {
+                        type: 'number'
+                    },
+                    name: {
+                        type: 'string'
+                    },
+                    joined: {
+                        type: 'string',
+                        format: 'date-time'
+                    }
+                }
+            }
+        },
+        users: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: objectid,
+                    username: {
+                        type: 'string'
+                    },
+                    joined: {
+                        type: 'string',
+                        format: 'date-time'
+                    },
+                    picture: {
+                        type: 'string'
+                    }
+                }
+            }
+        }
+    }
+};
+
 // model how deck revision changes are saved in log
 const deckRevisionChange = {
     type: 'object',
@@ -122,7 +164,7 @@ const deckRevisionChange = {
 
         timestamp: {
             type: 'string',
-            format: 'datetime',
+            format: 'date-time',
         },
 
         before: {
@@ -147,7 +189,7 @@ const deckRevision = {
         },
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
         parent: {
@@ -208,8 +250,14 @@ const deckRevision = {
         tags: {
             type: 'array',
             items: {
-                type: 'string'
-            }
+                type: 'object',
+                properties: {
+                    tagName: {
+                        type: 'string',
+                    },
+                    // TODO add other properties as well in sync with the tag-service
+                },
+            },
         },
         preferences: {
             type: 'array',
@@ -248,37 +296,6 @@ const deckRevision = {
             }
         }
     }, trackedDeckRevisionProperties),
-    translated_from: { //if this deck_revision is a result of translation
-        type: 'object',
-        properties: {
-            status: {
-                type: 'string',
-                enum: ['original', 'google', 'revised', null]
-            },
-            source: {
-                type: 'object',
-                properties: {
-                    id: {
-                        type: 'number'
-                    },
-                    revision: {
-                        type: 'number'
-                    }
-                }
-            },
-            translator: {
-                type: 'object',
-                properties: {
-                    id: {
-                        type: 'number',
-                    },
-                    username:{
-                        type: 'string'
-                    }
-                }
-            }
-        }
-    },
     required: ['id', 'timestamp', 'user']
 };
 
@@ -294,7 +311,7 @@ const deckChange = {
 
         timestamp: {
             type: 'string',
-            format: 'datetime',
+            format: 'date-time',
         },
 
         before: {
@@ -330,9 +347,36 @@ const deck = {
     properties: _.merge({
         timestamp: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
         user: objectid,
+        // // TODO include these here after validation is fixed across the service
+        // accessLevel: {
+        //     type: 'string',
+        //     enum: ['public', 'restricted', 'private']
+        // },
+        // editors: editors,
+
+        // points to fork origin (only for forked decks)
+        origin: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'number',
+                },
+                revision: {
+                    type: 'number',
+                },
+                title: {
+                    type: 'string',
+                },
+                user: {
+                    type: 'integer',
+                },
+            },
+            required: ['id', 'revision'],
+        },
+
         // kind: {
         //     type: 'string'
         // },
@@ -344,7 +388,7 @@ const deck = {
         // },
         lastUpdate: {
             type: 'string',
-            format: 'datetime'
+            format: 'date-time'
         },
 
         changeLog: {
@@ -355,12 +399,6 @@ const deck = {
         revisions: {
             type: 'array',
             items: deckRevision
-        },
-        tags: {
-            type: 'array',
-            items: {
-                type: 'string'
-            }
         },
         contributors: {
             type: 'array',
@@ -386,37 +424,38 @@ const deck = {
                 }
             }
         },
-        translated_from: { //if this deck is a result of translation
-            type: 'object',
-            properties: {
-                status: {
-                    type: 'string',
-                    enum: ['original', 'google', 'revised', null]
-                },
-                source: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number'
-                        },
-                        revision: {
-                            type: 'number'
-                        }
-                    }
-                },
-                translator: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number',
-                        },
-                        username:{
-                            type: 'string'
-                        }
-                    }
-                }
-            }
-        }
+        // TODO re-add some validation here after it is fixed on the service level, AND translation info schema is used
+        // translated_from: { //if this deck is a result of translation
+        //     type: 'object',
+        //     properties: {
+        //         status: {
+        //             type: 'string',
+        //             enum: ['original', 'google', 'revised', null]
+        //         },
+        //         source: {
+        //             type: 'object',
+        //             properties: {
+        //                 id: {
+        //                     type: 'number'
+        //                 },
+        //                 revision: {
+        //                     type: 'number'
+        //                 }
+        //             }
+        //         },
+        //         translator: {
+        //             type: 'object',
+        //             properties: {
+        //                 id: {
+        //                     type: 'number',
+        //                 },
+        //                 username:{
+        //                     type: 'string'
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }, trackedDeckProperties),
     required: ['timestamp', 'user']
 };
