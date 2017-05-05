@@ -1662,55 +1662,61 @@ let self = module.exports = {
         });
     },
 
-    getPictures: function(deckIdParam, pictures){
+    getPictures: function(deckId){
 
-        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+        let pictures = [];
 
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(deckId)})
-            .then((deck) => {
-                let deckRevisionIndex = revisionId;
-                if(deckRevisionIndex === null){
-                    deckRevisionIndex = getActiveRevision(deck);
-                }
-                if(!pictures){
-                    pictures = [];
-                }
+        return new Promise( (resolve, reject) => {
 
-                return new Promise( (resolve, reject) => {
-                    async.eachSeries(deck.revisions[deckRevisionIndex].contentItems, (citem, callback) => {
+            // get all subdeck ids including root deck id
+            return self.getSubdeckIds(deckId)
+            .then((subdeckIds) => {
 
-                        if(citem.kind === 'slide'){
-                            helper.connectToDatabase()
-                            .then((db) => db.collection('slides'))
-                            .then((col) => {
-                                col.findOne({_id: parseInt(citem.ref.id)})
-                                .then((slide) => {
-                                    let slideRevision = slide.revisions.find((revision) => String(revision.id) === String(citem.ref.revision));
-                                    if(slideRevision){
-                                        pictures.push(...util.findPictures(slideRevision.content));
-                                    }
-                                    callback();
-                                });
-                            });
-                        }
-                        else{
-                            col.findOne({_id: parseInt(citem.ref.id)})
-                            .then((innerDeck) => {
-                                self.getPictures(innerDeck._id+'-'+citem.ref.revision, pictures)
-                                .then((res) => {
-                                    callback();
-                                });
-                            });
-                        }
-                    }, (err) => {
-                        resolve([...new Set(pictures)]);
+                // deck not found
+                if (!subdeckIds) resolve();
+
+                async.eachSeries(subdeckIds, (subdeckId, callback) => {
+
+                    // get specified or active deck revision
+                    self.getRevision(subdeckId).then( (deckRevision) => {
+                        async.eachSeries(deckRevision.contentItems, (item, innerCallback) => {
+
+                            // if not slide, then bypass
+                            if(item.kind !== 'slide'){
+                                innerCallback();
+                            }else{
+                                // get slide from db
+                                helper.connectToDatabase()
+                                    .then((db) => db.collection('slides'))
+                                    .then((col) => {
+                                        col.findOne({_id: parseInt(item.ref.id)})
+                                        .then((slide) => {
+
+                                            // get specific slide revision
+                                            let slideRevision = slide.revisions.find((revision) => String(revision.id) === String(item.ref.revision));
+                                            if(slideRevision){
+                                                
+                                                // append pictures found in the content of current slide
+                                                pictures.push(...util.findPictures(slideRevision.content));
+                                            }
+                                            innerCallback();
+                                        });
+                                    });
+                            }
+                        }, () => {
+                            callback();
+                        });
+                    }).catch( () => {
+                        callback();
                     });
+                }, (err) => {
+                    if(err){
+                        reject(err);
+                    }
+                    else{
+                        resolve([...new Set(pictures)]);
+                    }
                 });
-            }).catch((error) => {
-                return;
             });
         });
     }
