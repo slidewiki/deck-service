@@ -8,5 +8,18 @@ let self = module.exports = {
             Object.assign(val, update.find((el) => el.id === val.id) );
         });
         return original;
+    },
+
+    // find fileservice pictures in html or text
+    findPictures: function(text){
+        let urlRegex = /(https?:\/\/fileservice[^\s]+(png|jpeg|jpg))/g;
+        let matchArray;
+        let pictures = [];
+
+        while( (matchArray = urlRegex.exec(text)) !== null ){
+            pictures.push(matchArray[0]);
+        }
+
+        return pictures;
     }
 };

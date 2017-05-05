@@ -879,4 +879,19 @@ module.exports = function(server) {
         }
     });
 
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/pictures',
+        handler: handlers.getDeckPictures,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                }
+            },
+            tags: ['api'],
+            description: 'Get pictures inside a deck'
+        }
+    });
+
 };

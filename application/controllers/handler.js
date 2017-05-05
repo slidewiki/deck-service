@@ -1888,6 +1888,20 @@ let self = module.exports = {
             request.log('error', error);
             reply(boom.badImplementation());
         });
+    },
+
+    getDeckPictures: function(request, reply){
+        deckDB.getPictures(request.params.id, undefined).then( (deckPictures) => {
+            if(!deckPictures){
+                reply(boom.notFound());
+            }
+            else{
+                reply(deckPictures);
+            }
+        }).catch( (error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
     }
 };
 
