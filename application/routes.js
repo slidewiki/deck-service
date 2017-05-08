@@ -3,6 +3,8 @@
 const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
+const changeLog = require('./controllers/changeLog');
+
 // TODO better organize joi validation models
 const apiModels = {};
 apiModels.tag = Joi.object().keys({
@@ -876,6 +878,23 @@ module.exports = function(server) {
             response: {
                 schema: Joi.array().items(apiModels.tag),
             },
+        }
+    });
+
+
+    //------------------------------- Change Log Routes -----------------------------//
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/changeLog',
+        handler: changeLog.getDeckChangeLog,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional')
+                },
+            },
+            tags: ['api'],
+            description: 'Get the change log array for a deck (revision)',
         }
     });
 
