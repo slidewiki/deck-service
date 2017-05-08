@@ -272,4 +272,31 @@ describe('deckDatabase', function() {
 
     });
 
+    describe('#getPicturesPerDeck', function() {
+        it('should return all images found in deck\'s and its sundecks\' slides', function() {
+            return deckDB.getPictures('54')
+            .then((pictures) => {
+                pictures.should.have.members([
+                    'http://fileservice.experimental.slidewiki.org/5/ddc9a830-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/ddfc02d0-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/ddfc7800-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/ddfd1440-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/ddfdb080-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/ddfe4cc0-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/ddff1010-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/de0f8ad0-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/de107530-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/de10ea60-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/de1186a0-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/de1249f0-bba4-11e6-9bdb-395cce787fb5.png',
+                    'http://fileservice.experimental.slidewiki.org/5/de12e630-bba4-11e6-9bdb-395cce787fb5.png',
+                    'https://fileservice.experimental.slidewiki.org/2/896eff50-1b86-11e7-9791-51f71d7b28b5.png',
+                    'https://fileservice.experimental.slidewiki.org/2/897010c0-1b86-11e7-9791-51f71d7b28b5.jpeg',
+                    'https://fileservice.experimental.slidewiki.org/2/89712230-1b86-11e7-9791-51f71d7b28b5.jpeg'
+                ]);
+            });
+
+        });
+    });
+
 });
