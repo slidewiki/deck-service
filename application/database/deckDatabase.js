@@ -870,59 +870,79 @@ let self = module.exports = {
     },
 
     //returns a flattened structure of a deck's slides, and optionally its sub-decks
-    getFlatSlidesFromDB: function(deck_id, deckTree, return_decks){
+    getFlatSlides: function(deckId, deckTree, returnDecks){
 
-        let revision_id = -1;
-        let decktreesplit = deck_id.split('-');
-        if(decktreesplit.length > 1){
-            deck_id = decktreesplit[0];
-            revision_id = decktreesplit[1]-1;
-        }
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(deck_id)})
-            .then((deck) => {
-                if(revision_id === -1){
-                    revision_id = deck.active-1;
-                }
-                if(!deckTree){
-                    deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), theme: String(deck.revisions[revision_id].theme), children: []};
-                }
-                return new Promise(function(resolve, reject) {
-                    async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
+        return self.getRevision(deckId)
+        .then((deckRevision) => {
 
-                        if(citem.kind === 'slide'){
-                            helper.connectToDatabase()
-                            .then((db) => db.collection('slides'))
-                            .then((col) => {
-                                col.findOne({_id: parseInt(citem.ref.id)})
-                                .then((slide) => {
-                                    let slide_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, user: String(slide.revisions[slide_revision].user), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
-                                    callback();
-                                });
-                            });
-                        }
-                        else{
-                            col.findOne({_id: parseInt(citem.ref.id)})
-                            .then((innerDeck) => {
-                                if(return_decks){
-                                    let deck_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: innerDeck.revisions[deck_revision].title, user: String(innerDeck.revisions[deck_revision].user), id: innerDeck._id+'-'+innerDeck.revisions[deck_revision].id, type: 'deck'});
-                                }
-                                self.getFlatSlidesFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree, return_decks)
-                                .then((res) => {
-                                    callback();
-                                });
-                            });
-                        }
-                    },function(err){
-                        resolve(deckTree);
-                    });
+            // return nothing if not found
+            if (!deckRevision) return;
+
+            if(!deckTree){
+                // info of root deck
+                deckTree = {
+                    title: deckRevision.title,
+                    id: deckId,
+                    type: 'deck',
+                    user: String(deckRevision.user),
+                    theme: String(deckRevision.theme),
+                    children: []
+                };
+            }
+
+            // include subdecks in result
+            if(returnDecks){
+                deckTree.children.push({
+                    title: deckRevision.title,
+                    user: String(deckRevision.user),
+                    id: deckId,
+                    type: 'deck'
                 });
-            }).catch((error) => {
-                return ;
+            }
+
+            return new Promise( (resolve, reject) => {
+                async.eachSeries(deckRevision.contentItems, (citem, callback) => {
+
+                    if(citem.kind === 'slide'){
+                        helper.connectToDatabase()
+                        .then((db) => db.collection('slides'))
+                        .then((col) => {
+                            col.findOne({_id: parseInt(citem.ref.id)})
+                            .then((slide) => {
+                                let slideRevision =  slide.revisions.find((rev) => (rev.id === citem.ref.revision));
+                                deckTree.children.push({
+                                    title:slideRevision.title,
+                                    content: slideRevision.content,
+                                    speakernotes: slideRevision.speakernotes,
+                                    user: String(slideRevision.user),
+                                    id: slide._id+'-'+slideRevision.id,
+                                    type: 'slide'
+                                });
+                                callback();
+                            }).catch( (err) => {
+                                callback(err);
+                            });
+                        }).catch( (err) => {
+                            callback(err);
+                        });
+                    }
+                    else if (citem.kind === 'deck'){
+                        // call recursively for subdecks
+                        self.getFlatSlides(`${citem.ref.id}-${citem.ref.revision}`, deckTree, returnDecks)
+                        .then(() => {
+                            callback();
+                        }).catch( (err) => {
+                            callback(err);
+                        });
+                    }
+                }, (err) => {
+                    if(err){
+                        reject(err);
+                    }
+                    else{
+                        resolve(deckTree);
+                    }
+                });
             });
         });
     },
@@ -1564,7 +1584,7 @@ let self = module.exports = {
                                     target_deck = new_revisions[i];
                                 }
                             }
-                            self.getFlatSlidesFromDB(root_deck, undefined, true).then((flatTree) => {
+                            self.getFlatSlides(root_deck, undefined, true).then((flatTree) => {
                                 for(let i = 0; i < flatTree.children.length; i++){
                                     if(flatTree.children[i].id === new_revisions[0]){
                                         resolve({'new_revisions': new_revisions, 'target_deck': target_deck, 'new_deck_id': flatTree.children[i].id, 'position': i+1, 'root_changed': false});
@@ -1663,61 +1683,14 @@ let self = module.exports = {
     },
 
     getPictures: function(deckId){
-
-        let pictures = [];
-
-        return new Promise( (resolve, reject) => {
-
-            // get all subdeck ids including root deck id
-            return self.getSubdeckIds(deckId)
-            .then((subdeckIds) => {
-
-                // deck not found
-                if (!subdeckIds) resolve();
-
-                async.eachSeries(subdeckIds, (subdeckId, callback) => {
-
-                    // get specified or active deck revision
-                    self.getRevision(subdeckId).then( (deckRevision) => {
-                        async.eachSeries(deckRevision.contentItems, (item, innerCallback) => {
-
-                            // if not slide, then bypass
-                            if(item.kind !== 'slide'){
-                                innerCallback();
-                            }else{
-                                // get slide from db
-                                helper.connectToDatabase()
-                                    .then((db) => db.collection('slides'))
-                                    .then((col) => {
-                                        col.findOne({_id: parseInt(item.ref.id)})
-                                        .then((slide) => {
-
-                                            // get specific slide revision
-                                            let slideRevision = slide.revisions.find((revision) => String(revision.id) === String(item.ref.revision));
-                                            if(slideRevision){
-                                                
-                                                // append pictures found in the content of current slide
-                                                pictures.push(...util.findPictures(slideRevision.content));
-                                            }
-                                            innerCallback();
-                                        });
-                                    });
-                            }
-                        }, () => {
-                            callback();
-                        });
-                    }).catch( () => {
-                        callback();
-                    });
-                }, (err) => {
-                    if(err){
-                        reject(err);
-                    }
-                    else{
-                        resolve([...new Set(pictures)]);
-                    }
-                });
+        return self.getFlatSlides(deckId, undefined, false).then( (flatSlides) => {
+            if(!flatSlides) return;
+            
+            let pictures = [];
+            flatSlides.children.forEach( (slide) => {
+                pictures.push(...util.findPictures(slide.content));
             });
+            return [...new Set(pictures)];
         });
     }
 };

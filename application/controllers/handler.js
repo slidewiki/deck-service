@@ -272,7 +272,7 @@ let self = module.exports = {
                             let promise = Promise.resolve({children: []});
                             if (thereAreSubdecks) {
                                 //if there are subdecks, get the rest of slides, from deeper levels ( > 1 )
-                                promise = deckDB.getFlatSlidesFromDB(request.params.id, undefined);
+                                promise = deckDB.getFlatSlides(request.params.id, undefined);
                             }
 
                             promise.then((deckTree) => {
@@ -1388,7 +1388,7 @@ let self = module.exports = {
     },
     //gets a flat listing of the slides from deck and all of its sub-decks with optional offset and limit
     getFlatSlides: function(request, reply){
-        deckDB.getFlatSlidesFromDB(request.params.id, undefined)
+        deckDB.getFlatSlides(request.params.id, undefined)
         .then((deckTree) => {
             if (co.isEmpty(deckTree)){
                 return reply(boom.notFound());
@@ -1418,6 +1418,9 @@ let self = module.exports = {
             }
 
             reply(deckTree);
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
     },
 
