@@ -49,6 +49,35 @@ let self = module.exports = {
 
     },
 
+    // TODO
+    // this could likely replace #get as it returns a more uniform data structure,
+    // only with the requested revision data merged into a single object
+    getDeck: function(identifier) {
+        let [deckId, revisionId] = identifier.split('-').map(parseInt);
+
+        return self.get(deckId).then((deck) => {
+            if (!deck) return;
+
+            if (!revisionId) {
+                // if not set, we are looking at the active one
+                revisionId = deck.active;
+            }
+
+            let deckRevision = deck.revisions.find((r) => (r.id === revisionId));
+            if (!deckRevision) return; // revision not found
+
+            // add some extra revision metadata
+            deck.revisionId = revisionId;
+
+            let [latestRevision] = deck.revisions.slice(-1);
+            deck.latestRevisionId = latestRevision.id;
+
+            return _.merge(deck, deckRevision);
+        });
+
+    },
+
+
     // returns the deck revision subdocument, either the one specified in identifier, or the active one
     getRevision: function(identifier) {
         return self.get(identifier)
@@ -113,6 +142,61 @@ let self = module.exports = {
         return helper.connectToDatabase()
         .then((db) => db.collection(collection))
         .then((col) => col.count(query));
+    },
+
+    // return a path array of deckId as it exists in the tree with rootDeckId as root
+    // returns first occurence of deckId, or nothing if cannot find the path
+    findPath: function(sourceDeckId, targetDeckId, path) {
+        if (!path) {
+            path = [{ id: sourceDeckId }];
+        }
+        let targetRevision;
+        [targetDeckId, targetRevision] = String(targetDeckId).split('-').map((i) => parseInt(i));
+
+        return self.getRevision(sourceDeckId).then((sourceDeck) => {
+            // source deck not found
+            if (!sourceDeck) return;
+
+            // expand all subdecks
+            let subPaths = [];
+            // we use #some so that `return true` breaks (means we found the target) and `return` continues
+            let foundTarget = sourceDeck.contentItems.some((citem, index) => {
+                // skip slides
+                if (citem.kind !== 'deck') return; // continue
+
+                // each subdeck expands the base path, we keep separate paths each subdeck
+                subPaths.push(path.concat({ id: `${citem.ref.id}-${citem.ref.revision}`, index: index }));
+
+                // also check if target deck is direct child and break
+                if (citem.ref.id === targetDeckId) return true;
+            });
+
+            // check if target is child of source
+            if (foundTarget) {
+                // the last subPath added is the path to target (because we did break in previous loop)
+                return subPaths.slice(-1)[0];
+            }
+
+            // if no further subdecks are here we just return empty (dead-end)
+            if (subPaths.length === 0) return;
+
+            // otherwise we search down
+            return new Promise((resolve, reject) => {
+                async.concatSeries(subPaths, (subPath, callback) => {
+                    // the sub deck is the last element in the path
+                    let subDeckId = subPath.slice(-1)[0].id;
+                    self.findPath(subDeckId, targetDeckId, subPath).then((result) => callback(null, result));
+                }, (error, results) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(results);
+                    }
+                });
+            });
+
+        });
+
     },
 
     //inserts a deck into the database
@@ -240,7 +324,7 @@ let self = module.exports = {
                 }
 
                 // start tracking changes
-                let deckTracker = ChangeLog.deckTracker(existingDeck, activeRevisionIndex);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, deck.top_root_deck);
 
                 //TODO check if all attributes are used from payload
                 const deckRevision = existingDeck.revisions[activeRevisionIndex];
@@ -287,7 +371,7 @@ let self = module.exports = {
     },
 
     //renames a deck
-    rename: function(deck_id, newName){
+    rename: function(deck_id, newName, top_root_deck){
         let deckId = deck_id.split('-')[0];
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
@@ -300,7 +384,7 @@ let self = module.exports = {
             if (!deckRevision) return;
 
             // start tracking changes
-            let deckTracker = ChangeLog.deckTracker(deck, revisionIndex);
+            let deckTracker = ChangeLog.deckTracker(deck, top_root_deck);
 
             deck.revisions[revisionIndex].title = newName;
 
@@ -413,7 +497,7 @@ let self = module.exports = {
                             });
                         }
                     }
-                    let deckTracker = ChangeLog.deckTracker(existingDeck);
+                    let deckTracker = ChangeLog.deckTracker(existingDeck, deck.top_root_deck);
 
                     let new_revisions = existingDeck.revisions;
                     new_revisions[activeRevisionIndex].usage = previousUsageArray;
@@ -436,7 +520,10 @@ let self = module.exports = {
     },
 
     //inserts a content item (slide or deck) into a deck at the specified position, or appends it at the end if no position is given
-    insertNewContentItem: function(citem, position, root_deck, ckind, citem_revision_id){
+    insertNewContentItem: function(citem, position, root_deck, ckind, citem_revision_id, top_root_deck){
+        // if top_root_deck is missing, root_deck is the top
+        if (!top_root_deck) top_root_deck = root_deck;
+
         if(typeof citem_revision_id === 'undefined'){
             citem_revision_id = parseInt(1);
         }
@@ -455,7 +542,7 @@ let self = module.exports = {
                     activeRevisionId = root_deck_path[1];
                 }
 
-                let deckTracker = ChangeLog.deckTracker(existingDeck, activeRevisionId - 1);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
                 // copy edit rights from existingDeck to new
                 if (ckind === 'deck') {
                     let attachedDeckId = `${parseInt(citem.id)}-${citem_revision_id}`;
@@ -533,7 +620,7 @@ let self = module.exports = {
     },
 
     //removes (unlinks) a content item from a given deck
-    removeContentItem: function(position, root_deck){
+    removeContentItem: function(position, root_deck, top_root_deck){
         let root_deck_path = root_deck.split('-');
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
@@ -546,7 +633,7 @@ let self = module.exports = {
                     activeRevisionId = root_deck_path[1];
                 }
 
-                let deckTracker = ChangeLog.deckTracker(existingDeck, activeRevisionId - 1);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
 
                 let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
                 for(let i = position-1; i < citems.length; i++){
@@ -638,7 +725,7 @@ let self = module.exports = {
     },
 
     //updates an existing content item's revision
-    updateContentItem: function(citem, revertedRevId, root_deck, ckind){ //can be used for reverting or updating
+    updateContentItem: function(citem, revertedRevId, root_deck, ckind, top_root_deck){ //can be used for reverting or updating
         let rootArray = root_deck.split('-');
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
@@ -657,7 +744,7 @@ let self = module.exports = {
 
                 // pre-compute what the for loop does
                 let revisionIndex = existingDeck.revisions.findIndex((rev) => rev.id === parseInt(rootRev));
-                let deckTracker = ChangeLog.deckTracker(existingDeck, revisionIndex);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
 
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
@@ -1116,7 +1203,7 @@ let self = module.exports = {
     },
 
     // simply creates a new deck revision without updating anything
-    createDeckRevision(deckId, userId, parentDeckId) {
+    createDeckRevision(deckId, userId, parentDeckId, rootDeckId) {
         return self.get(deckId).then((existingDeck) => {
             if (!existingDeck) return;
 
@@ -1145,7 +1232,7 @@ let self = module.exports = {
                 return self.get(replaced.value._id).then((fullDeck) => {
                     if (parentDeckId) {
                         // update parent deck first before returning
-                        return self.updateContentItem(fullDeck, '', parentDeckId, 'deck')
+                        return self.updateContentItem(fullDeck, '', parentDeckId, 'deck', rootDeckId)
                         .then((updated) => fullDeck);
                     } else {
                         return fullDeck;
@@ -1451,6 +1538,7 @@ let self = module.exports = {
 
     },
 
+    // TODO deprecated
     //performs recursive revisioning up to the top-most deck that is not owned/editable by the user
     handleChange(decktree, deck, root_deck, user_id){
         if(!root_deck){
@@ -1529,7 +1617,7 @@ let self = module.exports = {
                                         return self.get(replaced.value._id).then((newDeck) => {
 
                                             //only update the root deck, i.e., direct parent
-                                            return self.updateContentItem(newDeck, '', payload.root_deck, 'deck')
+                                            return self.updateContentItem(newDeck, '', payload.root_deck, 'deck', root_deck)
                                             .then((updated) => {
                                                 new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
                                                 callback();
@@ -1545,7 +1633,7 @@ let self = module.exports = {
                                     return self.get(replaced.value._id).then((newDeck) => {
 
                                         //only update the root deck, i.e., direct parent
-                                        return self.updateContentItem(newDeck, '', payload.root_deck, 'deck')
+                                        return self.updateContentItem(newDeck, '', payload.root_deck, 'deck', root_deck)
                                         .then((updated) => {
                                             new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
                                             callback();
@@ -1693,6 +1781,73 @@ let self = module.exports = {
                 return deck.revisions[revisionId].tags;
             });
         });
+    },
+
+    // TODO remove this 
+    // recursively fetches the change log for the deck tree with deckId as root
+    getTreeChangeLog: function(identifier, path = []) {
+        // we need to process both on the deck and the revision level
+        let [deckId, selectedRevisionId] = identifier.split('-').map((str) => parseInt(str));
+        return self.get(deckId).then((deck) => {
+            // deck not found
+            if (!deck) return;
+
+            // active revision is the default
+            let revisionId = selectedRevisionId || deck.active;
+
+            let deckRevision = deck.revisions.find((r) => (r.id === revisionId));
+            if (!deckRevision) {
+                // revision not found
+                if (selectedRevisionId) return;
+
+                // else active is corrupted, fall back to latestRevision
+                // TODO fix active as well?
+                [deckRevision] = deck.revisions.slice(-1);
+                revisionId = deckRevision.id;
+            }
+
+            // we concat the change log for all revisions up to and including revisionId
+            let deckChangeLog = deck.revisions
+            .filter((r) => (r.id <= revisionId))
+            .reduce((acc, cur) => acc.concat(cur.changeLog || []), deck.changeLog || []);
+
+            // we need to include the current path information with each record
+            if (!_.isEmpty(path)) {
+                deckChangeLog.forEach((rec) => {
+                    _.merge(rec, { path });
+                });
+            }
+
+            // we need to check the sub decks as well
+            // for sub deck inclusing we hold the paths separately to keep the path information as well
+            let subPaths = [];
+            deckRevision.contentItems.forEach((citem, index) => {
+                // skip slides
+                if (citem.kind !== 'deck') return;
+                // each subdeck expands the base path, we keep separate paths each subdeck
+                subPaths.push(path.concat({ id: `${citem.ref.id}-${citem.ref.revision}`, index: index }));
+            });
+
+            // for leave decks, we only return the current change log
+            if (subPaths.length === 0) return deckChangeLog;
+
+            // otherwise we concat the children's as well
+            return new Promise((resolve, reject) => {
+                async.concatSeries(subPaths, (subPath, callback) => {
+                    // the sub deck is the last element in the path
+                    let subDeckId = subPath.slice(-1)[0].id;
+                    self.getTreeChangeLog(subDeckId, subPath).then((result) => callback(null, result));
+                }, (error, results) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(deckChangeLog.concat(results));
+                    }
+                });
+            });
+
+        });
+
     },
 
 };

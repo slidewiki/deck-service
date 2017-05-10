@@ -11,45 +11,47 @@ let self = module.exports = {
     getDeckChangeLog: function(request, reply) {
         let deckId = request.params.id;
 
-        // change logs are distrubuted in the deck tree,
+        // TODO change this
+        // change logs are distributed in the deck tree,
         // so we need to get them for all subdeckids
-        deckDB.getSubdeckIds(deckId).then((subDeckIds) => {
-            if (!subDeckIds) return boom.notFound();
+        deckDB.getTreeChangeLog(deckId).then((changeLog) => {
+            if (!changeLog) return boom.notFound();
 
-            return new Promise((resolve, reject) => {
-                let changeLog = [];
-                async.eachSeries(subDeckIds, (subDeckId, callback) => {
-                    deckDB.get(subDeckId).then((subDeck) => {
-                        let deckChangeLog = [];
-                        if (subDeck.changeLog) deckChangeLog.push(subDeck.changeLog);
-                        subDeck.revisions.forEach((rev) => {
-                            if (rev.changeLog) {
-                                deckChangeLog.push(...rev.changeLog);
-                            };
-                        });
+            changeLog.forEach((rec) => {
+                let path = rec.path || [];
 
-                        // TODO add a path in the deck tree instead
-                        let nodeInfo = { node: {
-                            id: subDeck._id,
-                            revision: subDeck.revisions.slice(-1)[0].id,
-                        }};
-                        changeLog.push(...deckChangeLog.map((record) => _.assign(record, nodeInfo)));
+                // format response for output
+                if (rec.remove) {
+                    rec.value = {
+                        kind: rec.remove.kind,
+                        path: formatPath(path.concat({
+                            id: formatRef(rec.remove.ref),
+                            index: rec.index,
+                        })),
+                    };
+                    delete rec.remove;
+                    delete rec.index;
+                }
 
-                        callback();
-                    }).catch(callback);
+                if (rec.insert) {
+                    rec.value = {
+                        kind: rec.insert.kind,
+                        path: formatPath(path.concat({
+                            id: formatRef(rec.insert.ref),
+                            index: rec.index,
+                        })),
+                    };
+                    delete rec.insert;
+                    delete rec.index;
+                }
 
-                }, (err) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve(changeLog);
-                    }
-                });
+                delete rec.path;
             });
 
-        }).then((changeLog) => {
-            reply(changeLog);
-        }).catch((error) => {
+            // sort changeLog by timestamp before returning
+            return _.reverse(_.sortBy(changeLog, 'timestamp'));
+
+        }).then(reply).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
         });
@@ -57,3 +59,11 @@ let self = module.exports = {
     },
 
 };
+
+function formatPath(path) {
+    return path.map((n) => `${n.id}:${n.index + 1}`).join(';');
+}
+
+function formatRef(ref) {
+    return `${ref.id}-${ref.revision}`;
+}

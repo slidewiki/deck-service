@@ -6,6 +6,8 @@ const diff = require('immutablediff');
 
 const deckModel = require('../models/deck');
 
+const helper = require('../database/helper');
+
 const ChangeLogRecord = {
     createUpdate: function(before, after) {
         // before and after are objects and could have the same values,
@@ -77,23 +79,28 @@ const omitOrder = (item) => _.omit(item, 'order');
 
 module.exports = {
 
-    deckTracker: function(deck, revisionIndex) {
-        if (typeof revisionIndex === 'undefined') {
-            // latest if none specified
-            revisionIndex = deck.revisions.length - 1;
-        }
+    deckTracker: function(deck, rootDeckId) {
+        // latest is the only editable revision!!
+        const [revision] = deck.revisions.slice(-1);
 
-        const revision = deck.revisions[revisionIndex];
+        const deckId = `${deck._id}-${revision.id}`;
+
+        // TODO avoid this circular reference
+        const deckDB = require('../database/deckDatabase');
+
+        const pathPromise = deckDB.findPath(rootDeckId, deckId);
 
         // we only keep the properties we'd like to track for changes
         // we cloneDeep to make sure we don't share any references between deck/trackableDeck etc
         const deckBefore = _.cloneDeep(_.pick(
             deck,
             _.keys(deckModel.trackedDeckProperties)));
-        const deckRevisionBefore = _.cloneDeep(_.pick(
-            revision,
-            _.keys(deckModel.trackedDeckRevisionProperties)));
 
+        // in order to do the comparison, we merge revision into deck and only keep trackable stuff
+        _.merge(deckBefore, _.cloneDeep(_.pick(
+            revision,
+            _.keys(deckModel.trackedDeckRevisionProperties))
+        ));
 
         // we keep this here for children tracking
         const contentItemsBefore = Immutable.fromJS(revision.contentItems.map(omitOrder));
@@ -108,12 +115,14 @@ module.exports = {
                 }
 
                 const deckAfter = _.cloneDeep(_.pick(newDeck, _.keys(deckModel.trackedDeckProperties)));
-                return ChangeLogRecord.createUpdate(deckBefore, deckAfter);
-            },
 
-            revisionUpdateRecord: function() {
-                const deckRevisionAfter = _.cloneDeep(_.pick(revision, _.keys(deckModel.trackedDeckRevisionProperties)));
-                return ChangeLogRecord.createUpdate(deckRevisionBefore, deckRevisionAfter);
+                // in order to do the comparison, we merge revision into deck and only keep trackable stuff
+                _.merge(deckAfter, _.cloneDeep(_.pick(
+                    revision,
+                    _.keys(deckModel.trackedDeckRevisionProperties))
+                ));
+
+                return ChangeLogRecord.createUpdate(deckBefore, deckAfter);
             },
 
             contentItemsRecords: function() {
@@ -177,11 +186,8 @@ module.exports = {
 
             debugChangeLog: function(newDeck) {
                 let deckLog = _.compact([this.deckUpdateRecord(newDeck)]);
-                let revisionLog = _.compact([this.revisionUpdateRecord()]);
 
                 console.log('deck changed: ' + JSON.stringify(deckLog));
-                console.log('revision changed: ' + JSON.stringify(revisionLog));
-
                 console.log('nodes changed: ' + JSON.stringify(this.contentItemsRecords()));
             },
 
@@ -194,21 +200,22 @@ module.exports = {
 
                 // first the deck changes
                 let deckChanges = _.compact([this.deckUpdateRecord(newDeck)]);
-                if (!_.isEmpty(deckChanges)) {
-                    newDeck.changeLog = newDeck.changeLog || [];
-                    newDeck.changeLog = newDeck.changeLog.concat(deckChanges);
-                }
+                // then the children changes
+                deckChanges.push(...this.contentItemsRecords());
 
-                // then the revision changes
-                let revisionChanges = _.compact([this.revisionUpdateRecord()]);
-                revisionChanges = _.concat(revisionChanges, this.contentItemsRecords());
+                // wait for path promise then format, fill in stuff
+                return pathPromise.then((path) => {
+                    deckChanges.forEach((c) => _.assign(c, { path }));
 
-                if (!_.isEmpty(revisionChanges)) {
-                    revision.changeLog = revision.changeLog || [];
-                    revision.changeLog = revision.changeLog.concat(revisionChanges);
-                }
-// console.log('deck changed: ' + JSON.stringify(deckChanges));
-// console.log('revision changed: ' + JSON.stringify(revisionChanges));
+                    return helper.connectToDatabase()
+                    .then((db) => db.collection('deckChanges'))
+                    .then((col) => col.insert(deckChanges))
+                    .then((res) => {
+                        console.log('deck changed: ' + JSON.stringify(deckChanges));
+                    });
+
+                });
+
             },
 
         };
