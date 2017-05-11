@@ -10,14 +10,24 @@ let self = module.exports = {
         return original;
     },
 
-    // find fileservice pictures in html or text
-    findPictures: function(text){
-        let urlRegex = /(https?:\/\/fileservice[^\s]+(png|jpeg|jpg))/g;
+    // find fileservice media in html or text
+    findMedia: function(text, mediaType){
+        let mediaExtension;
+
+        // specify file extensions for earch media type
+        if(mediaType === 'pictures')
+            mediaExtension = 'png|jpeg|jpg|gif||bmp|tiff';
+        else if(mediaType === 'video')
+            mediaExtension = 'avi|flv|mpg|mpeg|mp4|wmv';
+        else if(mediaType === 'audio')
+            mediaExtension = 'mp3|wav|wma';
+
+        let urlRegex = new RegExp(`(https?:\\/\\/fileservice[^\\s]+(${mediaExtension}))`, 'g');
         let matchArray;
         let pictures = [];
 
         while( (matchArray = urlRegex.exec(text)) !== null ){
-            pictures.push(matchArray[0]);
+            pictures.push(matchArray[0].replace(/"/g, ''));     // remove trailing quote
         }
 
         return pictures;

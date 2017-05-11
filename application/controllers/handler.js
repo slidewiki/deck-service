@@ -1893,13 +1893,13 @@ let self = module.exports = {
         });
     },
 
-    getDeckPictures: function(request, reply){
-        deckDB.getPictures(request.params.id, undefined).then( (deckPictures) => {
-            if(!deckPictures){
+    getDeckMedia: function(request, reply){
+        deckDB.getMedia(request.params.id, request.query.mediaType).then( (deckMedia) => {
+            if(!deckMedia){
                 reply(boom.notFound());
             }
             else{
-                reply(deckPictures);
+                reply(deckMedia);
             }
         }).catch( (error) => {
             request.log('error', error);

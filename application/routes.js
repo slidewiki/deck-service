@@ -881,12 +881,15 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
-        path: '/deck/{id}/pictures',
-        handler: handlers.getDeckPictures,
+        path: '/deck/{id}/media',
+        handler: handlers.getDeckMedia,
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string(),
+                },
+                query: {
+                    mediaType: Joi.string().valid('pictures', 'video', 'audio').required()
                 }
             },
             tags: ['api'],

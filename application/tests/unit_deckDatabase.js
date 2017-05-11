@@ -274,7 +274,7 @@ describe('deckDatabase', function() {
 
     describe('#getPicturesPerDeck', function() {
         it('should return all images found in deck\'s and its sundecks\' slides', function() {
-            return deckDB.getPictures('54')
+            return deckDB.getMedia('54', 'pictures')
             .then((pictures) => {
                 pictures.should.have.members([
                     'http://fileservice.experimental.slidewiki.org/5/ddc9a830-bba4-11e6-9bdb-395cce787fb5.png',

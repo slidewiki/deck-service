@@ -1682,15 +1682,15 @@ let self = module.exports = {
         });
     },
 
-    getPictures: function(deckId){
+    getMedia: function(deckId, mediaType){
         return self.getFlatSlides(deckId, undefined, false).then( (flatSlides) => {
             if(!flatSlides) return;
-            
-            let pictures = [];
+
+            let media = [];
             flatSlides.children.forEach( (slide) => {
-                pictures.push(...util.findPictures(slide.content));
+                media.push(...util.findMedia(slide.content, mediaType));
             });
-            return [...new Set(pictures)];
+            return [...new Set(media)];
         });
     }
 };
