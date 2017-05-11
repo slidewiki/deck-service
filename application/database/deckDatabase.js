@@ -1617,7 +1617,7 @@ let self = module.exports = {
                         return resolve({ needs_revision: true, fork_allowed: false });
                     }
                     // else continue as normal
-                    console.log(`stopped handleChange after reaching a deck we can save without new revision ${JSON.stringify(errorOrNeedsResult)}`);
+                    // console.log(`stopped handleChange after reaching a deck we can save without new revision ${JSON.stringify(errorOrNeedsResult)}`);
                 }
 
                 if(revisions.length === 0){
@@ -1816,69 +1816,36 @@ let self = module.exports = {
         });
     },
 
-    // TODO remove this 
-    // recursively fetches the change log for the deck tree with deckId as root
+    // fetches change log records for the deck or subdecks thereof
     getTreeChangeLog: function(identifier, path = []) {
-        // we need to process both on the deck and the revision level
-        let [deckId, selectedRevisionId] = identifier.split('-').map((str) => parseInt(str));
-        return self.get(deckId).then((deck) => {
-            // deck not found
-            if (!deck) return;
+        // always check if deck exists to return a 404
+        return self.get(identifier).then((existingDeck) => {
+            if (!existingDeck) return;
 
-            // active revision is the default
-            let revisionId = selectedRevisionId || deck.active;
+            let deck = parseIdentifier(identifier);
+            // set default if not specified
+            if (!deck.revision) deck.revision = existingDeck.active;
 
-            let deckRevision = deck.revisions.find((r) => (r.id === revisionId));
-            if (!deckRevision) {
-                // revision not found
-                if (selectedRevisionId) return;
-
-                // else active is corrupted, fall back to latestRevision
-                // TODO fix active as well?
-                [deckRevision] = deck.revisions.slice(-1);
-                revisionId = deckRevision.id;
-            }
-
-            // we concat the change log for all revisions up to and including revisionId
-            let deckChangeLog = deck.revisions
-            .filter((r) => (r.id <= revisionId))
-            .reduce((acc, cur) => acc.concat(cur.changeLog || []), deck.changeLog || []);
-
-            // we need to include the current path information with each record
-            if (!_.isEmpty(path)) {
-                deckChangeLog.forEach((rec) => {
-                    _.merge(rec, { path });
-                });
-            }
-
-            // we need to check the sub decks as well
-            // for sub deck inclusing we hold the paths separately to keep the path information as well
-            let subPaths = [];
-            deckRevision.contentItems.forEach((citem, index) => {
-                // skip slides
-                if (citem.kind !== 'deck') return;
-                // each subdeck expands the base path, we keep separate paths each subdeck
-                subPaths.push(path.concat({ id: `${citem.ref.id}-${citem.ref.revision}`, index: index }));
-            });
-
-            // for leave decks, we only return the current change log
-            if (subPaths.length === 0) return deckChangeLog;
-
-            // otherwise we concat the children's as well
-            return new Promise((resolve, reject) => {
-                async.concatSeries(subPaths, (subPath, callback) => {
-                    // the sub deck is the last element in the path
-                    let subDeckId = subPath.slice(-1)[0].id;
-                    self.getTreeChangeLog(subDeckId, subPath).then((result) => callback(null, result));
-                }, (error, results) => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        resolve(deckChangeLog.concat(results));
-                    }
-                });
-            });
-
+            return helper.getCollection('deckChanges').then((changes) => {
+                return changes.aggregate([
+                    { $match: {
+                        $or: [
+                            { path: {
+                                $elemMatch: {
+                                    id: deck.id,
+                                    revision: deck.revision,
+                                }
+                            } },
+                            { value: {
+                                kind: 'deck',
+                                ref: deck,
+                            } },
+                        ]
+                    } },
+                    { $project: { _id: 0 } },
+                    { $sort: { timestamp: -1 } },
+                ]);
+            }).then((result) => result.toArray());
         });
 
     },

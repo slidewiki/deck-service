@@ -9,7 +9,8 @@ const deckModel = require('../models/deck');
 const helper = require('../database/helper');
 
 const ChangeLogRecord = {
-    createUpdate: function(before, after) {
+
+    createUpdate: function(before, after, path) {
         // before and after are objects and could have the same values,
         // we only want to keep in both the attributes that are different in any way
         let beforeDiff = _.omitBy(before, (value, key) => _.isEqual(value, after[key]));
@@ -18,39 +19,44 @@ const ChangeLogRecord = {
         if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff)) return;
 
         return {
-            operation: 'update',
-            timestamp: (new Date()).toISOString(),
+            op: 'replace',
 
-            before: beforeDiff,
-            after: afterDiff,
+            path: path,
+
+            value: afterDiff,
+            oldValue: beforeDiff,
+
+            timestamp: (new Date()).toISOString(),
         };
     },
 
-    createNodeRemove: function(before, index) {
+    createNodeRemove: function(before, index, path) {
         // we keep the removed value and its index
         return {
-            operation: 'remove',
-            timestamp: (new Date()).toISOString(),
+            op: 'remove',
 
+            path: path.concat({ index }),
             value: before[index],
-            index: index,
+
+            timestamp: (new Date()).toISOString(),
         };
 
     },
 
-    createNodeInsert: function(after, index) {
+    createNodeInsert: function(after, index, path) {
         // we keep the added value and its index
         return {
-            operation: 'insert',
-            timestamp: (new Date()).toISOString(),
+            op: 'add',
 
+            path: path.concat({ index }),
             value: after[index],
-            index: index,
+
+            timestamp: (new Date()).toISOString(),
         };
 
     },
 
-    createNodeUpdate: function(before, after, index) {
+    createNodeUpdate: function(before, after, index, path) {
         // before and after are content item objects and could have the same values,
         // we only want to keep in both the attributes that are different in any way
         let beforeDiff = before;// _.omitBy(before, (value, key) => _.isEqual(value, after[key]));
@@ -59,13 +65,14 @@ const ChangeLogRecord = {
         if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff)) return;
 
         return {
-            operation: 'update',
-            timestamp: (new Date()).toISOString(),
+            op: 'replace',
 
-            oldValue: beforeDiff,
+            path: path.concat({ index }),
+
             value: afterDiff,
+            oldValue: beforeDiff,
 
-            index: index,
+            timestamp: (new Date()).toISOString(),
         };
 
     },
@@ -107,7 +114,7 @@ module.exports = {
             // returns the change log record that should be appended to the database
             // should be called right after all changes are made, and before saving the deck object
             // `newDeck` is optional, for code that applies changes on a new deck object
-            deckUpdateRecord: function(newDeck) {
+            deckUpdateRecord: function(path, newDeck) {
                 if (typeof newDeck === 'undefined') {
                     newDeck = deck;
                 }
@@ -120,10 +127,11 @@ module.exports = {
                     _.keys(deckModel.trackedDeckRevisionProperties))
                 ));
 
-                return ChangeLogRecord.createUpdate(deckBefore, deckAfter);
+                // this may return nothing, which is ok
+                return ChangeLogRecord.createUpdate(deckBefore, deckAfter, path);
             },
 
-            contentItemsRecords: function() {
+            contentItemsRecords: function(path) {
                 const contentItemsAfter = Immutable.fromJS(revision.contentItems.map(omitOrder));
                 const contentItemOps = diff(contentItemsBefore, contentItemsAfter);
 
@@ -145,7 +153,7 @@ module.exports = {
 
                         // indexMatch[1] includes just the index added
                         let index = parseInt(indexMatch[1]);
-                        return ChangeLogRecord.createNodeRemove(contentItemsBefore.toJS(), index);
+                        return ChangeLogRecord.createNodeRemove(contentItemsBefore.toJS(), index, path);
                     }
 
                     if (rec.op === 'add') {
@@ -158,7 +166,7 @@ module.exports = {
 
                         // indexMatch[1] includes just the index added
                         let index = parseInt(indexMatch[1]);
-                        return ChangeLogRecord.createNodeInsert(contentItemsAfter.toJS(), index);
+                        return ChangeLogRecord.createNodeInsert(contentItemsAfter.toJS(), index, path);
                     }
 
                     if (rec.op === 'replace') {
@@ -174,19 +182,12 @@ module.exports = {
                         let cItem = contentItemsBefore.get(index).toJS();
                         let newRevision = rec.value;
 
-                        return ChangeLogRecord.createNodeUpdate(contentItemsBefore.get(index).toJS(), contentItemsAfter.get(index).toJS(), index);
+                        return ChangeLogRecord.createNodeUpdate(contentItemsBefore.get(index).toJS(), contentItemsAfter.get(index).toJS(), index, path);
                     }
 
                 });
 
-                return _.compact(result);
-            },
-
-            debugChangeLog: function(newDeck) {
-                let deckLog = _.compact([this.deckUpdateRecord(newDeck)]);
-
-                console.log('deck changed: ' + JSON.stringify(deckLog));
-                console.log('nodes changed: ' + JSON.stringify(this.contentItemsRecords()));
+                return result;
             },
 
             // should be called right after all changes are made, and before saving the deck object
@@ -196,23 +197,26 @@ module.exports = {
                     newDeck = deck;
                 }
 
-                // first the deck changes
-                let deckChanges = _.compact([this.deckUpdateRecord(newDeck)]);
-                // then the children changes
-                deckChanges.push(...this.contentItemsRecords());
-
                 // wait for path promise then format, fill in stuff
                 pathPromise.then((path) => {
-                    deckChanges.forEach((c) => {
-                        c.path = path;
-                    });
+                    let deckChanges = _.compact([
+                        // first the deck changes
+                        this.deckUpdateRecord(path, newDeck),
+                        // then the children changes
+                        ...this.contentItemsRecords(path)]);
+
+
+                    if (_.isEmpty(deckChanges)) {
+                        console.warn('WARNING: no deck changes detected as was expected');
+                        return;
+                    } else {
+                        // TODO remove this
+                        console.log('deck changed: ' + JSON.stringify(deckChanges));
+                    }
 
                     return helper.connectToDatabase()
                     .then((db) => db.collection('deckChanges'))
-                    .then((col) => col.insert(deckChanges))
-                    .then((res) => {
-                        console.log('deck changed: ' + JSON.stringify(deckChanges));
-                    });
+                    .then((col) => col.insert(deckChanges));
 
                 }).catch((err) => {
                     console.warn(err);

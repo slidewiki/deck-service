@@ -73,7 +73,7 @@ function getNextId(db, collectionName, fieldName) {
     return myPromise;
 }
 
-module.exports = {
+let self = module.exports = {
     createDatabase: function(dbname) {
         dbname = testDbName(dbname);
 
@@ -119,6 +119,10 @@ module.exports = {
             dbConnection = db;
             return db;
         });
+    },
+
+    getCollection: function(name) {
+        return self.connectToDatabase().then((db) => db.collection(name));
     },
 
     getNextIncrementationValueForCollection: function (dbconn, collectionName, fieldName) {
