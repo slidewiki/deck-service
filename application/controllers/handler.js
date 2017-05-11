@@ -120,7 +120,7 @@ let self = module.exports = {
                     request.payload.root_deck = parentDeckId;
 
                 //create the slide revision in the database
-                slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
+                return slideDB.replace(encodeURIComponent(slideId), request.payload).then((replaced) => {
                     if (co.isEmpty(replaced.value))
                         throw replaced;
                     else{
@@ -133,10 +133,9 @@ let self = module.exports = {
                         }
 
                         //we must update all decks in the 'usage' attribute
-                        slideDB.get(replaced.value._id).then((newSlide) => {
+                        return slideDB.get(replaced.value._id).then((newSlide) => {
 
-                            //update the content item of the parent deck with the new revision id
-                            deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', request.payload.top_root_deck);
+                            // prepare the newSlide response object
                             newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
 
                             //create thumbnail for the new slide revision
@@ -153,16 +152,20 @@ let self = module.exports = {
                                 changeset.new_revisions.push(newSlideId);
                                 newSlide.changeset = changeset;
                             }
-                            reply(newSlide);
-                        }).catch((error) => {
-                            request.log('error', error);
-                            reply(boom.badImplementation());
+
+                            // update the content item of the parent deck with the new revision id
+                            return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', request.payload.top_root_deck)
+                            .then(() => {
+                                reply(newSlide);
+                            });
+
                         });
                     }
-                }).catch((error) => {
-                    request.log('error', error);
-                    reply(boom.badImplementation());
                 });
+
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
             });
         });
     },
@@ -1283,6 +1286,10 @@ let self = module.exports = {
                     removed.changeset = changeset;
                 }
                 reply(removed);
+            })
+            .catch((err) => {
+                request.log('error', err);
+                reply(boom.badImplementation());
             });
         });
 

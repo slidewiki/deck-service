@@ -32,7 +32,7 @@ const ChangeLogRecord = {
             operation: 'remove',
             timestamp: (new Date()).toISOString(),
 
-            remove: before[index],
+            value: before[index],
             index: index,
         };
 
@@ -44,7 +44,7 @@ const ChangeLogRecord = {
             operation: 'insert',
             timestamp: (new Date()).toISOString(),
 
-            insert: after[index],
+            value: after[index],
             index: index,
         };
 
@@ -53,8 +53,8 @@ const ChangeLogRecord = {
     createNodeUpdate: function(before, after, index) {
         // before and after are content item objects and could have the same values,
         // we only want to keep in both the attributes that are different in any way
-        let beforeDiff = _.omitBy(before, (value, key) => _.isEqual(value, after[key]));
-        let afterDiff = _.omitBy(after, (value, key) => _.isEqual(value, before[key]));
+        let beforeDiff = before;// _.omitBy(before, (value, key) => _.isEqual(value, after[key]));
+        let afterDiff = after;//_.omitBy(after, (value, key) => _.isEqual(value, before[key]));
 
         if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff)) return;
 
@@ -62,10 +62,8 @@ const ChangeLogRecord = {
             operation: 'update',
             timestamp: (new Date()).toISOString(),
 
-            update: {
-                before: beforeDiff,
-                after: afterDiff,
-            },
+            oldValue: beforeDiff,
+            value: afterDiff,
 
             index: index,
         };
@@ -173,10 +171,10 @@ module.exports = {
 
                         // indexMatch[1] includes just the index added
                         let index = parseInt(indexMatch[1]);
-                        let oldRevision = contentItemsBefore.getIn([index, 'ref', 'revision']);
+                        let cItem = contentItemsBefore.get(index).toJS();
                         let newRevision = rec.value;
 
-                        return ChangeLogRecord.createNodeUpdate({ ref: { revision: oldRevision } }, { ref: { revision: newRevision } }, index);
+                        return ChangeLogRecord.createNodeUpdate(contentItemsBefore.get(index).toJS(), contentItemsAfter.get(index).toJS(), index);
                     }
 
                 });
@@ -204,8 +202,10 @@ module.exports = {
                 deckChanges.push(...this.contentItemsRecords());
 
                 // wait for path promise then format, fill in stuff
-                return pathPromise.then((path) => {
-                    deckChanges.forEach((c) => _.assign(c, { path }));
+                pathPromise.then((path) => {
+                    deckChanges.forEach((c) => {
+                        c.path = path;
+                    });
 
                     return helper.connectToDatabase()
                     .then((db) => db.collection('deckChanges'))
@@ -214,6 +214,8 @@ module.exports = {
                         console.log('deck changed: ' + JSON.stringify(deckChanges));
                     });
 
+                }).catch((err) => {
+                    console.warn(err);
                 });
 
             },

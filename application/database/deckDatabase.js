@@ -147,31 +147,41 @@ let self = module.exports = {
     // return a path array of deckId as it exists in the tree with rootDeckId as root
     // returns first occurence of deckId, or nothing if cannot find the path
     findPath: function(sourceDeckId, targetDeckId, path) {
-        if (!path) {
-            path = [{ id: sourceDeckId }];
-        }
-        let targetRevision;
-        [targetDeckId, targetRevision] = String(targetDeckId).split('-').map((i) => parseInt(i));
+        let source = parseIdentifier(sourceDeckId);
+        let target = parseIdentifier(targetDeckId);
 
-        return self.getRevision(sourceDeckId).then((sourceDeck) => {
+        // HACK force error if target does not include revision
+        target.revision;
+
+        return self.getRevision(sourceDeckId).then((sourceRevision) => {
             // source deck not found
-            if (!sourceDeck) return;
+            if (!sourceRevision) return;
+
+            // path should be canonical, so we need the revision to be defined
+            source.revision = sourceRevision.id;
+
+            if (!path) {
+                path = [source];
+
+                // return if source is same as target
+                if (_.isEqual(source, target)) return path;
+            }
 
             // expand all subdecks
             let subPaths = [];
             // we use #some so that `return true` breaks (means we found the target) and `return` continues
-            let foundTarget = sourceDeck.contentItems.some((citem, index) => {
+            let foundTarget = sourceRevision.contentItems.some((citem, index) => {
                 // skip slides
                 if (citem.kind !== 'deck') return; // continue
 
-                // each subdeck expands the base path, we keep separate paths each subdeck
-                subPaths.push(path.concat({ id: `${citem.ref.id}-${citem.ref.revision}`, index: index }));
+                // each subdeck expands the base path, we keep separate paths for each subdeck
+                subPaths.push(path.concat(_.assign({index}, citem.ref)));
 
                 // also check if target deck is direct child and break
-                if (citem.ref.id === targetDeckId) return true;
+                if (_.isEqual(citem.ref, target)) return true;
             });
 
-            // check if target is child of source
+            // target is child of source
             if (foundTarget) {
                 // the last subPath added is the path to target (because we did break in previous loop)
                 return subPaths.slice(-1)[0];
@@ -184,7 +194,8 @@ let self = module.exports = {
             return new Promise((resolve, reject) => {
                 async.concatSeries(subPaths, (subPath, callback) => {
                     // the sub deck is the last element in the path
-                    let subDeckId = subPath.slice(-1)[0].id;
+                    let [nextSource] = subPath.slice(-1);
+                    let subDeckId = `${nextSource.id}-${nextSource.revision}`;
                     self.findPath(subDeckId, targetDeckId, subPath).then((result) => callback(null, result));
                 }, (error, results) => {
                     if (error) {
@@ -595,6 +606,28 @@ let self = module.exports = {
                     col.save(existingDeck);
                 }
                 else{
+                    // add it to the end
+                    // we need to track stuff, this doesn't help
+                    let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+                    let newCitem = {
+                        order: parseInt(getOrder(existingDeck.revisions[activeRevisionId-1]))+1,
+                        kind: ckind,
+                        ref : {
+                            id: parseInt(citem.id),
+                            revision:citem_revision_id
+                        }
+                    };
+                    citems.push(newCitem);
+                    existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+
+                    deckTracker.applyChangeLog();
+
+                    col.save(existingDeck);
+
+                    // TODO dead code
+                    return;
+
+                    // we need to track stuff, this doesn't help
                     col.findOneAndUpdate({
                         _id: parseInt(root_deck_path[0]),  revisions : {$elemMatch: {id: parseInt(activeRevisionId)}}  },
                         {
@@ -1862,6 +1895,24 @@ function splitDeckIdParam(deckId){
     }
 
     return {deckId, revisionId};
+}
+
+// TODO
+// same as splitDeckIdParam, but there should be only one
+function parseIdentifier(identifier) {
+    let parsed = String(identifier).match(/^(\d+)(?:-(\d+))?$/);
+
+    // return both undefined if error
+    if (!parsed) {
+        // regex failed, no fallback!
+        return [undefined, undefined];
+    }
+
+    let id = parseInt(parsed[1]);
+    // could be undefined, so don't parse (it would result to NaN)
+    let revision = parsed[2] && parseInt(parsed[2]);
+
+    return {id, revision};
 }
 
 function findDeckInDeckTree(decktree, deck, path){
