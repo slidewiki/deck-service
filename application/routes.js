@@ -883,18 +883,37 @@ module.exports = function(server) {
 
 
     //------------------------------- Change Log Routes -----------------------------//
+
     server.route({
         method: 'GET',
-        path: '/deck/{id}/changeLog',
+        path: '/deck/{id}/changes',
         handler: changeLog.getDeckChangeLog,
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional')
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
                 },
             },
             tags: ['api'],
             description: 'Get the change log array for a deck (revision)',
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/changes',
+        handler: changeLog.getSlideChangeLog,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form slideId-slideRevisionId, revision is optional and will be ignored'),
+                },
+                query: {
+                    root: Joi.string().description('Identifier of deck tree root in the form deckId-deckRevisionId, revision is optional').required(),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the change log array for a slide',
         }
     });
 

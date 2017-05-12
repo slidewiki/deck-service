@@ -1,7 +1,10 @@
 'use strict';
 
-const ChangeLog = require('../lib/ChangeLog');
 const _ = require('lodash');
+const util = require('../lib/util');
+
+const ChangeLog = require('../lib/ChangeLog');
+
 const userService = require('../services/user');
 
 const helper = require('./helper'),
@@ -147,8 +150,8 @@ let self = module.exports = {
     // return a path array of deckId as it exists in the tree with rootDeckId as root
     // returns first occurence of deckId, or nothing if cannot find the path
     findPath: function(sourceDeckId, targetDeckId, path) {
-        let source = parseIdentifier(sourceDeckId);
-        let target = parseIdentifier(targetDeckId);
+        let source = util.parseIdentifier(sourceDeckId);
+        let target = util.parseIdentifier(targetDeckId);
 
         // HACK force error if target does not include revision
         target.revision;
@@ -1817,12 +1820,12 @@ let self = module.exports = {
     },
 
     // fetches change log records for the deck or subdecks thereof
-    getTreeChangeLog: function(identifier, path = []) {
+    getChangeLog: function(identifier) {
         // always check if deck exists to return a 404
         return self.get(identifier).then((existingDeck) => {
             if (!existingDeck) return;
 
-            let deck = parseIdentifier(identifier);
+            let deck = util.parseIdentifier(identifier);
             // set default if not specified
             if (!deck.revision) deck.revision = existingDeck.active;
 
@@ -1862,24 +1865,6 @@ function splitDeckIdParam(deckId){
     }
 
     return {deckId, revisionId};
-}
-
-// TODO
-// same as splitDeckIdParam, but there should be only one
-function parseIdentifier(identifier) {
-    let parsed = String(identifier).match(/^(\d+)(?:-(\d+))?$/);
-
-    // return both undefined if error
-    if (!parsed) {
-        // regex failed, no fallback!
-        return [undefined, undefined];
-    }
-
-    let id = parseInt(parsed[1]);
-    // could be undefined, so don't parse (it would result to NaN)
-    let revision = parsed[2] && parseInt(parsed[2]);
-
-    return {id, revision};
 }
 
 function findDeckInDeckTree(decktree, deck, path){
