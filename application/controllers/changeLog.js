@@ -41,7 +41,7 @@ let self = module.exports = {
 
 // TODO include them as API options ?
 const mergeMoves = true;
-const simplifyOutput = true;
+const simplifyOutput = false;
 
 function prepareChangeLog(changeLog) {
     if (!mergeMoves && !simplifyOutput) return changeLog;
@@ -85,33 +85,17 @@ function prepareChangeLog(changeLog) {
         if (hold) changeLog.push(hold);
     }
 
-    if (!simplifyOutput) return changeLog;
+    if (simplifyOutput) {
+        changeLog.forEach((cur) => {
+            // format paths and updates
+            cur.path = formatPath(cur.path);
+            if (cur.from) cur.from = formatPath(cur.from);
 
-    changeLog.forEach((cur) => {
-        cur.path = formatPath(cur.path);
-
-        if (cur.op === 'replace') {
-            if (cur.value.kind && cur.value.ref) {
-                // update on deck child
-                cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
-                cur.oldValue = `${cur.oldValue.kind}:${formatRef(cur.oldValue.ref)}`;
-            }
-        }
-
-        if (cur.op === 'add') {
-            cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
-        }
-
-        if (cur.op === 'remove') {
-            cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
-        }
-
-        if (cur.op === 'move') {
-            cur.from = formatPath(cur.from),
-            cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
-        }
-
-    });
+            // format node updates
+            if (cur.value) cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
+            if (cur.oldValue) cur.oldValue = `${cur.oldValue.kind}:${formatRef(cur.oldValue.ref)}`;
+        });
+    }
 
     return changeLog;
 }

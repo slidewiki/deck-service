@@ -368,7 +368,7 @@ let self = module.exports = {
             let slideId = util.parseIdentifier(identifier).id;
             let rootId = util.parseIdentifier(rootIdentifier).id;
 
-            return helper.getCollection('deckChanges').then((changes) => {
+            return helper.getCollection('deckchanges').then((changes) => {
                 return changes.aggregate([
                     { $match: {
                         'path': {

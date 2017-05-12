@@ -1829,7 +1829,7 @@ let self = module.exports = {
             // set default if not specified
             if (!deck.revision) deck.revision = existingDeck.active;
 
-            return helper.getCollection('deckChanges').then((changes) => {
+            return helper.getCollection('deckchanges').then((changes) => {
                 return changes.aggregate([
                     { $match: {
                         $or: [

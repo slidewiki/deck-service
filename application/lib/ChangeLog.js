@@ -5,6 +5,7 @@ const Immutable = require('immutable');
 const diff = require('immutablediff');
 
 const deckModel = require('../models/deck');
+const changeModel = require('../models/deckChange');
 
 const helper = require('../database/helper');
 
@@ -19,12 +20,12 @@ const ChangeLogRecord = {
         if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff)) return;
 
         return {
-            op: 'replace',
+            op: 'update',
 
             path: path,
 
-            value: afterDiff,
-            oldValue: beforeDiff,
+            values: afterDiff,
+            oldValues: beforeDiff,
 
             timestamp: (new Date()).toISOString(),
         };
@@ -57,20 +58,14 @@ const ChangeLogRecord = {
     },
 
     createNodeUpdate: function(before, after, index, path) {
-        // before and after are content item objects and could have the same values,
-        // we only want to keep in both the attributes that are different in any way
-        let beforeDiff = before;// _.omitBy(before, (value, key) => _.isEqual(value, after[key]));
-        let afterDiff = after;//_.omitBy(after, (value, key) => _.isEqual(value, before[key]));
-
-        if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff)) return;
 
         return {
             op: 'replace',
 
             path: path.concat({ index }),
 
-            value: afterDiff,
-            oldValue: beforeDiff,
+            value: after,
+            oldValue: before,
 
             timestamp: (new Date()).toISOString(),
         };
@@ -214,8 +209,20 @@ module.exports = {
                         console.log('deck changed: ' + JSON.stringify(deckChanges));
                     }
 
+                    // do some validation 
+                    var errors = _.compact(deckChanges.map((c) => {
+                        if (changeModel.validate(c)) return;
+                        return changeModel.validate.errors;
+                    }));
+
+                    // TODO enable validation
+                    // if (!_.isEmpty(errors)) throw errors;
+                    if (!_.isEmpty(errors)) {
+                        console.warn(errors);
+                    }
+
                     return helper.connectToDatabase()
-                    .then((db) => db.collection('deckChanges'))
+                    .then((db) => db.collection('deckchanges'))
                     .then((col) => col.insert(deckChanges));
 
                 }).catch((err) => {

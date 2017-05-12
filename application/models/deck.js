@@ -153,33 +153,6 @@ const editors = {
     }
 };
 
-// model how deck revision changes are saved in log
-const deckRevisionChange = {
-    type: 'object',
-    properties: {
-        operation: {
-            type: 'string',
-            enum: [ 'update', 'insert', 'delete', 'move' ],
-        },
-
-        timestamp: {
-            type: 'string',
-            format: 'date-time',
-        },
-
-        before: {
-            type: 'object',
-            properties: trackedDeckRevisionProperties,
-        },
-        after: {
-            type: 'object',
-            properties: trackedDeckRevisionProperties,
-        },
-
-    },
-
-};
-
 const deckRevision = {
     type: 'object',
     properties: _.merge({
@@ -270,11 +243,6 @@ const deckRevision = {
             items: contentItem
         },
 
-        changeLog: {
-            type: 'array',
-            items: deckRevisionChange
-        },
-
         dataSources: { //is filled out automatically from the slides
             type: 'array',
             items: {
@@ -297,49 +265,6 @@ const deckRevision = {
         }
     }, trackedDeckRevisionProperties),
     required: ['id', 'timestamp', 'user']
-};
-
-
-// model how deck changes are saved in log
-const deckChange = {
-    type: 'object',
-    properties: {
-        operation: {
-            type: 'string',
-            enum: [ 'update', 'remove', 'insert' ],
-        },
-
-        timestamp: {
-            type: 'string',
-            format: 'date-time',
-        },
-
-        before: {
-            type: 'object',
-            properties: trackedDeckProperties,
-        },
-        after: {
-            type: 'object',
-            properties: trackedDeckProperties,
-        },
-
-        index: {
-            type: 'integer',
-        },
-
-        insert: contentItem,
-        remove: contentItem,
-
-        update: {
-            type: 'object',
-            properties: {
-                before: contentItemPartial,
-                after: contentItemPartial,
-            },
-        },
-
-    },
-
 };
 
 const deck = {
@@ -389,11 +314,6 @@ const deck = {
         lastUpdate: {
             type: 'string',
             format: 'date-time'
-        },
-
-        changeLog: {
-            type: 'array',
-            items: deckChange
         },
 
         revisions: {
