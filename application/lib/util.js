@@ -21,11 +21,15 @@ let self = module.exports = {
             return [undefined, undefined];
         }
 
-        let id = parseInt(parsed[1]);
+        let result = { id: parseInt(parsed[1]) };
+
         // could be undefined, so don't parse (it would result to NaN)
         let revision = parsed[2] && parseInt(parsed[2]);
+        if (revision) {
+            result.revision = revision;
+        }
 
-        return {id, revision};
+        return result;
     },
 
     toIdentifier: function(ref) {

@@ -1836,24 +1836,24 @@ let self = module.exports = {
             if (!existingDeck) return;
 
             let deck = util.parseIdentifier(identifier);
-            // set default if not specified
-            if (!deck.revision) deck.revision = existingDeck.active;
+            // set default if not specified (?)
+            // if (!deck.revision) deck.revision = existingDeck.active;
+
+            let valueQuery = {
+                'value.kind': 'deck',
+                'value.ref.id': deck.id,
+            };
+            // if not specified, return all
+            if (deck.revision) valueQuery['value.ref.revision'] = deck.revision;
 
             return helper.getCollection('deckchanges').then((changes) => {
                 return changes.aggregate([
                     { $match: {
                         $or: [
                             { path: {
-                                $elemMatch: {
-                                    id: deck.id,
-                                    revision: deck.revision,
-                                }
+                                $elemMatch: deck
                             } },
-                            { 
-                                'value.kind': 'deck',
-                                'value.ref.id': deck.id,
-                                'value.ref.revision': deck.revision,
-                            },
+                            valueQuery,
                         ]
                     } },
                     { $project: { _id: 0 } },
