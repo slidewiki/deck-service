@@ -341,7 +341,7 @@ let self = module.exports = {
                 }
 
                 // start tracking changes
-                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, deck.user);
 
                 //TODO check if all attributes are used from payload
                 const deckRevision = existingDeck.revisions[activeRevisionIndex];
@@ -388,7 +388,7 @@ let self = module.exports = {
     },
 
     //renames a deck
-    rename: function(deck_id, newName, top_root_deck){
+    rename: function(deck_id, newName, top_root_deck, user){
         // if not included in the call, the deck itself is the top_root_deck
         top_root_deck = top_root_deck || deck_id;
 
@@ -404,7 +404,7 @@ let self = module.exports = {
             if (!deckRevision) return;
 
             // start tracking changes
-            let deckTracker = ChangeLog.deckTracker(deck, top_root_deck);
+            let deckTracker = ChangeLog.deckTracker(deck, top_root_deck, user);
 
             deck.revisions[revisionIndex].title = newName;
 
@@ -520,7 +520,7 @@ let self = module.exports = {
                             });
                         }
                     }
-                    let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
+                    let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, deck.user);
 
                     let new_revisions = existingDeck.revisions;
                     new_revisions[activeRevisionIndex].usage = previousUsageArray;
@@ -543,7 +543,7 @@ let self = module.exports = {
     },
 
     //inserts a content item (slide or deck) into a deck at the specified position, or appends it at the end if no position is given
-    insertNewContentItem: function(citem, position, root_deck, ckind, citem_revision_id, top_root_deck){
+    insertNewContentItem: function(citem, position, root_deck, ckind, citem_revision_id, top_root_deck, user){
         // if top_root_deck is missing, root_deck is the top
         if (!top_root_deck) top_root_deck = root_deck;
 
@@ -565,7 +565,7 @@ let self = module.exports = {
                     activeRevisionId = root_deck_path[1];
                 }
 
-                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user);
                 // copy edit rights from existingDeck to new
                 if (ckind === 'deck') {
                     let attachedDeckId = `${parseInt(citem.id)}-${citem_revision_id}`;
@@ -665,7 +665,7 @@ let self = module.exports = {
     },
 
     //removes (unlinks) a content item from a given deck
-    removeContentItem: function(position, root_deck, top_root_deck){
+    removeContentItem: function(position, root_deck, top_root_deck, userId){
         let root_deck_path = root_deck.split('-');
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
@@ -678,7 +678,7 @@ let self = module.exports = {
                     activeRevisionId = root_deck_path[1];
                 }
 
-                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, userId);
 
                 let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
                 for(let i = position-1; i < citems.length; i++){
@@ -770,7 +770,7 @@ let self = module.exports = {
     },
 
     //updates an existing content item's revision
-    updateContentItem: function(citem, revertedRevId, root_deck, ckind, top_root_deck){ //can be used for reverting or updating
+    updateContentItem: function(citem, revertedRevId, root_deck, ckind, top_root_deck, user){ //can be used for reverting or updating
         let rootArray = root_deck.split('-');
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
@@ -789,7 +789,7 @@ let self = module.exports = {
 
                 // pre-compute what the for loop does
                 let revisionIndex = existingDeck.revisions.findIndex((rev) => rev.id === parseInt(rootRev));
-                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user);
 
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
@@ -1262,6 +1262,7 @@ let self = module.exports = {
                 license: existingDeck.license,
                 user: userId,
                 root_deck: parentDeckId,
+                top_root_deck: rootDeckId,
             };
 
             // create the new revision
@@ -1277,7 +1278,7 @@ let self = module.exports = {
                 return self.get(replaced.value._id).then((fullDeck) => {
                     if (parentDeckId) {
                         // update parent deck first before returning
-                        return self.updateContentItem(fullDeck, '', parentDeckId, 'deck', rootDeckId)
+                        return self.updateContentItem(fullDeck, '', parentDeckId, 'deck', rootDeckId, userId)
                         .then((updated) => fullDeck);
                     } else {
                         return fullDeck;
@@ -1662,7 +1663,7 @@ let self = module.exports = {
                                         return self.get(replaced.value._id).then((newDeck) => {
 
                                             //only update the root deck, i.e., direct parent
-                                            return self.updateContentItem(newDeck, '', payload.root_deck, 'deck', root_deck)
+                                            return self.updateContentItem(newDeck, '', payload.root_deck, 'deck', root_deck, user_id)
                                             .then((updated) => {
                                                 new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
                                                 callback();
@@ -1678,7 +1679,7 @@ let self = module.exports = {
                                     return self.get(replaced.value._id).then((newDeck) => {
 
                                         //only update the root deck, i.e., direct parent
-                                        return self.updateContentItem(newDeck, '', payload.root_deck, 'deck', root_deck)
+                                        return self.updateContentItem(newDeck, '', payload.root_deck, 'deck', root_deck, user_id)
                                         .then((updated) => {
                                             new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
                                             callback();
@@ -1848,10 +1849,11 @@ let self = module.exports = {
                                     revision: deck.revision,
                                 }
                             } },
-                            { value: {
-                                kind: 'deck',
-                                ref: deck,
-                            } },
+                            { 
+                                'value.kind': 'deck',
+                                'value.ref.id': deck.id,
+                                'value.ref.revision': deck.revision,
+                            },
                         ]
                     } },
                     { $project: { _id: 0 } },

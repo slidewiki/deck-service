@@ -52,7 +52,7 @@ function prepareChangeLog(changeLog) {
 
             if (hold) {
                 // TODO check timestamps as well
-                if (cur.op === 'remove' && _.isEqual(hold.value, cur.value)) {
+                if (cur.op === 'remove' && _.isEqual(hold.value, cur.value) && hold.user === cur.user) {
                     // we have a move, so merge and push
                     acc.push({
                         op: 'move',
@@ -61,6 +61,7 @@ function prepareChangeLog(changeLog) {
                         value: cur.value,
 
                         timestamp: cur.timestamp,
+                        user: cur.user,
                     });
 
                 } else {

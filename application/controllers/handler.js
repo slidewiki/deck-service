@@ -90,7 +90,7 @@ let self = module.exports = {
 
     //updates slide by creating a new revision
     updateSlide: function(request, reply) {
-
+        let userId = request.payload.user;
         let slideId = request.params.id;
 
         //call recursive revisioning to handle needed changes in the decktree
@@ -154,7 +154,7 @@ let self = module.exports = {
                             }
 
                             // update the content item of the parent deck with the new revision id
-                            return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', request.payload.top_root_deck)
+                            return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', request.payload.top_root_deck, userId)
                             .then(() => {
                                 reply(newSlide);
                             });
@@ -172,13 +172,15 @@ let self = module.exports = {
 
     //reverts a slide to a previous revision, w.r.t. a parent deck
     revertSlideRevision: function(request, reply) {
+        let userId = request.payload.user;
+
         slideDB.get(encodeURIComponent(request.params.id.split('-')[0]), request.payload).then((slide) => {
             if (co.isEmpty(slide))
                 throw slide;
             else{
                 let revision_id = parseInt(request.payload.revision_id);
                 //update the content items of the root deck to reflect the slide revert
-                return deckDB.updateContentItem(slide, revision_id, request.payload.root_deck, 'slide', request.payload.top_root_deck)
+                return deckDB.updateContentItem(slide, revision_id, request.payload.root_deck, 'slide', request.payload.top_root_deck, userId)
                 .then((updatedIds) => {
                     let fullId = request.params.id;
                     if(fullId.split('-').length < 2){
@@ -207,6 +209,8 @@ let self = module.exports = {
 
         authorizeUser(userId, parentDeckId, rootDeckId).then((boom) => {
             if (boom) return reply(boom);
+
+            request.payload.user = userId;
 
             // continue as normal
             self.revertSlideRevision(request, reply);
@@ -386,7 +390,7 @@ let self = module.exports = {
                     //update the content items of the new deck to contain the new slide
                     // top root is the root_deck if missing from payload
                     let top_root_deck = request.payload.top_root_deck || newSlide.root_deck;
-                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, top_root_deck)
+                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, top_root_deck, newSlide.user)
                     .then((insertedContentItem) => {
                         reply(co.rewriteID(inserted.ops[0]));
                     });
@@ -515,7 +519,7 @@ let self = module.exports = {
                             }
                             //if deck is a sub-deck, update its parent's content items
                             if(request.payload.root_deck){
-                                deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck', request.payload.top_root_deck)
+                                deckDB.updateContentItem(newDeck, '', request.payload.root_deck, 'deck', request.payload.top_root_deck, request.payload.user)
                                 .then((updated) => {
                                     newDeck.revisions = [newDeck.revisions[newDeck.revisions.length-1]];
                                     reply(newDeck);
@@ -674,7 +678,7 @@ let self = module.exports = {
                             throw reverted;
                         else{
                             let revision_id = parseInt(reverted.value.revisions.length);
-                            return deckDB.updateContentItem(deck, revision_id, request.payload.root_deck, 'deck', request.payload.top_root_deck)
+                            return deckDB.updateContentItem(deck, revision_id, request.payload.root_deck, 'deck', request.payload.top_root_deck, request.payload.user)
                             .then((updatedIds) => {
                                 let fullId = request.params.id;
                                 if(fullId.split('-').length < 2){
@@ -749,6 +753,7 @@ let self = module.exports = {
     createDeckTreeNode: function(request, reply) {
         let node = {};
         let top_root_deck = request.payload.selector.id;
+        let userId = request.payload.user;
 
         //check if it is a slide or a deck
         if(request.payload.nodeSpec.type === 'slide'){
@@ -791,7 +796,7 @@ let self = module.exports = {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, top_root_deck);
+                            deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, top_root_deck, userId);
                             reply(node);
                         });
                     }
@@ -817,7 +822,7 @@ let self = module.exports = {
                                 parentID = changeset.target_deck || changeset.parent_deck || parentID;
                             }
 
-                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, top_root_deck);
+                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, top_root_deck, userId);
                             node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
                             slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
                             if(changeset && changeset.hasOwnProperty('target_deck')){
@@ -909,7 +914,7 @@ let self = module.exports = {
                             if (createdSlide.isBoom) return reply(createdSlide);
 
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, top_root_deck);
+                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, top_root_deck, userId);
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             if(changeset && changeset.hasOwnProperty('target_deck')){
                                 node.changeset = changeset;
@@ -980,7 +985,7 @@ let self = module.exports = {
                                 parentID = changeset.target_deck || changeset.parent_deck || parentID;
                             }
 
-                            deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, top_root_deck);
+                            deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, top_root_deck, userId);
                             deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             self.getDeckTree({
@@ -1038,7 +1043,7 @@ let self = module.exports = {
                                     parentID = changeset.target_deck || changeset.parent_deck || parentID;
                                 }
 
-                                deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, top_root_deck);
+                                deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, top_root_deck, userId);
                                 deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
                                 //we have to return from the callback, else empty node is returned because it is updated asynchronously
                                 self.getDeckTree({
@@ -1126,7 +1131,7 @@ let self = module.exports = {
                             if (createdDeck.isBoom) return reply(createdDeck);
                             //if there is a parent deck, update its content items
                             if(typeof parentID !== 'undefined')
-                                deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck', 1, top_root_deck);
+                                deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck', 1, top_root_deck, userId);
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             self.getDeckTree({
                                 'params': {'id' : createdDeck.id},
@@ -1171,7 +1176,7 @@ let self = module.exports = {
                     root_deck = changeset.target_deck;
                 }
                 let top_root_deck = request.payload.selector.id;
-                deckDB.rename(root_deck, request.payload.name, top_root_deck).then((renamed) => {
+                deckDB.rename(root_deck, request.payload.name, top_root_deck, request.payload.user).then((renamed) => {
                     if (co.isEmpty(renamed.value))
                         throw renamed;
                     else{
@@ -1241,6 +1246,8 @@ let self = module.exports = {
     },
     //deletes a decktree node by removing its reference from its parent deck (does not actually delete it from the database)
     deleteDeckTreeNode: function(request, reply) {
+        let userId = request.payload.user;
+
         //NOTE no removal in the DB, just unlink from content items, and update the positions of the other elements
         let spath = request.payload.selector.spath;
         let spathArray = spath.split(';');
@@ -1279,7 +1286,7 @@ let self = module.exports = {
             }
             //remove link of content item from db
             let top_root_deck = request.payload.selector.id;
-            deckDB.removeContentItem(itemPosition, parentID, top_root_deck)
+            deckDB.removeContentItem(itemPosition, parentID, top_root_deck, userId)
             .then((removed) => {
                 if(!removed){
                     removed = {};

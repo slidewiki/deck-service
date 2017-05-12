@@ -63,11 +63,12 @@ const ChangeLogRecord = {
     },
 
     createNodeUpdate: function(before, after, index, path) {
+        if (path && _.isNumber(index)) path = path.concat({ index });
 
         return {
             op: 'replace',
 
-            path: path.concat({ index }),
+            path: path,
 
             value: after,
             oldValue: before,
@@ -84,7 +85,10 @@ const omitOrder = (item) => _.omit(item, 'order');
 
 module.exports = {
 
-    deckTracker: function(deck, rootDeckId) {
+    deckTracker: function(deck, rootDeckId, user) {
+        // user is integer
+        if (user) user = parseInt(user);
+
         // latest is the only editable revision!!
         const [revision] = deck.revisions.slice(-1);
 
@@ -114,21 +118,61 @@ module.exports = {
             // returns the change log record that should be appended to the database
             // should be called right after all changes are made, and before saving the deck object
             // `newDeck` is optional, for code that applies changes on a new deck object
-            deckUpdateRecord: function(path, newDeck) {
+            deckUpdateRecords: function(path, newDeck) {
                 if (typeof newDeck === 'undefined') {
                     newDeck = deck;
                 }
 
-                const deckAfter = _.cloneDeep(_.pick(newDeck, _.keys(deckModel.trackedDeckProperties)));
+                // we may have two records here: one for updating the values
+                // the other for updating the revision (but only when not a subdeck)
+                let records = [];
+
+                let deckAfter = _.cloneDeep(_.pick(newDeck, _.keys(deckModel.trackedDeckProperties)));
+
+                // check if we are applying update to deck across revisions
+                // in that case newDeck would be not the same object as deck (the one we initialized with)
+                let newRevision = revision;
+                if (newDeck !== deck) {
+                    // latest is the only editable revision!!
+                    [newRevision] = newDeck.revisions.slice(-1);
+
+                    // check for the case where we're doing a deck revision for a ROOT deck
+                    // we double check that old revision and new are different!
+                    // if it's a root deck revision, the path will be of length 1
+                    if (revision.id !== newRevision.id && path.length === 1) {
+
+                        let before = {
+                            kind: 'deck',
+                            ref: {
+                                id: deck._id,
+                                revision: revision.id,
+                            },
+                        };
+                        let after = {
+                            kind: 'deck',
+                            ref: {
+                                id: deck._id,
+                                revision: newRevision.id,
+                            },
+                        };
+
+                        // no index or path in this case
+                        records.push(ChangeLogRecord.createNodeUpdate(before, after));
+                    }
+
+                }
 
                 // in order to do the comparison, we merge revision into deck and only keep trackable stuff
                 _.merge(deckAfter, _.cloneDeep(_.pick(
-                    revision,
+                    newRevision,
                     _.keys(deckModel.trackedDeckRevisionProperties))
                 ));
 
-                // this may return nothing, which is ok
-                return ChangeLogRecord.createUpdate(deckBefore, deckAfter, path);
+                // this may include empty slots nothing, which is ok
+                records.push(ChangeLogRecord.createUpdate(deckBefore, deckAfter, path));
+
+                // this may be a sparse array!
+                return records;
             },
 
             contentItemsRecords: function(path) {
@@ -201,7 +245,7 @@ module.exports = {
                 pathPromise.then((path) => {
                     let deckChanges = _.compact([
                         // first the deck changes
-                        this.deckUpdateRecord(path, newDeck),
+                        ...this.deckUpdateRecords(path, newDeck),
                         // then the children changes
                         ...this.contentItemsRecords(path)]);
 
@@ -210,6 +254,9 @@ module.exports = {
                         console.warn('WARNING: no deck changes detected as was expected');
                         return;
                     }
+
+                    // add user for all changes
+                    deckChanges.forEach((c) => { c.user = user; });
 
                     return fillSlideTitles(deckChanges).then(fillDeckTitles).then(() => {
                         // TODO remove this
