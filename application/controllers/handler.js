@@ -384,8 +384,9 @@ let self = module.exports = {
                 .then((insertedSlide) => {
                     insertedSlide.ops[0].id = insertedSlide.ops[0]._id;
                     //update the content items of the new deck to contain the new slide
-                    // top root is the root_deck
-                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, newSlide.root_deck)
+                    // top root is the root_deck if missing from payload
+                    let top_root_deck = request.payload.top_root_deck || newSlide.root_deck;
+                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, top_root_deck)
                     .then((insertedContentItem) => {
                         reply(co.rewriteID(inserted.ops[0]));
                     });
@@ -1114,6 +1115,7 @@ let self = module.exports = {
                             'license': parentDeck.license,
                             'user': request.payload.user,
                             'root_deck': parentID,
+                            'top_root_deck': top_root_deck,
                             'position' : deckPosition
                         };
                         //create the new deck
