@@ -28,4 +28,9 @@ let self = module.exports = {
         return {id, revision};
     },
 
+    toIdentifier: function(ref) {
+        let revision = ref.revision ? `-${ref.revision}` : '';
+        return `${ref.id}${revision}`;
+    },
+
 };

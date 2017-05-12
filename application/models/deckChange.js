@@ -22,6 +22,9 @@ const changePath = {
             revision: {
                 type: 'integer',
             },
+            title: {
+                type: 'string',
+            },
             index: {
                 type: 'integer',
             },
@@ -44,6 +47,9 @@ const nodeValue = {
                 },
                 revision: {
                     type: 'integer',
+                },
+                title: {
+                    type: 'string',
                 },
             },
         },

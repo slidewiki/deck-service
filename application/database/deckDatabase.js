@@ -320,6 +320,9 @@ let self = module.exports = {
 
     //updates a deck's metadata when no new revision is needed
     update: function(id, deck) {
+        // if not included in the call, the deck itself is the top_root_deck
+        let top_root_deck = deck.top_root_deck || id;
+
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => {
@@ -338,7 +341,7 @@ let self = module.exports = {
                 }
 
                 // start tracking changes
-                let deckTracker = ChangeLog.deckTracker(existingDeck, deck.top_root_deck);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
 
                 //TODO check if all attributes are used from payload
                 const deckRevision = existingDeck.revisions[activeRevisionIndex];
@@ -386,6 +389,9 @@ let self = module.exports = {
 
     //renames a deck
     rename: function(deck_id, newName, top_root_deck){
+        // if not included in the call, the deck itself is the top_root_deck
+        top_root_deck = top_root_deck || deck_id;
+
         let deckId = deck_id.split('-')[0];
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
@@ -414,6 +420,9 @@ let self = module.exports = {
 
     //updates a deck by creating a new revision
     replace: function(id, deck) {
+        // if not included in the call, the deck itself is the top_root_deck
+        let top_root_deck = deck.top_root_deck || id;
+
         let idArray = String(id).split('-');
         if(idArray.length > 1){
             id = idArray[0];
@@ -511,7 +520,7 @@ let self = module.exports = {
                             });
                         }
                     }
-                    let deckTracker = ChangeLog.deckTracker(existingDeck, deck.top_root_deck);
+                    let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck);
 
                     let new_revisions = existingDeck.revisions;
                     new_revisions[activeRevisionIndex].usage = previousUsageArray;

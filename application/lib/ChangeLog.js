@@ -1,13 +1,18 @@
 'use strict';
 
 const _ = require('lodash');
+const async = require('async');
+
 const Immutable = require('immutable');
 const diff = require('immutablediff');
+
+const util = require('../lib/util');
 
 const deckModel = require('../models/deck');
 const changeModel = require('../models/deckChange');
 
 const helper = require('../database/helper');
+const slideDB = require('../database/slideDatabase');
 
 const ChangeLogRecord = {
 
@@ -204,26 +209,29 @@ module.exports = {
                     if (_.isEmpty(deckChanges)) {
                         console.warn('WARNING: no deck changes detected as was expected');
                         return;
-                    } else {
+                    }
+
+                    return fillSlideTitles(deckChanges).then(fillDeckTitles).then(() => {
                         // TODO remove this
-                        console.log('deck changed: ' + JSON.stringify(deckChanges));
-                    }
+                        // console.log('deck changed: ' + JSON.stringify(deckChanges));
 
-                    // do some validation 
-                    var errors = _.compact(deckChanges.map((c) => {
-                        if (changeModel.validate(c)) return;
-                        return changeModel.validate.errors;
-                    }));
+                        // do some validation 
+                        var errors = _.compact(deckChanges.map((c) => {
+                            if (changeModel.validate(c)) return;
+                            return changeModel.validate.errors;
+                        }));
 
-                    // TODO enable validation
-                    // if (!_.isEmpty(errors)) throw errors;
-                    if (!_.isEmpty(errors)) {
-                        console.warn(errors);
-                    }
+                        // TODO enable validation
+                        // if (!_.isEmpty(errors)) throw errors;
+                        if (!_.isEmpty(errors)) {
+                            console.warn(errors);
+                        }
 
-                    return helper.connectToDatabase()
-                    .then((db) => db.collection('deckchanges'))
-                    .then((col) => col.insert(deckChanges));
+                        return helper.connectToDatabase()
+                        .then((db) => db.collection('deckchanges'))
+                        .then((col) => col.insert(deckChanges));
+
+                    });
 
                 }).catch((err) => {
                     console.warn(err);
@@ -236,3 +244,81 @@ module.exports = {
     },
 
 };
+
+function fillSlideTitles(deckChanges) {
+
+    // we check to see if we need to also read some data for slide updates
+    let slideUpdates = deckChanges.filter((c) => (c.value && c.value.kind === 'slide'));
+    return new Promise((resolve, reject) => {
+        async.eachSeries(slideUpdates, (rec, done) => {
+            // we want to add title and old title of slide
+            slideDB.get(rec.value.ref.id).then((slide) => {
+                if (!slide) return; // ignore errors ?
+
+                let after = slide.revisions.find((r) => r.id === rec.value.ref.revision);
+                rec.value.ref.title = after.title;
+
+                if (rec.oldValue) {
+                    let before = slide.revisions.find((r) => r.id === rec.oldValue.ref.revision);
+                    rec.oldValue.ref.title = before.title;
+                }
+
+                done();
+            }).catch(done);
+
+        }, (err) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(deckChanges);
+            }
+        });
+
+    });
+
+}
+
+
+function fillDeckTitles(deckChanges) {
+    // TODO handle circular dependency
+    let deckDB = require('../database/deckDatabase');
+
+    // we need a deck title if we are doing a deck data update, or a deck node update
+    let deckUpdates = deckChanges.filter((c) => (c.op === 'update' || (c.value && c.value.kind === 'deck') ));
+    return new Promise((resolve, reject) => {
+        async.eachSeries(deckUpdates, (rec, done) => {
+            if (rec.op === 'update') {
+                // deck data update, last path needs title
+                let [deckValue] = rec.path.slice(-1);
+                deckDB.getRevision(util.toIdentifier(deckValue)).then((deckRevision) => {
+                    deckValue.title = deckRevision.title;
+                    done();
+                }).catch(done);
+            } else {
+                // we want to add title and old title of deck
+                deckDB.get(rec.value.ref.id).then((deck) => {
+                    if (!deck) return; // ignore errors ?
+
+                    let after = deck.revisions.find((r) => r.id === rec.value.ref.revision);
+                    rec.value.ref.title = after.title;
+
+                    if (rec.oldValue) {
+                        let before = deck.revisions.find((r) => r.id === rec.oldValue.ref.revision);
+                        rec.oldValue.ref.title = before.title;
+                    }
+
+                    done();
+                }).catch(done);
+            }
+
+        }, (err) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(deckChanges);
+            }
+        });
+
+    });
+
+}
