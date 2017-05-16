@@ -37,7 +37,7 @@ function getNextId(db, collectionName, fieldName) {
     const fieldNameCorrected = fieldName || incrementationSettings.field;
     const step = incrementationSettings.step;
 
-    let myPromise = new Promise(function (resolve, reject) {
+    let myPromise = new Promise((resolve, reject) => {
         return db.collection(incrementationSettings.collection).findAndModify({
             _id: collectionName,
             field: fieldNameCorrected
@@ -77,17 +77,16 @@ let self = module.exports = {
     createDatabase: function(dbname) {
         dbname = testDbName(dbname);
 
-        let myPromise = new Promise(function(resolve, reject) {
+        let myPromise = new Promise((resolve, reject) => {
             let db = new Db(dbname, new Server(config.HOST, config.PORT));
-            const connection = db.open()
-            .then((connection) => {
+            db.open().then((connection) => {
                 connection.collection('test').insertOne({ //insert the first object to know that the database is properly created TODO this is not real test....could fail without your knowledge
                     id: 1,
                     data: {}
-                }, (data) => {
+                }, () => {
                     resolve(connection);
                 });
-            });
+            }).catch(reject);
         });
 
         return myPromise;
@@ -131,11 +130,11 @@ let self = module.exports = {
 
     applyFixtures: function(db, data) {
         let async = require('async');
-        var names = Object.keys(data.collections);
+        let names = Object.keys(data.collections);
 
         return new Promise((resolve) => {
-            async.eachSeries(names, function(name, cb) {
-                db.createCollection(name, function(err, collection) {
+            async.eachSeries(names, (name, cb) => {
+                db.createCollection(name, (err, collection) => {
                     if (err) return cb(err);
                     // console.log(data.collections[name].length);
                     collection.insert(data.collections[name], cb);

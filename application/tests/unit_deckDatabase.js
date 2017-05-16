@@ -1,4 +1,5 @@
 /* eslint-env mocha */
+/* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
 let chai = require('chai');
@@ -122,7 +123,7 @@ describe('deckDatabase', function() {
                     editors.users.should.include.members([ 9, 46, 10, 3 ]);
                 }),
                 // deckDB._adminUpdate('54', { accessLevel: 'restricted' })
-                // .then((updated) => deckDB.getDeckUsersGroups('54'))
+                // .then(() => deckDB.getDeckUsersGroups('54'))
                 // .then((editors) => {
                 //     editors.users.should.include.members([ 9, 46, 10, 3 ]);
                 // }),
@@ -133,7 +134,7 @@ describe('deckDatabase', function() {
         it.skip('should only include the owner and no groups for decks that are private', function() {
             // update first to private and recalculate
             return deckDB._adminUpdate('54', { accessLevel: 'private' })
-            .then((updated) => deckDB.getDeckUsersGroups('54'))
+            .then(() => deckDB.getDeckUsersGroups('54'))
             .then((editors) => {
                 editors.users.should.have.members([ 46 ]);
                 editors.groups.should.be.empty;
@@ -144,7 +145,7 @@ describe('deckDatabase', function() {
         it.skip('should exactly include all implicitly or explicitly authorized users and authorized groups for restricted decks', function() {
             // update first to restricted and recalculate
             return deckDB._adminUpdate('54', { accessLevel: 'restricted' })
-            .then((updated) => deckDB.getDeckUsersGroups('54'))
+            .then(() => deckDB.getDeckUsersGroups('54'))
             .then((editors) => {
                 editors.users.should.have.members([ 9, 46, 10, 3, 4, 5 ]);
                 editors.groups.should.have.members([ 2 ]);

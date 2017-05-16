@@ -15,8 +15,7 @@ const boom = require('boom'),
     co = require('../common'),
     Joi = require('joi'),
     async = require('async'),
-    Microservices = require('../configs/microservices'),
-    config = require('../configuration');
+    Microservices = require('../configs/microservices');
 
 const userService = require('../services/user');
 
@@ -396,7 +395,7 @@ let self = module.exports = {
                     // top root is the root_deck if missing from payload
                     let top_root_deck = request.payload.top_root_deck || newSlide.root_deck;
                     let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, top_root_deck, newSlide.user)
-                    .then((insertedContentItem) => {
+                    .then(() => {
                         reply(co.rewriteID(inserted.ops[0]));
                     });
                     //create the thumbnail for the new slide
@@ -489,29 +488,22 @@ let self = module.exports = {
         });
     },
 
-    // HACK this was introduced to help inject forkAllowed check in updateDeckRevision without refactoring much stuff
-    forkDeckRevisionWithCheck: function(request, reply) {
+    forkDeckRevision: function(request, reply) {
         return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
         .then((forkAllowed) => {
             if (!forkAllowed) {
                 return reply(boom.forbidden());
             }
 
-            // else return and continue with promise chain
-            return self.forkDeckRevision(request, reply);
-        })
-        .catch((error) => {
+            return deckDB.forkDeckRevision(request.params.id, request.payload.user).then((id_map) => {
+                reply(id_map);
+            });
+
+        }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation(error));
         });
 
-    },
-
-    //forks the deck revision by copying all of the decks in the decktree
-    forkDeckRevision: function(request, reply) {
-        deckDB.forkDeckRevision(encodeURIComponent(request.params.id), request.payload.user).then((id_map) => {
-            reply(id_map);
-        });
     },
 
     // simply creates a new deck revision without updating anything
@@ -648,12 +640,11 @@ let self = module.exports = {
                 //it means it is an existing node, we should retrieve the details
                 let spath = request.payload.selector.spath;
                 let spathArray = spath.split(';');
-                let parentID, parentPosition, slidePosition;
+                let parentID, slidePosition;
                 if(spathArray.length > 1){
 
                     let parentArrayPath = spathArray[spathArray.length-2].split(':');
                     parentID = parentArrayPath[0];
-                    parentPosition = parseInt(parentArrayPath[1]);
 
                 }
                 else{
@@ -685,12 +676,15 @@ let self = module.exports = {
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
                             deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, top_root_deck, userId);
                             reply(node);
+                        }).catch((err) => {
+                            request.log('error', err);
+                            reply(boom.badImplementation());
                         });
                     }
                     else{
                         //change position of the existing slide
                         slide.id = slide._id;
-                        
+
                         { // these brackets are kept during handleChange removal to keep git blame under control
 
                             deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, top_root_deck, userId);
@@ -708,12 +702,11 @@ let self = module.exports = {
                 //need to make a new slide
                 let spath = request.payload.selector.spath;
                 let spathArray = spath.split(';');
-                let parentID, parentPosition, slidePosition;
+                let parentID, slidePosition;
                 if(spathArray.length > 1){
 
                     let parentArrayPath = spathArray[spathArray.length-2].split(':');
                     parentID = parentArrayPath[0];
-                    parentPosition = parseInt(parentArrayPath[1]);
 
                 }
                 else{
@@ -779,12 +772,11 @@ let self = module.exports = {
                 //id is specified, it means it is an existing node
                 let spath = request.payload.selector.spath;
                 let spathArray = spath.split(';');
-                let parentID, parentPosition, deckPosition;
+                let parentID, deckPosition;
                 if(spathArray.length > 1){
 
                     let parentArrayPath = spathArray[spathArray.length-2].split(':');
                     parentID = parentArrayPath[0];
-                    parentPosition = parseInt(parentArrayPath[1]);
 
                 }
                 else{
@@ -868,6 +860,9 @@ let self = module.exports = {
                             }
                         });
                         //reply(id_map);
+                    }).catch((err) => {
+                        request.log('error', err);
+                        reply(boom.badImplementation());
                     });
                 }
 
@@ -877,12 +872,11 @@ let self = module.exports = {
                 //id is not specified, we need to make a new deck
                 let spath = request.payload.selector.spath;
                 let spathArray = spath.split(';');
-                let parentID, parentPosition, deckPosition;
+                let parentID, deckPosition;
                 if(spathArray.length > 1){
 
                     let parentArrayPath = spathArray[spathArray.length-2].split(':');
                     parentID = parentArrayPath[0];
-                    parentPosition = parseInt(parentArrayPath[1]);
 
                 }
                 else{
@@ -1020,12 +1014,11 @@ let self = module.exports = {
         //NOTE no removal in the DB, just unlink from content items, and update the positions of the other elements
         let spath = request.payload.selector.spath;
         let spathArray = spath.split(';');
-        let parentID, parentPosition, itemPosition;
+        let parentID, itemPosition;
         if(spathArray.length > 1){
 
             let parentArrayPath = spathArray[spathArray.length-2].split(':');
             parentID = parentArrayPath[0];
-            parentPosition = parentArrayPath[1];
 
         }
         else{
@@ -1082,7 +1075,6 @@ let self = module.exports = {
 
                         let parentArrayPath = targetspathArray[targetspathArray.length-2].split(':');
                         targetParentDeck = parentArrayPath[0];
-                        //parentPosition = parentArrayPath[1];
                     }
                     else{
                         let parentArrayPath = targetspathArray[targetspathArray.length-1].split(':');
@@ -1189,7 +1181,11 @@ let self = module.exports = {
             }
 
             reply(deckTree);
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
+
     },
 
     //returns the editors of a deck
@@ -1452,6 +1448,9 @@ let self = module.exports = {
 
             return reply(result);
 
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
     },
 
@@ -1464,6 +1463,9 @@ let self = module.exports = {
             else{
                 reply(foundDeck.revisions.length);
             }
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
     },
 
@@ -1476,6 +1478,9 @@ let self = module.exports = {
             else{
                 reply(foundSlide.revisions.length);
             }
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
     },
 
@@ -1498,6 +1503,9 @@ let self = module.exports = {
                 }
                 reply(slideCount);
             }
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
     },
 
