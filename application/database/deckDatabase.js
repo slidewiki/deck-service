@@ -1860,7 +1860,7 @@ let self = module.exports = {
                             valueQuery,
                         ]
                     } },
-                    { $project: { _id: 0 } },
+                    // { $project: { _id: 0 } }, // TODO re-insert this after 3.4 upgrade
                     { $sort: { timestamp: -1 } },
                 ]);
             }).then((result) => result.toArray());
