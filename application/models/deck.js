@@ -43,6 +43,18 @@ const trackedDeckRevisionProperties = {
         type: 'string',
     },
 
+    tags: {
+        type: 'array',
+        items: {
+            type: 'object',
+            properties: {
+                tagName: {
+                    type: 'string',
+                },
+                // TODO add other properties as well in sync with the tag-service
+            },
+        },
+    },
 };
 
 const contributor = {
@@ -219,18 +231,6 @@ const deckRevision = {
                     type: 'object'
                 }
             }
-        },
-        tags: {
-            type: 'array',
-            items: {
-                type: 'object',
-                properties: {
-                    tagName: {
-                        type: 'string',
-                    },
-                    // TODO add other properties as well in sync with the tag-service
-                },
-            },
         },
         preferences: {
             type: 'array',
