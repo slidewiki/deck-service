@@ -443,6 +443,21 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/revisions',
+        handler: handlers.getDeckRevisions,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+            },
+            tags: ['api'],
+            description: 'List all deck revisions meta data for current deck',
+        },
+    });
+
+    server.route({
         method: 'POST',
         path: '/deck/{id}/revision',
         handler: handlers.createDeckRevision,

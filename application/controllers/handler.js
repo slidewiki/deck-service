@@ -354,6 +354,33 @@ let self = module.exports = {
         });
     },
 
+    getDeckRevisions: function(request, reply) {
+        let deckId = request.params.id; // it should already be a number
+        console.log(_.isNumber(deckId));
+        deckDB.get(deckId).then((deck) => {
+            if (!deck) return reply(boom.notFound());
+
+            reply(deck.revisions.reverse().map((rev, index, list) => {
+                if (!rev.lastUpdate) {
+                    // fill in missing lastUpdate from next revision
+                    let nextRev = list[index + 1];
+                    rev.lastUpdate = (nextRev && nextRev.timestamp) || deck.lastUpdate;
+                }
+
+                // keep only deck data
+                delete rev.contentItems;
+                delete rev.usage;
+
+                return rev;
+            }));
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+
+    },
+
     //creates a new deck in the database
     newDeck: function(request, reply) {
         //insert the deck into the database
