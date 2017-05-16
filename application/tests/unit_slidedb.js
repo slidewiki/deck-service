@@ -518,7 +518,7 @@ describe('Database', () => {
             let ins = deckdb.insert(deck);
             let decktree = ins.then((ins) => deckdb.getDeckTreeFromDB(ins.ops[0]._id+'-1'));
             let res = decktree.then((decktree) => deckdb.handleChange(decktree, decktree.id, decktree.id, 1));
-            res.then((data) => console.log('resolved', data));
+            //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 //res.should.eventually.have.property('root_deck').that.is.not.empty,

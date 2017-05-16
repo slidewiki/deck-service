@@ -4,11 +4,13 @@ Controller for handling mongodb and the data model slide while providing CRUD'is
 
 'use strict';
 
+const util = require('../lib/util');
+
 const helper = require('./helper'),
     slideModel = require('../models/slide.js'),
     oid = require('mongodb').ObjectID;
 
-module.exports = {
+let self = module.exports = {
     get: function(identifier) {
         identifier = String(identifier);
         let idArray = identifier.split('-');
@@ -356,6 +358,36 @@ module.exports = {
             });
         });
     },
+
+    // fetches change log records for the slide as it appears in the deck tree with given root
+    getChangeLog: function(identifier, rootIdentifier) {
+        // always check if slide exists to return a 404
+        return self.get(identifier).then((existingSlide) => {
+            if (!existingSlide) return;
+
+            let slideId = util.parseIdentifier(identifier).id;
+            let rootId = util.parseIdentifier(rootIdentifier).id;
+
+            return helper.getCollection('deckchanges').then((changes) => {
+                return changes.aggregate([
+                    { $match: {
+                        'path': {
+                            $elemMatch: {
+                                id: rootId/*,
+                                revision: slide.revision,*/
+                            }
+                        },
+                        'value.kind': 'slide',
+                        'value.ref.id': slideId,
+                    } },
+                    { $project: { _id: 0 } },
+                    { $sort: { timestamp: -1 } },
+                ]);
+            }).then((result) => result.toArray());
+        });
+
+    },
+
 };
 
 // split slide id given as parameter to slide id and revision id

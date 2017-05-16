@@ -3,6 +3,8 @@
 const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
+const changeLog = require('./controllers/changeLog');
+
 // TODO better organize joi validation models
 const apiModels = {};
 apiModels.tag = Joi.object().keys({
@@ -441,6 +443,21 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/revisions',
+        handler: handlers.getDeckRevisions,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+            },
+            tags: ['api'],
+            description: 'List all deck revisions meta data for current deck',
+        },
+    });
+
+    server.route({
         method: 'POST',
         path: '/deck/{id}/revision',
         handler: handlers.createDeckRevision,
@@ -876,6 +893,42 @@ module.exports = function(server) {
             response: {
                 schema: Joi.array().items(apiModels.tag),
             },
+        }
+    });
+
+
+    //------------------------------- Change Log Routes -----------------------------//
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/changes',
+        handler: changeLog.getDeckChangeLog,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the change log array for a deck (revision)',
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/changes',
+        handler: changeLog.getSlideChangeLog,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form slideId-slideRevisionId, revision is optional and will be ignored'),
+                },
+                query: {
+                    root: Joi.string().description('Identifier of deck tree root in the form deckId-deckRevisionId, revision is optional').required(),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the change log array for a slide',
         }
     });
 
