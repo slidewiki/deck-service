@@ -150,6 +150,10 @@ const deckRevision = {
             type: 'string',
             format: 'date-time'
         },
+        lastUpdate: {
+            type: 'string',
+            format: 'date-time'
+        },
         user: objectid,
         parent: {
             type: 'object',

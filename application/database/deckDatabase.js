@@ -364,6 +364,7 @@ let self = module.exports = {
 
                 // lastUpdated update
                 existingDeck.lastUpdate = (new Date()).toISOString();
+                deckRevision.lastUpdate = existingDeck.lastUpdate;
                 if (!_.isEmpty(deck.editors) ){
                     existingDeck.editors = deck.editors;
                 }
@@ -406,13 +407,14 @@ let self = module.exports = {
             // start tracking changes
             let deckTracker = ChangeLog.deckTracker(deck, top_root_deck, user);
 
-            deck.revisions[revisionIndex].title = newName;
+            deckRevision.title = newName;
 
             // changes ended here
             deckTracker.applyChangeLog();
 
             // lastUpdated update
             deck.lastUpdate = (new Date()).toISOString();
+            deckRevision.lastUpdate = deck.lastUpdate;
 
             return col.findOneAndReplace({_id: parseInt(deckId)}, deck);
         }));
@@ -476,7 +478,6 @@ let self = module.exports = {
                 if (deckWithNewRevision.timestamp instanceof Date) deckWithNewRevision.timestamp = deckWithNewRevision.timestamp.toISOString();
 
                 deckWithNewRevision.user = existingDeck.user;
-                deckWithNewRevision.changeLog = existingDeck.changeLog;
 
                 if (existingDeck.origin) {
                     deckWithNewRevision.origin = existingDeck.origin;
@@ -836,6 +837,8 @@ let self = module.exports = {
                 let targetRevision = existingDeck.revisions[targetRevisionIndex];
                 let now = (new Date()).toISOString();
                 targetRevision.timestamp = now;
+                targetRevision.lastUpdate = now;
+
                 targetRevision.user = parseInt(deck.user);
 
                 targetRevision.id = existingDeck.revisions.length+1;
@@ -1377,6 +1380,7 @@ let self = module.exports = {
 
                                 // renew creation date for fresh revision
                                 copiedDeck.revisions[0].timestamp = timestamp;
+                                copiedDeck.revisions[0].lastUpdate = timestamp;
 
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
@@ -1981,6 +1985,7 @@ function convertToNewDeck(deck){
             usage: usageArray, //create new array and insert root deck
             title: deck.title,
             timestamp: now.toISOString(),
+            lastUpdate: now.toISOString(),
             user: deck.user,
             language: deck.language,
             parent: deck.parent_deck,
@@ -2028,6 +2033,7 @@ function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArr
             usage: usageArray,
             title: deck.title,
             timestamp: now.toISOString(),
+            lastUpdate: now.toISOString(),
             user: deck.user,
             language: deck.language,
             parent: deck.parent_deck,
