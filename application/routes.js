@@ -77,24 +77,6 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
-        path: '/deck/{id}/needsNewRevision',
-        handler: handlers.needsNewRevision,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string()
-                },
-                query: {
-                    user: Joi.string()
-                }
-            },
-            tags: ['api'],
-            description: 'Decide if deck needs new revision.'
-        }
-    });
-
-    server.route({
-        method: 'GET',
         path: '/deck/{id}/forkAllowed',
         handler: handlers.forkAllowed,
         config: {
@@ -114,25 +96,6 @@ module.exports = function(server) {
                     forkAllowed: Joi.boolean()
                 }).required().description('Return schema')
             },
-        }
-    });
-
-    server.route({
-        method: 'GET',
-        path: '/deck/{id}/handleChange',
-        handler: handlers.handleChange,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string()
-                },
-                query: {
-                    root_deck: Joi.string(),
-                    user: Joi.string()
-                }
-            },
-            tags: ['api'],
-            description: 'Checks the decktree to see which decks need new revisions, starting from a given deck up.'
         }
     });
 
