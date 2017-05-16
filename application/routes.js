@@ -77,30 +77,6 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
-        path: '/deck/{id}/forkAllowed',
-        handler: handlers.forkAllowed,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
-                },
-                headers: Joi.object({
-                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
-                }).unknown(),
-            },
-            tags: ['api'],
-            auth: 'jwt',
-            description: 'Decide if deck can be forked by the user - JWT needed',
-            response: {
-                schema: Joi.object().keys({
-                    forkAllowed: Joi.boolean()
-                }).required().description('Return schema')
-            },
-        }
-    });
-
-    server.route({
-        method: 'GET',
         path: '/deck/{id}/editors',
         handler: handlers.getEditors,
         config: {
@@ -246,43 +222,6 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Get total count of slides for this deck'
-        }
-    });
-
-    server.route({
-        method: 'GET',
-        path: '/deck/{id}/editAllowed',
-        handler: handlers.editAllowed,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
-                },
-                headers: Joi.object({
-                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
-                }).unknown()
-            },
-            tags: ['api'],
-            auth: 'jwt',
-            description: 'Check if user is allowed to edit the deck - JWT needed',
-            response: {
-                schema: Joi.object().keys({
-                    allowed: Joi.boolean()
-                }).required('allowed')
-            },
-            plugins: {
-                'hapi-swagger': {
-                    responses: {
-                        ' 200 ': {
-                            'description': 'Successful',
-                        },
-                        ' 404 ': {
-                            'description': 'Deck not found. Check the id.'
-                        }
-                    },
-                    payloadType: 'form'
-                }
-            }
         }
     });
 

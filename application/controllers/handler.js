@@ -1282,26 +1282,6 @@ let self = module.exports = {
 
     },
 
-    forkAllowed: function(request, reply) {
-        let userId = request.auth.credentials.userid;
-
-        deckDB.forkAllowed(request.params.id, userId).then((forkAllowed) => {
-            reply({forkAllowed: forkAllowed});
-        }).catch((err) => {
-            reply(boom.badImplementation());
-        });
-    },
-
-    editAllowed: function(request, reply) {
-        let userId = request.auth.credentials.userid;
-
-        deckDB.editAllowed(request.params.id, userId).then((allowed) => {
-            reply({allowed: allowed});
-        }).catch((err) => {
-            reply(boom.badImplementation());
-        });
-    },
-
     //gets all recent decks
     getAllRecent: (request, reply) => {
         deckDB.findWithLimitAndSort('decks', {}, parseInt(request.params.limit), parseInt(request.params.offset), {'timestamp': -1})

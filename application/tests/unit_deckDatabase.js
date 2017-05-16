@@ -161,50 +161,50 @@ describe('deckDatabase', function() {
 
     });
 
-    describe('#editAllowed()', function() {
+    describe('#userPermissions()', function() {
 
-        it('should return true for the deck owner regardless of access level', function() {
+        it('should allow edit for the deck owner regardless of access level', function() {
             let userId = 46;
             return Promise.all([
-                deckDB.editAllowed('54', userId)
-                .then((allowed) => {
-                    allowed.should.equal(true);
+                deckDB.userPermissions('54', userId)
+                .then((perms) => {
+                    perms.should.have.property('edit', true);
                 }),
             ]);
         });
 
         context('if the deck is public', function() {
 
-            it('should return false for some unauthorized user', function() {
+            it('should not allow edit for some unauthorized user', function() {
                 let someUserId = 666;
-                return deckDB.editAllowed('54', someUserId)
-                .then((allowed) => {
-                    allowed.should.equal(false);
+                return deckDB.userPermissions('54', someUserId)
+                .then((perms) => {
+                    perms.should.have.property('edit', false);
                 });
 
             });
 
-            it('should return true for a user implicitly authorized', function() {
-                return deckDB.editAllowed('54', 3)
-                .then((allowed) => {
-                    allowed.should.equal(true);
+            it('should allow edit for a user implicitly authorized', function() {
+                return deckDB.userPermissions('54', 3)
+                .then((perms) => {
+                    perms.should.have.property('edit', true);
                 });
 
             });
 
-            it('should return true for a user explicitly authorized', function() {
-                return deckDB.editAllowed('54', 4)
-                .then((allowed) => {
-                    allowed.should.equal(true);
+            it('should allow edit for a user explicitly authorized', function() {
+                return deckDB.userPermissions('54', 4)
+                .then((perms) => {
+                    perms.should.have.property('edit', true);
                 });
 
             });
 
             // TODO properly setup a test for this, needs a mock for the user service
-            it.skip('should return true for a user explicitly authorized via groups', function() {
-                return deckDB.editAllowed('54', 6)
-                .then((allowed) => {
-                    allowed.should.equal(true);
+            it.skip('should allow edit for a user explicitly authorized via groups', function() {
+                return deckDB.userPermissions('54', 6)
+                .then((perms) => {
+                    perms.should.have.property('edit', true);
                 });
 
             });

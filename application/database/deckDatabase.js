@@ -1526,15 +1526,6 @@ let self = module.exports = {
         });
     },
 
-    // computes edit permission
-    editAllowed(deckId, userId) {
-        userId = parseInt(userId);
-        return self.userPermissions(deckId, userId).then((perm) => {
-            if (!perm) return;
-            return (perm.edit === true);
-        });
-    },
-
     // computes admin permission only
     adminAllowed(deckId, userId) {
         userId = parseInt(userId);
