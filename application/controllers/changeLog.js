@@ -4,7 +4,6 @@ const deckDB = require('../database/deckDatabase');
 const slideDB = require('../database/slideDatabase');
 const boom = require('boom');
 const _ = require('lodash');
-const async = require('async');
 
 let self = module.exports = {
 

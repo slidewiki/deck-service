@@ -96,32 +96,6 @@ const contentItem = {
     required: ['kind', 'ref']
 };
 
-// same as contentItem, just remove some 'required' type attributes
-// used in deck revision change log
-const contentItemPartial = {
-    type: 'object',
-    properties: {
-        order: {
-            type: 'integer',
-        },
-        kind: {
-            type: 'string',
-            enum: ['deck', 'slide'],
-        },
-        ref: {
-            type: 'object',
-            properties: {
-                id: {
-                    type: 'integer',
-                },
-                revision: {
-                    type: 'integer',
-                },
-            },
-        },
-    },
-};
-
 const editors = {
     type: 'object',
     properties: {

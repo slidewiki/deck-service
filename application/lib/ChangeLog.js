@@ -223,9 +223,6 @@ module.exports = {
 
                         // indexMatch[1] includes just the index added
                         let index = parseInt(indexMatch[1]);
-                        let cItem = contentItemsBefore.get(index).toJS();
-                        let newRevision = rec.value;
-
                         return ChangeLogRecord.createNodeUpdate(contentItemsBefore.get(index).toJS(), contentItemsAfter.get(index).toJS(), index, path);
                     }
 
@@ -263,7 +260,7 @@ module.exports = {
                         // console.log('deck changed: ' + JSON.stringify(deckChanges));
 
                         // do some validation 
-                        var errors = _.compact(deckChanges.map((c) => {
+                        let errors = _.compact(deckChanges.map((c) => {
                             if (changeModel.validate(c)) return;
                             return changeModel.validate.errors;
                         }));
