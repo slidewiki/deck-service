@@ -6,9 +6,6 @@ const rp = require('request-promise-native');
 const config = require('../configuration');
 const Microservices = require('../configs/microservices');
 
-const deckDb = require('../database/deckDatabase');
-
-
 const self = module.exports = {
     // promises user data using jwt (and optionally other info as well)
     fetchUserData: function(authToken) {

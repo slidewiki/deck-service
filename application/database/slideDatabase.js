@@ -98,7 +98,6 @@ let self = module.exports = {
             return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
             .then((db2) => db2.collection('slides'))
             .then((col) => {
-                let valid = false;
                 slide._id = newId;
                 let revisionCopied = slide.revisions[slideRevision];
                 let now = new Date();
@@ -272,20 +271,20 @@ let self = module.exports = {
         let itemRevision = itemToAdd.ref.revision;
         let usageToPush = {id: parseInt(root_deck_path[0]), revision: parseInt(root_deck_path[1])};
         if(itemToAdd.kind === 'slide'){
-            helper.connectToDatabase()
+            return helper.connectToDatabase()
             .then((db) => db.collection('slides'))
             .then((col2) => {
-                col2.findOneAndUpdate(
+                return col2.findOneAndUpdate(
                     {_id: parseInt(itemId), 'revisions.id':itemRevision},
                     {$push: {'revisions.$.usage': usageToPush}}
                 );
             });
         }
         else{
-            helper.connectToDatabase()
+            return helper.connectToDatabase()
             .then((db) => db.collection('decks'))
             .then((col2) => {
-                col2.findOneAndUpdate(
+                return col2.findOneAndUpdate(
                     {_id: parseInt(itemId), 'revisions.id':itemRevision},
                     {$push: {'revisions.$.usage': usageToPush}}
                 );
@@ -467,7 +466,7 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
 }
 
 function findWithAttr(array, attr, value) {
-    for(var i = 0; i < array.length; i++) {
+    for(let i = 0; i < array.length; i++) {
         if(array[i][attr] === value) {
             return i;
         }

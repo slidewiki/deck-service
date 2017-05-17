@@ -77,67 +77,6 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
-        path: '/deck/{id}/needsNewRevision',
-        handler: handlers.needsNewRevision,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string()
-                },
-                query: {
-                    user: Joi.string()
-                }
-            },
-            tags: ['api'],
-            description: 'Decide if deck needs new revision.'
-        }
-    });
-
-    server.route({
-        method: 'GET',
-        path: '/deck/{id}/forkAllowed',
-        handler: handlers.forkAllowed,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
-                },
-                headers: Joi.object({
-                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
-                }).unknown(),
-            },
-            tags: ['api'],
-            auth: 'jwt',
-            description: 'Decide if deck can be forked by the user - JWT needed',
-            response: {
-                schema: Joi.object().keys({
-                    forkAllowed: Joi.boolean()
-                }).required().description('Return schema')
-            },
-        }
-    });
-
-    server.route({
-        method: 'GET',
-        path: '/deck/{id}/handleChange',
-        handler: handlers.handleChange,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string()
-                },
-                query: {
-                    root_deck: Joi.string(),
-                    user: Joi.string()
-                }
-            },
-            tags: ['api'],
-            description: 'Checks the decktree to see which decks need new revisions, starting from a given deck up.'
-        }
-    });
-
-    server.route({
-        method: 'GET',
         path: '/deck/{id}/editors',
         handler: handlers.getEditors,
         config: {
@@ -287,43 +226,6 @@ module.exports = function(server) {
     });
 
     server.route({
-        method: 'GET',
-        path: '/deck/{id}/editAllowed',
-        handler: handlers.editAllowed,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string().description('Identifier of the deck. DeckId-RevisionNumber')
-                },
-                headers: Joi.object({
-                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
-                }).unknown()
-            },
-            tags: ['api'],
-            auth: 'jwt',
-            description: 'Check if user is allowed to edit the deck - JWT needed',
-            response: {
-                schema: Joi.object().keys({
-                    allowed: Joi.boolean()
-                }).required('allowed')
-            },
-            plugins: {
-                'hapi-swagger': {
-                    responses: {
-                        ' 200 ': {
-                            'description': 'Successful',
-                        },
-                        ' 404 ': {
-                            'description': 'Deck not found. Check the id.'
-                        }
-                    },
-                    payloadType: 'form'
-                }
-            }
-        }
-    });
-
-    server.route({
         method: 'POST',
         path: '/deck/new',
         handler: handlers.newDeck,
@@ -427,7 +329,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/deck/{id}/fork',
-        handler: handlers.forkDeckRevisionWithCheck,
+        handler: handlers.forkDeckRevision,
         config: {
             validate: {
                 params: {

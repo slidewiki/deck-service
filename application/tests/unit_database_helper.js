@@ -1,5 +1,5 @@
 /* eslint-env mocha */
-// example unit tests
+/* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
 //Mocking is missing completely TODO add mocked objects

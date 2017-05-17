@@ -8,7 +8,6 @@ const ChangeLog = require('../lib/ChangeLog');
 const userService = require('../services/user');
 
 const helper = require('./helper'),
-    oid = require('mongodb').ObjectID,
     striptags = require('striptags'),
     validateDeck = require('../models/deck').validateDeck;
 
@@ -199,7 +198,11 @@ let self = module.exports = {
                     // the sub deck is the last element in the path
                     let [nextSource] = subPath.slice(-1);
                     let subDeckId = `${nextSource.id}-${nextSource.revision}`;
-                    self.findPath(subDeckId, targetDeckId, subPath).then((result) => callback(null, result));
+
+                    self.findPath(subDeckId, targetDeckId, subPath)
+                    .then((result) => callback(null, result))
+                    .catch(callback);
+
                 }, (error, results) => {
                     if (error) {
                         reject(error);
@@ -306,7 +309,9 @@ let self = module.exports = {
                         } else {
                             done();
                         }
-                    });
+                    })
+                    .catch(done);
+
                 }, (error) => {
                     if (error) {
                         reject(error);
@@ -330,7 +335,6 @@ let self = module.exports = {
             .then((existingDeck) => {
                 if (!existingDeck) return;
 
-                let valid = false;
                 let idArray = id.split('-');
                 let activeRevisionIndex ;
                 if(idArray.length > 1){
@@ -506,10 +510,10 @@ let self = module.exports = {
                             helper.connectToDatabase()
                             .then((db) => db.collection('slides'))
                             .then((col) => {
-                                col.findOne({_id: parseInt(citem.ref.id)})
+                                return col.findOne({_id: parseInt(citem.ref.id)})
                                 .then((slide) => {
                                     slide.revisions[citem.ref.revision-1].usage.push({'id': parseInt(id), 'revision': newRevisionId});
-                                    col.save(slide);
+                                    return col.save(slide);
                                 });
                             });
                         }
@@ -517,7 +521,7 @@ let self = module.exports = {
                             col.findOne({_id: parseInt(citem.ref.id)})
                             .then((innerDeck) => {
                                 innerDeck.revisions[citem.ref.revision-1].usage.push({'id': parseInt(id), 'revision': newRevisionId});
-                                col.save(innerDeck);
+                                return col.save(innerDeck);
                             });
                         }
                     }
@@ -570,11 +574,7 @@ let self = module.exports = {
                 // copy edit rights from existingDeck to new
                 if (ckind === 'deck') {
                     let attachedDeckId = `${parseInt(citem.id)}-${citem_revision_id}`;
-                    self.get(attachedDeckId).then((attachedDeck) => {
-                        // check if owner is the same, should be the same for now
-                        // TODO this might need to change in the future
-                        // if (attachedDeck.user !== existingDeck.user) return;
-
+                    self.get(attachedDeckId).then(() => {
                         return self.deepReplaceEditors(attachedDeckId, { editors: existingDeck.editors });
                     }).catch((err) => {
                         console.warn(`could not properly set edit rights for ${attachedDeckId} when adding it to ${root_deck}; error was: ${err}`);
@@ -706,7 +706,7 @@ let self = module.exports = {
             helper.connectToDatabase()
             .then((db) => db.collection('slides'))
             .then((col2) => {
-                col2.findOne({_id: parseInt(itemId)})
+                return col2.findOne({_id: parseInt(itemId)})
                 .then((foundSlide) => {
                     let oldUsage = foundSlide.revisions[itemRevision-1].usage;
                     for(let i = 0; i < oldUsage.length; i++){
@@ -716,7 +716,7 @@ let self = module.exports = {
                         }
                     }
                     foundSlide.revisions[itemRevision-1].usage = oldUsage;
-                    col2.save(foundSlide);
+                    return col2.save(foundSlide);
                 });
 
             });
@@ -725,7 +725,7 @@ let self = module.exports = {
             helper.connectToDatabase()
             .then((db) => db.collection('decks'))
             .then((col) => {
-                col.findOne({_id: parseInt(itemId)})
+                return col.findOne({_id: parseInt(itemId)})
                 .then((foundDeck) => {
                     let oldUsage = foundDeck.revisions[itemRevision-1].usage;
                     for(let i = 0; i < oldUsage.length; i++){
@@ -735,7 +735,7 @@ let self = module.exports = {
                         }
                     }
                     foundDeck.revisions[itemRevision-1].usage = oldUsage;
-                    col.save(foundDeck);
+                    return col.save(foundDeck);
 
                 });
             });
@@ -749,20 +749,20 @@ let self = module.exports = {
         let itemRevision = itemToAdd.ref.revision;
         let usageToPush = {id: parseInt(root_deck_path[0]), revision: parseInt(root_deck_path[1])};
         if(itemToAdd.kind === 'slide'){
-            helper.connectToDatabase()
+            return helper.connectToDatabase()
             .then((db) => db.collection('slides'))
             .then((col2) => {
-                col2.findOneAndUpdate(
+                return col2.findOneAndUpdate(
                     {_id: parseInt(itemId), 'revisions.id':itemRevision},
                     {$push: {'revisions.$.usage': usageToPush}}
                 );
             });
         }
         else{
-            helper.connectToDatabase()
+            return helper.connectToDatabase()
             .then((db) => db.collection('decks'))
             .then((col2) => {
-                col2.findOneAndUpdate(
+                return col2.findOneAndUpdate(
                     {_id: parseInt(itemId), 'revisions.id':itemRevision},
                     {$push: {'revisions.$.usage': usageToPush}}
                 );
@@ -789,7 +789,6 @@ let self = module.exports = {
                 let old_rev_id = rootArray[1];
 
                 // pre-compute what the for loop does
-                let revisionIndex = existingDeck.revisions.findIndex((rev) => rev.id === parseInt(rootRev));
                 let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user);
 
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
@@ -926,8 +925,8 @@ let self = module.exports = {
                     children: [],
                 };
 
-                return new Promise(function(resolve, reject) {
-                    async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
+                return new Promise((resolve, reject) => {
+                    async.eachSeries(deck.revisions[revision_id].contentItems, (citem, callback) => {
                         if(citem.kind === 'slide'){
                             if(!onlyDecks){
                                 helper.connectToDatabase()
@@ -955,7 +954,7 @@ let self = module.exports = {
                                 });
                             }).catch(callback);;
                         }
-                    },function(err){
+                    }, (err) => {
                         if (err) {
                             reject(err);
                         } else {
@@ -1000,7 +999,8 @@ let self = module.exports = {
                         subdeckIds,
                         (subdeckId, callback) => {
                             self.getSubdeckIds(subdeckId)
-                            .then((nestedResult) => callback(null, nestedResult));
+                            .then((nestedResult) => callback(null, nestedResult))
+                            .catch(callback);
                         },
                         (error, results) => {
                             if (error) {
@@ -1039,7 +1039,6 @@ let self = module.exports = {
 
     //returns a flattened structure of a deck's slides, and optionally its sub-decks
     getFlatSlidesFromDB: function(deck_id, deckTree, return_decks){
-
         let revision_id = -1;
         let decktreesplit = deck_id.split('-');
         if(decktreesplit.length > 1){
@@ -1057,20 +1056,20 @@ let self = module.exports = {
                 if(!deckTree){
                     deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), theme: String(deck.revisions[revision_id].theme), children: []};
                 }
-                return new Promise(function(resolve, reject) {
-                    async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
+                return new Promise((resolve, reject) => {
+                    async.eachSeries(deck.revisions[revision_id].contentItems, (citem, callback) => {
 
                         if(citem.kind === 'slide'){
                             helper.connectToDatabase()
                             .then((db) => db.collection('slides'))
                             .then((col) => {
-                                col.findOne({_id: parseInt(citem.ref.id)})
+                                return col.findOne({_id: parseInt(citem.ref.id)})
                                 .then((slide) => {
                                     let slide_revision = citem.ref.revision-1;
                                     deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, user: String(slide.revisions[slide_revision].user), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
                                     callback();
                                 });
-                            });
+                            }).catch(callback);
                         }
                         else{
                             col.findOne({_id: parseInt(citem.ref.id)})
@@ -1079,18 +1078,20 @@ let self = module.exports = {
                                     let deck_revision = citem.ref.revision-1;
                                     deckTree.children.push({title: innerDeck.revisions[deck_revision].title, user: String(innerDeck.revisions[deck_revision].user), id: innerDeck._id+'-'+innerDeck.revisions[deck_revision].id, type: 'deck'});
                                 }
-                                self.getFlatSlidesFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree, return_decks)
-                                .then((res) => {
+                                return self.getFlatSlidesFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree, return_decks)
+                                .then(() => {
                                     callback();
                                 });
-                            });
+                            }).catch(callback);
                         }
-                    },function(err){
-                        resolve(deckTree);
+                    }, (err) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(deckTree);
+                        }
                     });
                 });
-            }).catch((error) => {
-                return ;
             });
         });
     },
@@ -1116,8 +1117,8 @@ let self = module.exports = {
                     deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), children: []};
                 }
 
-                return new Promise(function(resolve, reject) {
-                    async.eachSeries(deck.revisions[revision_id].contentItems, function(citem, callback){
+                return new Promise((resolve, reject) => {
+                    async.eachSeries(deck.revisions[revision_id].contentItems, (citem, callback) => {
 
                         if(citem.kind === 'slide'){
                             callback();
@@ -1128,21 +1129,22 @@ let self = module.exports = {
                                 let deck_revision = citem.ref.revision-1;
                                 deckTree.children.push({title: innerDeck.revisions[deck_revision].title, user: String(innerDeck.revisions[deck_revision].user), id: innerDeck._id+'-'+innerDeck.revisions[deck_revision].id, type: 'deck'});
 
-                                self.getFlatDecksFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree)
-                                .then((res) => {
+                                return self.getFlatDecksFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree)
+                                .then(() => {
                                     callback();
                                 });
-                            });
+                            }).catch(callback);
                         }
-                    },function(err){
-                        resolve(deckTree);
+                    }, (err) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(deckTree);
+                        }
+
                     });
 
                 });
-
-
-            }).catch((error) => {
-                return ;
             });
         });
     },
@@ -1181,7 +1183,7 @@ let self = module.exports = {
                 contentItems = _.flatten(contentItems).filter((citem) => citem.kind === 'deck');
                 contentItems = _.uniqBy(contentItems, (citem) => `${citem.ref.id}-${citem.ref.revision}`);
 
-                return new Promise(function(resolve, reject) {
+                return new Promise((resolve, reject) => {
                     async.eachSeries(contentItems, (citem, callback) => {
                         col.findOne({_id: parseInt(citem.ref.id)})
                         .then((innerDeck) => self.getDeckEditors(innerDeck._id+'-'+citem.ref.revision, editorsList))
@@ -1282,7 +1284,7 @@ let self = module.exports = {
                     if (parentDeckId) {
                         // update parent deck first before returning
                         return self.updateContentItem(fullDeck, '', parentDeckId, 'deck', rootDeckId, userId)
-                        .then((updated) => fullDeck);
+                        .then(() => fullDeck);
                     } else {
                         return fullDeck;
                     }
@@ -1317,23 +1319,27 @@ let self = module.exports = {
             //feed the array for serial processing
 
             let new_decks = [];
-            return new Promise(function(resolve, reject) {
+            return new Promise((resolve, reject) => {
                 //first we generate all the new ids for the copied decks, and hold them in a map for future reference
-                async.eachSeries(flatDeckArray, function(next_deck, callback){
+                async.eachSeries(flatDeckArray, (next_deck, callback) => {
                     return helper.connectToDatabase()
                     .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
                     .then((newId) => {
                         id_map[next_deck] = newId+'-'+1;
                         id_noRev_map[next_deck.split('-')[0]] = newId;
                         callback();
-                    });
-                },function(err){
+                    }).catch(callback);
+                }, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+
                     //iterate the flat decktree and copy each deck, referring to the new ids in its content items and usage
-                    async.eachSeries(flatDeckArray, function(next_deck, callback){
+                    async.eachSeries(flatDeckArray, (next_deck, callback) => {
                         return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
                         .then((db2) => db2.collection('decks'))
                         .then((col) => {
-                            col.findOne({_id: parseInt(next_deck.split('-')[0])})
+                            return col.findOne({_id: parseInt(next_deck.split('-')[0])})
                             .then((found) => {
                                 let ind = parseInt(next_deck.split('-')[1])-1;
                                 let contributorsArray = found.contributors;
@@ -1411,14 +1417,17 @@ let self = module.exports = {
                                 }
 
                                 new_decks.push(copiedDeck);
-                                col.insertOne(copiedDeck).then((insertedOne) => {
+                                return col.insertOne(copiedDeck).then(() => {
                                     callback();
                                 });
                             });
-                        });
-                    },
-                    function(err2){
-                        resolve({'root_deck': id_map[res.id], 'id_map': id_map});
+                        }).catch(callback);
+                    }, (err2) => {
+                        if (err2) {
+                            reject(err2);
+                        } else {
+                            resolve({'root_deck': id_map[res.id], 'id_map': id_map});
+                        }
                     });
                 });
             });
@@ -1526,227 +1535,12 @@ let self = module.exports = {
         });
     },
 
-    // computes edit permission
-    editAllowed(deckId, userId) {
-        userId = parseInt(userId);
-        return self.userPermissions(deckId, userId).then((perm) => {
-            if (!perm) return;
-            return (perm.edit === true);
-        });
-    },
-
     // computes admin permission only
     adminAllowed(deckId, userId) {
         userId = parseInt(userId);
         return self.get(deckId).then((deck) => {
             if (!deck) return;
             return (deck.user === userId);
-        });
-    },
-
-    // TODO REMOVE
-    //checks if a new revision is needed
-    needsNewRevision(deckId, user){
-        let userId = parseInt(user);
-
-        return self.get(deckId)
-        .then((deck) => {
-            if (!deck) return;
-
-            // set the admin role permission
-            let adminAllowed = (deck.user === userId);
-
-            // default is public
-            let accessLevel = deck.accessLevel || 'public';
-
-            return self.getDeckUsersGroups(deck, deckId)
-            .then((editors) => {
-                if (editors.users.includes(userId)) {
-                    // user is an editor
-                    return {'target_deck': deckId, 'user': user, 'needs_revision': false, 'admin_allowed': adminAllowed };
-                } else {
-                    // we also need to check if the groups allowed to edit the deck include the user
-                    return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
-
-                        if (groupsUsers.includes(userId)) {
-                            // user is an editor
-                            return {'target_deck': deckId, 'user': user, 'needs_revision': false, 'admin_allowed': adminAllowed };
-                        } else {
-                            // user is not an editor or owner
-                            // also return if user can fork the deck (e.g. if it's public)
-                            return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel !== 'private'), 'admin_allowed': adminAllowed };
-                        }
-
-                    }).catch((err) => {
-                        console.warn(`could not fetch usergroup info from service: ${err.message}`);
-                        // we're not sure, let's just not allow this user
-                        return {'target_deck': deckId, 'user': user, 'needs_revision': true, 'fork_allowed': (accessLevel !== 'private'), 'admin_allowed': adminAllowed };
-                    });
-                }
-            });
-        });
-
-    },
-
-    // TODO deprecated
-    //performs recursive revisioning up to the top-most deck that is not owned/editable by the user
-    handleChange(decktree, deck, root_deck, user_id){
-        if(!root_deck){
-            return new Promise(function(resolve, reject) {
-                //No need for recursive revisioning
-                resolve();
-            });
-        }
-        let result = findDeckInDeckTree(decktree.children, deck, [{'id': root_deck}]);
-        if(root_deck === deck)
-            result = [{'id': root_deck}];
-        if(!result || result.length === 0){
-            return new Promise(function(resolve, reject) {
-                //Requested deck not found in the deck tree. If you havent defined revisions, then maybe active revisions of deck and root do not match
-                resolve();
-            });
-        }
-        result.reverse();
-        let revisions = [], new_revisions = [];
-        return new Promise(function(resolve, reject) {
-            async.eachSeries(result, function(next_deck, callback){
-                self.needsNewRevision(next_deck.id, user_id).then((needs) => {
-                    if (!needs.needs_revision) {
-                        // HACK we return the needs response as an error to break the series
-                        callback(needs);
-                    } else if (!needs.fork_allowed) {
-                        // cannot edit this at all!
-                        // HACK we return the needs response as an error to break the series
-                        callback(needs);
-                    } else {
-                        revisions.push(next_deck);
-                        callback();
-                    }
-                });
-            },function(errorOrNeedsResult){
-                if (errorOrNeedsResult) {
-                    // errorOrNeedsResult is needs result; means that either:
-                    // a) we've reached a deck we can't edit at all (fork_allowed: false)
-                    // b) we've reached a deck we can save without new revision (needs_revision: false)
-
-                    if (errorOrNeedsResult.needs_revision && !errorOrNeedsResult.fork_allowed) {
-                        // we cannot edit the deck! resolve the promise and inform caller of this
-                        return resolve({ needs_revision: true, fork_allowed: false });
-                    }
-                    // else continue as normal
-                    // console.log(`stopped handleChange after reaching a deck we can save without new revision ${JSON.stringify(errorOrNeedsResult)}`);
-                }
-
-                if(revisions.length === 0){
-                    // include as parent_deck to resolve revision if missing in request
-                    // avoid using `target_deck` because it implies elsewhere that a revision was performed
-                    resolve({parent_deck: errorOrNeedsResult.target_deck, needs_revision: false});
-                }
-                revisions.reverse(); //start from the innermost deck that needs revision
-                async.eachSeries(revisions, function(next_needs_revision, callback){
-                    //iteratively do the needed revisions
-                    self.get(encodeURIComponent(next_needs_revision.id)).then((existingDeck) => {
-                        let ind = existingDeck.revisions.length-1;
-                        let payload = {
-                            title: existingDeck.revisions[ind].title,
-                            description: existingDeck.description,
-                            language: existingDeck.revisions[ind].language,
-                            tags: existingDeck.revisions[ind].tags,
-                            license: existingDeck.license,
-                            user: user_id,
-                            editors: existingDeck.editors,
-                        };
-                        if(next_needs_revision.hasOwnProperty('parent_id')){
-                            if(findWithAttrRev(revisions, 'id', next_needs_revision.parent_id) > -1){
-                                return self.get(next_needs_revision.parent_id).then((existing_root_deck) => {
-                                    payload.root_deck = existing_root_deck._id+'-'+existing_root_deck.active;
-
-                                    return self.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
-                                        //must update parent of next revision with new revision id
-
-                                        return self.get(replaced.value._id).then((newDeck) => {
-
-                                            //only update the root deck, i.e., direct parent
-                                            return self.updateContentItem(newDeck, '', payload.root_deck, 'deck', root_deck, user_id)
-                                            .then((updated) => {
-                                                new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
-                                                callback();
-                                            });
-                                        });
-                                    });
-                                });
-                            }
-                            else{
-                                payload.root_deck = next_needs_revision.parent_id; //NOTE parent must contain the revision number!
-                                return self.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
-                                    //must update parent of next revision with new revision id
-                                    return self.get(replaced.value._id).then((newDeck) => {
-
-                                        //only update the root deck, i.e., direct parent
-                                        return self.updateContentItem(newDeck, '', payload.root_deck, 'deck', root_deck, user_id)
-                                        .then((updated) => {
-                                            new_revisions.push(newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id);
-                                            callback();
-                                        });
-                                    });
-                                });
-                            }
-                        }
-                        else{
-                            return self.replace(encodeURIComponent(next_needs_revision.id), payload).then((replaced) => {
-                                //must update parent of next revision with new revision id
-                                return self.get(replaced.value._id).then((newDeck) => {
-                                    new_revisions.push({'root_changed': newDeck._id+'-'+newDeck.revisions[newDeck.revisions.length-1].id});
-                                    callback();
-                                });
-                            });
-                        }
-                    }).catch(callback);
-
-                },function(error){
-                    if (error) return reject(error);
-
-                    if(new_revisions.length === 0){
-                        // TODO should never come to this ????
-                        resolve({'needs_revision': false});
-                    }
-                    else{
-                        if(new_revisions[0].hasOwnProperty('root_changed')){
-                            let resp = {
-                                'new_deck_id': new_revisions[0].root_changed,
-                                'position': 0,
-                                'root_changed' : true
-                            };
-                            for(let i = 0; i < new_revisions.length; i++){
-                                if(!new_revisions[i].hasOwnProperty('root_changed') && new_revisions[i].split('-')[0] === deck.split('-')[0]){
-                                    resp.target_deck = new_revisions[i];
-                                }
-                            }
-                            if(deck === root_deck)
-                                resp.target_deck = new_revisions[0].root_changed;
-
-                            resp.new_revisions = new_revisions;
-                            resolve(resp);
-                        }
-                        else{
-                            let target_deck = '';
-                            for(let i = 0; i < new_revisions.length; i++){
-                                if(!new_revisions[i].hasOwnProperty('root_changed') && new_revisions[i].split('-')[0] === deck.split('-')[0]){
-                                    target_deck = new_revisions[i];
-                                }
-                            }
-                            self.getFlatSlidesFromDB(root_deck, undefined, true).then((flatTree) => {
-                                for(let i = 0; i < flatTree.children.length; i++){
-                                    if(flatTree.children[i].id === new_revisions[0]){
-                                        resolve({'new_revisions': new_revisions, 'target_deck': target_deck, 'new_deck_id': flatTree.children[i].id, 'position': i+1, 'root_changed': false});
-                                    }
-                                }
-                            });
-                        }
-                    }
-
-                });
-            });
         });
     },
 
@@ -2055,7 +1849,7 @@ function pushIfNotExist(editorsList, toBeInserted){
 }
 
 function findWithAttr(array, attr, value) {
-    for(var i = 0; i < array.length; i++) {
+    for(let i = 0; i < array.length; i++) {
         if(array[i][attr] === value) {
             return i;
         }
@@ -2064,7 +1858,7 @@ function findWithAttr(array, attr, value) {
 }
 
 function findWithAttrRev(array, attr, value) {
-    for(var i = 0; i < array.length; i++) {
+    for(let i = 0; i < array.length; i++) {
         if(array[i][attr].split('-')[0] === value.split('-')[0]) {
             return i;
         }
