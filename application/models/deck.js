@@ -1,6 +1,8 @@
 'use strict';
 
 //require
+const _ = require('lodash');
+
 let Ajv = require('ajv');
 let ajv = Ajv({
     verbose: true,
@@ -14,6 +16,47 @@ const objectid = {
     maxLength: 24,
     minLength: 1
 };
+
+// needed for tracking changes in decks properties
+const trackedDeckProperties = {
+    license: {
+        type: 'string',
+        enum: [ 'CC0', 'CC BY', 'CC BY-SA' ]
+    },
+    description: {
+        type: 'string'
+    },
+
+};
+
+// needed for tracking changes in deck revisions properties
+const trackedDeckRevisionProperties = {
+    title: {
+        type: 'string'
+    },
+    language: {
+        type: 'string'
+    },
+
+    //NOTE: temporarily store themes with their name
+    theme: {
+        type: 'string',
+    },
+
+    tags: {
+        type: 'array',
+        items: {
+            type: 'object',
+            properties: {
+                tagName: {
+                    type: 'string',
+                },
+                // TODO add other properties as well in sync with the tag-service
+            },
+        },
+    },
+};
+
 const contributor = {
     type: 'object',
     properties: {
@@ -25,6 +68,7 @@ const contributor = {
     },
     required: ['user']
 };
+
 //build schema
 const contentItem = {
     type: 'object',
@@ -51,6 +95,7 @@ const contentItem = {
     },
     required: ['kind', 'ref']
 };
+
 const editors = {
     type: 'object',
     properties: {
@@ -93,17 +138,19 @@ const editors = {
         }
     }
 };
+
 const deckRevision = {
     type: 'object',
-    properties: {
+    properties: _.merge({
         id: { //increment with every new revision
             type: 'number',
             minimum: 1
         },
-        title: {
-            type: 'string'
-        },
         timestamp: {
+            type: 'string',
+            format: 'date-time'
+        },
+        lastUpdate: {
             type: 'string',
             format: 'date-time'
         },
@@ -122,10 +169,6 @@ const deckRevision = {
         popularity: {
             type: 'number',
             minimum: 0
-        },
-        //NOTE: temporarily store themes with their name
-        theme: {
-            type: 'string',
         },
         transition: {
             type: 'object',
@@ -155,9 +198,6 @@ const deckRevision = {
         visibility: {
             type: 'boolean'
         },
-        language: {
-            type: 'string'
-        },
         translation: {
             type: 'object',
             properties: {
@@ -170,18 +210,6 @@ const deckRevision = {
                 }
             }
         },
-        tags: {
-            type: 'array',
-            items: {
-                type: 'object',
-                properties: {
-                    tagName: {
-                        type: 'string',
-                    },
-                    // TODO add other properties as well in sync with the tag-service
-                },
-            },
-        },
         preferences: {
             type: 'array',
             items: {
@@ -192,6 +220,7 @@ const deckRevision = {
             type: 'array',
             items: contentItem
         },
+
         dataSources: { //is filled out automatically from the slides
             type: 'array',
             items: {
@@ -212,43 +241,13 @@ const deckRevision = {
                 required: ['id','revision']
             }
         }
-    },
-    translated_from: { //if this deck_revision is a result of translation
-        type: 'object',
-        properties: {
-            status: {
-                type: 'string',
-                enum: ['original', 'google', 'revised', null]
-            },
-            source: {
-                type: 'object',
-                properties: {
-                    id: {
-                        type: 'number'
-                    },
-                    revision: {
-                        type: 'number'
-                    }
-                }
-            },
-            translator: {
-                type: 'object',
-                properties: {
-                    id: {
-                        type: 'number',
-                    },
-                    username:{
-                        type: 'string'
-                    }
-                }
-            }
-        }
-    },
+    }, trackedDeckRevisionProperties),
     required: ['id', 'timestamp', 'user']
 };
+
 const deck = {
     type: 'object',
-    properties: {
+    properties: _.merge({
         timestamp: {
             type: 'string',
             format: 'date-time'
@@ -284,9 +283,6 @@ const deck = {
         // kind: {
         //     type: 'string'
         // },
-        description: {
-            type: 'string'
-        },
         // language: {
         //     type: 'string'
         // },
@@ -297,6 +293,7 @@ const deck = {
             type: 'string',
             format: 'date-time'
         },
+
         revisions: {
             type: 'array',
             items: deckRevision
@@ -313,10 +310,6 @@ const deck = {
         datasource: {
             type: 'string'
         },
-        license: {
-            type: 'string',
-            enum: ['CC0', 'CC BY', 'CC BY-SA']
-        },
         translations: { //put here all translations explicitly - deck ids
             type: 'array',
             items: {
@@ -329,40 +322,41 @@ const deck = {
                 }
             }
         },
-        translated_from: { //if this deck is a result of translation
-            type: 'object',
-            properties: {
-                status: {
-                    type: 'string',
-                    enum: ['original', 'google', 'revised', null]
-                },
-                source: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number'
-                        },
-                        revision: {
-                            type: 'number'
-                        }
-                    }
-                },
-                translator: {
-                    type: 'object',
-                    properties: {
-                        id: {
-                            type: 'number',
-                        },
-                        username:{
-                            type: 'string'
-                        }
-                    }
-                }
-            }
-        }
-    },
+        // TODO re-add some validation here after it is fixed on the service level, AND translation info schema is used
+        // translated_from: { //if this deck is a result of translation
+        //     type: 'object',
+        //     properties: {
+        //         status: {
+        //             type: 'string',
+        //             enum: ['original', 'google', 'revised', null]
+        //         },
+        //         source: {
+        //             type: 'object',
+        //             properties: {
+        //                 id: {
+        //                     type: 'number'
+        //                 },
+        //                 revision: {
+        //                     type: 'number'
+        //                 }
+        //             }
+        //         },
+        //         translator: {
+        //             type: 'object',
+        //             properties: {
+        //                 id: {
+        //                     type: 'number',
+        //                 },
+        //                 username:{
+        //                     type: 'string'
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+    }, trackedDeckProperties),
     required: ['timestamp', 'user']
 };
 
 //export
-module.exports = ajv.compile(deck);
+module.exports = { validateDeck: ajv.compile(deck), trackedDeckProperties, trackedDeckRevisionProperties };
