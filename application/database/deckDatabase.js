@@ -549,7 +549,7 @@ let self = module.exports = {
     },
 
     // simpler implementation of replace that does not update anything, just creates the revision
-    revise: function(deckId, userId, parentDeckId) {
+    revise: function(deckId, userId, parentDeckId, rootDeckId) {
         userId = parseInt(userId);
 
         let deck = util.parseIdentifier(deckId);
@@ -568,6 +568,9 @@ let self = module.exports = {
                 [originRevision] = existingDeck.revisions.slice(-1);
             }
             if (!originRevision) return;
+
+            // start tracking
+            let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId);
 
             let newRevision = _.cloneDeep(originRevision);
             // get the next revision id
@@ -692,10 +695,121 @@ let self = module.exports = {
                 return batch.execute().then((res) => existingDeck);
 
                 // return col.save(existingDeck).then(() => existingDeck);
+            }).then((updatedDeck) => {
+                // complete the tracking after revision (it may be nothing)
+                deckTracker.applyChangeLog(updatedDeck);
+
+                if (!parentDeck) return updatedDeck;
+
+                // update parent deck first before returning
+                return self.updateContentItem(updatedDeck, '', parentDeckId, 'deck', rootDeckId, userId)
+                .then(() => updatedDeck);
             });
 
         });
 
+    },
+
+    // this is what we use to create a new revision, we need to do this recursively in the deck tree
+    deepRevise: function(deckId, userId, parentDeckId, rootDeckId) {
+        if (!parentDeckId && !rootDeckId) {
+            // if both are missing, we are revising a root deck
+            rootDeckId = deckId;
+        } else if (parentDeckId) {
+            // if only root is missing, the parent is the root
+            rootDeckId = parentDeckId;
+        } else {
+            // if only parent is missing, the root is the parent (but it's probably a bug :)
+            parentDeckId = rootDeckId;
+        }
+
+        return self.revise(deckId, userId, parentDeckId, rootDeckId)
+        .then((updatedDeck) => {
+            if (!updatedDeck) return;
+
+            let [revision] = updatedDeck.revisions.slice(-1);
+            // revision is a copy of the previous revision, so it has the same contents
+            let subDecks = revision.contentItems.filter((i) => i.kind === 'deck').map((i) => i.ref);
+
+            return new Promise((resolve, reject) => {
+                async.eachSeries(subDecks, (subDeck, done) => {
+                    self.deepRevise(util.toIdentifier(subDeck), userId, deckId, rootDeckId)
+                    .then(() => done())
+                    .catch(done);
+                }, (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(updatedDeck);
+                    }
+                });
+            });
+        });
+    },
+
+    // reverts a deck an to older revision
+    revert: function(deckId, revisionId, userId, parentDeckId, rootDeckId) {
+        let deck = {
+            id: parseInt(deckId),
+            revision: parseInt(revisionId),
+        };
+
+        return self.get(deck.id).then((existingDeck) => {
+            if (!existingDeck) return;
+
+            // we require the revision to be explicit
+            let revision = existingDeck.revisions.find((r) => r.id === deck.revision);
+            if (!revision) return;
+
+            // we also require the revision specified to not be the last
+            let [latestRevision] = existingDeck.revisions.slice(-1);
+            if (revision.id === latestRevision.id) {
+                // it's like a no-op, already reverted to the requested revision :)
+                return existingDeck;
+            };
+
+            return self.revise(util.toIdentifier(deck), userId, parentDeckId, rootDeckId);
+        });
+
+    },
+
+    // this is what we use to revert to a revision, we need to do this recursively in the deck tree
+    deepRevert: function(deckId, revisionId, userId, parentDeckId, rootDeckId) {
+        if (!parentDeckId && !rootDeckId) {
+            // if both are missing, we are revising a root deck
+            rootDeckId = deckId;
+        } else if (parentDeckId) {
+            // if only root is missing, the parent is the root
+            rootDeckId = parentDeckId;
+        } else {
+            // if only parent is missing, the root is the parent (but it's probably a bug :)
+            parentDeckId = rootDeckId;
+        }
+
+        return self.revert(deckId, revisionId, userId, parentDeckId, rootDeckId)
+        .then((updatedDeck) => {
+            if (!updatedDeck) return;
+
+            let [revision] = updatedDeck.revisions.slice(-1);
+            let nextParentId = util.toIdentifier({ id: updatedDeck._id, revision: revision.id });
+
+            // revision is a copy of the previous revision, so it has the same contents
+            let subDecks = revision.contentItems.filter((i) => i.kind === 'deck').map((i) => i.ref);
+
+            return new Promise((resolve, reject) => {
+                async.eachSeries(subDecks, (subDeck, done) => {
+                    self.deepRevert(subDeck.id, subDeck.revision, userId, nextParentId, rootDeckId)
+                    .then(() => done())
+                    .catch(done);
+                }, (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(updatedDeck);
+                    }
+                });
+            });
+        });
     },
 
     //inserts a content item (slide or deck) into a deck at the specified position, or appends it at the end if no position is given
@@ -973,39 +1087,6 @@ let self = module.exports = {
                 col.save(existingDeck);
                 return {'old_revision': old_rev_id, 'new_revision': newRevId};
             });
-        });
-    },
-
-    // DEPRECATED
-    //reverts a deck's active revision to a new given one
-    revert: function(deck_id, deck){
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
-            let targetRevisionIndex = parseInt(deck.revision_id)-1;
-            return col.findOne({_id: parseInt(deck_id)})
-            .then((existingDeck) => {
-                let targetRevision = existingDeck.revisions[targetRevisionIndex];
-                let now = (new Date()).toISOString();
-                targetRevision.timestamp = now;
-                targetRevision.lastUpdate = now;
-
-                targetRevision.user = parseInt(deck.user);
-
-                targetRevision.id = existingDeck.revisions.length+1;
-                return col.findOneAndUpdate(
-                    { _id: parseInt(deck_id) },
-                    {
-                        '$set': {
-                            'active': targetRevision.id,
-                            'lastUpdate': now,
-                        },
-                        '$push': { 'revisions': targetRevision },
-                    },
-                    { returnOriginal: false }
-                );
-            });
-
         });
     },
 
@@ -1406,83 +1487,32 @@ let self = module.exports = {
 
     // simply creates a new deck revision without updating anything
     createDeckRevision(deckId, userId, parentDeckId, rootDeckId) {
-        return self.get(deckId).then((existingDeck) => {
-            if (!existingDeck) return;
+        // we only need the id, ignore any revision id
+        deckId = String(parseInt(deckId));
 
-            // start tracking
-            let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId);
+        // create the new revision
+        return self.deepRevise(deckId, userId, parentDeckId, rootDeckId).then((updatedDeck) => {
+            if (!updatedDeck) return;
 
-            // create the new revision
-            return self.revise(deckId, userId, parentDeckId).then((updatedDeck) => {
-                // complete the tracking after revision (it may be nothing)
-                deckTracker.applyChangeLog(updatedDeck);
-
-                if (parentDeckId) {
-                    // update parent deck first before returning
-                    return self.updateContentItem(updatedDeck, '', parentDeckId, 'deck', rootDeckId, userId)
-                    .then(() => updatedDeck);
-                } else {
-                    return updatedDeck;
-                }
-            });
-
-        }).then((fullDeck) => {
-            if (!fullDeck) return;
-
-            // only return the last (new) revision for the fullDeck in the revisions array
-            fullDeck.revisions = fullDeck.revisions.slice(-1);
-            return fullDeck;
+            // only return the last (new) revision for the updatedDeck in the revisions array
+            updatedDeck.revisions = updatedDeck.revisions.slice(-1);
+            return updatedDeck;
         });
-
     },
 
     // reverts a deck to a past revision by copying it to a new one
     revertDeckRevision: function(deckId, revisionId, userId, parentDeckId, rootDeckId) {
-        let deck = {
-            id: parseInt(deckId),
-            revision: parseInt(revisionId),
-        };
+        // we only need the id, ignore any revision id there
+        deckId = String(parseInt(deckId));
 
-        return self.get(deck.id).then((existingDeck) => {
-            if (!existingDeck) return;
-
-            // we require the revision to be explicit
-            let revision = existingDeck.revisions.find((r) => r.id === deck.revision);
-            if (!revision) return;
-
-            // we also require the revision specified to not be the last
-            let [latestRevision] = existingDeck.revisions.slice(-1);
-            if (revision.id === latestRevision.id) {
-                // it's like a no-op, already reverted to the requested revision :)
-                return existingDeck;
-            };
-
-            // start tracking 
-            let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId);
-
-            // revert to revision
-            return self.revise(util.toIdentifier(deck), userId, parentDeckId).then((updatedDeck) => {
-                // complete the tracking after revision (it may be nothing)
-                deckTracker.applyChangeLog(updatedDeck);
-
-                // if deck is a sub-deck, update its parent's content items
-                if (parentDeckId) {
-                    // update parent deck first before returning
-                    return self.updateContentItem(updatedDeck, '', parentDeckId, 'deck', rootDeckId, userId)
-                    .then(() => updatedDeck);
-                } else {
-                    return updatedDeck;
-                }
-            });
-
-        }).then((fullDeck) => {
-            if (!fullDeck) return;
+        // revert to revision
+        return self.deepRevert(deckId, revisionId, userId, parentDeckId, rootDeckId).then((updatedDeck) => {
+            if (!updatedDeck) return;
 
             // only return the last (new) revision for the fullDeck in the revisions array
-            fullDeck.revisions = fullDeck.revisions.slice(-1);
-            return fullDeck;
+            updatedDeck.revisions = updatedDeck.revisions.slice(-1);
+            return updatedDeck;
         });
-
     },
 
     //forks a given deck revision by copying all of its sub-decks into new decks

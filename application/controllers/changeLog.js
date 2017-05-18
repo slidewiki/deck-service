@@ -120,6 +120,8 @@ function prepareChangeLog(changeLog) {
             // format node updates
             if (cur.value) cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
             if (cur.oldValue) cur.oldValue = `${cur.oldValue.kind}:${formatRef(cur.oldValue.ref)}`;
+
+            if (cur.reverted) cur.reverted = `from ${cur.reverted.from} to ${cur.reverted.to}`;
         });
     }
 
@@ -127,7 +129,7 @@ function prepareChangeLog(changeLog) {
 }
 
 function formatPath(path) {
-    return '/' + path.map(formatPathPart).join('/');
+    return '/' + (path ? path.map(formatPathPart).join('/') : '');
 }
 
 function formatPathPart(pathPart) {
