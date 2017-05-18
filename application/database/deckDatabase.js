@@ -758,12 +758,17 @@ let self = module.exports = {
             let revision = existingDeck.revisions.find((r) => r.id === deck.revision);
             if (!revision) return;
 
-            // we also require the revision specified to not be the last
-            let [latestRevision] = existingDeck.revisions.slice(-1);
-            if (revision.id === latestRevision.id) {
-                // it's like a no-op, already reverted to the requested revision :)
-                return existingDeck;
-            };
+
+            // TODO commenting this because when we revert a revert,
+            // we may end up having the same subdeck revision
+            // in both the current deck revision, and an older one
+
+            // // we also require the revision specified to not be the last
+            // let [latestRevision] = existingDeck.revisions.slice(-1);
+            // if (revision.id === latestRevision.id) {
+            //     // it's like a no-op, already reverted to the requested revision :)
+            //     return existingDeck;
+            // };
 
             return self.revise(util.toIdentifier(deck), userId, parentDeckId, rootDeckId);
         });
