@@ -718,9 +718,6 @@ let self = module.exports = {
         } else if (parentDeckId) {
             // if only root is missing, the parent is the root
             rootDeckId = parentDeckId;
-        } else {
-            // if only parent is missing, the root is the parent (but it's probably a bug :)
-            parentDeckId = rootDeckId;
         }
 
         return self.revise(deckId, userId, parentDeckId, rootDeckId)
@@ -781,9 +778,6 @@ let self = module.exports = {
         } else if (parentDeckId) {
             // if only root is missing, the parent is the root
             rootDeckId = parentDeckId;
-        } else {
-            // if only parent is missing, the root is the parent (but it's probably a bug :)
-            parentDeckId = rootDeckId;
         }
 
         return self.revert(deckId, revisionId, userId, parentDeckId, rootDeckId)
