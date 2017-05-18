@@ -333,7 +333,6 @@ let self = module.exports = {
 
     getDeckRevisions: function(request, reply) {
         let deckId = request.params.id; // it should already be a number
-        console.log(_.isNumber(deckId));
         deckDB.get(deckId).then((deck) => {
             if (!deck) return reply(boom.notFound());
 
@@ -511,13 +510,14 @@ let self = module.exports = {
         let userId = request.auth.credentials.userid;
 
         let deckId = request.params.id;
-        let rootDeckId = request.payload.root;
-
-        let parentDeckId = request.payload.parent;
+        let rootDeckId = request.payload.top_root_deck;
 
         authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             // authorizeUser returns nothing if all's ok
             if (boom) return boom;
+
+            // continue as normal
+            let parentDeckId = request.payload.root_deck;
 
             return deckDB.createDeckRevision(deckId, userId, parentDeckId, rootDeckId);
         }).then((response) => {
@@ -530,80 +530,29 @@ let self = module.exports = {
 
     },
 
-    //reverts a deck into a different revision (past or future)
+    // reverts a deck into a past revision
     revertDeckRevision: function(request, reply) {
-        if(request.payload.root_deck === null || !request.payload.hasOwnProperty('root_deck') || request.payload.root_deck.split('-')[0] === request.params.id.split('-')[0] ){
-            deckDB.revert(encodeURIComponent(request.params.id), request.payload).then((reverted) => {
-                if (co.isEmpty(reverted))
-                    throw reverted;
-                else{
-                    //reply with the newly created revision that is actually a copy of the reverted one
-                    reverted.value.revisions = [reverted.value.revisions[reverted.value.revisions.length-1]];
-                    reply(reverted.value);
-                }
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
-            });
-        }
-        else{
-
-            deckDB.get(encodeURIComponent(request.params.id.split('-')[0]), request.payload).then((deck) => {
-                if (co.isEmpty(deck))
-                    throw deck;
-                else{
-                    deckDB.revert(encodeURIComponent(request.params.id), request.payload).then((reverted) => {
-                        if (co.isEmpty(reverted))
-                            throw reverted;
-                        else{
-                            let revision_id = parseInt(reverted.value.revisions.length);
-                            return deckDB.updateContentItem(deck, revision_id, request.payload.root_deck, 'deck', request.payload.top_root_deck, request.payload.user)
-                            .then((updatedIds) => {
-                                let fullId = request.params.id;
-                                if(fullId.split('-').length < 2){
-                                    fullId += '-'+updatedIds.old_revision;
-                                }
-                                return deckDB.updateUsage(fullId, revision_id, request.payload.root_deck).then((updatedDeck) => {
-                                    let revisionArray = [updatedDeck.revisions[revision_id-1]];
-                                    updatedDeck.revisions = revisionArray;
-                                    reply(updatedDeck);
-                                });
-
-                            });
-                            //reply with the newly created revision that is actually a copy of the reverted one
-                            // reverted.value.revisions = [reverted.value.revisions[reverted.value.revisions.length-1]];
-                            // reply(reverted.value);
-                        }
-                    }).catch((error) => {
-                        request.log('error', error);
-                        reply(boom.badImplementation());
-                    });
-
-
-                }
-            }).catch((error) => {
-                request.log('error', error);
-                reply(boom.badImplementation());
-            });
-        }
-
-    },
-
-    // HACK added this to do the checking and keep original handler intact
-    revertDeckRevisionWithCheck: function(request, reply) {
         let userId = request.auth.credentials.userid;
 
         let deckId = request.params.id;
         let rootDeckId = request.payload.top_root_deck;
 
         authorizeUser(userId, deckId, rootDeckId).then((boom) => {
-            if (boom) return reply(boom);
+            // authorizeUser returns nothing if all's ok
+            if (boom) return boom;
 
-            // include userId in payload
-            request.payload.user = userId;
+            // continue as normal
+            let revisionId = request.payload.revision_id;
+            let parentDeckId = request.payload.root_deck;
 
-            // else continue as normal
-            self.revertDeckRevision(request, reply);
+            return deckDB.revertDeckRevision(deckId, revisionId, userId, parentDeckId, rootDeckId);
+        }).then((response) => {
+            // by now it's not a 404, which means the revision_id in the payload was invalid
+            if (!response)
+                response = boom.badData();
+
+            // response is either the new deck revision or boom
+            reply(response);
         }).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());

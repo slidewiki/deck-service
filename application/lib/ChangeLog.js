@@ -248,14 +248,14 @@ module.exports = {
 
 
                     if (_.isEmpty(deckChanges)) {
-                        console.warn('WARNING: no deck changes detected as was expected');
+                        // console.warn('WARNING: no deck changes detected as was expected');
                         return;
                     }
 
                     // add user for all changes
                     deckChanges.forEach((c) => { c.user = user; });
 
-                    return fillSlideTitles(deckChanges).then(fillDeckTitles).then(() => {
+                    return fillSlideInfo(deckChanges).then(fillDeckInfo).then(() => {
                         // TODO remove this
                         // console.log('deck changed: ' + JSON.stringify(deckChanges));
 
@@ -289,7 +289,7 @@ module.exports = {
 
 };
 
-function fillSlideTitles(deckChanges) {
+function fillSlideInfo(deckChanges) {
 
     // we check to see if we need to also read some data for slide updates
     let slideUpdates = deckChanges.filter((c) => (c.value && c.value.kind === 'slide'));
@@ -323,7 +323,7 @@ function fillSlideTitles(deckChanges) {
 }
 
 
-function fillDeckTitles(deckChanges) {
+function fillDeckInfo(deckChanges) {
     // TODO handle circular dependency
     let deckDB = require('../database/deckDatabase');
 
@@ -339,15 +339,19 @@ function fillDeckTitles(deckChanges) {
                     done();
                 }).catch(done);
             } else {
-                // we want to add title and old title of deck
+                // we want to add title and originRevision for old and new deck
                 deckDB.get(rec.value.ref.id).then((deck) => {
                     if (!deck) return; // ignore errors ?
 
                     let after = deck.revisions.find((r) => r.id === rec.value.ref.revision);
+                    if (after.originRevision)
+                        rec.value.ref.originRevision = after.originRevision;
                     rec.value.ref.title = after.title;
 
                     if (rec.oldValue) {
                         let before = deck.revisions.find((r) => r.id === rec.oldValue.ref.revision);
+                        if (before.originRevision)
+                            rec.oldValue.ref.originRevision = before.originRevision;
                         rec.oldValue.ref.title = before.title;
                     }
 

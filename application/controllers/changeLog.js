@@ -43,6 +43,32 @@ const mergeMoves = true;
 const simplifyOutput = false;
 
 function prepareChangeLog(changeLog) {
+    // we at least add the revise/revert subops
+    changeLog.forEach((cur) => {
+        if (cur.op === 'replace') {
+            let ref = cur.value.ref;
+            if (cur.value.kind === 'deck') {
+                if (ref.originRevision && ref.originRevision < ref.revision - 1) {
+                    // we have a revert!
+                    cur.reverted = {
+                        from: cur.oldValue.ref.revision,
+                        to: ref.originRevision,
+                    };
+                }
+            }
+
+            if (cur.value.kind === 'slide') {
+                if (ref.revision < cur.oldValue.ref.revision) {
+                    // we have a revert!
+                    cur.reverted = {
+                        from: cur.oldValue.ref.revision,
+                        to: ref.revision,
+                    };
+                }
+            }
+        }
+    });
+
     if (!mergeMoves && !simplifyOutput) return changeLog;
 
     if (mergeMoves) {

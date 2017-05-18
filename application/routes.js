@@ -370,12 +370,12 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string(),
+                    id: Joi.number().integer().description('The deck id (without revision)'),
                 },
                 payload: Joi.object().keys({
-                    root: Joi.string().required(),
-                    parent: Joi.string(),
-                }),
+                    root_deck: Joi.string().description('The deck id-revision string for the subdeck parent'),
+                    top_root_deck: Joi.string().description('The deck id-revision string for the root of the deck tree'),
+                }).requiredKeys('top_root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),
@@ -389,16 +389,16 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/deck/revert/{id}',
-        handler: handlers.revertDeckRevisionWithCheck,
+        handler: handlers.revertDeckRevision,
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.number().integer().description('The deck id (without revision)'),
                 },
                 payload: Joi.object().keys({
-                    revision_id: Joi.string().alphanum().lowercase(),
-                    root_deck: Joi.string(),
-                    top_root_deck: Joi.string(),
+                    revision_id: Joi.string().alphanum().lowercase().description('The revision id the deck should be reverted to'),
+                    root_deck: Joi.string().description('The deck id-revision string for the subdeck parent'),
+                    top_root_deck: Joi.string().description('The deck id-revision string for the root of the deck tree'),
                 }).requiredKeys('revision_id', 'top_root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -406,7 +406,7 @@ module.exports = function(server) {
             },
             tags: ['api'],
             auth: 'jwt',
-            description: 'Revert a deck to an old revision'
+            description: 'Revert a deck to an old revision, and optionally update reference of parent deck - JWT needed',
         }
     });
 
