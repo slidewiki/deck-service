@@ -1646,7 +1646,31 @@ let self = module.exports = {
                     });
                 });
             });
+
+        }).then((id_map) => {
+            // after forking the deck and if the revision we forked is the latest,
+            // we create a new revision for the original deck;
+            // this way the fork points to a read-only revision
+
+            let deck = util.parseIdentifier(deck_id);
+            return self.get(deck.id).then((existingDeck) => {
+                // the deck exists for sure by now
+                let [latestRevision] = existingDeck.revisions.slice(-1);
+                if (deck.revision && latestRevision.id !== deck.revision) {
+                    // we forked a read-only revision, nothing to do here
+                    return id_map;
+                }
+
+                // this is an automatic revision, the user should be 'system'
+                return self.createDeckRevision(deck_id, -1).then(() => {
+                    // return the same result
+                    return id_map;
+                });
+
+            });
+
         });
+
     },
 
     getDeckForks(deckId, userId) {
