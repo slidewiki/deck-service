@@ -814,6 +814,9 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
                 },
+                query: {
+                    simplify: Joi.boolean().truthy('1').falsy('0', ''),
+                },
             },
             tags: ['api'],
             description: 'Get the change log array for a deck (revision)',
@@ -831,6 +834,7 @@ module.exports = function(server) {
                 },
                 query: {
                     root: Joi.string().description('Identifier of deck tree root in the form deckId-deckRevisionId, revision is optional').required(),
+                    simplify: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
             tags: ['api'],
