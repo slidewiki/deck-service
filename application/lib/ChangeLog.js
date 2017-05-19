@@ -83,7 +83,7 @@ const ChangeLogRecord = {
 // returns a new object without `order` property
 const omitOrder = (item) => _.omit(item, 'order');
 
-module.exports = {
+let self = module.exports = {
 
     deckTracker: function(deck, rootDeckId, user) {
         // user is integer
@@ -231,22 +231,24 @@ module.exports = {
                 return result;
             },
 
-            // should be called right after all changes are made, and before saving the deck object
-            // `newDeck` is optional, for code that applies changes on a new deck object
-            applyChangeLog: function(newDeck) {
-                if (typeof newDeck === 'undefined') {
-                    newDeck = deck;
+            getChangeLog: function(updatedDeck) {
+                if (!updatedDeck) {
+                    updatedDeck = deck;
                 }
 
-                // wait for path promise then format, fill in stuff
-                pathPromise.then((path) => {
-                    let deckChanges = _.compact([
-                        // first the deck changes
-                        ...this.deckUpdateRecords(path, newDeck),
-                        // then the children changes
-                        ...this.contentItemsRecords(path)]);
+                // wait for path promise then generate the log
+                return pathPromise.then((path) => _.compact([
+                    // first the deck changes
+                    ...this.deckUpdateRecords(path, updatedDeck),
+                    // then the children changes
+                    ...this.contentItemsRecords(path)])
+                );
+            },
 
-
+            // should be called right after all changes are made, and before saving the deck object
+            // `newDeck` is optional, for code that applies changes on a new deck object
+            applyChangeLog: function(updatedDeck) {
+                this.getChangeLog(updatedDeck).then((deckChanges) => {
                     if (_.isEmpty(deckChanges)) {
                         // console.warn('WARNING: no deck changes detected as was expected');
                         return;
