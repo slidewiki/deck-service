@@ -153,7 +153,7 @@ let self = module.exports = {
         let target = util.parseIdentifier(targetDeckId);
 
         // HACK force error if target does not include revision
-        target.revision;
+        target.revision.toString();
 
         return self.getRevision(sourceDeckId).then((sourceRevision) => {
             // source deck not found

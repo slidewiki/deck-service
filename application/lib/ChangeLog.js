@@ -117,54 +117,51 @@ let self = module.exports = {
         return {
             // returns the change log record that should be appended to the database
             // should be called right after all changes are made, and before saving the deck object
-            // `newDeck` is optional, for code that applies changes on a new deck object
-            deckUpdateRecords: function(path, newDeck) {
-                if (typeof newDeck === 'undefined') {
-                    newDeck = deck;
+            // `updatedDeck` is optional, for code that applies changes on a new deck object
+            deckUpdateRecords: function(path, updatedDeck) {
+                if (!updatedDeck) {
+                    updatedDeck = deck;
                 }
 
                 // we may have two records here: one for updating the values
                 // the other for updating the revision (but only when not a subdeck)
                 let records = [];
 
-                let deckAfter = _.cloneDeep(_.pick(newDeck, _.keys(deckModel.trackedDeckProperties)));
+                let deckAfter = _.cloneDeep(_.pick(updatedDeck, _.keys(deckModel.trackedDeckProperties)));
 
                 // check if we are applying update to deck across revisions
-                // in that case newDeck would be not the same object as deck (the one we initialized with)
-                let newRevision = revision;
-                if (newDeck !== deck) {
-                    // latest is the only editable revision!!
-                    [newRevision] = newDeck.revisions.slice(-1);
+                // in that case the deck/updatedDeck latest revisions will be different
+                let updatedRevision = revision;
+                [updatedRevision] = updatedDeck.revisions.slice(-1);
 
-                    // check for the case where we're doing a deck revision for a ROOT deck
-                    // we double check that old revision and new are different!
-                    // if it's a root deck revision, the path will be of length 1
-                    if (revision.id !== newRevision.id && path.length === 1) {
+                // check for the case where we're doing a deck revision for a ROOT deck
+                // we double check that old revision and new are different!
+                // if it's a root deck revision, the path will be of length 1
+                if (revision.id !== updatedRevision.id && path.length === 1) {
 
-                        let before = {
-                            kind: 'deck',
-                            ref: {
-                                id: deck._id,
-                                revision: revision.id,
-                            },
-                        };
-                        let after = {
-                            kind: 'deck',
-                            ref: {
-                                id: deck._id,
-                                revision: newRevision.id,
-                            },
-                        };
+                    let before = {
+                        kind: 'deck',
+                        ref: {
+                            id: deck._id,
+                            revision: revision.id,
+                        },
+                    };
+                    let after = {
+                        kind: 'deck',
+                        ref: {
+                            id: deck._id,
+                            revision: updatedRevision.id,
+                        },
+                    };
 
-                        // no index or path in this case
-                        records.push(ChangeLogRecord.createNodeUpdate(before, after));
-                    }
+                    // no index or path in this case
+                    records.push(ChangeLogRecord.createNodeUpdate(before, after));
 
                 }
 
                 // in order to do the comparison, we merge revision into deck and only keep trackable stuff
                 _.merge(deckAfter, _.cloneDeep(_.pick(
-                    newRevision,
+                    updatedRevision,
                     _.keys(deckModel.trackedDeckRevisionProperties))
                 ));
 
@@ -246,7 +243,7 @@ let self = module.exports = {
             },
 
             // should be called right after all changes are made, and before saving the deck object
-            // `newDeck` is optional, for code that applies changes on a new deck object
+            // `updatedDeck` is optional, for code that applies changes on a new deck object
             applyChangeLog: function(updatedDeck) {
                 this.getChangeLog(updatedDeck).then((deckChanges) => {
                     if (_.isEmpty(deckChanges)) {
