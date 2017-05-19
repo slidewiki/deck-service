@@ -74,15 +74,14 @@ function prepareChangeLog(changeLog) {
     if (mergeMoves) {
         let hold;
         changeLog = changeLog.reduce((acc, cur) => {
-
             if (hold) {
                 // TODO check timestamps as well
-                if (cur.op === 'remove' && _.isEqual(hold.value, cur.value) && hold.user === cur.user) {
+                if (cur.op === 'add' && _.isEqual(hold.value, cur.value) && hold.user === cur.user) {
                     // we have a move, so merge and push
                     acc.push({
                         op: 'move',
-                        from: cur.path,
-                        path: hold.path,
+                        from: hold.path,
+                        path: cur.path,
                         value: cur.value,
 
                         timestamp: cur.timestamp,
@@ -96,7 +95,7 @@ function prepareChangeLog(changeLog) {
 
                 // in any case, unset 'hold'
                 hold = undefined;
-            } else if (cur.op === 'add') {
+            } else if (cur.op === 'remove') {
                 // just hold it, don't push it yet
                 hold = cur;
             } else {
@@ -125,7 +124,8 @@ function prepareChangeLog(changeLog) {
         });
     }
 
-    return changeLog;
+    // always reverse the order, as the input is timestamp ascending
+    return changeLog.reverse();
 }
 
 function formatPath(path) {

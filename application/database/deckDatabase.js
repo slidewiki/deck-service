@@ -1868,7 +1868,7 @@ let self = module.exports = {
                         ]
                     } },
                     // { $project: { _id: 0 } }, // TODO re-insert this after 3.4 upgrade
-                    { $sort: { timestamp: -1 } },
+                    { $sort: { timestamp: 1 } },
                 ]);
             }).then((result) => result.toArray());
         });
