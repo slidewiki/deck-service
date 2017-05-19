@@ -725,12 +725,14 @@ let self = module.exports = {
             if (!updatedDeck) return;
 
             let [revision] = updatedDeck.revisions.slice(-1);
+            let nextParentId = util.toIdentifier({ id: updatedDeck._id, revision: revision.id });
+
             // revision is a copy of the previous revision, so it has the same contents
             let subDecks = revision.contentItems.filter((i) => i.kind === 'deck').map((i) => i.ref);
 
             return new Promise((resolve, reject) => {
                 async.eachSeries(subDecks, (subDeck, done) => {
-                    self.deepRevise(util.toIdentifier(subDeck), userId, deckId, rootDeckId)
+                    self.deepRevise(util.toIdentifier(subDeck), userId, nextParentId, rootDeckId)
                     .then(() => done())
                     .catch(done);
                 }, (err) => {
