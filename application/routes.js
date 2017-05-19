@@ -809,14 +809,17 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string(),
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
                 },
                 query: {
                     mediaType: Joi.string().valid('pictures', 'video', 'audio').required()
                 }
             },
             tags: ['api'],
-            description: 'Get media inside a deck'
+            description: 'Get media inside a deck',
+            response: {
+                schema: Joi.array().items(Joi.string()),
+            },
         }
     });
 

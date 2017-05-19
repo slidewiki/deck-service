@@ -25,13 +25,13 @@ let self = module.exports = {
 
         let urlRegex = new RegExp(`(https?:\\/\\/fileservice[^\\s]+(${mediaExtension}))`, 'g');
         let matchArray;
-        let pictures = [];
+        let media = [];
 
         while( (matchArray = urlRegex.exec(text)) !== null ){
-            pictures.push(matchArray[0].replace(/"/g, ''));     // remove trailing quote
+            media.push(matchArray[0].replace(/"/g, ''));     // remove trailing quote
         }
 
-        return pictures;
+        return media;
     },
 
     // splits the string identifier to {id, revision}

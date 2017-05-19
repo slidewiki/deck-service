@@ -1646,15 +1646,21 @@ let self = module.exports = {
         });
     },
 
+    // fetches specified media-type files that are present inside the deck
     getMedia: function(deckId, mediaType){
         return self.getFlatSlides(deckId, undefined, false).then( (flatSlides) => {
             if(!flatSlides) return;
 
-            let media = [];
-            flatSlides.children.forEach( (slide) => {
-                media.push(...util.findMedia(slide.content, mediaType));
+            // get media uris per slide as arrays
+            let media = flatSlides.children.map( (slide) => {
+                return util.findMedia(slide.content, mediaType);
             });
-            return [...new Set(media)];
+
+            // flatten arrays of media uris
+            var flatMedia = [].concat.apply([], media);
+
+            // return unique media uris
+            return [...new Set(flatMedia)];
         });
     },
 
