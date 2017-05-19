@@ -6,9 +6,6 @@ const rp = require('request-promise-native');
 const config = require('../configuration');
 const Microservices = require('../configs/microservices');
 
-const deckDb = require('../database/deckDatabase');
-
-
 const self = module.exports = {
     // promises user data using jwt (and optionally other info as well)
     fetchUserData: function(authToken) {
@@ -33,7 +30,7 @@ const self = module.exports = {
             uri: `${Microservices.user.uri}/users`,
             json: true,
             body: userIds,
-        }).then((users) => users.map((u) => ({id: u._id, username: u.username, picture: u.picture}) ) );
+        }).then((users) => users.map((u) => ({id: u._id, username: u.username, picture: u.picture, country: u.country, organization: u.organization}) ) );
     },
 
     // promises group public info for a list of group ids (not the users in the groups)

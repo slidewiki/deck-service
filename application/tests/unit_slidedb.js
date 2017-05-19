@@ -1,5 +1,5 @@
 /* eslint-env mocha */
-// example unit tests
+/* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
 //Mocking is missing completely TODO add mocked objects
@@ -497,32 +497,6 @@ describe('Database', () => {
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('root_deck').that.is.not.empty,
                 res.should.eventually.have.property('id_map').that.is.not.empty,
-            ]);
-        });
-
-        it('should handle change for an existing deck', () => {
-            let deck = {
-                'description': 'New Deck',
-                'language': 'en_EN',
-                'translation': {
-                    'status': 'original'
-                },
-                'tags': [],
-                'title': 'New Deck',
-                'user': 1,
-                'abstract': '',
-                'comment': '',
-                'footer': '',
-                'license': 'CC0'
-            };
-            let ins = deckdb.insert(deck);
-            let decktree = ins.then((ins) => deckdb.getDeckTreeFromDB(ins.ops[0]._id+'-1'));
-            let res = decktree.then((decktree) => deckdb.handleChange(decktree, decktree.id, decktree.id, 1));
-            res.then((data) => console.log('resolved', data));
-            return Promise.all([
-                res.should.be.fulfilled.and.eventually.not.be.empty,
-                //res.should.eventually.have.property('root_deck').that.is.not.empty,
-                res.should.eventually.have.property('needs_revision'),
             ]);
         });
 

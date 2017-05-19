@@ -1,4 +1,5 @@
 /* eslint-env mocha */
+/* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
 let chai = require('chai');
@@ -122,7 +123,7 @@ describe('deckDatabase', function() {
                     editors.users.should.include.members([ 9, 46, 10, 3 ]);
                 }),
                 // deckDB._adminUpdate('54', { accessLevel: 'restricted' })
-                // .then((updated) => deckDB.getDeckUsersGroups('54'))
+                // .then(() => deckDB.getDeckUsersGroups('54'))
                 // .then((editors) => {
                 //     editors.users.should.include.members([ 9, 46, 10, 3 ]);
                 // }),
@@ -133,7 +134,7 @@ describe('deckDatabase', function() {
         it.skip('should only include the owner and no groups for decks that are private', function() {
             // update first to private and recalculate
             return deckDB._adminUpdate('54', { accessLevel: 'private' })
-            .then((updated) => deckDB.getDeckUsersGroups('54'))
+            .then(() => deckDB.getDeckUsersGroups('54'))
             .then((editors) => {
                 editors.users.should.have.members([ 46 ]);
                 editors.groups.should.be.empty;
@@ -144,7 +145,7 @@ describe('deckDatabase', function() {
         it.skip('should exactly include all implicitly or explicitly authorized users and authorized groups for restricted decks', function() {
             // update first to restricted and recalculate
             return deckDB._adminUpdate('54', { accessLevel: 'restricted' })
-            .then((updated) => deckDB.getDeckUsersGroups('54'))
+            .then(() => deckDB.getDeckUsersGroups('54'))
             .then((editors) => {
                 editors.users.should.have.members([ 9, 46, 10, 3, 4, 5 ]);
                 editors.groups.should.have.members([ 2 ]);
@@ -161,50 +162,50 @@ describe('deckDatabase', function() {
 
     });
 
-    describe('#editAllowed()', function() {
+    describe('#userPermissions()', function() {
 
-        it('should return true for the deck owner regardless of access level', function() {
+        it('should allow edit for the deck owner regardless of access level', function() {
             let userId = 46;
             return Promise.all([
-                deckDB.editAllowed('54', userId)
-                .then((allowed) => {
-                    allowed.should.equal(true);
+                deckDB.userPermissions('54', userId)
+                .then((perms) => {
+                    perms.should.have.property('edit', true);
                 }),
             ]);
         });
 
         context('if the deck is public', function() {
 
-            it('should return false for some unauthorized user', function() {
+            it('should not allow edit for some unauthorized user', function() {
                 let someUserId = 666;
-                return deckDB.editAllowed('54', someUserId)
-                .then((allowed) => {
-                    allowed.should.equal(false);
+                return deckDB.userPermissions('54', someUserId)
+                .then((perms) => {
+                    perms.should.have.property('edit', false);
                 });
 
             });
 
-            it('should return true for a user implicitly authorized', function() {
-                return deckDB.editAllowed('54', 3)
-                .then((allowed) => {
-                    allowed.should.equal(true);
+            it('should allow edit for a user implicitly authorized', function() {
+                return deckDB.userPermissions('54', 3)
+                .then((perms) => {
+                    perms.should.have.property('edit', true);
                 });
 
             });
 
-            it('should return true for a user explicitly authorized', function() {
-                return deckDB.editAllowed('54', 4)
-                .then((allowed) => {
-                    allowed.should.equal(true);
+            it('should allow edit for a user explicitly authorized', function() {
+                return deckDB.userPermissions('54', 4)
+                .then((perms) => {
+                    perms.should.have.property('edit', true);
                 });
 
             });
 
             // TODO properly setup a test for this, needs a mock for the user service
-            it.skip('should return true for a user explicitly authorized via groups', function() {
-                return deckDB.editAllowed('54', 6)
-                .then((allowed) => {
-                    allowed.should.equal(true);
+            it.skip('should allow edit for a user explicitly authorized via groups', function() {
+                return deckDB.userPermissions('54', 6)
+                .then((perms) => {
+                    perms.should.have.property('edit', true);
                 });
 
             });
@@ -273,7 +274,7 @@ describe('deckDatabase', function() {
     });
 
     describe('#getPicturesPerDeck', function() {
-        it('should return all images found in deck\'s and its sundecks\' slides', function() {
+        it('should return all images found in deck\'s and its subdecks\' slides', function() {
             return deckDB.getMedia('54', 'pictures')
             .then((pictures) => {
                 pictures.should.have.members([
