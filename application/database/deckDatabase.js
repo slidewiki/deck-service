@@ -1721,7 +1721,32 @@ let self = module.exports = {
                     });
                 });
             });
+
+        }).then((forkResult) => {
+            // after forking the deck and if the revision we forked is the latest,
+            // we create a new revision for the original deck;
+            // this way the fork points to a read-only revision
+
+            let deck = util.parseIdentifier(deck_id);
+            return self.get(deck.id).then((existingDeck) => {
+                // the deck exists for sure by now
+                let [latestRevision] = existingDeck.revisions.slice(-1);
+                if (deck.revision && latestRevision.id !== deck.revision) {
+                    // we forked a read-only revision, nothing to do here
+                    return forkResult;
+                }
+
+                // this is an automatic revision, the user should be 'system'
+                // for now we just use the deck.id as the tree root...
+                return self.createDeckRevision(deck.id, -1, deck.id).then(() => {
+                    // return the same result
+                    return forkResult;
+                });
+
+            });
+
         });
+
     },
 
     // TODO make this actually private after code in handler.js has been moved here
