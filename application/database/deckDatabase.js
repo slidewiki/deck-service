@@ -1917,6 +1917,181 @@ let self = module.exports = {
 
     },
 
+    //forks a given deck revision by copying all of its sub-decks into new decks
+    translateDeckRevision(deck_id, user, language){
+
+        return self.getFlatDecksFromDB(deck_id)
+        .then((res) => {
+            //we have a flat sub-deck structure
+            let flatDeckArray = [];
+            flatDeckArray.push(res.id); //push root deck into array
+            for(let i = 0; i < res.children.length; i++){
+                flatDeckArray.push(res.children[i].id); //push next sub-deck into array
+            }
+            //init maps for new ids
+            let id_map = {}, id_noRev_map = {};
+            //reverse in order to iterate from bottom to top
+            flatDeckArray.reverse();
+            //feed the array for serial processing
+
+            let new_decks = [];
+            return new Promise((resolve, reject) => {
+                //first we generate all the new ids for the copied decks, and hold them in a map for future reference
+                async.eachSeries(flatDeckArray, (next_deck, callback) => {
+                    return helper.connectToDatabase()
+                    .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
+                    .then((newId) => {
+                        id_map[next_deck] = newId+'-'+1;
+                        id_noRev_map[next_deck.split('-')[0]] = newId;
+                        callback();
+                    }).catch(callback);
+                }, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+
+                    //iterate the flat decktree and copy each deck, referring to the new ids in its content items and usage
+                    async.eachSeries(flatDeckArray, (next_deck, callback) => {
+                        return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                        .then((db2) => db2.collection('decks'))
+                        .then((col) => {
+                            return col.findOne({_id: parseInt(next_deck.split('-')[0])})
+                            .then((found) => {
+                                let ind = parseInt(next_deck.split('-')[1])-1;
+                                let contributorsArray = found.contributors;
+                                //contributorsArray.push({'user': parseInt(user), 'count': 1});
+                                let existingUserContributorIndex = findWithAttr(contributorsArray, 'user', parseInt(user));
+                                if(existingUserContributorIndex > -1)
+                                    contributorsArray[existingUserContributorIndex].count++;
+                                else{
+                                    contributorsArray.push({'user': parseInt(user), 'count': 1});
+                                }
+
+                                let copiedDeck = {
+                                    _id: id_noRev_map[found._id],
+                                    origin: {
+                                        id: found._id,
+                                        revision: found.revisions[ind].id,
+                                        title: found.revisions[ind].title,
+                                        user: found.user,
+                                    },
+                                    description: found.description,
+                                    language: found.revisions[ind].language,
+                                    license: found.license,
+                                    user: parseInt(user),
+                                    translated_from: found.translated_from,
+                                    contributors: contributorsArray,
+                                    active: 1
+                                };
+
+                                let now = new Date();
+                                let timestamp = now.toISOString();
+                                copiedDeck.timestamp = timestamp;
+                                copiedDeck.lastUpdate = timestamp;
+                                if(found.hasOwnProperty('datasource')){
+                                    copiedDeck.datasource = found.datasource;
+                                }
+                                else{
+                                    copiedDeck.datasource = null;
+                                }
+                                //copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
+                                copiedDeck.revisions = [found.revisions[ind]];
+                                copiedDeck.revisions[0].id = 1;
+                                // own the revision as well!
+                                copiedDeck.revisions[0].user = copiedDeck.user;
+
+                                // renew creation date for fresh revision
+                                copiedDeck.revisions[0].timestamp = timestamp;
+                                copiedDeck.revisions[0].lastUpdate = timestamp;
+                                let contentItemsMap = {};
+                                async.eachSeries(copiedDeck.revisions[0].contentItems, (nextSlide, callback) => {
+                                    if(nextSlide.kind === 'slide'){
+                                        //we have to copy the slide, not like when forking
+                                        let root_deck_path = [copiedDeck._id, '1'];
+                                        return helper.connectToDatabase()
+                                        .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
+                                        .then((newId) => {
+                                            helper.connectToDatabase()
+                                            .then((db2) => db2.collection('slides'))
+                                            .then((col2) => {
+                                                return col2.findOne({_id: parseInt(nextSlide.ref.id)})
+                                                .then((slide) => {
+                                                    let slideRevisionIndex = parseInt(nextSlide.ref.revision)-1;
+                                                    slide.revisions = [slide.revisions[slideRevisionIndex]];
+                                                    slide._id = newId;
+                                                    contentItemsMap[slide._id] = newId;
+                                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                                        if(copiedDeck.revisions[0].contentItems[i].ref.id === slide._id){
+                                                            copiedDeck.revisions[0].contentItems[i].ref.id = newId;
+                                                            copiedDeck.revisions[0].contentItems[i].ref.revision = '1';
+                                                            break;
+                                                        }
+                                                    }
+                                                });
+                                            });
+                                        });
+
+                                        //console.log('outside root_deck_path', root_deck_path);                                        
+
+                                        for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                            for(let j in id_map){
+                                                if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
+                                                    copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
+                                                    copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
+                                                }
+                                            }
+                                        }
+                                        for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
+                                            for(let j in id_map){
+                                                if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                    copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                    copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
+                                                }
+                                            }
+                                        }
+                                        for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                            let nextSlide = copiedDeck.revisions[0].contentItems[i];
+                                            if(nextSlide.kind === 'slide'){
+                                                let root_deck_path = [copiedDeck._id, '1'];
+                                                //console.log('outside root_deck_path', root_deck_path);
+                                                self.addToUsage(contentItemsMap[nextSlide], root_deck_path);
+                                            }
+                                            else{
+                                                continue;
+                                            }
+                                        }
+
+                                        new_decks.push(copiedDeck);
+                                        return col.insertOne(copiedDeck).then(() => {
+                                            callback();
+                                        });
+
+                                    }
+                                    else{
+                                        callback();
+                                    }
+                                },(err) => {
+                                    if (err) {
+                                        return reject(err);
+                                    }
+                                });
+
+
+
+                            });
+                        }).catch(callback);
+                    }, (err2) => {
+                        if (err2) {
+                            reject(err2);
+                        } else {
+                            resolve({'root_deck': id_map[res.id], 'id_map': id_map});
+                        }
+                    });
+                });
+            });
+        });
+    },
+
     getDeckForks(deckId, userId) {
         if (userId) userId = parseInt(userId);
         deckId = parseInt(deckId);
