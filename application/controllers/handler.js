@@ -22,6 +22,7 @@ const userService = require('../services/user');
 const tagService = require('../services/tag');
 
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
+    '<div class="bodySlide">' + 
     '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid h-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;">'+
     '<h3 class="h-mid">Title</h3></div>'+
     '<div _id="3" _idx="1" _name="Content Placeholder 2" _type="body" class="block content v-up" style="position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;">'+
@@ -30,7 +31,7 @@ const slidetemplate = '<div class="pptx2html" style="position: relative; width: 
     '	<li>Text bullet 2</li>'+
     '</ul>'+
     '<div class="h-left">&nbsp;</div>'+
-    '</div></div>';
+    '</div></div></div>';
 
 let self = module.exports = {
     //gets a single slide with all of its revisions, unless revision is defined
