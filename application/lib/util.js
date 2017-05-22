@@ -17,18 +17,18 @@ let self = module.exports = {
 
         // specify file extensions for earch media type
         if(mediaType === 'pictures')
-            mediaExtension = 'png|jpeg|jpg|gif||bmp|tiff';
+            mediaExtension = 'png|jpeg|jpg|gif|bmp|tiff';
         else if(mediaType === 'video')
             mediaExtension = 'avi|flv|mpg|mpeg|mp4|wmv';
         else if(mediaType === 'audio')
             mediaExtension = 'mp3|wav|wma';
 
-        let urlRegex = new RegExp(`(https?:\\/\\/fileservice[^\\s]+(${mediaExtension}))`, 'g');
+        let urlRegex = new RegExp(`https?:\\/\\/fileservice[^\\s]+(\.${mediaExtension})`, 'g');
         let matchArray;
         let media = [];
 
         while( (matchArray = urlRegex.exec(text)) !== null ){
-            media.push(matchArray[0].replace(/"/g, ''));     // remove trailing quote
+            media.push(matchArray[0]);
         }
 
         return media;

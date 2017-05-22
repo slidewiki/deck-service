@@ -1657,7 +1657,7 @@ let self = module.exports = {
             });
 
             // flatten arrays of media uris
-            var flatMedia = [].concat.apply([], media);
+            let flatMedia = [].concat.apply([], media);
 
             // return unique media uris
             return [...new Set(flatMedia)];
