@@ -48,6 +48,9 @@ const nodeValue = {
                 revision: {
                     type: 'integer',
                 },
+                originRevision: {
+                    type: 'integer',
+                },
                 title: {
                     type: 'string',
                 },

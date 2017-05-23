@@ -15,11 +15,8 @@ let self = module.exports = {
     parseIdentifier: function(identifier) {
         let parsed = String(identifier).match(/^(\d+)(?:-(\d+))?$/);
 
-        // return both undefined if error
-        if (!parsed) {
-            // regex failed, no fallback!
-            return [undefined, undefined];
-        }
+        // return nothing undefined if error
+        if (!parsed) return;
 
         let result = { id: parseInt(parsed[1]) };
 

@@ -155,6 +155,9 @@ const deckRevision = {
             format: 'date-time'
         },
         user: objectid,
+        originRevision: {
+            type: 'integer',
+        },
         parent: {
             type: 'object',
             // properties: {

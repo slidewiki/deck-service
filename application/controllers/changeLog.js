@@ -4,6 +4,7 @@ const deckDB = require('../database/deckDatabase');
 const slideDB = require('../database/slideDatabase');
 const boom = require('boom');
 const _ = require('lodash');
+const util = require('../lib/util');
 
 let self = module.exports = {
 
@@ -13,7 +14,7 @@ let self = module.exports = {
         deckDB.getChangeLog(deckId).then((changeLog) => {
             if (!changeLog) return boom.notFound();
 
-            return prepareChangeLog(changeLog);
+            return prepareChangeLog(changeLog, request.query.simplify, deckId);
 
         }).then(reply).catch((error) => {
             request.log('error', error);
@@ -28,7 +29,7 @@ let self = module.exports = {
         slideDB.getChangeLog(slideId, rootId).then((changeLog) => {
             if (!changeLog) return boom.notFound();
 
-            return prepareChangeLog(changeLog);
+            return prepareChangeLog(changeLog, request.query.simplify);
 
         }).then(reply).catch((error) => {
             request.log('error', error);
@@ -38,25 +39,55 @@ let self = module.exports = {
 
 };
 
-// TODO include them as API options ?
 const mergeMoves = true;
-const simplifyOutput = false;
+const mergeRevisions = true;
 
-function prepareChangeLog(changeLog) {
+function prepareChangeLog(changeLog, simplifyOutput, deckId) {
+    // we add the revise/revert subops
+    changeLog.forEach((cur) => {
+        if (cur.op === 'replace') {
+            let ref = cur.value.ref;
+            if (cur.value.kind === 'deck') {
+                if (ref.originRevision && ref.originRevision < ref.revision - 1) {
+                    // we have a revert!
+                    cur.reverted = {
+                        from: cur.oldValue.ref.revision,
+                        to: ref.originRevision,
+                    };
+                }
+            }
+
+            if (cur.value.kind === 'slide') {
+                if (ref.revision < cur.oldValue.ref.revision) {
+                    // we have a revert!
+                    cur.reverted = {
+                        from: cur.oldValue.ref.revision,
+                        to: ref.revision,
+                    };
+                }
+            }
+        }
+    });
+
+    let deck = util.parseIdentifier(deckId);
+    if (mergeRevisions && deck) {
+        // we need to merge the recursive revisioning logs
+        changeLog = mergeDeckRevisions(changeLog, deck);
+    }
+
     if (!mergeMoves && !simplifyOutput) return changeLog;
 
     if (mergeMoves) {
         let hold;
         changeLog = changeLog.reduce((acc, cur) => {
-
             if (hold) {
                 // TODO check timestamps as well
-                if (cur.op === 'remove' && _.isEqual(hold.value, cur.value) && hold.user === cur.user) {
+                if (cur.op === 'add' && _.isEqual(hold.value, cur.value) && hold.user === cur.user) {
                     // we have a move, so merge and push
                     acc.push({
                         op: 'move',
-                        from: cur.path,
-                        path: hold.path,
+                        from: hold.path,
+                        path: cur.path,
                         value: cur.value,
 
                         timestamp: cur.timestamp,
@@ -70,7 +101,7 @@ function prepareChangeLog(changeLog) {
 
                 // in any case, unset 'hold'
                 hold = undefined;
-            } else if (cur.op === 'add') {
+            } else if (cur.op === 'remove') {
                 // just hold it, don't push it yet
                 hold = cur;
             } else {
@@ -94,14 +125,17 @@ function prepareChangeLog(changeLog) {
             // format node updates
             if (cur.value) cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
             if (cur.oldValue) cur.oldValue = `${cur.oldValue.kind}:${formatRef(cur.oldValue.ref)}`;
+
+            if (cur.reverted) cur.reverted = `from ${cur.reverted.from} to ${cur.reverted.to}`;
         });
     }
 
-    return changeLog;
+    // always reverse the order, as the input is timestamp ascending
+    return changeLog.reverse();
 }
 
 function formatPath(path) {
-    return '/' + path.map(formatPathPart).join('/');
+    return '/' + (path ? path.map(formatPathPart).join('/') : '');
 }
 
 function formatPathPart(pathPart) {
@@ -112,4 +146,66 @@ function formatPathPart(pathPart) {
 function formatRef(ref) {
     if (!ref.id || !ref.revision) return undefined;
     return `${ref.id}-${ref.revision}`;
+}
+
+function mergeDeckRevisions(changeLog, deck) {
+    let stack = [];
+    // we push a dummy op to make sure we merge any final revision chains left over in the stack
+    changeLog.push({ op: 'dummy' });
+
+    return changeLog.reduce((acc, cur) => {
+        let hold;
+        let firstRec = stack[0];
+
+        if (cur.op === 'replace' && cur.value.kind === 'deck') {
+            // this is a revisioning record
+
+            if (firstRec && cur.value.ref.id === deck.id) { 
+                // the stack is not empty, and we have a new chain starting
+                // we just keep the current record held for now
+                hold = cur;
+            } else {
+                // it's either a new chain and the stack is empty,
+                // or part of the one in the stack
+                // so keep it in stack for now and proceed to next record
+                stack.push(cur);
+                return acc;
+            }
+
+        }
+
+        // if we come this far, then we need to merge whatever the stack has
+        // because `cur` is not part of the revision chain
+        // (either not a revision record, or part of a new revision chain)
+
+        if (!_.isEmpty(stack)) {
+            // let's create the grouped revisioning thing and push it forward
+            let [lastRec] = stack.slice(-1);
+            acc.push({
+                op: 'replace',
+                path: firstRec.path,
+                value: firstRec.value,
+                oldValue: firstRec.oldValue,
+
+                timestamp: lastRec.timestamp,
+                user: lastRec.user,
+            });
+
+            // and clear the stack
+            stack.length = 0;
+        }
+
+        // if `hold` has a value, then `cur` *IS* a revisioning record
+        // stack is empty by now, so we can just push it there
+        if (hold) {
+            stack.push(hold);
+        } else if (cur.op !== 'dummy') {
+            // we push the `cur` forward if it's not the dummy record
+            acc.push(cur);
+        }
+
+        return acc;
+
+    }, []);
+
 }

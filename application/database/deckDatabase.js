@@ -153,7 +153,7 @@ let self = module.exports = {
         let target = util.parseIdentifier(targetDeckId);
 
         // HACK force error if target does not include revision
-        target.revision;
+        target.revision.toString();
 
         return self.getRevision(sourceDeckId).then((sourceRevision) => {
             // source deck not found
@@ -424,6 +424,7 @@ let self = module.exports = {
         }));
     },
 
+    // DEPRECATED
     //updates a deck by creating a new revision
     replace: function(id, deck) {
         // if not included in the call, the deck itself is the top_root_deck
@@ -543,6 +544,271 @@ let self = module.exports = {
                     throw e;
                 }
 
+            });
+        });
+    },
+
+    // simpler implementation of replace that does not update anything, just creates the revision
+    revise: function(deckId, userId, parentDeckId, rootDeckId) {
+        userId = parseInt(userId);
+
+        let deck = util.parseIdentifier(deckId);
+        let parentDeck = util.parseIdentifier(parentDeckId);
+
+        return self.get(deck.id).then((existingDeck) => {
+            if (!existingDeck) return;
+
+            // we will create the new revision as a copy of the input revision
+            let originRevision;
+            if (deck.revision) {
+                // this can be used for revert as well
+                originRevision = existingDeck.revisions.find((r) => r.id === deck.revision);
+            } else {
+                // if missing, we want the latest
+                [originRevision] = existingDeck.revisions.slice(-1);
+            }
+            if (!originRevision) return;
+
+            // start tracking
+            let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId);
+
+            let newRevision = _.cloneDeep(originRevision);
+            // get the next revision id
+            let newRevisionId = Math.max(...existingDeck.revisions.map((r) => r.id)) + 1;
+            newRevision.id = newRevisionId;
+
+            // update the new revision metadata
+            let now = (new Date()).toISOString();
+            newRevision.timestamp = now;
+            newRevision.lastUpdate = now;
+
+            newRevision.user = userId;
+
+            // we need to add some extra metadata when reverting, let's add it always :)
+            newRevision.originRevision = originRevision.id;
+
+            // usage array stuff
+            newRevision.usage = [];
+            if (parentDeck) {
+                // if replacing a subdeck we remove the parent deck revision from the usage of the originRevision
+                _.remove(originRevision.usage, (u) => {
+                    return (u.id === parentDeck.id && u.revision === parentDeck.revision);
+                });
+
+                // and we add it to the newRevision
+                newRevision.usage.push(parentDeck);
+            }
+
+            // add the new revision!
+            existingDeck.revisions.push(newRevision);
+
+            // update the contributors to the deck
+            let contributors = existingDeck.contributors;
+            if (!contributors) {
+                existingDeck.contributors = contributors = [];
+            }
+
+            let existingContributor = contributors.find((c) => c.user === userId);
+            if (existingContributor) {
+                // if found, simply increment the count
+                existingContributor.count++;
+            } else {
+                // otherwise add it
+                existingContributor = { user: userId, count: 1};
+                contributors.push(existingContributor);
+            }
+
+            // final metadata
+            existingDeck.active = newRevisionId;
+            existingDeck.lastUpdate = now;
+
+            // update usage of each slide or subdeck
+            async.eachSeries(originRevision.contentItems, (item, done) => {
+                let promise;
+                if (item.kind === 'slide') {
+                    promise = helper.getCollection('slides').then((col) => {
+                        return col.findOneAndUpdate(
+                            { 
+                                _id: item.ref.id,
+                                'revisions.id': item.ref.revision,
+                            },
+                            { $push: {
+                                'revisions.$.usage': {
+                                    id: deck.id,
+                                    revision: newRevisionId,
+                                },
+                            } }
+                        );
+                    });
+
+                } else {
+                    promise = helper.getCollection('decks').then((col) => {
+                        return col.findOneAndUpdate(
+                            { 
+                                _id: item.ref.id,
+                                'revisions.id': item.ref.revision,
+                            },
+                            { $push: {
+                                'revisions.$.usage': {
+                                    id: deck.id,
+                                    revision: newRevisionId,
+                                },
+                            } }
+                        );
+                    });
+                }
+
+                promise.then((res) => {
+                    if (!res.value) {
+                        // something's wrong
+                        console.warn(item);
+                    }
+                    done();
+                }).catch(done);
+
+            }, (err) => {
+                if (err) {
+                    console.warn(err);
+                }
+            });
+
+            return helper.getCollection('decks').then((col) => {
+                var batch = col.initializeOrderedBulkOp();
+                // update current revision first
+                batch.find({
+                    _id: deck.id,
+                    'revisions.id': originRevision.id,
+                }).updateOne({
+                    $set: {
+                        'revisions.$': originRevision,
+                    },
+                });
+                // then push new and other updates
+                batch.find({ _id: deck.id }).updateOne({
+                    $set: {
+                        active: newRevisionId,
+                        lastUpdate: now,
+                        contributors: contributors,
+                    },
+                    $push: { 'revisions': newRevision },
+                });
+                return batch.execute().then((res) => existingDeck);
+
+                // return col.save(existingDeck).then(() => existingDeck);
+            }).then((updatedDeck) => {
+                // complete the tracking after revision (it may be nothing)
+                deckTracker.applyChangeLog(updatedDeck);
+
+                if (!parentDeck) return updatedDeck;
+
+                // update parent deck first before returning
+                return self.updateContentItem(updatedDeck, '', parentDeckId, 'deck', rootDeckId, userId)
+                .then(() => updatedDeck);
+            });
+
+        });
+
+    },
+
+    // this is what we use to create a new revision, we need to do this recursively in the deck tree
+    deepRevise: function(deckId, userId, parentDeckId, rootDeckId) {
+        if (!parentDeckId && !rootDeckId) {
+            // if both are missing, we are revising a root deck
+            rootDeckId = deckId;
+        } else if (parentDeckId) {
+            // if only root is missing, the parent is the root
+            rootDeckId = parentDeckId;
+        }
+
+        return self.revise(deckId, userId, parentDeckId, rootDeckId)
+        .then((updatedDeck) => {
+            if (!updatedDeck) return;
+
+            let [revision] = updatedDeck.revisions.slice(-1);
+            let nextParentId = util.toIdentifier({ id: updatedDeck._id, revision: revision.id });
+
+            // revision is a copy of the previous revision, so it has the same contents
+            let subDecks = revision.contentItems.filter((i) => i.kind === 'deck').map((i) => i.ref);
+
+            return new Promise((resolve, reject) => {
+                async.eachSeries(subDecks, (subDeck, done) => {
+                    self.deepRevise(util.toIdentifier(subDeck), userId, nextParentId, rootDeckId)
+                    .then(() => done())
+                    .catch(done);
+                }, (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(updatedDeck);
+                    }
+                });
+            });
+        });
+    },
+
+    // reverts a deck an to older revision
+    revert: function(deckId, revisionId, userId, parentDeckId, rootDeckId) {
+        let deck = {
+            id: parseInt(deckId),
+            revision: parseInt(revisionId),
+        };
+
+        return self.get(deck.id).then((existingDeck) => {
+            if (!existingDeck) return;
+
+            // we require the revision to be explicit
+            let revision = existingDeck.revisions.find((r) => r.id === deck.revision);
+            if (!revision) return;
+
+
+            // TODO commenting this because when we revert a revert,
+            // we may end up having the same subdeck revision
+            // in both the current deck revision, and an older one
+
+            // // we also require the revision specified to not be the last
+            // let [latestRevision] = existingDeck.revisions.slice(-1);
+            // if (revision.id === latestRevision.id) {
+            //     // it's like a no-op, already reverted to the requested revision :)
+            //     return existingDeck;
+            // };
+
+            return self.revise(util.toIdentifier(deck), userId, parentDeckId, rootDeckId);
+        });
+
+    },
+
+    // this is what we use to revert to a revision, we need to do this recursively in the deck tree
+    deepRevert: function(deckId, revisionId, userId, parentDeckId, rootDeckId) {
+        if (!parentDeckId && !rootDeckId) {
+            // if both are missing, we are revising a root deck
+            rootDeckId = deckId;
+        } else if (parentDeckId) {
+            // if only root is missing, the parent is the root
+            rootDeckId = parentDeckId;
+        }
+
+        return self.revert(deckId, revisionId, userId, parentDeckId, rootDeckId)
+        .then((updatedDeck) => {
+            if (!updatedDeck) return;
+
+            let [revision] = updatedDeck.revisions.slice(-1);
+            let nextParentId = util.toIdentifier({ id: updatedDeck._id, revision: revision.id });
+
+            // revision is a copy of the previous revision, so it has the same contents
+            let subDecks = revision.contentItems.filter((i) => i.kind === 'deck').map((i) => i.ref);
+
+            return new Promise((resolve, reject) => {
+                async.eachSeries(subDecks, (subDeck, done) => {
+                    self.deepRevert(subDeck.id, subDeck.revision, userId, nextParentId, rootDeckId)
+                    .then(() => done())
+                    .catch(done);
+                }, (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(updatedDeck);
+                    }
+                });
             });
         });
     },
@@ -822,38 +1088,6 @@ let self = module.exports = {
                 col.save(existingDeck);
                 return {'old_revision': old_rev_id, 'new_revision': newRevId};
             });
-        });
-    },
-
-    //reverts a deck's active revision to a new given one
-    revert: function(deck_id, deck){
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
-            let targetRevisionIndex = parseInt(deck.revision_id)-1;
-            return col.findOne({_id: parseInt(deck_id)})
-            .then((existingDeck) => {
-                let targetRevision = existingDeck.revisions[targetRevisionIndex];
-                let now = (new Date()).toISOString();
-                targetRevision.timestamp = now;
-                targetRevision.lastUpdate = now;
-
-                targetRevision.user = parseInt(deck.user);
-
-                targetRevision.id = existingDeck.revisions.length+1;
-                return col.findOneAndUpdate(
-                    { _id: parseInt(deck_id) },
-                    {
-                        '$set': {
-                            'active': targetRevision.id,
-                            'lastUpdate': now,
-                        },
-                        '$push': { 'revisions': targetRevision },
-                    },
-                    { returnOriginal: false }
-                );
-            });
-
         });
     },
 
@@ -1254,51 +1488,32 @@ let self = module.exports = {
 
     // simply creates a new deck revision without updating anything
     createDeckRevision(deckId, userId, parentDeckId, rootDeckId) {
-        return self.get(deckId).then((existingDeck) => {
-            if (!existingDeck) return;
+        // we only need the id, ignore any revision id
+        deckId = String(parseInt(deckId));
 
-            // ready to copy stuff to new revision
-            let [lastRevision] = existingDeck.revisions.slice(-1);
-            let replacePayload = {
-                title: lastRevision.title,
-                description: existingDeck.description,
-                language: lastRevision.language,
-                tags: lastRevision.tags,
-                license: existingDeck.license,
-                user: userId,
-                root_deck: parentDeckId,
-                top_root_deck: rootDeckId,
-            };
+        // create the new revision
+        return self.deepRevise(deckId, userId, parentDeckId, rootDeckId).then((updatedDeck) => {
+            if (!updatedDeck) return;
 
-            // create the new revision
-            return self.replace(deckId, replacePayload)
-            .then((replaced) => {
-                if (replaced.ok !== 1) {
-                    throw replaced;
-                }
+            // only return the last (new) revision for the updatedDeck in the revisions array
+            updatedDeck.revisions = updatedDeck.revisions.slice(-1);
+            return updatedDeck;
+        });
+    },
 
-                // if deck is a sub-deck, update its parent's content items
-                // HACK replaced.value._id is used instead of parsing deckId and getting the deck id (wo/ revision)
-                // we do this because we want to get the full deck (with all revisions)
-                return self.get(replaced.value._id).then((fullDeck) => {
-                    if (parentDeckId) {
-                        // update parent deck first before returning
-                        return self.updateContentItem(fullDeck, '', parentDeckId, 'deck', rootDeckId, userId)
-                        .then(() => fullDeck);
-                    } else {
-                        return fullDeck;
-                    }
-                });
-            });
+    // reverts a deck to a past revision by copying it to a new one
+    revertDeckRevision: function(deckId, revisionId, userId, parentDeckId, rootDeckId) {
+        // we only need the id, ignore any revision id there
+        deckId = String(parseInt(deckId));
 
-        }).then((fullDeck) => {
-            if (!fullDeck) return;
+        // revert to revision
+        return self.deepRevert(deckId, revisionId, userId, parentDeckId, rootDeckId).then((updatedDeck) => {
+            if (!updatedDeck) return;
 
             // only return the last (new) revision for the fullDeck in the revisions array
-            fullDeck.revisions = fullDeck.revisions.slice(-1);
-            return fullDeck;
+            updatedDeck.revisions = updatedDeck.revisions.slice(-1);
+            return updatedDeck;
         });
-
     },
 
     //forks a given deck revision by copying all of its sub-decks into new decks
@@ -1655,7 +1870,7 @@ let self = module.exports = {
                         ]
                     } },
                     // { $project: { _id: 0 } }, // TODO re-insert this after 3.4 upgrade
-                    { $sort: { timestamp: -1 } },
+                    { $sort: { timestamp: 1 } },
                 ]);
             }).then((result) => result.toArray());
         });
