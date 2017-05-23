@@ -1,5 +1,9 @@
 'use strict';
 
+const url = require('url');
+const Microservices = require('../configs/microservices');
+const fileserviceHost = url.parse(Microservices.file.uri).hostname;
+
 // updates the elements in original by assigning values from update using id property to match elements in arrays
 let self = module.exports = {
 
@@ -15,7 +19,7 @@ let self = module.exports = {
     findMedia: function(text, mediaType){
         let mediaExtension;
 
-        // specify file extensions for earch media type
+        // specify file extensions for each media type
         if(mediaType === 'pictures')
             mediaExtension = 'png|jpeg|jpg|gif|bmp|tiff';
         else if(mediaType === 'video')
@@ -23,7 +27,7 @@ let self = module.exports = {
         else if(mediaType === 'audio')
             mediaExtension = 'mp3|wav|wma';
 
-        let urlRegex = new RegExp(`https?:\\/\\/fileservice[^\\s]+(\.${mediaExtension})`, 'g');
+        let urlRegex = new RegExp(`https?:\\/\\/${fileserviceHost}[^\\s]+(\.${mediaExtension})`, 'g');
         let matchArray;
         let media = [];
 
