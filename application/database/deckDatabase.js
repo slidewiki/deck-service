@@ -623,14 +623,18 @@ let self = module.exports = {
                 existingDeck.contributors = contributors = [];
             }
 
-            let existingContributor = contributors.find((c) => c.user === userId);
-            if (existingContributor) {
-                // if found, simply increment the count
-                existingContributor.count++;
-            } else {
-                // otherwise add it
-                existingContributor = { user: userId, count: 1};
-                contributors.push(existingContributor);
+            // should a user that simply creates a revision be considered a contributor?
+            // for now, the answer is yes, but only if it's an actual user
+            if (userId > 0) {
+                let existingContributor = contributors.find((c) => c.user === userId);
+                if (existingContributor) {
+                    // if found, simply increment the count
+                    existingContributor.count++;
+                } else {
+                    // otherwise add it
+                    existingContributor = { user: userId, count: 1};
+                    contributors.push(existingContributor);
+                }
             }
 
             // final metadata
