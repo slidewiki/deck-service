@@ -1404,6 +1404,7 @@ let self = module.exports = {
 
     // returns an implicit list of editors of a given deck
     getDeckEditors(deck_id, editorsList){
+        deck_id = String(deck_id);
         if (!editorsList) editorsList = [];
 
         let revision_id = -1;
