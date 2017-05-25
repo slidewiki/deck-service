@@ -30,6 +30,9 @@ let self = module.exports = {
     },
 
     toIdentifier: function(ref) {
+        // return nothing for null or invalid data
+        if (!ref || !ref.id) return;
+
         let revision = ref.revision ? `-${ref.revision}` : '';
         return `${ref.id}${revision}`;
     },

@@ -516,10 +516,7 @@ let self = module.exports = {
             // authorizeUser returns nothing if all's ok
             if (boom) return boom;
 
-            // continue as normal
-            let parentDeckId = request.payload.root_deck;
-
-            return deckDB.createDeckRevision(deckId, userId, parentDeckId, rootDeckId);
+            return deckDB.createDeckRevision(deckId, userId, rootDeckId);
         }).then((response) => {
             // response is either the new deck revision or boom
             reply(response);
@@ -543,9 +540,8 @@ let self = module.exports = {
 
             // continue as normal
             let revisionId = request.payload.revision_id;
-            let parentDeckId = request.payload.root_deck;
 
-            return deckDB.revertDeckRevision(deckId, revisionId, userId, parentDeckId, rootDeckId);
+            return deckDB.revertDeckRevision(deckId, revisionId, userId, rootDeckId);
         }).then((response) => {
             // by now it's not a 404, which means the revision_id in the payload was invalid
             if (!response)

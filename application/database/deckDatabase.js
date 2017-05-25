@@ -153,7 +153,7 @@ let self = module.exports = {
         let target = util.parseIdentifier(targetDeckId);
 
         // HACK force error if target does not include revision
-        target.revision.toString();
+        // target.revision.toString();
 
         return self.getRevision(sourceDeckId).then((sourceRevision) => {
             // source deck not found
@@ -166,7 +166,7 @@ let self = module.exports = {
                 path = [source];
 
                 // return if source is same as target
-                if (_.isEqual(source, target)) return path;
+                if (source.id === target.id) return path;
             }
 
             // expand all subdecks
@@ -180,7 +180,7 @@ let self = module.exports = {
                 subPaths.push(path.concat(_.assign({index}, citem.ref)));
 
                 // also check if target deck is direct child and break
-                if (_.isEqual(citem.ref, target)) return true;
+                if (citem.ref.id === target.id) return true;
             });
 
             // target is child of source
@@ -549,11 +549,16 @@ let self = module.exports = {
     },
 
     // simpler implementation of replace that does not update anything, just creates the revision
-    revise: function(deckId, userId, parentDeckId, rootDeckId) {
+    revise: function(deckId, path, userId) {
         userId = parseInt(userId);
 
         let deck = util.parseIdentifier(deckId);
-        let parentDeck = util.parseIdentifier(parentDeckId);
+
+        // parent is second to last; if path length is 1, then parent is undefined
+        let [parentDeck] = path.slice(-2, -1);
+
+        // root is first; if path length is 1, the root is the deck itself
+        let rootDeckId = util.toIdentifier(path[0]);
 
         return self.get(deck.id).then((existingDeck) => {
             if (!existingDeck) return;
@@ -702,7 +707,7 @@ let self = module.exports = {
                 if (!parentDeck) return updatedDeck;
 
                 // update parent deck first before returning
-                return self.updateContentItem(updatedDeck, '', parentDeckId, 'deck', rootDeckId, userId)
+                return self.updateContentItem(updatedDeck, '', util.toIdentifier(parentDeck), 'deck', rootDeckId, userId)
                 .then(() => updatedDeck);
             });
 
@@ -711,30 +716,28 @@ let self = module.exports = {
     },
 
     // this is what we use to create a new revision, we need to do this recursively in the deck tree
-    deepRevise: function(deckId, userId, parentDeckId, rootDeckId) {
-        if (!parentDeckId && !rootDeckId) {
-            // if both are missing, we are revising a root deck
-            rootDeckId = deckId;
-        } else if (parentDeckId) {
-            // if only root is missing, the parent is the root
-            rootDeckId = parentDeckId;
-        }
+    deepRevise: function(path, userId) {
+        // we revise the end of the path
+        let [deck] = path.slice(-1);
 
-        return self.revise(deckId, userId, parentDeckId, rootDeckId)
+        return self.revise(util.toIdentifier(deck), path, userId)
         .then((updatedDeck) => {
             if (!updatedDeck) return;
 
             let [revision] = updatedDeck.revisions.slice(-1);
-            let nextParentId = util.toIdentifier({ id: updatedDeck._id, revision: revision.id });
+            let nextParent = { id: updatedDeck._id, revision: revision.id };
+
+            // replace last path item with new parent (after revision)
+            let updatedPath = path.slice(0, -1).concat(nextParent);
 
             // revision is a copy of the previous revision, so it has the same contents
-            let subDecks = revision.contentItems.filter((i) => i.kind === 'deck').map((i) => i.ref);
+            // we extend updatedPath to include each subdeck
+            let subPaths = revision.contentItems.filter((i) => i.kind === 'deck').map((i) => updatedPath.concat(i.ref));
 
             return new Promise((resolve, reject) => {
-                async.eachSeries(subDecks, (subDeck, done) => {
-                    self.deepRevise(util.toIdentifier(subDeck), userId, nextParentId, rootDeckId)
-                    .then(() => done())
-                    .catch(done);
+                async.eachSeries(subPaths, (subPath, done) => {
+                    self.deepRevise(subPath, userId)
+                    .then(() => done()).catch(done);
                 }, (err) => {
                     if (err) {
                         reject(err);
@@ -747,7 +750,7 @@ let self = module.exports = {
     },
 
     // reverts a deck an to older revision
-    revert: function(deckId, revisionId, userId, parentDeckId, rootDeckId) {
+    revert: function(deckId, revisionId, path, userId) {
         let deck = {
             id: parseInt(deckId),
             revision: parseInt(revisionId),
@@ -772,36 +775,40 @@ let self = module.exports = {
             //     return existingDeck;
             // };
 
-            return self.revise(util.toIdentifier(deck), userId, parentDeckId, rootDeckId);
+            return self.revise(util.toIdentifier(deck), path, userId);
         });
 
     },
 
     // this is what we use to revert to a revision, we need to do this recursively in the deck tree
-    deepRevert: function(deckId, revisionId, userId, parentDeckId, rootDeckId) {
-        if (!parentDeckId && !rootDeckId) {
-            // if both are missing, we are revising a root deck
-            rootDeckId = deckId;
-        } else if (parentDeckId) {
-            // if only root is missing, the parent is the root
-            rootDeckId = parentDeckId;
-        }
+    deepRevert: function(path, revisionId, userId) {
+        // we revert the end of the path
+        let [deck] = path.slice(-1);
 
-        return self.revert(deckId, revisionId, userId, parentDeckId, rootDeckId)
+        // deck points to the latest revision, but we revert to revisionId
+        return self.revert(deck.id, revisionId, path, userId)
         .then((updatedDeck) => {
             if (!updatedDeck) return;
 
             let [revision] = updatedDeck.revisions.slice(-1);
-            let nextParentId = util.toIdentifier({ id: updatedDeck._id, revision: revision.id });
+            let nextParent = { id: updatedDeck._id, revision: revision.id };
 
-            // revision is a copy of the previous revision, so it has the same contents
-            let subDecks = revision.contentItems.filter((i) => i.kind === 'deck').map((i) => i.ref);
+            // replace last path item with new parent (after revert)
+            let updatedPath = path.slice(0, -1).concat(nextParent);
+
+            // revision is a copy of the revision we are reverting to, so it has the same contents
+            // we extend updatedPath to include each subdeck
+            let subPaths = revision.contentItems.filter((i) => i.kind === 'deck').map((i) => updatedPath.concat(i.ref));
 
             return new Promise((resolve, reject) => {
-                async.eachSeries(subDecks, (subDeck, done) => {
-                    self.deepRevert(subDeck.id, subDeck.revision, userId, nextParentId, rootDeckId)
-                    .then(() => done())
-                    .catch(done);
+                async.eachSeries(subPaths, (subPath, done) => {
+                    // each subpath ends with the subdeck at the revision
+                    // it is under in the parent deck revision we are reverting to
+                    // so we need to revert the subdeck as well to that revision
+                    let [subDeck] = subPath.slice(-1);
+
+                    self.deepRevert(subPath, subDeck.revision, userId)
+                    .then(() => done()).catch(done);
                 }, (err) => {
                     if (err) {
                         reject(err);
@@ -1488,33 +1495,44 @@ let self = module.exports = {
     },
 
     // simply creates a new deck revision without updating anything
-    createDeckRevision(deckId, userId, parentDeckId, rootDeckId) {
+    createDeckRevision(deckId, userId, rootDeckId) {
         // we only need the id, ignore any revision id
         deckId = String(parseInt(deckId));
 
-        // create the new revision
-        return self.deepRevise(deckId, userId, parentDeckId, rootDeckId).then((updatedDeck) => {
-            if (!updatedDeck) return;
+        // we also need the path from root to deck
+        return self.findPath(rootDeckId, deckId).then((path) => {
+            // create the new revision
+            return self.deepRevise(path, userId).then((updatedDeck) => {
+                if (!updatedDeck) return;
 
-            // only return the last (new) revision for the updatedDeck in the revisions array
-            updatedDeck.revisions = updatedDeck.revisions.slice(-1);
-            return updatedDeck;
+                // only return the last (new) revision for the updatedDeck in the revisions array
+                updatedDeck.revisions = updatedDeck.revisions.slice(-1);
+                return updatedDeck;
+            });
+
         });
+
     },
 
     // reverts a deck to a past revision by copying it to a new one
-    revertDeckRevision: function(deckId, revisionId, userId, parentDeckId, rootDeckId) {
+    revertDeckRevision: function(deckId, revisionId, userId, rootDeckId) {
         // we only need the id, ignore any revision id there
         deckId = String(parseInt(deckId));
 
-        // revert to revision
-        return self.deepRevert(deckId, revisionId, userId, parentDeckId, rootDeckId).then((updatedDeck) => {
-            if (!updatedDeck) return;
+        // we also need the path from root to deck
+        return self.findPath(rootDeckId, deckId).then((path) => {
 
-            // only return the last (new) revision for the fullDeck in the revisions array
-            updatedDeck.revisions = updatedDeck.revisions.slice(-1);
-            return updatedDeck;
+            // revert to revision
+            return self.deepRevert(path, revisionId, userId).then((updatedDeck) => {
+                if (!updatedDeck) return;
+
+                // only return the last (new) revision for the fullDeck in the revisions array
+                updatedDeck.revisions = updatedDeck.revisions.slice(-1);
+                return updatedDeck;
+            });
+
         });
+
     },
 
     //forks a given deck revision by copying all of its sub-decks into new decks
