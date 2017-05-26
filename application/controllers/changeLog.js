@@ -179,9 +179,9 @@ function mergeDeckRevisions(changeLog, deck) {
         // (either not a revision record, or part of a new revision chain)
 
         if (!_.isEmpty(stack)) {
-            // let's create the grouped revisioning thing and push it forward
+            // let's create the grouped revisioning thing
             let [lastRec] = stack.slice(-1);
-            acc.push({
+            let mergedRec = {
                 op: 'replace',
                 path: firstRec.path,
                 value: firstRec.value,
@@ -189,8 +189,13 @@ function mergeDeckRevisions(changeLog, deck) {
 
                 timestamp: lastRec.timestamp,
                 user: lastRec.user,
-            });
-
+            };
+            // add revert information
+            if (firstRec.reverted) {
+                mergedRec.reverted = firstRec.reverted;
+            }
+            // push it forward
+            acc.push(mergedRec);
             // and clear the stack
             stack.length = 0;
         }
