@@ -11,7 +11,7 @@ const helper = require('./helper'),
     striptags = require('striptags'),
     validateDeck = require('../models/deck').validateDeck;
 
-let async = require('async');
+const async = require('async');
 
 let self = module.exports = {
     //gets a specified deck and all of its revision, or only the given revision
@@ -147,17 +147,18 @@ let self = module.exports = {
     },
 
     // return a path array of deckId as it exists in the tree with rootDeckId as root
-    // returns first occurence of deckId, or nothing if cannot find the path
-    findPath: function(sourceDeckId, targetDeckId, path) {
+    // returns first occurence of targetId, or nothing if cannot find the path
+    // if targetKind is deck, then the path includes that as last item
+    findPath: function(sourceDeckId, targetId, targetKind = 'deck', path) {
         let source = util.parseIdentifier(sourceDeckId);
-        let target = util.parseIdentifier(targetDeckId);
+        let target = util.parseIdentifier(targetId);
 
-        // HACK force error if target does not include revision
-        // target.revision.toString();
+        // deck is default if invalid (?)
+        if (!['deck', 'slide'].includes(targetKind)) targetKind = 'deck';
 
         return self.getRevision(sourceDeckId).then((sourceRevision) => {
             // source deck not found
-            if (!sourceRevision) return;
+            if (!sourceRevision) return [];
 
             // path should be canonical, so we need the revision to be defined
             source.revision = sourceRevision.id;
@@ -166,7 +167,17 @@ let self = module.exports = {
                 path = [source];
 
                 // return if source is same as target
-                if (source.id === target.id) return path;
+                // but only for deck targets
+                if (targetKind === 'deck' && source.id === target.id) return path;
+            }
+
+            if (targetKind === 'slide') {
+                // first check all children for slide target
+                let foundSlideIndex = sourceRevision.contentItems.findIndex((citem) => citem.kind === 'slide' && citem.ref.id === target.id);
+                let foundSlide = sourceRevision.contentItems[foundSlideIndex];
+
+                // the path points to the slide, append just the index and return
+                if (foundSlide) return path.concat({ index: foundSlideIndex });
             }
 
             // expand all subdecks
@@ -180,7 +191,7 @@ let self = module.exports = {
                 subPaths.push(path.concat(_.assign({index}, citem.ref)));
 
                 // also check if target deck is direct child and break
-                if (citem.ref.id === target.id) return true;
+                if (targetKind === 'deck' && citem.ref.id === target.id) return true;
             });
 
             // target is child of source
@@ -190,16 +201,15 @@ let self = module.exports = {
             }
 
             // if no further subdecks are here we just return empty (dead-end)
-            if (subPaths.length === 0) return;
+            if (subPaths.length === 0) return [];
 
             // otherwise we search down
             return new Promise((resolve, reject) => {
                 async.concatSeries(subPaths, (subPath, callback) => {
                     // the sub deck is the last element in the path
                     let [nextSource] = subPath.slice(-1);
-                    let subDeckId = `${nextSource.id}-${nextSource.revision}`;
 
-                    self.findPath(subDeckId, targetDeckId, subPath)
+                    self.findPath(util.toIdentifier(nextSource), targetId, targetKind, subPath)
                     .then((result) => callback(null, result))
                     .catch(callback);
 

@@ -147,50 +147,45 @@ let self = module.exports = {
 
     },
 
-    //reverts a slide to a previous revision, w.r.t. a parent deck
+    // reverts a slide to a previous revision, w.r.t. a parent deck
     revertSlideRevision: function(request, reply) {
-        let userId = request.payload.user;
+        let slideId = request.params.id;
+        slideDB.exists(slideId).then((exists) => {
+            if (!exists) return boom.notFound();
 
-        slideDB.get(encodeURIComponent(request.params.id.split('-')[0]), request.payload).then((slide) => {
-            if (co.isEmpty(slide))
-                throw slide;
-            else{
-                let revision_id = parseInt(request.payload.revision_id);
-                //update the content items of the root deck to reflect the slide revert
-                return deckDB.updateContentItem(slide, revision_id, request.payload.root_deck, 'slide', request.payload.top_root_deck, userId)
-                .then((updatedIds) => {
-                    let fullId = request.params.id;
-                    if(fullId.split('-').length < 2){
-                        fullId += '-'+updatedIds.old_revision;
-                    }
-                    //update the usage of the reverted slide to point to the root deck
-                    return slideDB.updateUsage(fullId, revision_id, request.payload.root_deck).then((updatedSlide) => {
-                        let revisionArray = [updatedSlide.revisions[revision_id-1]];
-                        updatedSlide.revisions = revisionArray;
-                        reply(updatedSlide);
+            let rootDeckId = request.payload.top_root_deck;
+            // we need to find the parent from the path!
+            return deckDB.findPath(rootDeckId, slideId, 'slide').then((path) => {
+                // could not find path due to bad payload
+                if (!path || !path.length) return boom.badData(`could not find slide: ${slideId} in deck tree: ${rootDeckId} `);
+
+                // the parent of the slide is the second to last item of the path
+                // path has at least length 2, guaranteed
+                let [parentDeck] = path.slice(-2, -1);
+                let parentDeckId = util.toIdentifier(parentDeck);
+
+                let userId = request.auth.credentials.userid;
+                return authorizeUser(userId, parentDeckId, rootDeckId).then((boomError) => {
+                    if (boomError) return boomError;
+
+                    let slide = util.parseIdentifier(slideId);
+                    let revisionId = parseInt(request.payload.revision_id);
+                    return slideDB.revert(slide.id, revisionId, path, userId).then((updatedSlide) => {
+                        // if revert returns nothing, it's not because of 404, but no path was found!
+                        if (!updatedSlide) return boom.badData(`unknown revision id: ${revisionId} for slide: ${slideId}`);
+
+                        // keep only the new slide revision in revisions array for response
+                        let slideRevision = updatedSlide.revisions.find((r) => r.id === revisionId);
+                        updatedSlide.revisions = [slideRevision];
+                        return updatedSlide;
                     });
+
                 });
-            }
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
-        });
-    },
 
-    // HACK added this to do the checking and keep original handler intact
-    revertSlideRevisionWithCheck: function(request, reply) {
-        let userId = request.auth.credentials.userid;
+            });
 
-        let parentDeckId = request.payload.root_deck;
-        let rootDeckId = request.payload.top_root_deck;
-
-        authorizeUser(userId, parentDeckId, rootDeckId).then((boom) => {
-            if (boom) return reply(boom);
-
-            request.payload.user = userId;
-
-            // continue as normal
-            self.revertSlideRevision(request, reply);
+        }).then((response) => {
+            reply(response);
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());

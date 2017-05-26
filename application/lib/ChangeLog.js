@@ -12,7 +12,6 @@ const deckModel = require('../models/deck');
 const changeModel = require('../models/deckChange');
 
 const helper = require('../database/helper');
-const slideDB = require('../database/slideDatabase');
 
 const ChangeLogRecord = {
 
@@ -289,6 +288,8 @@ let self = module.exports = {
 };
 
 function fillSlideInfo(deckChanges) {
+    // TODO avoid this circular reference
+    const slideDB = require('../database/slideDatabase');
 
     // we check to see if we need to also read some data for slide updates
     let slideUpdates = deckChanges.filter((c) => (c.value && c.value.kind === 'slide'));
