@@ -116,6 +116,36 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
         if (hold) changeLog.push(hold);
     }
 
+    // fill `action` were missing, and detect 'rename' actions
+    changeLog.forEach((cur) => {
+        if (cur.op === 'update') {
+            // check for deck rename in values
+            if (cur.values.title && _.size(cur.values) === 1) {
+                cur.action = 'rename';
+                cur.renamed = {
+                    kind: 'deck',
+                    from: cur.oldValues.title,
+                    to: cur.values.title,
+                };
+            }
+
+        } else if (cur.op === 'replace' && cur.value.kind === 'slide') {
+            // check for slide rename
+            if (cur.value.ref.title !== cur.oldValue.ref.title) {
+                cur.action = 'rename';
+                cur.renamed = {
+                    kind: 'slide',
+                    from: cur.oldValue.ref.title,
+                    to: cur.value.ref.title,
+                };
+            }
+
+        }
+
+        // set `action` to value of `op` if it's missing
+        if (!cur.action) cur.action = cur.op;
+    });
+
     if (simplifyOutput) {
         changeLog.forEach((cur) => {
             // format paths and updates
@@ -127,6 +157,11 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
             if (cur.oldValue) cur.oldValue = `${cur.oldValue.kind}:${formatRef(cur.oldValue.ref)}`;
 
             if (cur.reverted) cur.reverted = `from ${cur.reverted.from} to ${cur.reverted.to}`;
+            if (cur.renamed) {
+                cur.renamed = `${cur.renamed.kind} from '${cur.renamed.from}' to '${cur.renamed.to}'`;
+                delete cur.values;
+                delete cur.oldValues;
+            }
         });
     }
 
@@ -193,6 +228,9 @@ function mergeDeckRevisions(changeLog, deck) {
             // add revert information
             if (firstRec.reverted) {
                 mergedRec.reverted = firstRec.reverted;
+                mergedRec.action = 'revert';
+            } else {
+                mergedRec.action = 'revise';
             }
             // push it forward
             acc.push(mergedRec);
