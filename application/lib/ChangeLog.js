@@ -126,46 +126,53 @@ let self = module.exports = {
                 // the other for updating the revision (but only when not a subdeck)
                 let records = [];
 
-                let deckAfter = _.cloneDeep(_.pick(updatedDeck, _.keys(deckModel.trackedDeckProperties)));
-
                 // check if we are applying update to deck across revisions
                 // in that case the deck/updatedDeck latest revisions will be different
                 let updatedRevision = revision;
                 [updatedRevision] = updatedDeck.revisions.slice(-1);
 
-                // check for the case where we're doing a deck revision for a ROOT deck
-                // we double check that old revision and new are different!
-                // if it's a root deck revision, the path will be of length 1
-                if (revision.id !== updatedRevision.id && path.length === 1) {
+                if (revision.id !== updatedRevision.id) {
+                    // this means we are creating a new revision for the deck
+                    // that means that we should have an 'update' change log record
 
-                    let before = {
-                        kind: 'deck',
-                        ref: {
-                            id: deck._id,
-                            revision: revision.id,
-                        },
-                    };
-                    let after = {
-                        kind: 'deck',
-                        ref: {
-                            id: deck._id,
-                            revision: updatedRevision.id,
-                        },
-                    };
+                    // if the path length is 1, we need to record a ROOT deck 'replace'
+                    if (path.length === 1) {
 
-                    // no index or path in this case
-                    records.push(ChangeLogRecord.createNodeUpdate(before, after));
+                        let before = {
+                            kind: 'deck',
+                            ref: {
+                                id: deck._id,
+                                revision: revision.id,
+                            },
+                        };
+                        let after = {
+                            kind: 'deck',
+                            ref: {
+                                id: deck._id,
+                                revision: updatedRevision.id,
+                            },
+                        };
 
+                        // no index or path in this case
+                        records.push(ChangeLogRecord.createNodeUpdate(before, after));
+
+                    }
+
+                } else {
+                    // there is no revision change, so we need to check if some values
+                    // in the deck revision (which is always the latest) where updated 
+
+                    let deckAfter = _.cloneDeep(_.pick(updatedDeck, _.keys(deckModel.trackedDeckProperties)));
+
+                    // in order to do the comparison, we merge revision into deck and only keep trackable stuff
+                    _.merge(deckAfter, _.cloneDeep(_.pick(
+                        updatedRevision,
+                        _.keys(deckModel.trackedDeckRevisionProperties))
+                    ));
+
+                    // this may include empty slots nothing, which is ok
+                    records.push(ChangeLogRecord.createUpdate(deckBefore, deckAfter, path));
                 }
-
-                // in order to do the comparison, we merge revision into deck and only keep trackable stuff
-                _.merge(deckAfter, _.cloneDeep(_.pick(
-                    updatedRevision,
-                    _.keys(deckModel.trackedDeckRevisionProperties))
-                ));
-
-                // this may include empty slots nothing, which is ok
-                records.push(ChangeLogRecord.createUpdate(deckBefore, deckAfter, path));
 
                 // this may be a sparse array!
                 return records;
