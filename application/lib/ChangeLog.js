@@ -62,7 +62,7 @@ const ChangeLogRecord = {
     },
 
     createNodeUpdate: function(before, after, index, path) {
-        if (path && _.isNumber(index)) path = path.concat({ index });
+        if (!_.isEmpty(path) && _.isNumber(index)) path = path.concat({ index });
 
         return {
             op: 'replace',
