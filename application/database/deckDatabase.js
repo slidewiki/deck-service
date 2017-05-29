@@ -1272,59 +1272,78 @@ let self = module.exports = {
     },
 
     //returns a flattened structure of a deck's slides, and optionally its sub-decks
-    getFlatSlidesFromDB: function(deck_id, deckTree, return_decks){
-        let revision_id = -1;
-        let decktreesplit = deck_id.split('-');
-        if(decktreesplit.length > 1){
-            deck_id = decktreesplit[0];
-            revision_id = decktreesplit[1]-1;
-        }
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(deck_id)})
-            .then((deck) => {
-                if(revision_id === -1){
-                    revision_id = deck.active-1;
-                }
-                if(!deckTree){
-                    deckTree = { title: deck.revisions[revision_id].title, id: deck_id+'-'+(revision_id+1), type: 'deck', user: String(deck.revisions[revision_id].user), theme: String(deck.revisions[revision_id].theme), children: []};
-                }
-                return new Promise((resolve, reject) => {
-                    async.eachSeries(deck.revisions[revision_id].contentItems, (citem, callback) => {
+    getFlatSlides: function(deckId, deckTree, returnDecks){
 
-                        if(citem.kind === 'slide'){
-                            helper.connectToDatabase()
-                            .then((db) => db.collection('slides'))
-                            .then((col) => {
-                                return col.findOne({_id: parseInt(citem.ref.id)})
-                                .then((slide) => {
-                                    let slide_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, user: String(slide.revisions[slide_revision].user), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
-                                    callback();
-                                });
-                            }).catch(callback);
-                        }
-                        else{
+        return self.getRevision(deckId)
+        .then((deckRevision) => {
+
+            // return nothing if not found
+            if (!deckRevision) return;
+
+            if(!deckTree){
+                // info of root deck
+                deckTree = {
+                    title: deckRevision.title,
+                    id: deckId,
+                    type: 'deck',
+                    user: String(deckRevision.user),
+                    theme: String(deckRevision.theme),
+                    children: []
+                };
+            }
+
+            // include subdecks in result
+            if(returnDecks){
+                deckTree.children.push({
+                    title: deckRevision.title,
+                    user: String(deckRevision.user),
+                    id: deckId,
+                    type: 'deck'
+                });
+            }
+
+            return new Promise( (resolve, reject) => {
+                async.eachSeries(deckRevision.contentItems, (citem, callback) => {
+
+                    if(citem.kind === 'slide'){
+                        helper.connectToDatabase()
+                        .then((db) => db.collection('slides'))
+                        .then((col) => {
                             col.findOne({_id: parseInt(citem.ref.id)})
-                            .then((innerDeck) => {
-                                if(return_decks){
-                                    let deck_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: innerDeck.revisions[deck_revision].title, user: String(innerDeck.revisions[deck_revision].user), id: innerDeck._id+'-'+innerDeck.revisions[deck_revision].id, type: 'deck'});
-                                }
-                                return self.getFlatSlidesFromDB(innerDeck._id+'-'+citem.ref.revision, deckTree, return_decks)
-                                .then(() => {
-                                    callback();
+                            .then((slide) => {
+                                let slideRevision =  slide.revisions.find((rev) => (rev.id === citem.ref.revision));
+                                deckTree.children.push({
+                                    title:slideRevision.title,
+                                    content: slideRevision.content,
+                                    speakernotes: slideRevision.speakernotes,
+                                    user: String(slideRevision.user),
+                                    id: slide._id+'-'+slideRevision.id,
+                                    type: 'slide'
                                 });
-                            }).catch(callback);
-                        }
-                    }, (err) => {
-                        if (err) {
-                            reject(err);
-                        } else {
-                            resolve(deckTree);
-                        }
-                    });
+                                callback();
+                            }).catch( (err) => {
+                                callback(err);
+                            });
+                        }).catch( (err) => {
+                            callback(err);
+                        });
+                    }
+                    else if (citem.kind === 'deck'){
+                        // call recursively for subdecks
+                        self.getFlatSlides(`${citem.ref.id}-${citem.ref.revision}`, deckTree, returnDecks)
+                        .then(() => {
+                            callback();
+                        }).catch( (err) => {
+                            callback(err);
+                        });
+                    }
+                }, (err) => {
+                    if(err){
+                        reject(err);
+                    }
+                    else{
+                        resolve(deckTree);
+                    }
                 });
             });
         });
@@ -1842,6 +1861,24 @@ let self = module.exports = {
         });
     },
 
+    // fetches specified media-type files that are present inside the deck
+    getMedia: function(deckId, mediaType){
+        return self.getFlatSlides(deckId, undefined, false).then( (flatSlides) => {
+            if(!flatSlides) return;
+
+            // get media uris per slide as arrays
+            let media = flatSlides.children.map( (slide) => {
+                return util.findMedia(slide.content, mediaType);
+            });
+
+            // flatten arrays of media uris
+            let flatMedia = [].concat.apply([], media);
+
+            // return unique media uris
+            return [...new Set(flatMedia)];
+        });
+    },
+
     // fetches change log records for the deck or subdecks thereof
     getChangeLog: function(identifier) {
         // always check if deck exists to return a 404
@@ -1876,7 +1913,6 @@ let self = module.exports = {
         });
 
     },
-
 };
 
 // split deck id given as parameter to deck id and revision id
