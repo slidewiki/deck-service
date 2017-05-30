@@ -54,6 +54,9 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
                         from: cur.oldValue.ref.revision,
                         to: ref.originRevision,
                     };
+                    cur.action = 'revert';
+                } else {
+                    cur.action = 'revise';
                 }
             }
 
@@ -64,6 +67,10 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
                         from: cur.oldValue.ref.revision,
                         to: ref.revision,
                     };
+                    cur.action = 'revert';
+                } else {
+                    // it's a slide edit action
+                    cur.action = 'edit';
                 }
             }
         }
@@ -129,7 +136,7 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
                 };
             }
 
-        } else if (cur.op === 'replace' && cur.value.kind === 'slide') {
+        } else if (cur.action === 'edit') {
             // check for slide rename
             if (cur.value.ref.title !== cur.oldValue.ref.title) {
                 cur.action = 'rename';
