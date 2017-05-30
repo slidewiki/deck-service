@@ -1910,9 +1910,7 @@ let self = module.exports = {
     getChangesCounts: function(deckId) {
         let deck = util.parseIdentifier(deckId);
         return helper.getCollection('deckchanges').then((changes) => {
-            let valueQuery = {
-            };
-
+   
             return changes.aggregate([
                 // primary filter
                 { $match: {
