@@ -278,7 +278,7 @@ let self = module.exports = {
     },
 
     // we create a change log record for deck creation as well
-    trackDeckCreated: function(newDeck, rootDeckId) {
+    trackDeckCreated: function(newDeck, rootDeckId, action) {
         // userId is the new deck creator
         let userId = newDeck.user;
 
@@ -324,12 +324,20 @@ let self = module.exports = {
             // add the user!
             logRecord.user = userId;
 
+            // add the action!
+            if (action) logRecord.action = action;
+
             return saveDeckChanges([logRecord]);
 
         }).catch((err) => {
             console.warn(err);
         });
 
+    },
+
+    // we create a change log record for deck creation as well
+    trackDeckForked: function(newDeck, rootDeckId) {
+        return self.trackDeckCreated(newDeck, rootDeckId, 'fork');
     },
 
 };
@@ -422,11 +430,21 @@ function fillDeckInfo(deckChanges) {
                         rec.value.ref.originRevision = after.originRevision;
                     rec.value.ref.title = after.title;
 
+                    // check for fork information in add ops
+                    let origin = rec.action === 'fork' && deck.origin && _.pick(deck.origin, 'id', 'revision');
+                    if (origin) {
+                        rec.value.origin = origin;
+                    }
+
                     if (rec.oldValue) {
                         let before = deck.revisions.find((r) => r.id === rec.oldValue.ref.revision);
                         if (before.originRevision)
                             rec.oldValue.ref.originRevision = before.originRevision;
                         rec.oldValue.ref.title = before.title;
+
+                        if (origin) {
+                            rec.oldValue.origin = origin;
+                        }
                     }
 
                     done();

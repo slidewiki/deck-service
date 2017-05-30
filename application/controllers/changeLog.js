@@ -41,6 +41,7 @@ let self = module.exports = {
 
 const mergeMoves = true;
 const mergeRevisions = true;
+const mergeForks = true;
 
 function prepareChangeLog(changeLog, simplifyOutput, deckId) {
     // we add the revise/revert subops
@@ -80,6 +81,11 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
     if (mergeRevisions && deck) {
         // we need to merge the recursive revisioning logs
         changeLog = mergeDeckRevisions(changeLog, deck);
+    }
+
+    if (mergeForks && deck) {
+        // we need to merge the recursive revisioning logs
+        changeLog = mergeDeckForks(changeLog, deck);
     }
 
     if (!mergeMoves && !simplifyOutput) return changeLog;
@@ -159,6 +165,8 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
             cur.path = formatPath(cur.path);
             if (cur.from) cur.from = formatPath(cur.from);
 
+            if (cur.action === 'fork') cur.forkOf = util.toIdentifier(cur.value.origin);
+
             // format node updates
             if (cur.value) cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
             if (cur.oldValue) cur.oldValue = `${cur.oldValue.kind}:${formatRef(cur.oldValue.ref)}`;
@@ -169,6 +177,7 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
                 delete cur.values;
                 delete cur.oldValues;
             }
+
         });
     }
 
@@ -239,6 +248,70 @@ function mergeDeckRevisions(changeLog, deck) {
             } else {
                 mergedRec.action = 'revise';
             }
+            // push it forward
+            acc.push(mergedRec);
+            // and clear the stack
+            stack.length = 0;
+        }
+
+        // if `hold` has a value, then `cur` *IS* a revisioning record
+        // stack is empty by now, so we can just push it there
+        if (hold) {
+            stack.push(hold);
+        } else if (cur.op !== 'dummy') {
+            // we push the `cur` forward if it's not the dummy record
+            acc.push(cur);
+        }
+
+        return acc;
+
+    }, []);
+
+}
+
+function mergeDeckForks(changeLog, deck) {
+    let stack = [];
+    // we push a dummy op to make sure we merge any final revision chains left over in the stack
+    changeLog.push({ op: 'dummy' });
+
+    return changeLog.reduce((acc, cur) => {
+        let hold;
+        let firstRec = stack[0];
+
+        if (cur.action === 'fork') {
+            // this is a forking record
+
+            if (firstRec && cur.value.ref.id === deck.id) { 
+                // the stack is not empty, and we have a new chain starting
+                // we just keep the current record held for now
+                hold = cur;
+            } else {
+                // it's either a new chain and the stack is empty,
+                // or part of the one in the stack
+                // so keep it in stack for now and proceed to next record
+                stack.push(cur);
+                return acc;
+            }
+
+        }
+
+        // if we come this far, then we need to merge whatever the stack has
+        // because `cur` is not part of the revision chain
+        // (either not a revision record, or part of a new revision chain)
+
+        if (!_.isEmpty(stack)) {
+            // let's create the grouped revisioning thing
+            let [lastRec] = stack.slice(-1);
+            let mergedRec = {
+                op: firstRec.op,
+                path: firstRec.path,
+                value: firstRec.value,
+
+                timestamp: lastRec.timestamp,
+                user: lastRec.user,
+
+                action: 'fork',
+            };
             // push it forward
             acc.push(mergedRec);
             // and clear the stack

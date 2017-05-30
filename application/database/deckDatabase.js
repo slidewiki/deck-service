@@ -1679,7 +1679,7 @@ let self = module.exports = {
                             // we reverse the array to track the root first, then the children in order
                             async.eachSeries(new_decks.reverse(), (new_deck, done) => {
                                 // we track everything as rooted to the deck_id
-                                ChangeLog.trackDeckCreated(new_deck, rootDeckId).then(() => done());
+                                ChangeLog.trackDeckForked(new_deck, rootDeckId).then(() => done());
                             });
 
                             resolve({'root_deck': id_map[res.id], 'id_map': id_map});
