@@ -49,11 +49,16 @@ const ChangeLogRecord = {
     },
 
     createNodeInsert: function(after, index, path) {
+        if (!_.isEmpty(path) && _.isNumber(index)) path = path.concat({ index });
+
+        // we set this to zero because the value will be the first item in after
+        if (!_.isNumber(index)) index = 0;
+
         // we keep the added value and its index
         return {
             op: 'add',
 
-            path: path.concat({ index }),
+            path: path,
             value: after[index],
 
             timestamp: (new Date()).toISOString(),
@@ -260,27 +265,7 @@ let self = module.exports = {
                     // add user for all changes
                     deckChanges.forEach((c) => { c.user = user; });
 
-                    return fillSlideInfo(deckChanges).then(fillDeckInfo).then(() => {
-                        // TODO remove this
-                        // console.log('deck changed: ' + JSON.stringify(deckChanges));
-
-                        // do some validation 
-                        let errors = _.compact(deckChanges.map((c) => {
-                            if (changeModel.validate(c)) return;
-                            return changeModel.validate.errors;
-                        }));
-
-                        // TODO enable validation
-                        // if (!_.isEmpty(errors)) throw errors;
-                        if (!_.isEmpty(errors)) {
-                            console.warn(errors);
-                        }
-
-                        return helper.connectToDatabase()
-                        .then((db) => db.collection('deckchanges'))
-                        .then((col) => col.insert(deckChanges));
-
-                    });
+                    return saveDeckChanges(deckChanges);
 
                 }).catch((err) => {
                     console.warn(err);
@@ -292,7 +277,89 @@ let self = module.exports = {
 
     },
 
+    // we create a change log record for deck creation as well
+    trackDeckCreated: function(newDeck, rootDeckId) {
+        // userId is the new deck creator
+        let userId = newDeck.user;
+
+        // latest should be the only one but let's be defensive
+        const [revision] = newDeck.revisions.slice(-1);
+        const deckNode = {
+            kind: 'deck',
+            ref: {
+                id: newDeck._id,
+                revision: revision.id,
+            },
+        };
+
+        const deckId = util.toIdentifier(deckNode.ref);
+
+        // TODO avoid this circular reference
+        const deckDB = require('../database/deckDatabase');
+
+        return deckDB.findPath(rootDeckId, deckId).then((path) => {
+            // path could be empty (?)
+            if (rootDeckId && _.isEmpty(path)) {
+                // this means we couldn't find the deck in the path
+                // it's probably a bug, but let's ignore it here
+                console.warn(`tried to track add new deck ${deckId} but root deck ${rootDeckId} was invalid`);
+                return;
+            }
+
+            let logRecord;
+            if (_.isEmpty(path) || path.length === 1) {
+                // means the deck is added as root, so no path, no index
+                logRecord = ChangeLogRecord.createNodeInsert([deckNode]);
+            } else {
+                // means the deck is created and inserted to a parent
+
+                // we need to remove the last part of the path for the record
+                let [leaf] = path.splice(-1);
+                // the index where we inserted it is in the last path part, which should be same as deckId
+                let after = []; // sparse array to accomodate createNodeInsert API
+                after[leaf.index] = { kind: 'deck', ref: _.pick(leaf, 'id', 'revision') };
+
+                logRecord = ChangeLogRecord.createNodeInsert(after, leaf.index, path);
+            }
+            // add the user!
+            logRecord.user = userId;
+
+            return saveDeckChanges([logRecord]);
+
+        }).catch((err) => {
+            console.warn(err);
+        });
+
+    },
+
 };
+
+
+
+// should be called right after all changes are made, and before saving the deck object
+// `updatedDeck` is optional, for code that applies changes on a new deck object
+function saveDeckChanges(deckChanges, userId) {
+    return fillSlideInfo(deckChanges).then(fillDeckInfo).then(() => {
+        // TODO remove this
+        // console.log('deck changed: ' + JSON.stringify(deckChanges));
+
+        // do some validation 
+        let errors = _.compact(deckChanges.map((c) => {
+            if (changeModel.validate(c)) return;
+            return changeModel.validate.errors;
+        }));
+
+        // TODO enable validation
+        // if (!_.isEmpty(errors)) throw errors;
+        if (!_.isEmpty(errors)) {
+            console.warn(errors);
+        }
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('deckchanges'))
+        .then((col) => col.insert(deckChanges));
+    });
+}
 
 function fillSlideInfo(deckChanges) {
     // TODO avoid this circular reference

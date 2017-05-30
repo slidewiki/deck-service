@@ -231,27 +231,27 @@ let self = module.exports = {
         return helper.connectToDatabase()
         .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
         .then((newId) => {
-            return helper.connectToDatabase()
-            .then((db2) => db2.collection('decks'))
+            return helper.getCollection('decks')
             .then((col) => {
-                let valid = false;
                 deck._id = newId;
+
                 if(typeof deck.root_deck === 'undefined'){
                     deck.root_deck = null;
                 }
 
-                try {
-                    const convertedDeck = convertToNewDeck(deck);
-                    valid = validateDeck(convertedDeck);
-                    if (!valid) {
-                        throw validateDeck.errors;
-                    }
-
-                    return col.insertOne(convertedDeck);
-                } catch (e) {
-                    console.log('validation failed', e);
-                    throw e;
+                const convertedDeck = convertToNewDeck(deck);
+                if (!validateDeck(convertedDeck)) {
+                    throw validateDeck.errors;
                 }
+
+                return col.insertOne(convertedDeck).then((result) => {
+                    // the deck.root_deck means we are adding a subdeck to that deck
+                    if (!deck.root_deck) {
+                        // also track in change log, but only if it's not a subdeck
+                        ChangeLog.trackDeckCreated(convertedDeck);
+                    }
+                    return result;
+                });
             });
         });
     },
@@ -1670,6 +1670,15 @@ let self = module.exports = {
                         if (err2) {
                             reject(err2);
                         } else {
+                            // by now, new_decks has all the new decks
+                            let rootDeckId = id_map[res.id];
+                            // we need to add tracking for each sequentially, but otherwise it can be async
+                            // we reverse the array to track the root first, then the children in order
+                            async.eachSeries(new_decks.reverse(), (new_deck, done) => {
+                                // we track everything as rooted to the deck_id
+                                ChangeLog.trackDeckCreated(new_deck, rootDeckId).then(() => done());
+                            });
+
                             resolve({'root_deck': id_map[res.id], 'id_map': id_map});
                         }
                     });
