@@ -129,7 +129,7 @@ let self = module.exports = {
                             createThumbnail(content, newSlideId);
 
                             // update the content item of the parent deck with the new revision id
-                            return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', request.payload.top_root_deck, userId)
+                            return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
                             .then(() => {
                                 reply(newSlide);
                             });
@@ -328,23 +328,30 @@ let self = module.exports = {
 
     getDeckRevisions: function(request, reply) {
         let deckId = request.params.id; // it should already be a number
+
         deckDB.get(deckId).then((deck) => {
-            if (!deck) return reply(boom.notFound());
+            if (!deck) return boom.notFound();
 
-            reply(deck.revisions.reverse().map((rev, index, list) => {
-                if (!rev.lastUpdate) {
-                    // fill in missing lastUpdate from next revision
-                    let nextRev = list[index + 1];
-                    rev.lastUpdate = (nextRev && nextRev.timestamp) || deck.lastUpdate;
-                }
+            return deckDB.getChangesCounts(deckId).then((changesCounts) => {
+                return deck.revisions.reverse().map((rev, index, list) => {
+                    if (!rev.lastUpdate) {
+                        // fill in missing lastUpdate from next revision
+                        let nextRev = list[index + 1];
+                        rev.lastUpdate = (nextRev && nextRev.timestamp) || deck.lastUpdate;
+                    }
 
-                // keep only deck data
-                delete rev.contentItems;
-                delete rev.usage;
+                    // keep only deck data
+                    delete rev.contentItems;
+                    delete rev.usage;
 
-                return rev;
-            }));
+                    // normalize missing counts to 0
+                    rev.changesCount = changesCounts[rev.id] || 0;
 
+                    return rev;
+                });
+            });
+        }).then((response) => {
+            reply(response);
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());

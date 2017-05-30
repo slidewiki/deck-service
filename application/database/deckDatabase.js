@@ -717,7 +717,7 @@ let self = module.exports = {
                 if (!parentDeck) return updatedDeck;
 
                 // update parent deck first before returning
-                return self.updateContentItem(updatedDeck, '', util.toIdentifier(parentDeck), 'deck', rootDeckId, userId)
+                return self.updateContentItem(updatedDeck, '', util.toIdentifier(parentDeck), 'deck', userId, rootDeckId)
                 .then(() => updatedDeck);
             });
 
@@ -1054,7 +1054,7 @@ let self = module.exports = {
     },
 
     //updates an existing content item's revision
-    updateContentItem: function(citem, revertedRevId, root_deck, ckind, top_root_deck, user){ //can be used for reverting or updating
+    updateContentItem: function(citem, revertedRevId, root_deck, ckind, user, top_root_deck){ //can be used for reverting or updating
         let rootArray = root_deck.split('-');
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
@@ -1902,6 +1902,69 @@ let self = module.exports = {
                     { $sort: { timestamp: 1 } },
                 ]);
             }).then((result) => result.toArray());
+        });
+
+    },
+
+    // returns change log record counts for all revisions of deck
+    getChangesCounts: function(deckId) {
+        let deck = util.parseIdentifier(deckId);
+        return helper.getCollection('deckchanges').then((changes) => {
+            let valueQuery = {
+            };
+
+            return changes.aggregate([
+                // primary filter
+                { $match: {
+                    $or: [
+                        { 'path.id': deck.id },
+                        {
+                            'value.kind': 'deck',
+                            'value.ref.id': deck.id,
+                        },
+                    ]
+                } },
+                { $unwind: { path: '$path', 'preserveNullAndEmptyArrays': true } },
+                // secondary filter (same as primary)
+                { $match: {
+                    $or: [
+                        { 'path.id': deck.id },
+                        {
+                            'value.kind': 'deck',
+                            'value.ref.id': deck.id,
+                        },
+                    ]
+                } },
+                // selection
+                { $project: {
+                    target: {
+                        $cond: {
+                            if: { $eq: ['$path.id', deck.id] },
+                            then: '$path',
+                            else: '$value.ref',
+                        }
+                    }
+                } },
+                { $group: {
+                    _id: '$target.revision',
+                    'changesCount': { $sum: 1 },
+                } },
+            ]);
+
+        }).then((cursor) => {
+            return new Promise((resolve, reject) => {
+                let result = {};
+                cursor.forEach((doc) => {
+                    // console.log(doc);
+                    result[doc._id] = doc.changesCount;
+                }, (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(result);
+                    }
+                });
+            });
         });
 
     },
