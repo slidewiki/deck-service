@@ -1632,6 +1632,9 @@ let self = module.exports = {
                                 copiedDeck.revisions[0].timestamp = timestamp;
                                 copiedDeck.revisions[0].lastUpdate = timestamp;
 
+                                // this points to the same deck, needs to be removed in forked decks
+                                delete copiedDeck.revisions[0].originRevision;
+
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
                                         if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
