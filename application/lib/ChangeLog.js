@@ -431,7 +431,7 @@ function fillDeckInfo(deckChanges) {
                     rec.value.ref.title = after.title;
 
                     // check for fork information in add ops
-                    let origin = rec.action === 'fork' && deck.origin && _.pick(deck.origin, 'id', 'revision');
+                    let origin = rec.action === 'fork' && deck.origin;
                     if (origin) {
                         rec.value.origin = origin;
                     }
