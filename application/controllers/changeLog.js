@@ -278,10 +278,10 @@ function mergeDeckForks(changeLog, deck) {
         let hold;
         let firstRec = stack[0];
 
-        if (cur.action === 'fork') {
+        if (['fork', 'attach'].includes(cur.action)) {
             // this is a forking record
 
-            if (firstRec && cur.value.ref.id === deck.id) { 
+            if (firstRec && firstRec.action === cur.action && cur.value.ref.id === deck.id) { 
                 // the stack is not empty, and we have a new chain starting
                 // we just keep the current record held for now
                 hold = cur;
@@ -310,7 +310,7 @@ function mergeDeckForks(changeLog, deck) {
                 timestamp: lastRec.timestamp,
                 user: lastRec.user,
 
-                action: 'fork',
+                action: firstRec.action,
             };
             // push it forward
             acc.push(mergedRec);

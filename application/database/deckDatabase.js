@@ -248,7 +248,7 @@ let self = module.exports = {
                     // the deck.root_deck means we are adding a subdeck to that deck
                     if (!deck.root_deck) {
                         // also track in change log, but only if it's not a subdeck
-                        ChangeLog.trackDeckCreated(convertedDeck);
+                        ChangeLog.trackDeckCreated(convertedDeck._id, convertedDeck.user);
                     }
                     return result;
                 });
@@ -831,10 +831,7 @@ let self = module.exports = {
     },
 
     //inserts a content item (slide or deck) into a deck at the specified position, or appends it at the end if no position is given
-    insertNewContentItem: function(citem, position, root_deck, ckind, citem_revision_id, top_root_deck, user){
-        // if top_root_deck is missing, root_deck is the top
-        if (!top_root_deck) top_root_deck = root_deck;
-
+    insertNewContentItem: function(citem, position, root_deck, ckind, citem_revision_id, user, top_root_deck){
         if(typeof citem_revision_id === 'undefined'){
             citem_revision_id = parseInt(1);
         }
@@ -853,7 +850,11 @@ let self = module.exports = {
                     activeRevisionId = root_deck_path[1];
                 }
 
-                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user);
+                let deckTracker;
+                if (top_root_deck) {
+                    // only track this when top_root_deck is provided
+                    deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user);
+                }
                 // copy edit rights from existingDeck to new
                 if (ckind === 'deck') {
                     let attachedDeckId = `${parseInt(citem.id)}-${citem_revision_id}`;
@@ -897,7 +898,7 @@ let self = module.exports = {
                     citems.splice(position-1, 0, newCitem);
                     existingDeck.revisions[activeRevisionId-1].contentItems = citems;
 
-                    deckTracker.applyChangeLog();
+                    if (deckTracker) deckTracker.applyChangeLog();
 
                     col.save(existingDeck);
                 }
@@ -916,7 +917,7 @@ let self = module.exports = {
                     citems.push(newCitem);
                     existingDeck.revisions[activeRevisionId-1].contentItems = citems;
 
-                    deckTracker.applyChangeLog();
+                    if (deckTracker) deckTracker.applyChangeLog();
 
                     col.save(existingDeck);
 
@@ -1545,8 +1546,9 @@ let self = module.exports = {
 
     },
 
-    //forks a given deck revision by copying all of its sub-decks into new decks
-    forkDeckRevision(deck_id, user){
+    // forks a given deck revision by copying all of its sub-decks into new decks
+    // forAttach is true when forking is done during deck attach process
+    forkDeckRevision(deck_id, user, forAttach) {
 
         return self.getFlatDecksFromDB(deck_id)
         .then((res) => {
@@ -1673,20 +1675,28 @@ let self = module.exports = {
                         if (err2) {
                             reject(err2);
                         } else {
-                            // by now, new_decks has all the new decks
-                            let rootDeckId = id_map[res.id];
-                            // we need to add tracking for each sequentially, but otherwise it can be async
-                            // we reverse the array to track the root first, then the children in order
-                            async.eachSeries(new_decks.reverse(), (new_deck, done) => {
-                                // we track everything as rooted to the deck_id
-                                ChangeLog.trackDeckForked(new_deck, rootDeckId).then(() => done());
-                            });
+                            if (!forAttach) {
+                                // if not attaching, we need to track stuff here
+                                let rootDeckId = id_map[res.id];
+                                self._trackDecksForked(rootDeckId, id_map, user);
+                            }
 
                             resolve({'root_deck': id_map[res.id], 'id_map': id_map});
                         }
                     });
                 });
             });
+        });
+    },
+
+    // TODO make this actually private after code in handler.js has been moved here
+    _trackDecksForked(rootDeckId, forkIdsMap, userId, forAttach) {
+        // we reverse the array to track the root first, then the children in order
+        let newDeckIds = Object.keys(forkIdsMap).map((key) => forkIdsMap[key]).reverse();
+        // we need to add tracking for each sequentially, but otherwise it can be async
+        async.eachSeries(newDeckIds, (newDeckId, done) => {
+            // we track everything as rooted to the deck_id
+            ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, forAttach).then(() => done());
         });
     },
 

@@ -278,26 +278,17 @@ let self = module.exports = {
     },
 
     // we create a change log record for deck creation as well
-    trackDeckCreated: function(newDeck, rootDeckId, action) {
-        // userId is the new deck creator
-        let userId = newDeck.user;
+    trackDeckCreated: function(deckId, userId, rootDeckId, action) {
+        userId = parseInt(userId);
 
-        // latest should be the only one but let's be defensive
-        const [revision] = newDeck.revisions.slice(-1);
-        const deckNode = {
+        let deckNode = {
             kind: 'deck',
-            ref: {
-                id: newDeck._id,
-                revision: revision.id,
-            },
+            ref: { id: parseInt(deckId), revision: 1 },
         };
-
-        const deckId = util.toIdentifier(deckNode.ref);
 
         // TODO avoid this circular reference
         const deckDB = require('../database/deckDatabase');
-
-        return deckDB.findPath(rootDeckId, deckId).then((path) => {
+        return deckDB.findPath(rootDeckId, util.toIdentifier(deckNode.ref)).then((path) => {
             // path could be empty (?)
             if (rootDeckId && _.isEmpty(path)) {
                 // this means we couldn't find the deck in the path
@@ -336,8 +327,11 @@ let self = module.exports = {
     },
 
     // we create a change log record for deck creation as well
-    trackDeckForked: function(newDeck, rootDeckId) {
-        return self.trackDeckCreated(newDeck, rootDeckId, 'fork');
+    trackDeckForked: function(deckId, userId, rootDeckId, forAttach) {
+        return self.trackDeckCreated(deckId, userId, rootDeckId, forAttach ? 'attach' : 'fork')
+        .catch((err) => {
+            console.warn(err);
+        });
     },
 
 };
@@ -431,7 +425,7 @@ function fillDeckInfo(deckChanges) {
                     rec.value.ref.title = after.title;
 
                     // check for fork information in add ops
-                    let origin = rec.action === 'fork' && deck.origin;
+                    let origin = ['fork', 'attach'].includes(rec.action) && deck.origin;
                     if (origin) {
                         rec.value.origin = origin;
                     }

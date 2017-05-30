@@ -17,6 +17,9 @@ const boom = require('boom'),
     async = require('async'),
     Microservices = require('../configs/microservices');
 
+// TODO remove this from here after we've refactored all database-specific code into slide/deck database js files
+const ChangeLog = require('../lib/ChangeLog');
+
 const userService = require('../services/user');
 
 const tagService = require('../services/tag');
@@ -395,7 +398,7 @@ let self = module.exports = {
                     //update the content items of the new deck to contain the new slide
                     // top root is the root_deck if missing from payload
                     let top_root_deck = request.payload.top_root_deck || newSlide.root_deck;
-                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, top_root_deck, newSlide.user)
+                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, newSlide.user, top_root_deck)
                     .then(() => {
                         reply(co.rewriteID(inserted.ops[0]));
                     });
@@ -621,7 +624,7 @@ let self = module.exports = {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, top_root_deck, userId);
+                            deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck);
                             reply(node);
                         }).catch((err) => {
                             request.log('error', err);
@@ -634,7 +637,7 @@ let self = module.exports = {
 
                         { // these brackets are kept during handleChange removal to keep git blame under control
 
-                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, top_root_deck, userId);
+                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck);
                             node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
                             slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
 
@@ -706,7 +709,7 @@ let self = module.exports = {
                             if (createdSlide.isBoom) return reply(createdSlide);
 
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, top_root_deck, userId);
+                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck);
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             reply(node);
                         });
@@ -756,7 +759,7 @@ let self = module.exports = {
                                 parentID = request.payload.selector.id;
                             }
 
-                            deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, top_root_deck, userId);
+                            deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId, top_root_deck);
                             deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             self.getDeckTree({
@@ -771,10 +774,9 @@ let self = module.exports = {
                     });
                 }
                 else{
-                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, request.payload.user).then((id_map) => {
-                        //console.log('id_map', id_map);
-                        //console.log('request payload before', request.payload);
-                        request.payload.nodeSpec.id = id_map.id_map[request.payload.nodeSpec.id];
+                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, request.payload.user, true).then((forkResult) => {
+                        // get the new deck we are going to attach
+                        request.payload.nodeSpec.id = forkResult.id_map[request.payload.nodeSpec.id];
 
                         deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
                         self.getDeck({
@@ -793,8 +795,16 @@ let self = module.exports = {
                                     parentID = request.payload.selector.id;
                                 }
 
-                                deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, top_root_deck, userId);
+                                // omitting the top_root_deck means this change won't be tracked,
+                                // as it will be tracked right after this code, we just need to attach 
+                                // first so that the rest of the tracking will work
+                                deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
+                                    // track all created forks AFTER it's attached
+                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, true);
+                                });
+
                                 deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
+
                                 //we have to return from the callback, else empty node is returned because it is updated asynchronously
                                 self.getDeckTree({
                                     'params': {'id' : deck.id},
@@ -806,7 +816,7 @@ let self = module.exports = {
                                 });
                             }
                         });
-                        //reply(id_map);
+
                     }).catch((err) => {
                         request.log('error', err);
                         reply(boom.badImplementation());
@@ -863,7 +873,7 @@ let self = module.exports = {
                             if (createdDeck.isBoom) return reply(createdDeck);
                             //if there is a parent deck, update its content items
                             if(typeof parentID !== 'undefined')
-                                deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck', 1, top_root_deck, userId);
+                                deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck', 1, userId, top_root_deck);
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             self.getDeckTree({
                                 'params': {'id' : createdDeck.id},
