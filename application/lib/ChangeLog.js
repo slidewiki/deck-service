@@ -89,7 +89,12 @@ const omitOrder = (item) => _.omit(item, 'order');
 
 let self = module.exports = {
 
-    deckTracker: function(deck, rootDeckId, user) {
+    deckTracker: function(deck, rootDeckId, user, parentOperations=[]) {
+        // parentOperations is an array of deck change records that includes
+        // any change records that act as a source for the operation we are currently tracking
+        // those for now are really only one deck change
+        // the one that started either of the actions: revise, revert, fork, or attach!
+
         // user is integer
         if (user) user = parseInt(user);
 
@@ -256,19 +261,27 @@ let self = module.exports = {
             // should be called right after all changes are made, and before saving the deck object
             // `updatedDeck` is optional, for code that applies changes on a new deck object
             applyChangeLog: function(updatedDeck) {
-                this.getChangeLog(updatedDeck).then((deckChanges) => {
+                return this.getChangeLog(updatedDeck).then((deckChanges) => {
                     if (_.isEmpty(deckChanges)) {
                         // console.warn('WARNING: no deck changes detected as was expected');
-                        return;
+                        return deckChanges;
                     }
 
-                    // add user for all changes
-                    deckChanges.forEach((c) => { c.user = user; });
+                    let parentOpIds = parentOperations.map((op) => op._id);
+                    deckChanges.forEach((c) => {
+                        // add user for all changes
+                        c.user = user;
+                        // add parent operations for all changes
+                        if (parentOpIds.length) {
+                            c.parents = parentOpIds;
+                        }
+                    });
 
                     return saveDeckChanges(deckChanges);
 
                 }).catch((err) => {
                     console.warn(err);
+                    return [];
                 });
 
             },
@@ -278,7 +291,7 @@ let self = module.exports = {
     },
 
     // we create a change log record for deck creation as well
-    trackDeckCreated: function(deckId, userId, rootDeckId, action) {
+    trackDeckCreated: function(deckId, userId, rootDeckId, parentOperations=[], action) {
         userId = parseInt(userId);
 
         let deckNode = {
@@ -315,6 +328,12 @@ let self = module.exports = {
             // add the user!
             logRecord.user = userId;
 
+            // add the parent ops!
+            let parentOpIds = parentOperations.map((op) => op._id);
+            if (parentOpIds.length) {
+                logRecord.parents = parentOpIds;
+            }
+
             // add the action!
             if (action) logRecord.action = action;
 
@@ -322,15 +341,17 @@ let self = module.exports = {
 
         }).catch((err) => {
             console.warn(err);
+            return [];
         });
 
     },
 
     // we create a change log record for deck creation as well
-    trackDeckForked: function(deckId, userId, rootDeckId, forAttach) {
-        return self.trackDeckCreated(deckId, userId, rootDeckId, forAttach ? 'attach' : 'fork')
+    trackDeckForked: function(deckId, userId, rootDeckId, parentOperations, forAttach) {
+        return self.trackDeckCreated(deckId, userId, rootDeckId, parentOperations, forAttach ? 'attach' : 'fork')
         .catch((err) => {
             console.warn(err);
+            return [];
         });
     },
 
@@ -359,7 +380,8 @@ function saveDeckChanges(deckChanges, userId) {
 
         return helper.connectToDatabase()
         .then((db) => db.collection('deckchanges'))
-        .then((col) => col.insert(deckChanges));
+        .then((col) => col.insert(deckChanges))
+        .then(() => deckChanges);
     });
 }
 

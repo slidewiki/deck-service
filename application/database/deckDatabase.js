@@ -559,7 +559,7 @@ let self = module.exports = {
     },
 
     // simpler implementation of replace that does not update anything, just creates the revision
-    revise: function(deckId, path, userId) {
+    revise: function(deckId, path, userId, parentOperations=[]) {
         userId = parseInt(userId);
 
         let deck = util.parseIdentifier(deckId);
@@ -585,7 +585,7 @@ let self = module.exports = {
             if (!originRevision) return;
 
             // start tracking
-            let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId);
+            let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId, parentOperations);
 
             let newRevision = _.cloneDeep(originRevision);
             // get the next revision id
@@ -712,13 +712,19 @@ let self = module.exports = {
                 // return col.save(existingDeck).then(() => existingDeck);
             }).then((updatedDeck) => {
                 // complete the tracking after revision (it may be nothing)
-                deckTracker.applyChangeLog(updatedDeck);
+                return deckTracker.applyChangeLog(updatedDeck).then((deckChanges) => {
+                    // deckChanges may be nothing if an error occured
 
-                if (!parentDeck) return updatedDeck;
+                    if (!parentDeck) return [updatedDeck, deckChanges];
 
-                // update parent deck first before returning
-                return self.updateContentItem(updatedDeck, '', util.toIdentifier(parentDeck), 'deck', userId, rootDeckId)
-                .then(() => updatedDeck);
+                    // update parent deck first before returning
+                    return self.updateContentItem(updatedDeck, '', util.toIdentifier(parentDeck), 'deck', userId, rootDeckId, parentOperations)
+                    .then(({deckChanges: moreDeckChanges}) => {
+                        return [updatedDeck, deckChanges.concat(moreDeckChanges)];
+                    });
+
+                });
+
             });
 
         });
@@ -726,12 +732,13 @@ let self = module.exports = {
     },
 
     // this is what we use to create a new revision, we need to do this recursively in the deck tree
-    deepRevise: function(path, userId) {
+    // `parentOperations` is set internally, external code should leave it undefined
+    deepRevise: function(path, userId, parentOperations=[]) {
         // we revise the end of the path
         let [deck] = path.slice(-1);
 
-        return self.revise(util.toIdentifier(deck), path, userId)
-        .then((updatedDeck) => {
+        return self.revise(util.toIdentifier(deck), path, userId, parentOperations)
+        .then(([updatedDeck, deckChanges]) => {
             if (!updatedDeck) return;
 
             let [revision] = updatedDeck.revisions.slice(-1);
@@ -746,7 +753,7 @@ let self = module.exports = {
 
             return new Promise((resolve, reject) => {
                 async.eachSeries(subPaths, (subPath, done) => {
-                    self.deepRevise(subPath, userId)
+                    self.deepRevise(subPath, userId, parentOperations.concat(deckChanges))
                     .then(() => done()).catch(done);
                 }, (err) => {
                     if (err) {
@@ -760,7 +767,7 @@ let self = module.exports = {
     },
 
     // reverts a deck an to older revision
-    revert: function(deckId, revisionId, path, userId) {
+    revert: function(deckId, revisionId, path, userId, parentOperations=[]) {
         let deck = {
             id: parseInt(deckId),
             revision: parseInt(revisionId),
@@ -785,19 +792,20 @@ let self = module.exports = {
             //     return existingDeck;
             // };
 
-            return self.revise(util.toIdentifier(deck), path, userId);
+            return self.revise(util.toIdentifier(deck), path, userId, parentOperations);
         });
 
     },
 
     // this is what we use to revert to a revision, we need to do this recursively in the deck tree
-    deepRevert: function(path, revisionId, userId) {
+    // `parentOperations` is set internally, external code should leave it undefined
+    deepRevert: function(path, revisionId, userId, parentOperations=[]) {
         // we revert the end of the path
         let [deck] = path.slice(-1);
 
         // deck points to the latest revision, but we revert to revisionId
-        return self.revert(deck.id, revisionId, path, userId)
-        .then((updatedDeck) => {
+        return self.revert(deck.id, revisionId, path, userId, parentOperations)
+        .then(([updatedDeck, deckChanges]) => {
             if (!updatedDeck) return;
 
             let [revision] = updatedDeck.revisions.slice(-1);
@@ -817,7 +825,7 @@ let self = module.exports = {
                     // so we need to revert the subdeck as well to that revision
                     let [subDeck] = subPath.slice(-1);
 
-                    self.deepRevert(subPath, subDeck.revision, userId)
+                    self.deepRevert(subPath, subDeck.revision, userId, parentOperations.concat(deckChanges))
                     .then(() => done()).catch(done);
                 }, (err) => {
                     if (err) {
@@ -1054,11 +1062,11 @@ let self = module.exports = {
         }
     },
 
-    //updates an existing content item's revision
-    updateContentItem: function(citem, revertedRevId, root_deck, ckind, user, top_root_deck){ //can be used for reverting or updating
+    // updates an existing content item's revision
+    // can be used for reverting or updating
+    updateContentItem: function(citem, revertedRevId, root_deck, ckind, user, top_root_deck, parentOperations) {
         let rootArray = root_deck.split('-');
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
+        return helper.getCollection('decks')
         .then((col) => {
             return col.findOne({_id: parseInt(rootArray[0])})
             .then((existingDeck) => {
@@ -1073,7 +1081,7 @@ let self = module.exports = {
                 let old_rev_id = rootArray[1];
 
                 // pre-compute what the for loop does
-                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user, parentOperations);
 
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
@@ -1088,7 +1096,7 @@ let self = module.exports = {
                     }
                     else continue;
                 }
-                deckTracker.applyChangeLog();
+
                 if(existingDeck.hasOwnProperty('contributors')){
                     let revIndex = 0;
                     if(citem.revisions.length > 1){
@@ -1103,8 +1111,16 @@ let self = module.exports = {
                     }
                     existingDeck.contributors = contributors;
                 }
-                col.save(existingDeck);
-                return {'old_revision': old_rev_id, 'new_revision': newRevId};
+
+                return col.save(existingDeck)
+                .then(() => deckTracker.applyChangeLog())
+                .then((deckChanges) => {
+                    return {
+                        oldRevision: old_rev_id,
+                        newRrevision: newRevId,
+                        deckChanges: deckChanges,
+                    };
+                });
             });
         });
     },
@@ -1693,11 +1709,25 @@ let self = module.exports = {
     _trackDecksForked(rootDeckId, forkIdsMap, userId, forAttach) {
         // we reverse the array to track the root first, then the children in order
         let newDeckIds = Object.keys(forkIdsMap).map((key) => forkIdsMap[key]).reverse();
-        // we need to add tracking for each sequentially, but otherwise it can be async
-        async.eachSeries(newDeckIds, (newDeckId, done) => {
-            // we track everything as rooted to the deck_id
-            ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, forAttach).then(() => done());
-        });
+
+        let parentOperations = [];
+        // taken from https://stackoverflow.com/questions/30823653/is-node-js-native-promise-all-processing-in-parallel-or-sequentially/#30823708
+        // this starts with a promise that resolves to empty array,
+        // then takes each new deck id and applies the tracking and returns a new promise that resolves
+        // to the tracking results, that are picked up by the next iteration, etc...
+        return newDeckIds.reduce((p, newDeckId) => {
+            return p.then((deckChanges) => {
+                // if errored somewhere return nothing, chain will just end without doing the rest
+                if (!deckChanges) return;
+
+                // parent operations is only the ops for the forking of the first deck (the root of the fork tree)
+                // the first time this runs, deckChanges is empty!
+                if (_.isEmpty(parentOperations)) parentOperations.push(...deckChanges);
+                // we track everything as rooted to the deck_id
+                return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forAttach);
+            });
+        }, Promise.resolve([]));
+
     },
 
     getDeckForks(deckId, userId) {
@@ -1944,38 +1974,38 @@ let self = module.exports = {
                         },
                     ]
                 } },
-                { $unwind: { path: '$path', 'preserveNullAndEmptyArrays': true } },
-                // secondary filter (same as primary)
-                { $match: {
-                    $or: [
-                        { 'path.id': deck.id },
-                        {
-                            'value.kind': 'deck',
-                            'value.ref.id': deck.id,
-                        },
-                    ]
-                } },
                 // selection
                 { $project: {
+                    opgroup: {
+                        $ifNull: [ { $arrayElemAt: ['$parents', 0] }, '$_id' ],
+                    },
                     target: {
                         $cond: {
-                            if: { $eq: ['$path.id', deck.id] },
-                            then: '$path',
-                            else: '$value.ref',
+                            if: { $eq: ['$value.ref.id', deck.id] },
+                            then: '$value.ref',
+                            else: '$path',
                         }
                     }
                 } },
+                { $unwind: '$target' },
+                // secondary filter
+                { $match: { 'target.id': deck.id } },
+                // first grouping, gets rid of groups
                 { $group: {
-                    _id: '$target.revision',
+                    _id: { revision: '$target.revision', opgroup: '$opgroup' },
+                } },
+                // second grouping, counts groups
+                { $group: {
+                    _id: '$_id.revision',
                     'changesCount': { $sum: 1 },
                 } },
+
             ]);
 
         }).then((cursor) => {
             return new Promise((resolve, reject) => {
                 let result = {};
                 cursor.forEach((doc) => {
-                    // console.log(doc);
                     result[doc._id] = doc.changesCount;
                 }, (err) => {
                     if (err) {

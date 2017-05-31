@@ -231,7 +231,7 @@ let self = module.exports = {
             return deckDB.updateContentItem(slide, revisionId, parentDeckId, 'slide', userId, rootDeckId)
             .then((updatedIds) => {
                 // make old slide id canonical
-                let oldSlideId = util.toIdentifier({ id: slideId, revision: parseInt(updatedIds.old_revision) });
+                let oldSlideId = util.toIdentifier({ id: slideId, revision: parseInt(updatedIds.oldRevision) });
 
                 //update the usage of the reverted slide to point to the parent deck before returning
                 return self.updateUsage(oldSlideId, revisionId, parentDeckId)
