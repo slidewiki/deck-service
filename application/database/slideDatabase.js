@@ -128,6 +128,7 @@ let self = module.exports = {
                 else{
                     revisionCopied.parent = slide.parent;
                 }
+                revisionCopied.usage = [];
                 revisionCopied.comment = slide.comment;
                 revisionCopied.id = 1;
                 revisionCopied.timestamp = timestamp;
