@@ -839,7 +839,7 @@ let self = module.exports = {
     },
 
     //inserts a content item (slide or deck) into a deck at the specified position, or appends it at the end if no position is given
-    insertNewContentItem: function(citem, position, root_deck, ckind, citem_revision_id, user, top_root_deck){
+    insertNewContentItem: function(citem, position, root_deck, ckind, citem_revision_id, user, top_root_deck, action) {
         if(typeof citem_revision_id === 'undefined'){
             citem_revision_id = parseInt(1);
         }
@@ -861,7 +861,7 @@ let self = module.exports = {
                 let deckTracker;
                 if (top_root_deck) {
                     // only track this when top_root_deck is provided
-                    deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user);
+                    deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user, [], action);
                 }
                 // copy edit rights from existingDeck to new
                 if (ckind === 'deck') {

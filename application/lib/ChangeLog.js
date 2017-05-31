@@ -89,7 +89,7 @@ const omitOrder = (item) => _.omit(item, 'order');
 
 let self = module.exports = {
 
-    deckTracker: function(deck, rootDeckId, user, parentOperations=[]) {
+    deckTracker: function(deck, rootDeckId, user, parentOperations=[], addAction) {
         // parentOperations is an array of deck change records that includes
         // any change records that act as a source for the operation we are currently tracking
         // those for now are really only one deck change
@@ -275,6 +275,11 @@ let self = module.exports = {
                         if (parentOpIds.length) {
                             c.parents = parentOpIds;
                         }
+                        // check addAction content flag
+                        if (c.op === 'add' && addAction) {
+                            c.action = addAction;
+                        }
+
                     });
 
                     return saveDeckChanges(deckChanges);
@@ -399,6 +404,14 @@ function fillSlideInfo(deckChanges) {
 
                 let after = slide.revisions.find((r) => r.id === rec.value.ref.revision);
                 rec.value.ref.title = after.title;
+
+                // check for copy information in add ops
+                let origin = ['copy', 'attach'].includes(rec.action) && after.parent;
+                if (origin) {
+                    // it's slides, and the parent's title hasn't changed
+                    origin.title = after.title;
+                    rec.value.origin = origin;
+                }
 
                 if (rec.oldValue) {
                     let before = slide.revisions.find((r) => r.id === rec.oldValue.ref.revision);
