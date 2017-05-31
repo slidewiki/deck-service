@@ -540,7 +540,7 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/slide/revert/{id}',
-        handler: handlers.revertSlideRevisionWithCheck,
+        handler: handlers.revertSlideRevision,
         config: {
             validate: {
                 params: {
@@ -550,7 +550,7 @@ module.exports = function(server) {
                     revision_id: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string(),
                     top_root_deck: Joi.string(),
-                }).requiredKeys('revision_id', 'root_deck', 'top_root_deck'),
+                }).requiredKeys('revision_id', 'top_root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),

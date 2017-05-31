@@ -17,6 +17,9 @@ const boom = require('boom'),
     async = require('async'),
     Microservices = require('../configs/microservices');
 
+// TODO remove this from here after we've refactored all database-specific code into slide/deck database js files
+const ChangeLog = require('../lib/ChangeLog');
+
 const userService = require('../services/user');
 
 const tagService = require('../services/tag');
@@ -129,7 +132,7 @@ let self = module.exports = {
                             createThumbnail(content, newSlideId);
 
                             // update the content item of the parent deck with the new revision id
-                            return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', request.payload.top_root_deck, userId)
+                            return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
                             .then(() => {
                                 reply(newSlide);
                             });
@@ -147,50 +150,45 @@ let self = module.exports = {
 
     },
 
-    //reverts a slide to a previous revision, w.r.t. a parent deck
+    // reverts a slide to a previous revision, w.r.t. a parent deck
     revertSlideRevision: function(request, reply) {
-        let userId = request.payload.user;
+        let slideId = request.params.id;
+        slideDB.exists(slideId).then((exists) => {
+            if (!exists) return boom.notFound();
 
-        slideDB.get(encodeURIComponent(request.params.id.split('-')[0]), request.payload).then((slide) => {
-            if (co.isEmpty(slide))
-                throw slide;
-            else{
-                let revision_id = parseInt(request.payload.revision_id);
-                //update the content items of the root deck to reflect the slide revert
-                return deckDB.updateContentItem(slide, revision_id, request.payload.root_deck, 'slide', request.payload.top_root_deck, userId)
-                .then((updatedIds) => {
-                    let fullId = request.params.id;
-                    if(fullId.split('-').length < 2){
-                        fullId += '-'+updatedIds.old_revision;
-                    }
-                    //update the usage of the reverted slide to point to the root deck
-                    return slideDB.updateUsage(fullId, revision_id, request.payload.root_deck).then((updatedSlide) => {
-                        let revisionArray = [updatedSlide.revisions[revision_id-1]];
-                        updatedSlide.revisions = revisionArray;
-                        reply(updatedSlide);
+            let rootDeckId = request.payload.top_root_deck;
+            // we need to find the parent from the path!
+            return deckDB.findPath(rootDeckId, slideId, 'slide').then((path) => {
+                // could not find path due to bad payload
+                if (!path || !path.length) return boom.badData(`could not find slide: ${slideId} in deck tree: ${rootDeckId} `);
+
+                // the parent of the slide is the second to last item of the path
+                // path has at least length 2, guaranteed
+                let [parentDeck] = path.slice(-2, -1);
+                let parentDeckId = util.toIdentifier(parentDeck);
+
+                let userId = request.auth.credentials.userid;
+                return authorizeUser(userId, parentDeckId, rootDeckId).then((boomError) => {
+                    if (boomError) return boomError;
+
+                    let slide = util.parseIdentifier(slideId);
+                    let revisionId = parseInt(request.payload.revision_id);
+                    return slideDB.revert(slide.id, revisionId, path, userId).then((updatedSlide) => {
+                        // if revert returns nothing, it's not because of 404, but no path was found!
+                        if (!updatedSlide) return boom.badData(`unknown revision id: ${revisionId} for slide: ${slideId}`);
+
+                        // keep only the new slide revision in revisions array for response
+                        let slideRevision = updatedSlide.revisions.find((r) => r.id === revisionId);
+                        updatedSlide.revisions = [slideRevision];
+                        return updatedSlide;
                     });
+
                 });
-            }
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
-        });
-    },
 
-    // HACK added this to do the checking and keep original handler intact
-    revertSlideRevisionWithCheck: function(request, reply) {
-        let userId = request.auth.credentials.userid;
+            });
 
-        let parentDeckId = request.payload.root_deck;
-        let rootDeckId = request.payload.top_root_deck;
-
-        authorizeUser(userId, parentDeckId, rootDeckId).then((boom) => {
-            if (boom) return reply(boom);
-
-            request.payload.user = userId;
-
-            // continue as normal
-            self.revertSlideRevision(request, reply);
+        }).then((response) => {
+            reply(response);
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
@@ -333,23 +331,30 @@ let self = module.exports = {
 
     getDeckRevisions: function(request, reply) {
         let deckId = request.params.id; // it should already be a number
+
         deckDB.get(deckId).then((deck) => {
-            if (!deck) return reply(boom.notFound());
+            if (!deck) return boom.notFound();
 
-            reply(deck.revisions.reverse().map((rev, index, list) => {
-                if (!rev.lastUpdate) {
-                    // fill in missing lastUpdate from next revision
-                    let nextRev = list[index + 1];
-                    rev.lastUpdate = (nextRev && nextRev.timestamp) || deck.lastUpdate;
-                }
+            return deckDB.getChangesCounts(deckId).then((changesCounts) => {
+                return deck.revisions.reverse().map((rev, index, list) => {
+                    if (!rev.lastUpdate) {
+                        // fill in missing lastUpdate from next revision
+                        let nextRev = list[index + 1];
+                        rev.lastUpdate = (nextRev && nextRev.timestamp) || deck.lastUpdate;
+                    }
 
-                // keep only deck data
-                delete rev.contentItems;
-                delete rev.usage;
+                    // keep only deck data
+                    delete rev.contentItems;
+                    delete rev.usage;
 
-                return rev;
-            }));
+                    // normalize missing counts to 0
+                    rev.changesCount = changesCounts[rev.id] || 0;
 
+                    return rev;
+                });
+            });
+        }).then((response) => {
+            reply(response);
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
@@ -393,7 +398,7 @@ let self = module.exports = {
                     //update the content items of the new deck to contain the new slide
                     // top root is the root_deck if missing from payload
                     let top_root_deck = request.payload.top_root_deck || newSlide.root_deck;
-                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, top_root_deck, newSlide.user)
+                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, newSlide.user, top_root_deck)
                     .then(() => {
                         reply(co.rewriteID(inserted.ops[0]));
                     });
@@ -516,10 +521,7 @@ let self = module.exports = {
             // authorizeUser returns nothing if all's ok
             if (boom) return boom;
 
-            // continue as normal
-            let parentDeckId = request.payload.root_deck;
-
-            return deckDB.createDeckRevision(deckId, userId, parentDeckId, rootDeckId);
+            return deckDB.createDeckRevision(deckId, userId, rootDeckId);
         }).then((response) => {
             // response is either the new deck revision or boom
             reply(response);
@@ -543,9 +545,8 @@ let self = module.exports = {
 
             // continue as normal
             let revisionId = request.payload.revision_id;
-            let parentDeckId = request.payload.root_deck;
 
-            return deckDB.revertDeckRevision(deckId, revisionId, userId, parentDeckId, rootDeckId);
+            return deckDB.revertDeckRevision(deckId, revisionId, userId, rootDeckId);
         }).then((response) => {
             // by now it's not a 404, which means the revision_id in the payload was invalid
             if (!response)
@@ -623,7 +624,7 @@ let self = module.exports = {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, top_root_deck, userId);
+                            deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck);
                             reply(node);
                         }).catch((err) => {
                             request.log('error', err);
@@ -636,7 +637,7 @@ let self = module.exports = {
 
                         { // these brackets are kept during handleChange removal to keep git blame under control
 
-                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, top_root_deck, userId);
+                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck);
                             node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
                             slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
 
@@ -708,7 +709,7 @@ let self = module.exports = {
                             if (createdSlide.isBoom) return reply(createdSlide);
 
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, top_root_deck, userId);
+                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck);
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             reply(node);
                         });
@@ -758,7 +759,7 @@ let self = module.exports = {
                                 parentID = request.payload.selector.id;
                             }
 
-                            deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, top_root_deck, userId);
+                            deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId, top_root_deck);
                             deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             self.getDeckTree({
@@ -773,10 +774,9 @@ let self = module.exports = {
                     });
                 }
                 else{
-                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, request.payload.user).then((id_map) => {
-                        //console.log('id_map', id_map);
-                        //console.log('request payload before', request.payload);
-                        request.payload.nodeSpec.id = id_map.id_map[request.payload.nodeSpec.id];
+                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, request.payload.user, true).then((forkResult) => {
+                        // get the new deck we are going to attach
+                        request.payload.nodeSpec.id = forkResult.id_map[request.payload.nodeSpec.id];
 
                         deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
                         self.getDeck({
@@ -795,8 +795,16 @@ let self = module.exports = {
                                     parentID = request.payload.selector.id;
                                 }
 
-                                deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, top_root_deck, userId);
+                                // omitting the top_root_deck means this change won't be tracked,
+                                // as it will be tracked right after this code, we just need to attach 
+                                // first so that the rest of the tracking will work
+                                deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
+                                    // track all created forks AFTER it's attached
+                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, true);
+                                });
+
                                 deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
+
                                 //we have to return from the callback, else empty node is returned because it is updated asynchronously
                                 self.getDeckTree({
                                     'params': {'id' : deck.id},
@@ -808,7 +816,7 @@ let self = module.exports = {
                                 });
                             }
                         });
-                        //reply(id_map);
+
                     }).catch((err) => {
                         request.log('error', err);
                         reply(boom.badImplementation());
@@ -865,7 +873,7 @@ let self = module.exports = {
                             if (createdDeck.isBoom) return reply(createdDeck);
                             //if there is a parent deck, update its content items
                             if(typeof parentID !== 'undefined')
-                                deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck', 1, top_root_deck, userId);
+                                deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck', 1, userId, top_root_deck);
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             self.getDeckTree({
                                 'params': {'id' : createdDeck.id},

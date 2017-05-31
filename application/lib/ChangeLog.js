@@ -12,7 +12,6 @@ const deckModel = require('../models/deck');
 const changeModel = require('../models/deckChange');
 
 const helper = require('../database/helper');
-const slideDB = require('../database/slideDatabase');
 
 const ChangeLogRecord = {
 
@@ -50,11 +49,16 @@ const ChangeLogRecord = {
     },
 
     createNodeInsert: function(after, index, path) {
+        if (!_.isEmpty(path) && _.isNumber(index)) path = path.concat({ index });
+
+        // we set this to zero because the value will be the first item in after
+        if (!_.isNumber(index)) index = 0;
+
         // we keep the added value and its index
         return {
             op: 'add',
 
-            path: path.concat({ index }),
+            path: path,
             value: after[index],
 
             timestamp: (new Date()).toISOString(),
@@ -63,7 +67,7 @@ const ChangeLogRecord = {
     },
 
     createNodeUpdate: function(before, after, index, path) {
-        if (path && _.isNumber(index)) path = path.concat({ index });
+        if (!_.isEmpty(path) && _.isNumber(index)) path = path.concat({ index });
 
         return {
             op: 'replace',
@@ -85,7 +89,12 @@ const omitOrder = (item) => _.omit(item, 'order');
 
 let self = module.exports = {
 
-    deckTracker: function(deck, rootDeckId, user) {
+    deckTracker: function(deck, rootDeckId, user, parentOperations=[]) {
+        // parentOperations is an array of deck change records that includes
+        // any change records that act as a source for the operation we are currently tracking
+        // those for now are really only one deck change
+        // the one that started either of the actions: revise, revert, fork, or attach!
+
         // user is integer
         if (user) user = parseInt(user);
 
@@ -127,46 +136,53 @@ let self = module.exports = {
                 // the other for updating the revision (but only when not a subdeck)
                 let records = [];
 
-                let deckAfter = _.cloneDeep(_.pick(updatedDeck, _.keys(deckModel.trackedDeckProperties)));
-
                 // check if we are applying update to deck across revisions
                 // in that case the deck/updatedDeck latest revisions will be different
                 let updatedRevision = revision;
                 [updatedRevision] = updatedDeck.revisions.slice(-1);
 
-                // check for the case where we're doing a deck revision for a ROOT deck
-                // we double check that old revision and new are different!
-                // if it's a root deck revision, the path will be of length 1
-                if (revision.id !== updatedRevision.id && path.length === 1) {
+                if (revision.id !== updatedRevision.id) {
+                    // this means we are creating a new revision for the deck
+                    // that means that we should have an 'update' change log record
 
-                    let before = {
-                        kind: 'deck',
-                        ref: {
-                            id: deck._id,
-                            revision: revision.id,
-                        },
-                    };
-                    let after = {
-                        kind: 'deck',
-                        ref: {
-                            id: deck._id,
-                            revision: updatedRevision.id,
-                        },
-                    };
+                    // if the path length is 1, we need to record a ROOT deck 'replace'
+                    if (path.length === 1) {
 
-                    // no index or path in this case
-                    records.push(ChangeLogRecord.createNodeUpdate(before, after));
+                        let before = {
+                            kind: 'deck',
+                            ref: {
+                                id: deck._id,
+                                revision: revision.id,
+                            },
+                        };
+                        let after = {
+                            kind: 'deck',
+                            ref: {
+                                id: deck._id,
+                                revision: updatedRevision.id,
+                            },
+                        };
 
+                        // no index or path in this case
+                        records.push(ChangeLogRecord.createNodeUpdate(before, after));
+
+                    }
+
+                } else {
+                    // there is no revision change, so we need to check if some values
+                    // in the deck revision (which is always the latest) where updated 
+
+                    let deckAfter = _.cloneDeep(_.pick(updatedDeck, _.keys(deckModel.trackedDeckProperties)));
+
+                    // in order to do the comparison, we merge revision into deck and only keep trackable stuff
+                    _.merge(deckAfter, _.cloneDeep(_.pick(
+                        updatedRevision,
+                        _.keys(deckModel.trackedDeckRevisionProperties))
+                    ));
+
+                    // this may include empty slots nothing, which is ok
+                    records.push(ChangeLogRecord.createUpdate(deckBefore, deckAfter, path));
                 }
-
-                // in order to do the comparison, we merge revision into deck and only keep trackable stuff
-                _.merge(deckAfter, _.cloneDeep(_.pick(
-                    updatedRevision,
-                    _.keys(deckModel.trackedDeckRevisionProperties))
-                ));
-
-                // this may include empty slots nothing, which is ok
-                records.push(ChangeLogRecord.createUpdate(deckBefore, deckAfter, path));
 
                 // this may be a sparse array!
                 return records;
@@ -245,39 +261,27 @@ let self = module.exports = {
             // should be called right after all changes are made, and before saving the deck object
             // `updatedDeck` is optional, for code that applies changes on a new deck object
             applyChangeLog: function(updatedDeck) {
-                this.getChangeLog(updatedDeck).then((deckChanges) => {
+                return this.getChangeLog(updatedDeck).then((deckChanges) => {
                     if (_.isEmpty(deckChanges)) {
                         // console.warn('WARNING: no deck changes detected as was expected');
-                        return;
+                        return deckChanges;
                     }
 
-                    // add user for all changes
-                    deckChanges.forEach((c) => { c.user = user; });
-
-                    return fillSlideInfo(deckChanges).then(fillDeckInfo).then(() => {
-                        // TODO remove this
-                        // console.log('deck changed: ' + JSON.stringify(deckChanges));
-
-                        // do some validation 
-                        let errors = _.compact(deckChanges.map((c) => {
-                            if (changeModel.validate(c)) return;
-                            return changeModel.validate.errors;
-                        }));
-
-                        // TODO enable validation
-                        // if (!_.isEmpty(errors)) throw errors;
-                        if (!_.isEmpty(errors)) {
-                            console.warn(errors);
+                    let parentOpIds = parentOperations.map((op) => op._id);
+                    deckChanges.forEach((c) => {
+                        // add user for all changes
+                        c.user = user;
+                        // add parent operations for all changes
+                        if (parentOpIds.length) {
+                            c.parents = parentOpIds;
                         }
-
-                        return helper.connectToDatabase()
-                        .then((db) => db.collection('deckchanges'))
-                        .then((col) => col.insert(deckChanges));
-
                     });
+
+                    return saveDeckChanges(deckChanges);
 
                 }).catch((err) => {
                     console.warn(err);
+                    return [];
                 });
 
             },
@@ -286,9 +290,104 @@ let self = module.exports = {
 
     },
 
+    // we create a change log record for deck creation as well
+    trackDeckCreated: function(deckId, userId, rootDeckId, parentOperations=[], action) {
+        userId = parseInt(userId);
+
+        let deckNode = {
+            kind: 'deck',
+            ref: { id: parseInt(deckId), revision: 1 },
+        };
+
+        // TODO avoid this circular reference
+        const deckDB = require('../database/deckDatabase');
+        return deckDB.findPath(rootDeckId, util.toIdentifier(deckNode.ref)).then((path) => {
+            // path could be empty (?)
+            if (rootDeckId && _.isEmpty(path)) {
+                // this means we couldn't find the deck in the path
+                // it's probably a bug, but let's ignore it here
+                console.warn(`tried to track add new deck ${deckId} but root deck ${rootDeckId} was invalid`);
+                return;
+            }
+
+            let logRecord;
+            if (_.isEmpty(path) || path.length === 1) {
+                // means the deck is added as root, so no path, no index
+                logRecord = ChangeLogRecord.createNodeInsert([deckNode]);
+            } else {
+                // means the deck is created and inserted to a parent
+
+                // we need to remove the last part of the path for the record
+                let [leaf] = path.splice(-1);
+                // the index where we inserted it is in the last path part, which should be same as deckId
+                let after = []; // sparse array to accomodate createNodeInsert API
+                after[leaf.index] = { kind: 'deck', ref: _.pick(leaf, 'id', 'revision') };
+
+                logRecord = ChangeLogRecord.createNodeInsert(after, leaf.index, path);
+            }
+            // add the user!
+            logRecord.user = userId;
+
+            // add the parent ops!
+            let parentOpIds = parentOperations.map((op) => op._id);
+            if (parentOpIds.length) {
+                logRecord.parents = parentOpIds;
+            }
+
+            // add the action!
+            if (action) logRecord.action = action;
+
+            return saveDeckChanges([logRecord]);
+
+        }).catch((err) => {
+            console.warn(err);
+            return [];
+        });
+
+    },
+
+    // we create a change log record for deck creation as well
+    trackDeckForked: function(deckId, userId, rootDeckId, parentOperations, forAttach) {
+        return self.trackDeckCreated(deckId, userId, rootDeckId, parentOperations, forAttach ? 'attach' : 'fork')
+        .catch((err) => {
+            console.warn(err);
+            return [];
+        });
+    },
+
 };
 
+
+
+// should be called right after all changes are made, and before saving the deck object
+// `updatedDeck` is optional, for code that applies changes on a new deck object
+function saveDeckChanges(deckChanges, userId) {
+    return fillSlideInfo(deckChanges).then(fillDeckInfo).then(() => {
+        // TODO remove this
+        // console.log('deck changed: ' + JSON.stringify(deckChanges));
+
+        // do some validation 
+        let errors = _.compact(deckChanges.map((c) => {
+            if (changeModel.validate(c)) return;
+            return changeModel.validate.errors;
+        }));
+
+        // TODO enable validation
+        // if (!_.isEmpty(errors)) throw errors;
+        if (!_.isEmpty(errors)) {
+            console.warn(errors);
+        }
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('deckchanges'))
+        .then((col) => col.insert(deckChanges))
+        .then(() => deckChanges);
+    });
+}
+
 function fillSlideInfo(deckChanges) {
+    // TODO avoid this circular reference
+    const slideDB = require('../database/slideDatabase');
 
     // we check to see if we need to also read some data for slide updates
     let slideUpdates = deckChanges.filter((c) => (c.value && c.value.kind === 'slide'));
@@ -347,11 +446,21 @@ function fillDeckInfo(deckChanges) {
                         rec.value.ref.originRevision = after.originRevision;
                     rec.value.ref.title = after.title;
 
+                    // check for fork information in add ops
+                    let origin = ['fork', 'attach'].includes(rec.action) && deck.origin;
+                    if (origin) {
+                        rec.value.origin = origin;
+                    }
+
                     if (rec.oldValue) {
                         let before = deck.revisions.find((r) => r.id === rec.oldValue.ref.revision);
                         if (before.originRevision)
                             rec.oldValue.ref.originRevision = before.originRevision;
                         rec.oldValue.ref.title = before.title;
+
+                        if (origin) {
+                            rec.oldValue.origin = origin;
+                        }
                     }
 
                     done();

@@ -14,7 +14,7 @@ let self = module.exports = {
         deckDB.getChangeLog(deckId).then((changeLog) => {
             if (!changeLog) return boom.notFound();
 
-            return prepareChangeLog(changeLog, request.query.simplify, deckId);
+            return prepareChangeLog(changeLog, request.query.simplify);
 
         }).then(reply).catch((error) => {
             request.log('error', error);
@@ -40,9 +40,13 @@ let self = module.exports = {
 };
 
 const mergeMoves = true;
-const mergeRevisions = true;
+const mergeParents = true;
 
-function prepareChangeLog(changeLog, simplifyOutput, deckId) {
+function prepareChangeLog(changeLog, simplifyOutput) {
+    if (mergeParents) {
+        changeLog = mergeChangeParents(changeLog);
+    }
+
     // we add the revise/revert subops
     changeLog.forEach((cur) => {
         if (cur.op === 'replace') {
@@ -54,6 +58,9 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
                         from: cur.oldValue.ref.revision,
                         to: ref.originRevision,
                     };
+                    cur.action = 'revert';
+                } else {
+                    cur.action = 'revise';
                 }
             }
 
@@ -64,18 +71,14 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
                         from: cur.oldValue.ref.revision,
                         to: ref.revision,
                     };
+                    cur.action = 'revert';
+                } else {
+                    // it's a slide edit action
+                    cur.action = 'edit';
                 }
             }
         }
     });
-
-    let deck = util.parseIdentifier(deckId);
-    if (mergeRevisions && deck) {
-        // we need to merge the recursive revisioning logs
-        changeLog = mergeDeckRevisions(changeLog, deck);
-    }
-
-    if (!mergeMoves && !simplifyOutput) return changeLog;
 
     if (mergeMoves) {
         let hold;
@@ -116,17 +119,55 @@ function prepareChangeLog(changeLog, simplifyOutput, deckId) {
         if (hold) changeLog.push(hold);
     }
 
+    // fill `action` were missing, and detect 'rename' actions
+    changeLog.forEach((cur) => {
+        if (cur.op === 'update') {
+            // check for deck rename in values
+            if (cur.values.title && _.size(cur.values) === 1) {
+                cur.action = 'rename';
+                cur.renamed = {
+                    kind: 'deck',
+                    from: cur.oldValues.title,
+                    to: cur.values.title,
+                };
+            }
+
+        } else if (cur.action === 'edit') {
+            // check for slide rename
+            if (cur.value.ref.title !== cur.oldValue.ref.title) {
+                cur.action = 'rename';
+                cur.renamed = {
+                    kind: 'slide',
+                    from: cur.oldValue.ref.title,
+                    to: cur.value.ref.title,
+                };
+            }
+
+        }
+
+        // set `action` to value of `op` if it's missing
+        if (!cur.action) cur.action = cur.op;
+    });
+
     if (simplifyOutput) {
         changeLog.forEach((cur) => {
             // format paths and updates
             cur.path = formatPath(cur.path);
             if (cur.from) cur.from = formatPath(cur.from);
 
+            if (cur.action === 'fork') cur.forkOf = util.toIdentifier(cur.value.origin);
+
             // format node updates
             if (cur.value) cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
             if (cur.oldValue) cur.oldValue = `${cur.oldValue.kind}:${formatRef(cur.oldValue.ref)}`;
 
             if (cur.reverted) cur.reverted = `from ${cur.reverted.from} to ${cur.reverted.to}`;
+            if (cur.renamed) {
+                cur.renamed = `${cur.renamed.kind} from '${cur.renamed.from}' to '${cur.renamed.to}'`;
+                delete cur.values;
+                delete cur.oldValues;
+            }
+
         });
     }
 
@@ -148,7 +189,7 @@ function formatRef(ref) {
     return `${ref.id}-${ref.revision}`;
 }
 
-function mergeDeckRevisions(changeLog, deck) {
+function mergeChangeParents(changeLog) {
     let stack = [];
     // we push a dummy op to make sure we merge any final revision chains left over in the stack
     changeLog.push({ op: 'dummy' });
@@ -157,40 +198,30 @@ function mergeDeckRevisions(changeLog, deck) {
         let hold;
         let firstRec = stack[0];
 
-        if (cur.op === 'replace' && cur.value.kind === 'deck') {
-            // this is a revisioning record
+        if (firstRec && (_.isEmpty(cur.parents) || !cur.parents.some((pid) => pid.equals(firstRec._id))) ) { 
+            // the stack is not empty, and we have a new chain starting
+            // the parents attribute in the record links each record
+            // to its parent records, i.e. the ones in the same operation group
 
-            if (firstRec && cur.value.ref.id === deck.id) { 
-                // the stack is not empty, and we have a new chain starting
-                // we just keep the current record held for now
-                hold = cur;
-            } else {
-                // it's either a new chain and the stack is empty,
-                // or part of the one in the stack
-                // so keep it in stack for now and proceed to next record
-                stack.push(cur);
-                return acc;
-            }
-
+            // we just keep the current record held for now
+            hold = cur;
+        } else {
+            // it's either a new chain and the stack is empty,
+            // or part of the one in the stack
+            // so keep it in stack for now and proceed to next record
+            stack.push(cur);
+            return acc;
         }
 
         // if we come this far, then we need to merge whatever the stack has
         // because `cur` is not part of the revision chain
         // (either not a revision record, or part of a new revision chain)
 
-        if (!_.isEmpty(stack)) {
-            // let's create the grouped revisioning thing and push it forward
-            let [lastRec] = stack.slice(-1);
-            acc.push({
-                op: 'replace',
-                path: firstRec.path,
-                value: firstRec.value,
-                oldValue: firstRec.oldValue,
-
-                timestamp: lastRec.timestamp,
-                user: lastRec.user,
-            });
-
+        if (firstRec) {
+            // just push the first record in the stack forward
+            acc.push(firstRec);
+            // also hide the parent info
+            delete firstRec.parents;
             // and clear the stack
             stack.length = 0;
         }
