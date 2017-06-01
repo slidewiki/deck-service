@@ -1733,18 +1733,36 @@ let self = module.exports = {
 
             let deck = util.parseIdentifier(deck_id);
             return self.get(deck.id).then((existingDeck) => {
-                // the deck exists for sure by now
                 let [latestRevision] = existingDeck.revisions.slice(-1);
                 if (deck.revision && latestRevision.id !== deck.revision) {
                     // we forked a read-only revision, nothing to do here
                     return forkResult;
+                } else {
+                    // make the deck id canonical just in case
+                    deck.revision = latestRevision.id;
                 }
 
                 // this is an automatic revision, the user should be 'system'
-                // for now we just use the deck.id as the tree root...
-                return self.createDeckRevision(deck.id, -1, deck.id).then(() => {
-                    // return the same result
-                    return forkResult;
+                // deck autorevision is created with same deck as root
+                return self.createDeckRevision(deck.id, -1, deck.id).then((updatedDeck) => {
+                    // we need to update all parents of the deck to keep them updated
+                    // with the latest revision we have just created now
+                    return self.getUsage(util.toIdentifier(deck)).then((usage) => {
+                        // if a deck has no roots, itself is the root
+                        console.log(`updating deck revision used for ${deck.id} in ${usage.length} parent decks`);
+
+                        usage.reduce((p, parentDeck) => {
+                            return p.then(() => {
+                                // citem, revertedRevId, root_deck, ckind, user, top_root_deck, parentOperations
+                                let parentDeckId = util.toIdentifier(parentDeck);
+                                return self.updateContentItem(updatedDeck, '', parentDeckId, 'deck', -1, parentDeckId);
+                            });
+                        }, Promise.resolve());
+                    }).then(() => {
+                        // return the same result
+                        return forkResult;
+                    });
+
                 });
 
             });
