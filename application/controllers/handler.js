@@ -439,6 +439,14 @@ let self = module.exports = {
                 if (!replaced) return boom.notFound();
 
                 if (replaced.ok !== 1) throw replaced;
+
+                // send tags to tag-service
+                if (!_.isEmpty(request.payload.tags)) {
+                    tagService.upload(request.payload.tags, userId).catch((e) => {
+                        request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id + ': ' + e.message);
+                    });
+                }
+
                 return replaced.value;
             });
 
