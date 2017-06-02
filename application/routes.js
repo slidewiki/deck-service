@@ -620,7 +620,7 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/decktree/node/create',
-        handler: handlers.createDeckTreeNode,
+        handler: handlers.createDeckTreeNodeWithCheck,
         config: {
             validate: {
                 payload: Joi.object().keys({
@@ -630,10 +630,12 @@ module.exports = function(server) {
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
-                    nodeSpec: Joi.object().keys({
-                        id: Joi.string(),
-                        type: Joi.string()
-                    }),
+                    nodeSpec: Joi.array().items(
+                        Joi.object().keys({
+                            id: Joi.string(),
+                            type: Joi.string(),
+                        })
+                    ).single(),
                     user: Joi.string().alphanum().lowercase(),
                     content: Joi.string(),
                     title: Joi.string(),
