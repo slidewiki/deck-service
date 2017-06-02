@@ -413,17 +413,17 @@ let self = module.exports = {
             if (!existingSlide) return;
 
             let slideId = util.parseIdentifier(identifier).id;
-            let rootId = util.parseIdentifier(rootIdentifier).id;
+            let rootDeck = util.parseIdentifier(rootIdentifier);
+
+            let deckQuery = { id: rootDeck.id, };
+            if (rootDeck.revision) {
+                deckQuery['revision'] = { $lte: rootDeck.revision };
+            }
 
             return helper.getCollection('deckchanges').then((changes) => {
                 return changes.aggregate([
                     { $match: {
-                        'path': {
-                            $elemMatch: {
-                                id: rootId/*,
-                                revision: slide.revision,*/
-                            }
-                        },
+                        'path': { $elemMatch: deckQuery },
                         'value.kind': 'slide',
                         'value.ref.id': slideId,
                     } },
