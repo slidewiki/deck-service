@@ -417,7 +417,7 @@ let self = module.exports = {
 
             let deckQuery = { id: rootDeck.id, };
             if (rootDeck.revision) {
-                deckQuery['revision'] = { $lte: rootDeck.revision };
+                deckQuery.revision = { $lte: rootDeck.revision };
             }
 
             return helper.getCollection('deckchanges').then((changes) => {
