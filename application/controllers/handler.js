@@ -586,6 +586,66 @@ let self = module.exports = {
         });
     },
 
+    // authorize node creation and iterate nodeSpec array to apply each insert
+    createDeckTreeNodeWithCheck: function(request, reply) {
+        let userId = request.payload.user;
+        let rootDeckId = request.payload.selector.id;
+
+        // TODO proper authorization checking the actual parent id
+        return authorizeUser(userId, rootDeckId, rootDeckId).then((boomError) => {
+            if (boomError) return reply(boomError);
+
+            let nodeSpecs = request.payload.nodeSpec;
+            if (nodeSpecs.length < 2) {
+                request.payload.nodeSpec = nodeSpecs[0];
+                return self.createDeckTreeNode(request, reply);
+            }
+
+            // do some complex validations
+            // we only support more than one nodeSpec when attaching,
+            // so isMove cannot be true
+            if (request.payload.isMove) {
+                return reply(boom.badData());
+            }
+
+            // also, all ids should be valid numbers
+            if (!nodeSpecs.every((node) => node.id && node.id !== '0')) {
+                return reply(boom.badData());
+            }
+
+            // we reverse the node specs because they are added right after
+            // the position specified in selector, like in a stack (LIFO)
+            // we would like to provide the semantics of a queue (FIFO)
+            async.concatSeries(nodeSpecs.reverse(), (nodeSpec, done) => {
+                // just put this nodespec
+                request.payload.nodeSpec = nodeSpec;
+
+                self.createDeckTreeNode(request, (result) => {
+                    // an error already logged
+                    if (result && result.isBoom) done(result);
+
+                    // result is not an error
+                    done(null, result);
+                });
+            }, (err, results) => {
+                if (err) {
+                    // an error already logged
+                    if (err.isBoom) {
+                        reply(err);
+                    } else {
+                        // an error in this method code, not logged
+                        request.log('error', err);
+                        reply(boom.badImplementation());
+                    }
+                } else {
+                    // we again reverse the results to match the node spec order
+                    reply(results.reverse());
+                }
+            });
+        });
+
+    },
+
     //creates a node (deck or slide) into the given deck tree
     createDeckTreeNode: function(request, reply) {
         let node = {};
