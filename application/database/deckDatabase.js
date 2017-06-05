@@ -9,7 +9,8 @@ const userService = require('../services/user');
 
 const helper = require('./helper'),
     striptags = require('striptags'),
-    validateDeck = require('../models/deck').validateDeck;
+    validateDeck = require('../models/deck').validateDeck,
+    Microservices = require('../configs/microservices');
 
 const async = require('async');
 
@@ -1929,7 +1930,7 @@ let self = module.exports = {
                 flatDeckArray.push(res.children[i].id); //push next sub-deck into array
             }
             //init maps for new ids
-            let id_map = {}, id_noRev_map = {};
+            let id_map = {}, id_noRev_map = {}, slide_id_map = {};
             //reverse in order to iterate from bottom to top
             flatDeckArray.reverse();
             //feed the array for serial processing
@@ -2004,68 +2005,79 @@ let self = module.exports = {
                                 copiedDeck.revisions[0].timestamp = timestamp;
                                 copiedDeck.revisions[0].lastUpdate = timestamp;
                                 let contentItemsMap = {};
+                                //console.log('before loop for content items');
                                 async.eachSeries(copiedDeck.revisions[0].contentItems, (nextSlide, callback) => {
                                     if(nextSlide.kind === 'slide'){
                                         //we have to copy the slide, not like when forking
                                         let root_deck_path = [copiedDeck._id, '1'];
                                         return helper.connectToDatabase()
                                         .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
-                                        .then((newId) => {
-                                            helper.connectToDatabase()
+                                        .then((newSlideId) => {
+                                            return helper.connectToDatabase()
                                             .then((db2) => db2.collection('slides'))
                                             .then((col2) => {
                                                 return col2.findOne({_id: parseInt(nextSlide.ref.id)})
                                                 .then((slide) => {
                                                     let slideRevisionIndex = parseInt(nextSlide.ref.revision)-1;
                                                     slide.revisions = [slide.revisions[slideRevisionIndex]];
-                                                    slide._id = newId;
-                                                    contentItemsMap[slide._id] = newId;
+                                                    contentItemsMap[slide._id] = newSlideId;
+                                                    slide_id_map[slide._id] = newSlideId;
+                                                    let oldSlideId = slide._id;
+                                                    slide._id = newSlideId;
+                                                    //slide.translated_from =
+                                                    let rp = require('request-promise-native');
+                                                    let myPromise = new Promise((resolve, reject) => {
+
+                                                        var options = {
+                                                            method: 'POST',
+                                                            uri: Microservices.translation.uri+'/slide/'+oldSlideId,
+                                                            headers : {
+                                                                'Content-Type': 'application/json',
+                                                                'Cache-Control': 'no-cache'
+                                                            },
+                                                            body :{
+                                                                'target': 'de_DE',
+                                                                'user': copiedDeck.user+''
+                                                            },
+                                                            json: true
+                                                        };
+                                                        rp(options).then(function (original){
+                                                            //console.log('response', original);
+                                                            if (original.error){
+                                                                //console.log(original);
+                                                                resolve({});
+                                                            }else{
+                                                                slide.revisions[0].title = original.revisions[0].title;
+                                                                slide.revisions[0].content = original.revisions[0].content;
+                                                                //slide.description = original.description;
+                                                                col2.save(slide);
+                                                                //new_decks.push(copiedDeck);
+                                                                // return col.insertOne(copiedDeck).then(() => {
+                                                                //     callback();
+                                                                // });
+
+                                                                resolve();
+
+                                                            }
+                                                        })
+                                                        .catch(function (e){
+                                                            console.log('problem with request deck: ' + e.message);
+                                                            reject(e);
+                                                        });
+                                                    });
+
+                                                    //console.log('contentItemsMap', contentItemsMap);
+                                                    //console.log('copiedDeck', copiedDeck);
                                                     for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                                        if(copiedDeck.revisions[0].contentItems[i].ref.id === slide._id){
-                                                            copiedDeck.revisions[0].contentItems[i].ref.id = newId;
+                                                        if(copiedDeck.revisions[0].contentItems[i].ref.id === oldSlideId){
+                                                            copiedDeck.revisions[0].contentItems[i].ref.id = newSlideId;
                                                             copiedDeck.revisions[0].contentItems[i].ref.revision = '1';
-                                                            break;
+                                                            callback();
                                                         }
                                                     }
                                                 });
                                             });
                                         });
-
-                                        //console.log('outside root_deck_path', root_deck_path);                                        
-
-                                        for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                            for(let j in id_map){
-                                                if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
-                                                    copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
-                                                    copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
-                                                }
-                                            }
-                                        }
-                                        for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
-                                            for(let j in id_map){
-                                                if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                                    copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
-                                                    copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
-                                                }
-                                            }
-                                        }
-                                        for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                            let nextSlide = copiedDeck.revisions[0].contentItems[i];
-                                            if(nextSlide.kind === 'slide'){
-                                                let root_deck_path = [copiedDeck._id, '1'];
-                                                //console.log('outside root_deck_path', root_deck_path);
-                                                self.addToUsage(contentItemsMap[nextSlide], root_deck_path);
-                                            }
-                                            else{
-                                                continue;
-                                            }
-                                        }
-
-                                        new_decks.push(copiedDeck);
-                                        return col.insertOne(copiedDeck).then(() => {
-                                            callback();
-                                        });
-
                                     }
                                     else{
                                         callback();
@@ -2074,6 +2086,84 @@ let self = module.exports = {
                                     if (err) {
                                         return reject(err);
                                     }
+
+                                    //console.log('outside root_deck_path', root_deck_path);
+                                    console.log('check point 1');
+
+                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
+                                                copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
+                                            }
+                                        }
+                                    }
+                                    console.log('check point 2');
+                                    for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
+                                            }
+                                        }
+                                    }
+                                    console.log('check point 3');
+                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                        let nextSlide = copiedDeck.revisions[0].contentItems[i];
+                                        console.log('nextSlide', nextSlide);
+                                        if(nextSlide.kind === 'slide'){
+                                            let root_deck_path = [copiedDeck._id, '1'];
+                                            console.log('outside root_deck_path', root_deck_path);
+                                            console.log('contentItemsMap', contentItemsMap);
+                                            self.addToUsage(nextSlide, root_deck_path);
+                                        }
+                                        else{
+                                            continue;
+                                        }
+                                    }
+                                    console.log('check point 4');
+
+                                    //translate copiedDeck
+                                    //console.log('translation uri', Microservices.translation.uri+'/deck/'+found._id);
+                                    let rp = require('request-promise-native');
+                                    let myPromise = new Promise((resolve, reject) => {
+
+                                        var options = {
+                                            method: 'POST',
+                                            uri: Microservices.translation.uri+'/deck/'+found._id,
+                                            headers : {
+                                                'Content-Type': 'application/json',
+                                                'Cache-Control': 'no-cache'
+                                            },
+                                            body :{
+                                                'target': 'de_DE',
+                                                'user': copiedDeck.user+''
+                                            },
+                                            json: true
+                                        };
+                                        rp(options).then(function (original){
+                                            //console.log('response', original);
+                                            if (original.error){
+                                                //console.log(original);
+                                                resolve({});
+                                            }else{
+                                                copiedDeck.revisions[0].title = original.revisions[0].title;
+                                                copiedDeck.description = original.description;
+                                                new_decks.push(copiedDeck);
+                                                return col.insertOne(copiedDeck).then(() => {
+                                                    callback();
+                                                });
+
+                                                resolve();
+
+                                            }
+                                        })
+                                        .catch(function (e){
+                                            console.log('problem with request deck: ' + e.message);
+                                            reject(e);
+                                        });
+                                    });
+
                                 });
 
 
@@ -2084,7 +2174,7 @@ let self = module.exports = {
                         if (err2) {
                             reject(err2);
                         } else {
-                            resolve({'root_deck': id_map[res.id], 'id_map': id_map});
+                            resolve({'root_deck': id_map[res.id], 'id_map': id_map, 'slide_id_map': slide_id_map});
                         }
                     });
                 });
