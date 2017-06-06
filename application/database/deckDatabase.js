@@ -1585,9 +1585,36 @@ let self = module.exports = {
 
     },
 
+    // we guard the fork deck revision method against abuse, by checking for change logs of one
+    forkDeckRevision(deck_id, user, forAttach) {
+        let deck = util.parseIdentifier(deck_id);
+        return self.get(deck.id).then((existingDeck) => {
+            let [latestRevision] = existingDeck.revisions.slice(-1);
+            if (deck.revision && latestRevision.id !== deck.revision) {
+                // we want to fork a read-only revision, all's well
+                return self._forkDeckRevision(deck_id, user, forAttach);
+            } else {
+                // make the deck id canonical just in case
+                deck.revision = latestRevision.id;
+            }
+
+            // before we fork it, let's check if it's a fresh revision
+            return self.getChangesCounts(deck.id).then((counts) => {
+                if (counts[deck.revision] === 1) {
+                    // we want to fork a fresh revision, let's fork the one before it
+                    console.log(`forking ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
+                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach);
+                } else {
+                    // unknown revision, old deck without changelog, or a revision with changes, just fork it!
+                    return self._forkDeckRevision(deck_id, user, forAttach);
+                }
+            });
+        });
+    },
+
     // forks a given deck revision by copying all of its sub-decks into new decks
     // forAttach is true when forking is done during deck attach process
-    forkDeckRevision(deck_id, user, forAttach) {
+    _forkDeckRevision(deck_id, user, forAttach) {
 
         return self.getFlatDecksFromDB(deck_id)
         .then((res) => {
