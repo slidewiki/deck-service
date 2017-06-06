@@ -613,10 +613,17 @@ let self = module.exports = {
                 return reply(boom.badData());
             }
 
-            // we reverse the node specs because they are added right after
-            // the position specified in selector, like in a stack (LIFO)
-            // we would like to provide the semantics of a queue (FIFO)
-            async.concatSeries(nodeSpecs.reverse(), (nodeSpec, done) => {
+            // check if we append at the end (no position argument) or at a position
+            let reverseOrder = !!request.payload.selector.spath;
+            if (reverseOrder) {
+                // if we *don't* attach to the end, we need to 
+                // reverse the node specs because they are added right after
+                // the position specified in selector, like in a stack (LIFO)
+                // we would like to provide the semantics of a queue (FIFO)
+                nodeSpecs.reverse();
+            }
+
+            async.concatSeries(nodeSpecs, (nodeSpec, done) => {
                 // just put this nodespec
                 request.payload.nodeSpec = nodeSpec;
 
@@ -638,8 +645,10 @@ let self = module.exports = {
                         reply(boom.badImplementation());
                     }
                 } else {
-                    // we again reverse the results to match the node spec order
-                    reply(results.reverse());
+                    // if needed, we again reverse the results to match the node spec order
+                    if (reverseOrder) results.reverse();
+
+                    reply(results);
                 }
             });
         });
