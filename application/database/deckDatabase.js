@@ -1784,6 +1784,129 @@ let self = module.exports = {
         });
     },
 
+    // computes the usage of the item, i.e. the decks that point to it
+    getUsage(itemId, itemKind='deck') {
+        let item = util.parseIdentifier(itemId);
+        let elemMatchQuery = {
+            kind: itemKind,
+            'ref.id': item.id,
+        };
+
+        let projectStage = {
+            _id : 0,
+            id: '$_id',
+            revision: '$revisions.id',
+        };
+
+        if (item.revision) {
+            elemMatchQuery['ref.revision'] = item.revision;
+        } else {
+            projectStage.using = {
+                $arrayElemAt: [
+                    { $filter: {
+                        input: '$revisions.contentItems',
+                        as: 'citem',
+                        cond: {
+                            $and: [
+                                { $eq: ['$$citem.kind', itemKind] },
+                                { $eq: ['$$citem.ref.id', item.id] },
+                            ],
+                        },
+                    } },
+                    0,
+                ],
+            };
+        }
+
+        let pipeline = [
+            { $project: {
+                revisions: {
+                    id: 1,
+                    contentItems: {
+                        kind: 1,
+                        ref: 1,
+                    },
+                },
+            } },
+            { $unwind: '$revisions' },
+            { $match: {
+                'revisions.contentItems': {
+                    $elemMatch: elemMatchQuery,
+                }
+            } },
+            { $project: projectStage },
+        ];
+
+        if (!item.revision) {
+            // also clean up match property
+            pipeline.push({
+                $project: {
+                    id: 1,
+                    revision: 1,
+                    using: '$using.ref.revision',
+                },
+            });
+        }
+
+        return helper.getCollection('decks')
+        .then((decks) => decks.aggregate(pipeline))
+        .then((result) => result.toArray());
+
+    },
+
+    // computes the usage of the item, i.e. the decks that point to it directly or indirectly
+    getDeepUsage(itemId, itemKind='deck') {
+        return self.getUsage(itemId, itemKind).then((parents) => {
+            return parents.reduce((promise, parent) => {
+                return promise.then((usage) => {
+                    let parentId = util.toIdentifier(parent);
+                    // a deck/slide parent is always a deck
+                    return self.getDeepUsage(parentId).then((deepUsage) => {
+                        // when method is called by client code the itemId may have revision
+                        // in such a case `parent` includes a `using` attribute
+                        // let's propagate that that in deep results
+                        if (parent.using) {
+                            deepUsage.forEach((u) => u.using = parent.using);
+                        }
+                        return usage.concat(deepUsage);
+                    });
+                });
+            }, Promise.resolve(parents));
+        });
+    },
+
+    // computes the decks that point to it directly or indirectly, and are roots themselves (their own parents is empty)
+    // when item type is 'deck', includes the deck in question if it's a root deck (i.e. has no parents in the db)
+    getRootDecks(itemId, itemKind='deck') {
+        return self.getUsage(itemId, itemKind).then((parents) => {
+            // return self if is deck and is root
+            if (parents.length === 0) {
+                if (itemKind === 'deck') {
+                    return [util.parseIdentifier(itemId)];
+                } else {
+                    // orphan slide
+                    return [];
+                }
+            }
+
+            return parents.reduce((promise, parent) => {
+                return promise.then((roots) => {
+                    let parentId = util.toIdentifier(parent);
+                    // a deck/slide parent is always a deck
+                    return self.getRootDecks(parentId).then((deepRoots) => {
+                        // when method is called by client code the itemId may have revision
+                        // in such a case `parent` includes a `using` attribute
+                        // let's propagate that that in deep results
+                        if (parent.using) {
+                            deepRoots.forEach((u) => u.using = parent.using);
+                        }
+                        return roots.concat(deepRoots);
+                    });
+                });
+            }, Promise.resolve([]));
+        });
+    },
+
     // computes all deck permissions the user has been granted
     userPermissions(deckId, userId) {
         userId = parseInt(userId);

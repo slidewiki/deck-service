@@ -1543,6 +1543,70 @@ let self = module.exports = {
         });
     },
 
+    getDeckUsage: function(request, reply) {
+        let deckId = request.params.id;
+        let deck = util.parseIdentifier(deckId);
+        deckDB.get(deck.id).then((existingDeck) => {
+            if (!existingDeck) return boom.notFound();
+
+            return deckDB.getUsage(deckId);
+
+            // TODO dead code
+            return deckDB.getRootDecks(deckId)
+            .then((roots) => {
+                return roots;
+                // TODO dead code
+                return Promise.all(roots.map((r) => {
+                    return deckDB.findPath(util.toIdentifier(r), deckId)
+                    .then((path) => {
+                        let [leaf] = path.slice(-1);
+                        leaf.id = deck.id;
+                        leaf.revision = deck.revision || r.using;
+                        return path;
+                    });
+                })).then((paths) => paths.map(util.toPlatformPath));
+            });
+
+        }).then(reply).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+
+    },
+
+    getSlideUsage: function(request, reply) {
+        let slideId = request.params.id;
+        let slide = util.parseIdentifier(slideId);
+        slideDB.get(slide.id).then((existingSlide) => {
+            if (!existingSlide) return boom.notFound();
+
+            return deckDB.getUsage(slideId, 'slide');
+
+            // TODO dead code
+            return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
+                return roots;
+                // TODO dead code
+                return Promise.all(roots.map((r) => {
+                    // path method does not return the slide id, so we take it from the root
+                    return deckDB.findPath(util.toIdentifier(r), slideId, 'slide')
+                    .then((path) => {
+                        let [leaf] = path.slice(-1);
+                        leaf.id = slide.id;
+                        leaf.revision = slide.revision || r.using;
+                        leaf.kind = 'slide';
+
+                        return path;
+                    });
+                })).then((paths) => paths.map(util.toPlatformPath));
+
+            });
+        }).then(reply).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+
+    },
+
     getDeckTags: function(request, reply){
         deckDB.getTags(request.params.id).then( (tagsList) => {
             if(!tagsList){

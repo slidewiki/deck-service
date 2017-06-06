@@ -1,5 +1,7 @@
 'use strict';
 
+const _ = require('lodash');
+
 const url = require('url');
 const Microservices = require('../configs/microservices');
 const fileserviceHost = url.parse(Microservices.file.uri).hostname;
@@ -64,4 +66,28 @@ let self = module.exports = {
         return `${ref.id}${revision}`;
     },
 
+    toPlatformPath: function(path) {
+        if (_.isEmpty(path)) return '';
+
+        // first path part is always a deck
+        let result = `/deck/${self.toIdentifier(path[0])}`;
+
+        if (path.length > 1) {
+            // not just the root
+            let [leaf] = path.slice(-1);
+            if (leaf.kind === 'slide') {
+                result += `/slide/${self.toIdentifier(leaf)}`;
+            } else {
+                result += `/deck/${self.toIdentifier(leaf)}`;
+            }
+        }
+
+        return result + '/' + path.slice(1).map(formatPlatformPathPart).join(';');
+    },
+
 };
+
+function formatPlatformPathPart(pathPart) {
+    let affix = _.isNumber(pathPart.index) ? `${pathPart.index + 1}` : undefined;
+    return _.compact([self.toIdentifier(pathPart), affix]).join(':');
+}
