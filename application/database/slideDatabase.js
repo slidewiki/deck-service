@@ -10,7 +10,24 @@ const helper = require('./helper'),
     slideModel = require('../models/slide.js'),
     oid = require('mongodb').ObjectID;
 
+const deckDB = require('./deckDatabase');
+
 let self = module.exports = {
+
+    exists: function(identifier) {
+        return helper.getCollection('slides').then((col) => {
+            let slide = util.parseIdentifier(identifier);
+            if (!slide) return false;
+
+            let query = { _id: slide.id };
+            if (slide.revision) {
+                query['revisions.id'] = slide.revision;
+            }
+
+            return col.find(query).hasNext();
+        });
+    },
+
     get: function(identifier) {
         identifier = String(identifier);
         let idArray = identifier.split('-');
@@ -22,6 +39,8 @@ let self = module.exports = {
         })
         )
         .then((found) => {
+            if (!found) return null;
+
             if(idArray.length === 1){
                 return found;
             }
@@ -109,6 +128,7 @@ let self = module.exports = {
                 else{
                     revisionCopied.parent = slide.parent;
                 }
+                revisionCopied.usage = [];
                 revisionCopied.comment = slide.comment;
                 revisionCopied.id = 1;
                 revisionCopied.timestamp = timestamp;
@@ -189,6 +209,34 @@ let self = module.exports = {
                     console.log('validation failed', e);
                 }
                 return;
+            });
+        });
+    },
+
+    revert: function(slideId, revisionId, path, userId) {
+        return self.get(slideId).then((slide) => {
+            if (!slide) return;
+
+            // also check if revisionId we revert to exists
+            let revision = slide.revisions.find((r) => r.id === revisionId);
+            if (!revision) return;
+
+            // the parent of the slide is the second to last item of the path
+            // path has at least length 2, guaranteed
+            let [parentDeck] = path.slice(-2, -1);
+            let parentDeckId = util.toIdentifier(parentDeck);
+
+            let rootDeckId = util.toIdentifier(path[0]);
+
+            // update the content items of the parent deck to reflect the slide revert
+            return deckDB.updateContentItem(slide, revisionId, parentDeckId, 'slide', userId, rootDeckId)
+            .then((updatedIds) => {
+                // make old slide id canonical
+                let oldSlideId = util.toIdentifier({ id: slideId, revision: parseInt(updatedIds.oldRevision) });
+
+                //update the usage of the reverted slide to point to the parent deck before returning
+                return self.updateUsage(oldSlideId, revisionId, parentDeckId)
+                .then((updatedSlide) => updatedSlide);
             });
         });
     },
@@ -365,22 +413,22 @@ let self = module.exports = {
             if (!existingSlide) return;
 
             let slideId = util.parseIdentifier(identifier).id;
-            let rootId = util.parseIdentifier(rootIdentifier).id;
+            let rootDeck = util.parseIdentifier(rootIdentifier);
+
+            let deckQuery = { id: rootDeck.id, };
+            if (rootDeck.revision) {
+                deckQuery.revision = { $lte: rootDeck.revision };
+            }
 
             return helper.getCollection('deckchanges').then((changes) => {
                 return changes.aggregate([
                     { $match: {
-                        'path': {
-                            $elemMatch: {
-                                id: rootId/*,
-                                revision: slide.revision,*/
-                            }
-                        },
+                        'path': { $elemMatch: deckQuery },
                         'value.kind': 'slide',
                         'value.ref.id': slideId,
                     } },
                     // { $project: { _id: 0 } }, // TODO re-insert this after 3.4 upgrade
-                    { $sort: { timestamp: -1 } },
+                    { $sort: { timestamp: 1 } },
                 ]);
             }).then((result) => result.toArray());
         });
