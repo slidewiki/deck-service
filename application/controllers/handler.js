@@ -614,7 +614,7 @@ let self = module.exports = {
             }
 
             // check if we append at the end (no position argument) or at a position
-            let reverseOrder = !!request.payload.selector.spath;
+            let reverseOrder = (request.payload.selector.stype === 'slide');
             if (reverseOrder) {
                 // if we *don't* attach to the end, we need to 
                 // reverse the node specs because they are added right after
@@ -668,18 +668,25 @@ let self = module.exports = {
                 let spath = request.payload.selector.spath;
                 let spathArray = spath.split(';');
                 let parentID, slidePosition;
-                if(spathArray.length > 1){
 
-                    let parentArrayPath = spathArray[spathArray.length-2].split(':');
-                    parentID = parentArrayPath[0];
-
-                }
-                else{
+                if (request.payload.selector.stype === 'deck') {
                     parentID = request.payload.selector.sid;
+                } else if (request.payload.selector.stype === 'slide') {
+                    // could be slide, or nothing
+                    if (spathArray.length > 1) {
+                        let parentArrayPath = spathArray[spathArray.length-2].split(':');
+                        parentID = parentArrayPath[0];
+                    } else {
+                        parentID = request.payload.selector.sid;
+                    }
+
+                    let slideArrayPath = spathArray[spathArray.length-1].split(':');
+                    slidePosition = parseInt(slideArrayPath[1])+1;
+                } else {
+                    // means we are at root deck
+                    parentID = request.payload.selector.id;
                 }
 
-                let slideArrayPath = spathArray[spathArray.length-1].split(':');
-                slidePosition = parseInt(slideArrayPath[1])+1;
                 let slideRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
                 self.getSlide({
                     'params' : {'id' : request.payload.nodeSpec.id.split('-')[0]},
@@ -698,9 +705,6 @@ let self = module.exports = {
 
                         //we must duplicate the slide
                         let duplicateSlide = slide;
-                        if(spathArray.length <= 1)
-                            parentID = request.payload.selector.id;
-
                         duplicateSlide.parent = request.payload.nodeSpec.id;
                         duplicateSlide.comment = 'Duplicate slide of ' + request.payload.nodeSpec.id;
                         //copy the slide to a new duplicate
