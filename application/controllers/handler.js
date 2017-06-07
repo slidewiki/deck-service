@@ -677,7 +677,7 @@ let self = module.exports = {
                         let parentArrayPath = spathArray[spathArray.length-2].split(':');
                         parentID = parentArrayPath[0];
                     } else {
-                        parentID = request.payload.selector.sid;
+                        parentID = request.payload.selector.id;
                     }
 
                     let slideArrayPath = spathArray[spathArray.length-1].split(':');
