@@ -889,6 +889,9 @@ let self = module.exports = {
                     existingDeck.contributors = contributors;
                 }
 
+                existingDeck.lastUpdate = new Date().toISOString();
+                existingDeck.revisions[activeRevisionId-1].lastUpdate = existingDeck.lastUpdate;
+
                 if(position && position > 0){
                     let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
                     for(let i = position-1; i < citems.length; i++){
@@ -981,6 +984,9 @@ let self = module.exports = {
 
                 citems.splice(position-1, 1);
                 existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+
+                existingDeck.lastUpdate = new Date().toISOString();
+                existingDeck.revisions[activeRevisionId-1].lastUpdate = existingDeck.lastUpdate;
 
                 deckTracker.applyChangeLog();
 
@@ -1083,6 +1089,7 @@ let self = module.exports = {
                 // pre-compute what the for loop does
                 let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user, parentOperations);
 
+                existingDeck.lastUpdate = new Date().toISOString();
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
 
@@ -1090,6 +1097,8 @@ let self = module.exports = {
                             if(existingDeck.revisions[i].contentItems[j].ref.id === citem._id && existingDeck.revisions[i].contentItems[j].kind === ckind) {
                                 old_rev_id = existingDeck.revisions[i].contentItems[j].ref.revision;
                                 existingDeck.revisions[i].contentItems[j].ref.revision = newRevId;
+
+                                existingDeck.revisions[i].lastUpdate = existingDeck.lastUpdate;
                             }
                             else continue;
                         }
