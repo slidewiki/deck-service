@@ -621,6 +621,9 @@ let self = module.exports = {
                 // the position specified in selector, like in a stack (LIFO)
                 // we would like to provide the semantics of a queue (FIFO)
                 nodeSpecs.reverse();
+            } else {
+                // if appending to deck lets remove the spath because we always attach to the last position
+                request.payload.selector.spath = '';
             }
 
             async.concatSeries(nodeSpecs, (nodeSpec, done) => {
@@ -668,24 +671,20 @@ let self = module.exports = {
                 let spath = request.payload.selector.spath;
                 let spathArray = spath.split(';');
                 let parentID, slidePosition;
+                if(spathArray.length > 1){
 
-                if (request.payload.selector.stype === 'deck') {
+                    let parentArrayPath = spathArray[spathArray.length-2].split(':');
+                    parentID = parentArrayPath[0];
+
+                } else if (request.payload.selector.stype === 'deck') {
                     parentID = request.payload.selector.sid;
-                } else if (request.payload.selector.stype === 'slide') {
-                    // could be slide, or nothing
-                    if (spathArray.length > 1) {
-                        let parentArrayPath = spathArray[spathArray.length-2].split(':');
-                        parentID = parentArrayPath[0];
-                    } else {
-                        parentID = request.payload.selector.id;
-                    }
-
-                    let slideArrayPath = spathArray[spathArray.length-1].split(':');
-                    slidePosition = parseInt(slideArrayPath[1])+1;
                 } else {
                     // means we are at root deck
                     parentID = request.payload.selector.id;
                 }
+
+                let slideArrayPath = spathArray[spathArray.length-1].split(':');
+                slidePosition = parseInt(slideArrayPath[1])+1;
 
                 let slideRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
                 self.getSlide({
