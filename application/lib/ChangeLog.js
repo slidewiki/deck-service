@@ -89,7 +89,7 @@ const omitOrder = (item) => _.omit(item, 'order');
 
 let self = module.exports = {
 
-    deckTracker: function(deck, rootDeckId, user, parentOperations=[], addAction) {
+    deckTracker: function(deck, rootDeckId, user, parentOperations=[], editAction) {
         // parentOperations is an array of deck change records that includes
         // any change records that act as a source for the operation we are currently tracking
         // those for now are really only one deck change
@@ -275,9 +275,9 @@ let self = module.exports = {
                         if (parentOpIds.length) {
                             c.parents = parentOpIds;
                         }
-                        // check addAction content flag
-                        if (c.op === 'add' && addAction) {
-                            c.action = addAction;
+                        // check editAction content flag
+                        if (editAction) {
+                            c.action = editAction;
                         }
 
                     });
@@ -296,7 +296,7 @@ let self = module.exports = {
     },
 
     // we create a change log record for deck creation as well
-    trackDeckCreated: function(deckId, userId, rootDeckId, parentOperations=[], action) {
+    trackDeckCreated: function(deckId, userId, rootDeckId, parentOperations=[], createAction) {
         userId = parseInt(userId);
 
         let deckNode = {
@@ -340,7 +340,7 @@ let self = module.exports = {
             }
 
             // add the action!
-            if (action) logRecord.action = action;
+            if (createAction) logRecord.action = createAction;
 
             return saveDeckChanges([logRecord]);
 

@@ -65,7 +65,7 @@ function prepareChangeLog(changeLog, simplifyOutput) {
             }
 
             if (cur.value.kind === 'slide') {
-                if (ref.revision < cur.oldValue.ref.revision) {
+                if (ref.revision < cur.oldValue.ref.revision || cur.action === 'revert') {
                     // we have a revert!
                     cur.reverted = {
                         from: cur.oldValue.ref.revision,
