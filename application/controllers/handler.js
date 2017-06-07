@@ -715,6 +715,9 @@ let self = module.exports = {
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
                             deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
                             slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
+
+                            createThumbnail(insertedDuplicate.revisions[0].content, insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id);
+
                             reply(node);
                         }).catch((err) => {
                             request.log('error', err);
