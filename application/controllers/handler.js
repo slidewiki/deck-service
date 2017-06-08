@@ -36,18 +36,6 @@ const slidetemplate = '<div class="pptx2html" style="position: relative; width: 
     '</div></div>';
 
 let self = module.exports = {
-    //returns a news ID of a legacy deck (with the revision number fort the user owning the legacy revision)
-    getLegacyDeckId: function(request, reply) {
-        deckDB.getLegacyId(request.params.oldId).then((id) => {
-            if (co.isEmpty(id))
-                reply(boom.notFound());
-            else
-                reply(id);
-        }).catch((error) => {
-            reply(error);
-        });
-    },
-
     //gets a single slide with all of its revisions, unless revision is defined
     getSlide: function(request, reply) {
         slideDB.get(encodeURIComponent(request.params.id)).then((slide) => {
@@ -520,25 +508,6 @@ let self = module.exports = {
             }
 
             return deckDB.forkDeckRevision(request.params.id, request.payload.user).then((id_map) => {
-                reply(id_map);
-            });
-
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation(error));
-        });
-
-    },
-
-    translateDeckRevision: function(request, reply) {
-        return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
-        .then((forkAllowed) => {
-            if (!forkAllowed) {
-                return reply(boom.forbidden());
-            }
-
-            return deckDB.translateDeckRevision(request.params.id, request.payload.user, request.payload.language).then((id_map) => {
-                //We must iterate through all objects in the decktree of the fork and translate each one
                 reply(id_map);
             });
 

@@ -9,13 +9,11 @@ const userService = require('../services/user');
 
 const helper = require('./helper'),
     striptags = require('striptags'),
-    validateDeck = require('../models/deck').validateDeck,
-    Microservices = require('../configs/microservices');
+    validateDeck = require('../models/deck').validateDeck;
 
 const async = require('async');
 
 let self = module.exports = {
-
     //gets a specified deck and all of its revision, or only the given revision
     get: function(identifier) {
         identifier = String(identifier);
@@ -97,72 +95,6 @@ let self = module.exports = {
                 return deck.revisions.find((rev) => (rev.id === deck.active));
             }
         });
-
-    },
-
-    //gets a new id for a legacy deck
-    getLegacyId: function(id) {
-        return helper.connectToDatabase()
-        .then((db) => db.collection('oldrevisions'))
-        .then((col) => col.findOne({'_id' :parseInt(id)}))
-        .then((old_deck) => {
-            if(old_deck) {
-                return helper.connectToDatabase()
-                .then((db) => db.collection('decks'))
-                .then((col) => col.findOne({'_id':parseInt(old_deck.deck_id)}))
-                .then((found) => {
-                    if(found) {
-                        if (found.revisions.length){
-                            return new Promise((resolve, reject) => {
-                                let index = 0;
-                                for (let i = found.revisions.length - 1; i>=0; i--){
-                                    if (found.revisions[i].user === old_deck.user_id){
-                                        index = parseInt(i)+1;
-                                        resolve(found._id+'-'+index); //the last revision for this user
-                                    };
-                                }
-                                resolve(found._id + '-' + found.revisions.length); //the last revision if there is no revision for this user
-                                // async.eachOf(found.revisions, (value, key, cbEach) => {
-                                //     if (value.user === old_deck.user_id){
-                                //         //k = key;
-                                //         if (key > j){ //this is a later revision of this user, return it
-                                //             j = key;
-                                //             k = key;
-                                //             cbEach(j);
-                                //         }else{
-                                //             k=key;
-                                //             cbEach(j); //this is a previous revision of this user, continue search
-                                //         }
-                                //     }else{
-                                //         cbEach(k); //there is no revisions for this user, return the last revision
-                                //     }
-                                // }, (index) => {
-                                //     let i = parseInt(index)+1;
-                                //     resolve(found._id+'-'+i);
-                                // });
-                            });
-                        }else{
-                            return;
-                        }
-                    }else{
-                        return ;
-                    }
-                }).catch((error) => {
-                    console.log(error);
-                    return;
-                });
-            }else{
-                return;
-            }
-        }).catch((error) => {
-            console.log(error);
-            return;
-        });
-    },
-
-    //gets the last revision of a user for a legacy deck
-    getLegacyRevision: function(id, user_id){
-        return 'id'+id+'user_id'+user_id;
 
     },
 
@@ -1801,7 +1733,6 @@ let self = module.exports = {
         });
     },
 
-
     // TODO make this actually private after code in handler.js has been moved here
     _trackDecksForked(rootDeckId, forkIdsMap, userId, forAttach) {
         // we reverse the array to track the root first, then the children in order
@@ -1824,7 +1755,6 @@ let self = module.exports = {
                 return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forAttach);
             });
         }, Promise.resolve([]));
-
 
     },
 
