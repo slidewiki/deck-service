@@ -1860,6 +1860,67 @@ let self = module.exports = {
         });
     },
 
+    // queries the database to return the set of all decks that are part of a deck fork chain
+    // the group can be identified by the deck with minimum id (earliest created one)
+    // if it returns an empty array, it means the deck id is NOT in the database
+    computeForkGroup(deckId) {
+        deckId = parseInt(deckId);
+        let pipeline = [
+            { $match: { _id: deckId } },
+            { $project: { origin: 1 } },
+            // add the origins
+            { $graphLookup: {
+                from: 'decks',
+                startWith: '$origin.id',
+                connectFromField: 'origin.id',
+                connectToField: '_id',
+                as: 'origins',
+            } },
+            { $project: {
+                origins: { _id: 1 },
+            } },
+            // add self in origins, it could be the fork group root
+            { $project: {
+                origins: { $setUnion: [ '$origins', [{ _id: '$_id' }] ] },
+            } },
+            // add the forks of origins
+            { $graphLookup: {
+                from: 'decks',
+                startWith: '$origins._id',
+                connectFromField: '_id',
+                connectToField: 'origin.id',
+                as: 'originsforks',
+            } },
+            { $project: {
+                origins: 1,
+                originsforks: { _id: 1 },
+            } },
+            // add the forks
+            { $graphLookup: {
+                from: 'decks',
+                startWith: '$_id',
+                connectFromField: '_id',
+                connectToField: 'origin.id',
+                as: 'forks',
+            } },
+            { $project: {
+                _id: 0,
+                origins: 1,
+                originsforks: 1,
+                forks: { _id: 1 },
+            } },
+            { $project: {
+                forkGroup: { $setUnion: [ '$origins', '$forks', '$originsforks' ] },
+            } },
+            { $unwind: '$forkGroup' },
+            { $project: { id: '$forkGroup._id' } },
+        ];
+
+        return helper.getCollection('decks')
+        .then((decks) => decks.aggregate(pipeline))
+        .then((result) => result.map((d) => d.id).toArray());
+    },
+
     // computes the usage of the item, i.e. the decks that point to it
     getUsage(itemId, itemKind='deck', keepVisibleOnly=false) {
         let item = util.parseIdentifier(itemId);
