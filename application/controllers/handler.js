@@ -36,6 +36,18 @@ const slidetemplate = '<div class="pptx2html" style="position: relative; width: 
     '</div></div>';
 
 let self = module.exports = {
+    //returns a news ID of a legacy deck (with the revision number fort the user owning the legacy revision)
+    getLegacyDeckId: function(request, reply) {
+        deckDB.getLegacyId(request.params.oldId).then((id) => {
+            if (co.isEmpty(id))
+                reply(boom.notFound());
+            else
+                reply(id);
+        }).catch((error) => {
+            reply(error);
+        });
+    },
+
     //gets a single slide with all of its revisions, unless revision is defined
     getSlide: function(request, reply) {
         slideDB.get(encodeURIComponent(request.params.id)).then((slide) => {
