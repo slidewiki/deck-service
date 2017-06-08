@@ -77,6 +77,21 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/legacy/{oldId}',
+        handler: handlers.getLegacyDeckId,
+        config: {
+            validate: {
+                params: {
+                    oldId: Joi.string()
+                }
+            },
+            tags: ['api'],
+            description: 'Get new id of a legacy deck'
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/editors',
         handler: handlers.getEditors,
         config: {
