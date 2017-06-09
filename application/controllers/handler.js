@@ -220,7 +220,7 @@ let self = module.exports = {
                 if (deck.revisions !== undefined && deck.revisions.length > 0 && deck.revisions[0] !== null) {
                     // add first slide id-revision for all revisions
                     deck.revisions.forEach((rev) => {
-                        rev.firstSlide = getFirstSlide(rev);
+                        rev.firstSlide = deckDB.getFirstSlide(rev);
                     });
 
                     let deckRevision = deck.revisions.find((revision) => String(revision.id) === String(deckRevisionId));
@@ -805,7 +805,7 @@ let self = module.exports = {
                                 }
 
                                 // omitting the top_root_deck means this change won't be tracked,
-                                // as it will be tracked right after this code, we just need to attach 
+                                // as it will be tracked right after this code, we just need to attach
                                 // first so that the rest of the tracking will work
                                 deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
                                     // track all created forks AFTER it's attached
@@ -1246,52 +1246,17 @@ let self = module.exports = {
 
     //gets all recent decks
     getAllRecent: (request, reply) => {
-        deckDB.findWithLimitAndSort('decks', {}, parseInt(request.params.limit), parseInt(request.params.offset), {'timestamp': -1})
-        .then((decks) => {
-            if (decks.length < 1) {
-                reply(boom.notFound());
-                return;
-            }
-            let result = [];
-            async.eachSeries(decks, (deck, callback) => {
-                let metadata = {};
-                metadata._id = deck._id;
-                metadata.description = deck.description;
-                metadata.countRevisions = deck.revisions.length;
-                metadata.active = deck.active;
-                metadata.user = deck.user;
+        let limit = parseInt(request.params.limit);
+        let offset = parseInt(request.params.offset);
 
-                metadata.timestamp = deck.timestamp;
-                //get revision
-                let revision = deck.revisions[deck.active-1];
-                metadata.title = revision.title;
-                if (revision.language){
-                    metadata.language = revision.language.length === 2 ? revision.language : revision.language.substring(0, 2);
-                }else{
-                    metadata.language = 'en';
-                }
-                metadata.firstSlide = getFirstSlide(revision);
+        deckDB.getAllRecent(limit, offset).then( (recentDecks) => {
+            if(!recentDecks) return reply([]);
 
-                metadata.revision_to_show = revision.id;
-                deckDB.getUsernameById(deck.user) //get username
-                .then((username) => {
-                    metadata.username = username;
-                    result.push(metadata);
-                    callback();
-                })
-                .catch((err) => {
-                    console.log(err);
-                    metadata.username = null;
-                    result.push(metadata);
-                    callback();
-                });
-            }, () => {
-                return reply(result);
-            });
-        })
-        .catch((err) => {
-            console.log(err);
-            reply(boom.notFound());
+            reply(recentDecks);
+
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
     },
 
@@ -1330,7 +1295,7 @@ let self = module.exports = {
                     metadata.language = 'en';
                 }
 
-                metadata.firstSlide = getFirstSlide(revision);
+                metadata.firstSlide = deckDB.getFirstSlide(revision);
                 metadata.revision_to_show = revision.id;
                 deckDB.getUsernameById(deck.user) //get username
                 .then((username) => {
@@ -1407,7 +1372,7 @@ let self = module.exports = {
                 metadata.parent = revision.parent;
 
                 // get first slide
-                metadata.firstSlide = getFirstSlide(revision);
+                metadata.firstSlide = deckDB.getFirstSlide(revision);
 
                 result.push(metadata);
             });
@@ -1587,27 +1552,6 @@ function authorizeUser(userId, deckId, rootDeckId) {
         // return nothing if all's ok :)
     });
 
-}
-
-// get first slide
-function getFirstSlide(revision) {
-    // TODO two bugs in this code just by looking at it,
-    // (1) it assumes first contentItem is slide
-    // (2) it assumes there's at least one slide in contentItems, could be in subdecks
-    // (3) it keeps iteration even though it found it
-    let firstSlide;
-    for (let key in revision.contentItems) {
-        if (revision.contentItems[key].order === 1
-            && revision.contentItems[key].kind === 'slide') {
-            firstSlide = revision.contentItems[key].ref.id;
-
-            if (revision.contentItems[key].ref.revision) {
-                firstSlide += '-' + revision.contentItems[key].ref.revision;
-            }
-        }
-    }
-
-    return firstSlide;
 }
 
 //creates a thumbnail for a given slide

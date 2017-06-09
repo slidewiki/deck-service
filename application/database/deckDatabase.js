@@ -643,7 +643,7 @@ let self = module.exports = {
                 if (item.kind === 'slide') {
                     promise = helper.getCollection('slides').then((col) => {
                         return col.findOneAndUpdate(
-                            { 
+                            {
                                 _id: item.ref.id,
                                 'revisions.id': item.ref.revision,
                             },
@@ -659,7 +659,7 @@ let self = module.exports = {
                 } else {
                     promise = helper.getCollection('decks').then((col) => {
                         return col.findOneAndUpdate(
-                            { 
+                            {
                                 _id: item.ref.id,
                                 'revisions.id': item.ref.revision,
                             },
@@ -1999,7 +1999,7 @@ let self = module.exports = {
     getChangesCounts: function(deckId) {
         let deck = util.parseIdentifier(deckId);
         return helper.getCollection('deckchanges').then((changes) => {
-   
+
             return changes.aggregate([
                 // primary filter
                 { $match: {
@@ -2055,8 +2055,109 @@ let self = module.exports = {
         });
 
     },
+    // count deck forks count for an array of deck ids
+    countManyDeckForks(deckIds){
+        let aggregateQuery = [
+            {
+                $match: {
+                    'origin.id': {
+                        $in: deckIds
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: '$origin.id',
+                    forkCount: { $sum: 1 }
+                }
+            }
+        ];
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.aggregate(aggregateQuery);
+        }).then((cursor) => cursor.toArray());
+    },
+
+    // get all recent decks
+    getAllRecent: function(limit, offset){
+        return self.findWithLimitAndSort('decks', {}, limit, offset, {'timestamp': -1})
+        .then((recentDecks) => {
+
+            let userIds = new Set(), countForksIds = new Set();
+
+            // collect user ids and deck ids to count forks needed
+            recentDecks.forEach( (deck) => {
+                userIds.add(deck.user);
+                countForksIds.add(deck._id);
+            });
+
+            // count deck forks for the abouve deck ids
+            let forkCounts = {};
+            let forkCountsPromise = self.countManyDeckForks([...countForksIds]).then( (forkCountsInfo) => {
+                forkCountsInfo.forEach( (forkCount) => {
+                    forkCounts[forkCount._id] = forkCount.forkCount;
+                });
+            });
+
+            // fetch usernames for user ids needed
+            let usernames = {};
+            let userPromise = userService.fetchUserInfo([...userIds]).then( (userInfo) => {
+                userInfo.forEach( (u) => {
+                    usernames[u.id] = u.username;
+                });
+            });
+
+            return Promise.all([userPromise, forkCountsPromise]).then( () => {
+                recentDecks = recentDecks.map( (deck) => {
+                    let activeRevision = deck.revisions.find((rev) => (rev.id === deck.active));
+                    if(!activeRevision) return null;
+
+                    return {
+                        _id: deck._id,
+                        title: activeRevision.title,
+                        description: deck.description,
+                        user: deck.user,
+                        username: !_.isNil(usernames[deck.user]) ? usernames[deck.user] : 'Unknown user',
+                        active: deck.active,
+                        countRevisions: deck.revisions.length,
+                        timestamp: deck.timestamp,
+                        language: !_.isNil(activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
+                        revision_to_show: activeRevision.id,
+                        forkCount: !_.isNil(forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                        firstSlide: self.getFirstSlide(activeRevision)
+                    };
+                });
+
+                return recentDecks;
+            });
+        });
+    },
+
+    // get first slide
+    getFirstSlide: function(revision) {
+        // TODO two bugs in this code just by looking at it,
+        // (1) it assumes first contentItem is slide
+        // (2) it assumes there's at least one slide in contentItems, could be in subdecks
+        // (3) it keeps iteration even though it found it
+        let firstSlide;
+        for (let key in revision.contentItems) {
+            if (revision.contentItems[key].order === 1
+                && revision.contentItems[key].kind === 'slide') {
+                firstSlide = revision.contentItems[key].ref.id;
+
+                if (revision.contentItems[key].ref.revision) {
+                    firstSlide += '-' + revision.contentItems[key].ref.revision;
+                }
+            }
+        }
+
+        return firstSlide;
+    }
 
 };
+
 
 // split deck id given as parameter to deck id and revision id
 function splitDeckIdParam(deckId){
