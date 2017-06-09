@@ -981,18 +981,27 @@ let self = module.exports = {
                             'log': request.log.bind(request),
                         }, (createdDeck) => {
                             if (createdDeck.isBoom) return reply(createdDeck);
-                            //if there is a parent deck, update its content items
-                            if(typeof parentID !== 'undefined')
-                                deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck', 1, userId, top_root_deck);
-                            //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                            self.getDeckTree({
-                                'params': {'id' : createdDeck.id},
-                                'log': request.log.bind(request),
-                            }, (deckTree) => {
-                                if (deckTree.isBoom) return reply(deckTree);
 
-                                reply(deckTree);
+                            let insertPromise = Promise.resolve();
+                            if (parentID) {
+                                insertPromise = deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck', 1, userId, top_root_deck);
+                            }
+
+                            insertPromise.then(() => {
+                                // we have to return from the callback, else empty node is returned because it is updated asynchronously
+                                self.getDeckTree({
+                                    'params': {'id' : createdDeck.id},
+                                    'log': request.log.bind(request),
+                                }, (deckTree) => {
+                                    if (deckTree.isBoom) return reply(deckTree);
+
+                                    reply(deckTree);
+                                });
+                            }).catch((err) => {
+                                request.log('error', err);
+                                reply(boom.badImplementation());
                             });
+
                         });
                     });
                 }
