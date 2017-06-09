@@ -86,26 +86,36 @@ let self = module.exports = {
     },
 
     insert: function(slide) {
+        // check if parentDeck has revision
+        let parentDeck = util.parseIdentifier(slide.root_deck);
+        if (parentDeck && !parentDeck.revision) {
+            // need to find the latest revision id
+            return deckDB.getLatestRevision(parentDeck.id)
+            .then((parentRevision) => {
+                if (!parentRevision) return;
+
+                parentDeck.revision = parentRevision;
+                slide.root_deck = util.toIdentifier(parentDeck);
+
+                return self._insert(slide);
+            });
+        }
+
+        return self._insert(slide);
+    },
+
+    _insert: function(slide) {
         return helper.connectToDatabase()
         .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
         .then((newId) => {
-            return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
-            .then((db2) => db2.collection('slides'))
-            .then((col) => {
-                let valid = false;
+            return helper.getCollection('slides').then((slides) => {
                 slide._id = newId;
-                try {
-                    const convertedSlide = convertToNewSlide(slide);
-                    valid = slideModel(convertedSlide);
-                    if (!valid) {
-                        return slideModel.errors;
-                    }
-
-                    return col.insertOne(convertedSlide);
-                } catch (e) {
-                    console.log('validation failed', e);
+                const convertedSlide = convertToNewSlide(slide);
+                if (!slideModel(convertedSlide)) {
+                    throw new Error(JSON.stringify(slideModel.errors));
                 }
-                return;
+
+                return slides.insertOne(convertedSlide);
             });
         });
     },
@@ -452,12 +462,9 @@ function splitSlideIdParam(slideId){
 function convertToNewSlide(slide) {
     let now = new Date();
     slide.user = parseInt(slide.user);
-    let root_deck_array = slide.root_deck.split('-');
-    let usageArray = [];
-    usageArray.push({
-        'id': parseInt(root_deck_array[0]),
-        'revision': parseInt(root_deck_array[1])
-    });
+
+    let usageArray = [util.parseIdentifier(slide.root_deck)];
+
     if(slide.language === null){
         slide.language = 'en_EN';
     }

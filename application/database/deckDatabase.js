@@ -165,6 +165,17 @@ let self = module.exports = {
 
     },
 
+    // gets the latest revision id stored for deckId
+    getLatestRevision: function(deckId) {
+        deckId = parseInt(deckId);
+
+        return helper.getCollection('decks')
+        .then((col) => col.findOne(
+            { _id: deckId },
+            { revisions: { $slice: -1 } }
+        )).then((found) => found && found.revisions[0].id);
+    },
+
     //gets active revision of deck from database
     getActiveRevisionFromDB: function(identifier) {
         if(identifier.split('-').length > 1){
@@ -293,8 +304,28 @@ let self = module.exports = {
 
     },
 
-    //inserts a deck into the database
+    // inserts a deck into the database
     insert: function(deck) {
+        // check if parentDeck has revision
+        let parentDeck = util.parseIdentifier(deck.root_deck);
+        if (parentDeck && !parentDeck.revision) {
+            // need to find the latest revision id
+            return self.getLatestRevision(parentDeck.id)
+            .then((parentRevision) => {
+                if (!parentRevision) return;
+
+                parentDeck.revision = parentRevision;
+                deck.root_deck = util.toIdentifier(parentDeck);
+
+                return self._insert(deck);
+            });
+        }
+
+        return self._insert(deck);
+    },
+
+    // inserts a deck into the database
+    _insert: function(deck) {
         return helper.connectToDatabase()
         .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
         .then((newId) => {
@@ -302,13 +333,9 @@ let self = module.exports = {
             .then((col) => {
                 deck._id = newId;
 
-                if(typeof deck.root_deck === 'undefined'){
-                    deck.root_deck = null;
-                }
-
                 const convertedDeck = convertToNewDeck(deck);
                 if (!validateDeck(convertedDeck)) {
-                    throw validateDeck.errors;
+                    throw new Error(JSON.stringify(validateDeck.errors));
                 }
 
                 return col.insertOne(convertedDeck).then((result) => {
@@ -2330,15 +2357,12 @@ function getOrder(activeRevision){
 
 function convertToNewDeck(deck){
     let now = new Date();
-    let root_deck = deck.root_deck;
+
     let usageArray = [];
-    if(root_deck !== null){
-        let root_deck_array = root_deck.split('-');
-        usageArray.push({
-            'id': parseInt(root_deck_array[0]),
-            'revision': parseInt(root_deck_array[1])
-        });
+    if (deck.root_deck) {
+        usageArray.push(util.parseIdentifier(deck.root_deck));
     }
+
     deck.user = parseInt(deck.user);
     let contributorsArray = [{'user': deck.user, 'count': 1}];
     if(!deck.hasOwnProperty('tags') || deck.tags === null){

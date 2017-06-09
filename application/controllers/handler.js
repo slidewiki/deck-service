@@ -82,6 +82,9 @@ let self = module.exports = {
     newSlide: function(request, reply) {
         //insert the slide
         slideDB.insert(request.payload).then((inserted) => {
+            // empty results means something wrong with the payload
+            if (!inserted) return reply(boom.badData());
+
             if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
                 throw inserted;
             else{
@@ -378,6 +381,9 @@ let self = module.exports = {
     newDeck: function(request, reply) {
         //insert the deck into the database
         deckDB.insert(request.payload).then((inserted) => {
+            // empty results means something wrong with the payload
+            if (!inserted) return reply(boom.badData());
+
             if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
                 throw inserted;
             else{
