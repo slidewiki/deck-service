@@ -5,6 +5,7 @@ const async = require('async');
 
 const Immutable = require('immutable');
 const diff = require('immutablediff');
+const patch = require('immutablepatch');
 
 const util = require('../lib/util');
 
@@ -82,7 +83,28 @@ const ChangeLogRecord = {
 
     },
 
+    createNodeReplace: function(contentItems, replaceOps, index, path) {
+        if (!_.isEmpty(path) && _.isNumber(index)) path = path.concat({ index });
+
+        let before = contentItems.get(index).toJS();
+        let after = patch(contentItems, replaceOps).get(index).toJS();
+
+        return {
+            op: 'replace',
+
+            path: path,
+
+            value: after,
+            oldValue: before,
+
+            timestamp: (new Date()).toISOString(),
+        };
+
+    },
 };
+
+// flag to enable/disable track detailed revert change log
+const detailedRevertChangeLog = false;
 
 // returns a new object without `order` property
 const omitOrder = (item) => _.omit(item, 'order');
@@ -126,12 +148,7 @@ let self = module.exports = {
         return {
             // returns the change log record that should be appended to the database
             // should be called right after all changes are made, and before saving the deck object
-            // `updatedDeck` is optional, for code that applies changes on a new deck object
             deckUpdateRecords: function(path, updatedDeck) {
-                if (!updatedDeck) {
-                    updatedDeck = deck;
-                }
-
                 // we may have two records here: one for updating the values
                 // the other for updating the revision (but only when not a subdeck)
                 let records = [];
@@ -188,29 +205,75 @@ let self = module.exports = {
                 return records;
             },
 
-            contentItemsRecords: function(path) {
-                const contentItemsAfter = Immutable.fromJS(revision.contentItems.map(omitOrder));
+            contentItemsRecords: function(path, updatedDeck) {
+                // check if we are applying update to deck across revisions
+                // in that case the deck/updatedDeck latest revisions will be different
+                let updatedRevision = revision;
+                [updatedRevision] = updatedDeck.revisions.slice(-1);
+
+                if (revision.id !== updatedRevision.id) {
+                    if (revision.originRevision < revision.id) {
+                        // this is a revert! check the flag
+                        if (!detailedRevertChangeLog) {
+                            // do nothing
+                            return [];
+                        } else {
+                            console.log(`generating change log for deck ${deck._id} revert action from ${revision.id} to ${updatedRevision.originRevision}`);
+                        }
+                    } else {
+                        console.log(`generating change log for deck ${deck._id} revise action from ${revision.id}`);
+                    }
+                }
+
+                const contentItemsAfter = Immutable.fromJS(updatedRevision.contentItems.map(omitOrder));
                 const contentItemOps = diff(contentItemsBefore, contentItemsAfter);
 
 // console.log(contentItemsBefore);
 // console.log(contentItemsAfter);
 // console.log(contentItemOps);
 
+                // in order to get correct positions, we need to apply each diff op
+                // to the contentItemsBefore object incrementally as we iterate through the diffs
+                let contentItemsPatched = contentItemsBefore;
+
+                let replaceOpsGroup = [], lastReplaceIndex;
                 // we have a list of JSON patch-style operations, which we would like to save in the log
                 // in a reversible way as to provide full log capabilities without need for current state
-                let result = contentItemOps.toJS().map((rec) => {
+                let result = contentItemOps.toJS().concat({ op: 'dummy' }).reduce((acc, rec) => {
+                    // we add a dummy record to make sure we process everything
+                    let nextRecord;
+
+                    if (rec.op !== 'replace') {
+                        // check if anything's in the replace group and add it before moving on
+                        if (replaceOpsGroup.length) {
+                            // starts another group
+                            // create the record from the current group
+                            let patchList = Immutable.fromJS(replaceOpsGroup);
+                            acc.push(ChangeLogRecord.createNodeReplace(contentItemsPatched, patchList, lastReplaceIndex, path));
+
+                            // patch the contentItems!
+                            contentItemsPatched = patch(contentItemsPatched, patchList);
+                            // clear the group
+                            replaceOpsGroup.length = 0;
+                            // unset the replace index
+                            lastReplaceIndex = -1;
+                        }
+                    }
 
                     if (rec.op === 'remove') {
                         // we only expect removal of an index, will throw an error otherwise
                         let indexMatch = rec.path.match(/^\/(\d+)$/);
 
                         if (!indexMatch) {
-                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.strigify(rec)}`);
+                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${updatedRevision.id}: ${JSON.stringify(rec)}`);
                         }
 
                         // indexMatch[1] includes just the index added
                         let index = parseInt(indexMatch[1]);
-                        return ChangeLogRecord.createNodeRemove(contentItemsBefore.toJS(), index, path);
+                        nextRecord = ChangeLogRecord.createNodeRemove(contentItemsPatched.toJS(), index, path);
+
+                        // for remove op, we need to patch the contentItems AFTER we create the record!
+                        contentItemsPatched = patch(contentItemsPatched, Immutable.fromJS([rec]));
                     }
 
                     if (rec.op === 'add') {
@@ -218,28 +281,61 @@ let self = module.exports = {
                         let indexMatch = rec.path.match(/^\/(\d+)$/);
 
                         if (!indexMatch) {
-                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.strigify(rec)}`);
+                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${updatedRevision.id}: ${JSON.stringify(rec)}`);
                         }
 
                         // indexMatch[1] includes just the index added
                         let index = parseInt(indexMatch[1]);
-                        return ChangeLogRecord.createNodeInsert(contentItemsAfter.toJS(), index, path);
+
+                        // for add op, we need to patch the contentItems BEFORE we create the record!
+                        contentItemsPatched = patch(contentItemsPatched, Immutable.fromJS([rec]));
+
+                        nextRecord = ChangeLogRecord.createNodeInsert(contentItemsPatched.toJS(), index, path);
                     }
 
                     if (rec.op === 'replace') {
-                        // for now we expect only revision changes to contentItems, so let's throw an Error otherwise
-                        let indexMatch = rec.path.match(/^\/(\d+)\/ref\/revision/);
+                        // for now we expect only 'kind', 'ref/id', or 'ref/revision' paths
+                        let indexMatch = rec.path.match(/^\/(\d+)\/(kind|ref\/(?:id|revision))$/);
 
                         if (!indexMatch) {
-                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.strigify(rec)}`);
+                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${updatedRevision.id}: ${JSON.stringify(rec)}`);
                         }
 
                         // indexMatch[1] includes just the index added
                         let index = parseInt(indexMatch[1]);
-                        return ChangeLogRecord.createNodeUpdate(contentItemsBefore.get(index).toJS(), contentItemsAfter.get(index).toJS(), index, path);
+
+                        // replace ops may include one or more types in sequence for the same index
+                        // we would like to merge them into one record
+                        if (replaceOpsGroup.length) {
+                            if (lastReplaceIndex !== index) {
+                                // starts another group
+                                // create the record from the current group
+                                let patchList = Immutable.fromJS(replaceOpsGroup);
+                                nextRecord = ChangeLogRecord.createNodeReplace(contentItemsPatched, patchList, lastReplaceIndex, path);
+
+                                // patch the contentItems!
+                                contentItemsPatched = patch(contentItemsPatched, patchList);
+
+                                // clear the group
+                                replaceOpsGroup.length = 0;
+                                // reset the replace index
+                                lastReplaceIndex = index;
+                            } // either way add current rec and move on
+                            replaceOpsGroup.push(rec);
+                        } else {
+                            // set the replace index
+                            lastReplaceIndex = index;
+                            // add it to the group
+                            replaceOpsGroup.push(rec);
+                        }
+
                     }
 
-                });
+                    if (nextRecord) acc.push(nextRecord);
+
+                    return acc;
+
+                }, []);
 
                 return result;
             },
@@ -254,7 +350,7 @@ let self = module.exports = {
                     // first the deck changes
                     ...this.deckUpdateRecords(path, updatedDeck),
                     // then the children changes
-                    ...this.contentItemsRecords(path)])
+                    ...this.contentItemsRecords(path, updatedDeck)])
                 );
             },
 
