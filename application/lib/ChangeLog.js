@@ -104,7 +104,7 @@ const ChangeLogRecord = {
 };
 
 // flag to enable/disable track detailed revert change log
-const detailedRevertChangeLog = false;
+const detailedRevertChangeLog = true;
 
 // returns a new object without `order` property
 const omitOrder = (item) => _.omit(item, 'order');
@@ -122,13 +122,6 @@ let self = module.exports = {
 
         // latest is the only editable revision!!
         const [revision] = deck.revisions.slice(-1);
-
-        const deckId = `${deck._id}-${revision.id}`;
-
-        // TODO avoid this circular reference
-        const deckDB = require('../database/deckDatabase');
-
-        const pathPromise = deckDB.findPath(rootDeckId, deckId);
 
         // we only keep the properties we'd like to track for changes
         // we cloneDeep to make sure we don't share any references between deck/trackableDeck etc
@@ -228,6 +221,7 @@ let self = module.exports = {
                 const contentItemsAfter = Immutable.fromJS(updatedRevision.contentItems.map(omitOrder));
                 const contentItemOps = diff(contentItemsBefore, contentItemsAfter);
 
+// console.log(path);
 // console.log(contentItemsBefore);
 // console.log(contentItemsAfter);
 // console.log(contentItemOps);
@@ -340,45 +334,67 @@ let self = module.exports = {
                 return result;
             },
 
-            getChangeLog: function(updatedDeck) {
+            // should be called right after all changes are made, and before saving the deck object
+            // `updatedDeck` is optional, for code that applies changes on a new deck object
+            applyChangeLog: function(updatedDeck) {
                 if (!updatedDeck) {
                     updatedDeck = deck;
                 }
 
-                // wait for path promise then generate the log
-                return pathPromise.then((path) => _.compact([
-                    // first the deck changes
-                    ...this.deckUpdateRecords(path, updatedDeck),
-                    // then the children changes
-                    ...this.contentItemsRecords(path, updatedDeck)])
-                );
-            },
+                // latest is the only editable revision!!
+                let [updatedRevision] = updatedDeck.revisions.slice(-1);
+                let updatedDeckId = util.toIdentifier({ id: deck._id, revision: updatedRevision.id });
 
-            // should be called right after all changes are made, and before saving the deck object
-            // `updatedDeck` is optional, for code that applies changes on a new deck object
-            applyChangeLog: function(updatedDeck) {
-                return this.getChangeLog(updatedDeck).then((deckChanges) => {
-                    if (_.isEmpty(deckChanges)) {
-                        // console.warn('WARNING: no deck changes detected as was expected');
-                        return deckChanges;
+                // it could be that the updated deck is the root deck, so we check the rootDeckId again
+                let rootDeck = util.parseIdentifier(rootDeckId);
+                if (rootDeck.id === deck._id) {
+                    rootDeckId = updatedDeckId;
+                }
+
+                // TODO avoid this circular reference
+                let deckDB = require('../database/deckDatabase');
+                // wait for path promise then generate the log
+                return deckDB.findPath(rootDeckId, updatedDeckId)
+                .then((path) => {
+                    // keep the parent ops list handy
+                    let parentOpIds = parentOperations.map((op) => op._id);
+
+                    // first the deck changes
+                    let deckUpdates = _.compact(this.deckUpdateRecords(path, updatedDeck));
+
+                    let saveFirstBatch = Promise.resolve([]);
+                    if (deckUpdates.length) {
+                        if (parentOpIds.length) {
+                            // add parent operations for deck updates
+                            deckUpdates.forEach((c) => { c.parents = parentOpIds; });
+                        }
+
+                        saveFirstBatch = saveDeckChanges(deckUpdates, user, editAction);
                     }
 
-                    let parentOpIds = parentOperations.map((op) => op._id);
-                    deckChanges.forEach((c) => {
-                        // add user for all changes
-                        c.user = user;
-                        // add parent operations for all changes
+                    return saveFirstBatch.then(() => {
+
+                        // then the children changes
+                        let childrenUpdates = _.compact(this.contentItemsRecords(path, updatedDeck));
+                        if (_.isEmpty(childrenUpdates)) {
+                            // if (_.isEmpty(deckUpdates)) console.warn('WARNING: no deck changes detected as was expected');
+                            return deckUpdates;
+                        }
+
+                        // when we have both deck updates and children updates
+                        // we would like the children to be linked to the deck updates
+                        parentOpIds = parentOpIds.concat(deckUpdates.map((op) => op._id));
                         if (parentOpIds.length) {
-                            c.parents = parentOpIds;
+                            // add parent operations for children updates
+                            childrenUpdates.forEach((c) => { c.parents = parentOpIds; });
                         }
-                        // check editAction content flag
-                        if (editAction) {
-                            c.action = editAction;
-                        }
+
+                        return saveDeckChanges(childrenUpdates, user, editAction).then(() => {
+                            // return all changes
+                            return [...deckUpdates, ...childrenUpdates];
+                        });
 
                     });
-
-                    return saveDeckChanges(deckChanges);
 
                 }).catch((err) => {
                     console.warn(err);
@@ -401,7 +417,7 @@ let self = module.exports = {
         };
 
         // TODO avoid this circular reference
-        const deckDB = require('../database/deckDatabase');
+        let deckDB = require('../database/deckDatabase');
         return deckDB.findPath(rootDeckId, util.toIdentifier(deckNode.ref)).then((path) => {
             // path could be empty (?)
             if (rootDeckId && _.isEmpty(path)) {
@@ -426,8 +442,6 @@ let self = module.exports = {
 
                 logRecord = ChangeLogRecord.createNodeInsert(after, leaf.index, path);
             }
-            // add the user!
-            logRecord.user = userId;
 
             // add the parent ops!
             let parentOpIds = parentOperations.map((op) => op._id);
@@ -435,10 +449,7 @@ let self = module.exports = {
                 logRecord.parents = parentOpIds;
             }
 
-            // add the action!
-            if (createAction) logRecord.action = createAction;
-
-            return saveDeckChanges([logRecord]);
+            return saveDeckChanges([logRecord], userId, createAction);
 
         }).catch((err) => {
             console.warn(err);
@@ -460,10 +471,20 @@ let self = module.exports = {
 
 
 
-// should be called right after all changes are made, and before saving the deck object
-// `updatedDeck` is optional, for code that applies changes on a new deck object
-function saveDeckChanges(deckChanges, userId) {
+// fills record data with slide/deck/user info before saving it
+function saveDeckChanges(deckChanges, userId, userAction) {
     return fillSlideInfo(deckChanges).then(fillDeckInfo).then(() => {
+
+        deckChanges.forEach((c) => {
+            // add user for all changes
+            c.user = userId;
+
+            // check userAction content flag
+            if (userAction) {
+                c.action = userAction;
+            }
+        });
+
         // TODO remove this
         // console.log('deck changed: ' + JSON.stringify(deckChanges));
 
