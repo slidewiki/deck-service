@@ -1181,7 +1181,7 @@ let self = module.exports = {
                 let old_rev_id = rootArray[1];
 
                 // pre-compute what the for loop does
-                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user, parentOperations);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user, parentOperations, revertedRevId ? 'revert' : undefined);
 
                 existingDeck.lastUpdate = new Date().toISOString();
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
