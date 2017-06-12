@@ -1656,6 +1656,9 @@ let self = module.exports = {
                                 // this points to the same deck, needs to be removed in forked decks
                                 delete copiedDeck.revisions[0].originRevision;
 
+                                // isFeatured needs to be removed in forked decks
+                                delete copiedDeck.revisions[0].isFeatured;
+
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
                                         if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
