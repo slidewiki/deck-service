@@ -1289,22 +1289,6 @@ let self = module.exports = {
         });
     },
 
-    //returns the username of a user by the user's id (why is this here?)
-    getUsernameById: function(user_id){
-        return helper.connectToDatabase()
-        .then((db) => db.collection('users'))
-        .then((col) => col.findOne({
-            _id: user_id})
-        .then((user) => {
-            if (user){
-                return user.username;
-            }else{
-                return '';
-            }
-        })
-        );
-    },
-
     //returns a flattened structure of a deck's slides, and optionally its sub-decks
     getFlatSlides: function(deckId, deckTree, returnDecks){
 
@@ -2055,7 +2039,7 @@ let self = module.exports = {
         });
 
     },
-    // count deck forks count for an array of deck ids
+    // count deck forks for an array of deck ids
     countManyDeckForks(deckIds){
         let aggregateQuery = [
             {
@@ -2080,59 +2064,14 @@ let self = module.exports = {
         }).then((cursor) => cursor.toArray());
     },
 
-    // get all recent decks
+    // get  recent decks
     getAllRecent: function(limit, offset){
-        return self.findWithLimitAndSort('decks', {}, limit, offset, {'timestamp': -1})
-        .then((recentDecks) => {
+        return self.findWithLimitAndSort('decks', {}, limit, offset, {'timestamp': -1});
+    },
 
-            let userIds = new Set(), countForksIds = new Set();
-
-            // collect user ids and deck ids to count forks needed
-            recentDecks.forEach( (deck) => {
-                userIds.add(deck.user);
-                countForksIds.add(deck._id);
-            });
-
-            // count deck forks for the abouve deck ids
-            let forkCounts = {};
-            let forkCountsPromise = self.countManyDeckForks([...countForksIds]).then( (forkCountsInfo) => {
-                forkCountsInfo.forEach( (forkCount) => {
-                    forkCounts[forkCount._id] = forkCount.forkCount;
-                });
-            });
-
-            // fetch usernames for user ids needed
-            let usernames = {};
-            let userPromise = userService.fetchUserInfo([...userIds]).then( (userInfo) => {
-                userInfo.forEach( (u) => {
-                    usernames[u.id] = u.username;
-                });
-            });
-
-            return Promise.all([userPromise, forkCountsPromise]).then( () => {
-                recentDecks = recentDecks.map( (deck) => {
-                    let activeRevision = deck.revisions.find((rev) => (rev.id === deck.active));
-                    if(!activeRevision) return null;
-
-                    return {
-                        _id: deck._id,
-                        title: activeRevision.title,
-                        description: deck.description,
-                        user: deck.user,
-                        username: !_.isNil(usernames[deck.user]) ? usernames[deck.user] : 'Unknown user',
-                        active: deck.active,
-                        countRevisions: deck.revisions.length,
-                        timestamp: deck.timestamp,
-                        language: !_.isNil(activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
-                        revision_to_show: activeRevision.id,
-                        forkCount: !_.isNil(forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
-                        firstSlide: self.getFirstSlide(activeRevision)
-                    };
-                });
-
-                return recentDecks;
-            });
-        });
+    // get featured decks
+    getAllFeatured: function(limit, offset){
+        return self.findWithLimit('decks', {'revisions.isFeatured': 1}, limit, offset);
     },
 
     // get first slide

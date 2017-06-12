@@ -1252,8 +1252,64 @@ let self = module.exports = {
         deckDB.getAllRecent(limit, offset).then( (recentDecks) => {
             if(!recentDecks) return reply([]);
 
-            reply(recentDecks);
+            let userIds = new Set(), countForksIds = new Set();
 
+            // collect user ids and deck ids to count forks needed
+            recentDecks.forEach( (deck) => {
+                userIds.add(deck.user);
+                countForksIds.add(deck._id);
+            });
+
+            // count deck forks for the abouve deck ids
+            let forkCounts = {};
+            let forkCountsPromise = deckDB.countManyDeckForks([...countForksIds]).then( (forkCountsInfo) => {
+                forkCountsInfo.forEach( (forkCount) => {
+                    forkCounts[forkCount._id] = forkCount.forkCount;
+                });
+            });
+
+            // fetch usernames for user ids needed
+            let usernames = {};
+            let userPromise = userService.fetchUserInfo([...userIds]).then( (userInfo) => {
+                userInfo.forEach( (u) => {
+                    usernames[u.id] = u.username;
+                });
+            });
+
+            return Promise.all([userPromise, forkCountsPromise]).then( () => {
+
+                recentDecks = recentDecks.map( (deck) => {
+
+                    // get active revision
+                    let activeRevision = deck.revisions.find((rev) => (rev.id === deck.active));
+                    if(!activeRevision) return null;
+
+                    // get latest revision
+                    let [latestRevision] = deck.revisions.slice(-1);
+
+                    return {
+                        _id: deck._id,
+                        title: activeRevision.title,
+                        description: deck.description,
+                        user: deck.user,
+                        username: (usernames[deck.user]) ? usernames[deck.user] : 'Unknown user',
+                        active: deck.active,
+                        countRevisions: deck.revisions.length,
+                        timestamp: deck.timestamp,
+                        language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
+                        forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                        firstSlide: deckDB.getFirstSlide(activeRevision),
+                        revisionId: activeRevision.id,
+                        latestRevisionId: latestRevision.id
+                    };
+                }).filter( (deck) => { return deck != null; });
+
+                reply(recentDecks);
+
+            }).catch( (err) => {
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });
         }).catch( (err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1262,60 +1318,68 @@ let self = module.exports = {
 
     //gets all featured decks
     getAllFeatured: (request, reply) => {
+        let limit = parseInt(request.params.limit);
+        let offset = parseInt(request.params.offset);
 
-        if(request.params.offset === 'null'){
-            request.params.offset = 0;
-        }
-        deckDB.findWithLimit('decks', {'revisions.isFeatured': 1}, parseInt(request.params.limit), parseInt(request.params.offset))
-        .then((decks) => {
-            if (decks.length < 1) {
-                reply([]);
-                return;
-            }
-            let result = [];
-            async.eachSeries(decks, (deck, callback) => {
-                let metadata = {};
-                metadata._id = deck._id;
-                metadata.description = deck.description;
-                metadata.countRevisions = deck.revisions.length;
-                metadata.active = deck.active;
-                metadata.user = deck.user;
+        deckDB.getAllFeatured(limit, offset).then( (featuredDecks) => {
+            if(!featuredDecks) return reply([]);
 
-                metadata.timestamp = deck.timestamp;
-                //get revision
-                let revision = {};
-                for (let key in deck.revisions) {
-                    if (deck.revisions[key].isFeatured === 1)
-                        revision = deck.revisions[key];
-                }
-                metadata.title = revision.title;
-                if (revision.language){
-                    metadata.language = revision.language.length === 2 ? revision.language : revision.language.substring(0, 2);
-                }else{
-                    metadata.language = 'en';
-                }
+            let userIds = new Set(), countForksIds = new Set();
 
-                metadata.firstSlide = deckDB.getFirstSlide(revision);
-                metadata.revision_to_show = revision.id;
-                deckDB.getUsernameById(deck.user) //get username
-                .then((username) => {
-                    metadata.username = username;
-                    result.push(metadata);
-                    callback();
-                })
-                .catch((err) => {
-                    console.log(err);
-                    metadata.username = null;
-                    result.push(metadata);
-                    callback();
-                });
-            }, () => {
-                return reply(result);
+            // collect user ids and deck ids to count forks needed
+            featuredDecks.forEach( (deck) => {
+                userIds.add(deck.user);
+                countForksIds.add(deck._id);
             });
-        })
-        .catch((err) => {
-            console.log(err);
-            reply(boom.notFound());
+
+            // count deck forks for the abouve deck ids
+            let forkCounts = {};
+            let forkCountsPromise = deckDB.countManyDeckForks([...countForksIds]).then( (forkCountsInfo) => {
+                forkCountsInfo.forEach( (forkCount) => {
+                    forkCounts[forkCount._id] = forkCount.forkCount;
+                });
+            });
+
+            // fetch usernames for user ids needed
+            let usernames = {};
+            let userPromise = userService.fetchUserInfo([...userIds]).then( (userInfo) => {
+                userInfo.forEach( (u) => {
+                    usernames[u.id] = u.username;
+                });
+            });
+
+            return Promise.all([userPromise, forkCountsPromise]).then( () => {
+                featuredDecks = featuredDecks.map( (deck) => {
+
+                    // get active revision
+                    let activeRevision = deck.revisions.find((rev) => (rev.id === deck.active));
+                    if(!activeRevision) return null;
+
+                    // get latest revision
+                    let [latestRevision] = deck.revisions.slice(-1);
+
+                    return {
+                        _id: deck._id,
+                        title: activeRevision.title,
+                        description: deck.description,
+                        user: deck.user,
+                        username: (usernames[deck.user]) ? usernames[deck.user] : 'Unknown user',
+                        active: deck.active,
+                        countRevisions: deck.revisions.length,
+                        timestamp: deck.timestamp,
+                        language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
+                        forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                        firstSlide: deckDB.getFirstSlide(activeRevision),
+                        revisionId: activeRevision.id,
+                        latestRevisionId: latestRevision.id
+                    };
+                });
+
+                reply(featuredDecks);
+            });
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
     },
 
