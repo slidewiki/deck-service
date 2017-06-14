@@ -77,6 +77,21 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/legacy/{oldId}',
+        handler: handlers.getLegacyDeckId,
+        config: {
+            validate: {
+                params: {
+                    oldId: Joi.string()
+                }
+            },
+            tags: ['api'],
+            description: 'Get new id of a legacy deck'
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/editors',
         handler: handlers.getEditors,
         config: {
@@ -370,12 +385,12 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string(),
+                    id: Joi.number().integer().description('The deck id (without revision)'),
                 },
                 payload: Joi.object().keys({
-                    root: Joi.string().required(),
-                    parent: Joi.string(),
-                }),
+                    root_deck: Joi.string().description('The deck id-revision string for the subdeck parent'),
+                    top_root_deck: Joi.string().description('The deck id-revision string for the root of the deck tree'),
+                }).requiredKeys('top_root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),
@@ -389,16 +404,16 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/deck/revert/{id}',
-        handler: handlers.revertDeckRevisionWithCheck,
+        handler: handlers.revertDeckRevision,
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.number().integer().description('The deck id (without revision)'),
                 },
                 payload: Joi.object().keys({
-                    revision_id: Joi.string().alphanum().lowercase(),
-                    root_deck: Joi.string(),
-                    top_root_deck: Joi.string(),
+                    revision_id: Joi.string().alphanum().lowercase().description('The revision id the deck should be reverted to'),
+                    root_deck: Joi.string().description('The deck id-revision string for the subdeck parent'),
+                    top_root_deck: Joi.string().description('The deck id-revision string for the root of the deck tree'),
                 }).requiredKeys('revision_id', 'top_root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -406,7 +421,7 @@ module.exports = function(server) {
             },
             tags: ['api'],
             auth: 'jwt',
-            description: 'Revert a deck to an old revision'
+            description: 'Revert a deck to an old revision, and optionally update reference of parent deck - JWT needed',
         }
     });
 
@@ -540,7 +555,7 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/slide/revert/{id}',
-        handler: handlers.revertSlideRevisionWithCheck,
+        handler: handlers.revertSlideRevision,
         config: {
             validate: {
                 params: {
@@ -550,7 +565,7 @@ module.exports = function(server) {
                     revision_id: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string(),
                     top_root_deck: Joi.string(),
-                }).requiredKeys('revision_id', 'root_deck', 'top_root_deck'),
+                }).requiredKeys('revision_id', 'top_root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),
@@ -620,7 +635,7 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/decktree/node/create',
-        handler: handlers.createDeckTreeNode,
+        handler: handlers.createDeckTreeNodeWithCheck,
         config: {
             validate: {
                 payload: Joi.object().keys({
@@ -630,10 +645,12 @@ module.exports = function(server) {
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
-                    nodeSpec: Joi.object().keys({
-                        id: Joi.string(),
-                        type: Joi.string()
-                    }),
+                    nodeSpec: Joi.array().items(
+                        Joi.object().keys({
+                            id: Joi.string(),
+                            type: Joi.string(),
+                        })
+                    ).single(),
                     user: Joi.string().alphanum().lowercase(),
                     content: Joi.string(),
                     title: Joi.string(),
@@ -715,6 +732,37 @@ module.exports = function(server) {
             tags: ['api'],
             description: 'Move a node (slide/deck) in a different position in the deck tree'
         }
+    });
+
+    //----------------------------- Usage Routes -----------------------------//
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/usage',
+        handler: handlers.getDeckUsage,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Locate the parent decks of the deck if any',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/usage',
+        handler: handlers.getSlideUsage,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: slideId-slideRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Locate the parent decks of the slide',
+        },
     });
 
     //------------------------------- Tag Routes -----------------------------//
@@ -802,6 +850,26 @@ module.exports = function(server) {
         }
     });
 
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/media',
+        handler: handlers.getDeckMedia,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+                query: {
+                    mediaType: Joi.string().valid('pictures', 'video', 'audio').required()
+                }
+            },
+            tags: ['api'],
+            description: 'Get media inside a deck',
+            response: {
+                schema: Joi.array().items(Joi.string()),
+            },
+        }
+    });
 
     //------------------------------- Change Log Routes -----------------------------//
 
@@ -813,6 +881,9 @@ module.exports = function(server) {
             validate: {
                 params: {
                     id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+                query: {
+                    simplify: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
             tags: ['api'],
@@ -831,6 +902,7 @@ module.exports = function(server) {
                 },
                 query: {
                     root: Joi.string().description('Identifier of deck tree root in the form deckId-deckRevisionId, revision is optional').required(),
+                    simplify: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
             tags: ['api'],
