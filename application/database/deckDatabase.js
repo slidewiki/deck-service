@@ -737,7 +737,7 @@ let self = module.exports = {
                 if (item.kind === 'slide') {
                     promise = helper.getCollection('slides').then((col) => {
                         return col.findOneAndUpdate(
-                            { 
+                            {
                                 _id: item.ref.id,
                                 'revisions.id': item.ref.revision,
                             },
@@ -753,7 +753,7 @@ let self = module.exports = {
                 } else {
                     promise = helper.getCollection('decks').then((col) => {
                         return col.findOneAndUpdate(
-                            { 
+                            {
                                 _id: item.ref.id,
                                 'revisions.id': item.ref.revision,
                             },
@@ -1392,22 +1392,6 @@ let self = module.exports = {
         });
     },
 
-    //returns the username of a user by the user's id (why is this here?)
-    getUsernameById: function(user_id){
-        return helper.connectToDatabase()
-        .then((db) => db.collection('users'))
-        .then((col) => col.findOne({
-            _id: user_id})
-        .then((user) => {
-            if (user){
-                return user.username;
-            }else{
-                return '';
-            }
-        })
-        );
-    },
-
     //returns a flattened structure of a deck's slides, and optionally its sub-decks
     getFlatSlides: function(deckId, deckTree, returnDecks){
 
@@ -1774,6 +1758,9 @@ let self = module.exports = {
 
                                 // this points to the same deck, needs to be removed in forked decks
                                 delete copiedDeck.revisions[0].originRevision;
+
+                                // isFeatured needs to be removed in forked decks
+                                delete copiedDeck.revisions[0].isFeatured;
 
                                 for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                     for(let j in id_map){
@@ -2225,7 +2212,7 @@ let self = module.exports = {
     getChangesCounts: function(deckId) {
         let deck = util.parseIdentifier(deckId);
         return helper.getCollection('deckchanges').then((changes) => {
-   
+
             return changes.aggregate([
                 // primary filter
                 { $match: {
@@ -2281,8 +2268,64 @@ let self = module.exports = {
         });
 
     },
+    // count deck forks for an array of deck ids
+    countManyDeckForks(deckIds){
+        let aggregateQuery = [
+            {
+                $match: {
+                    'origin.id': {
+                        $in: deckIds
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: '$origin.id',
+                    forkCount: { $sum: 1 }
+                }
+            }
+        ];
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.aggregate(aggregateQuery);
+        }).then((cursor) => cursor.toArray());
+    },
+
+    // get  recent decks
+    getAllRecent: function(limit, offset){
+        return self.findWithLimitAndSort('decks', {}, limit, offset, {'timestamp': -1});
+    },
+
+    // get featured decks
+    getAllFeatured: function(limit, offset){
+        return self.findWithLimit('decks', {'revisions.isFeatured': 1}, limit, offset);
+    },
+
+    // get first slide
+    getFirstSlide: function(revision) {
+        // TODO two bugs in this code just by looking at it,
+        // (1) it assumes first contentItem is slide
+        // (2) it assumes there's at least one slide in contentItems, could be in subdecks
+        // (3) it keeps iteration even though it found it
+        let firstSlide;
+        for (let key in revision.contentItems) {
+            if (revision.contentItems[key].order === 1
+                && revision.contentItems[key].kind === 'slide') {
+                firstSlide = revision.contentItems[key].ref.id;
+
+                if (revision.contentItems[key].ref.revision) {
+                    firstSlide += '-' + revision.contentItems[key].ref.revision;
+                }
+            }
+        }
+
+        return firstSlide;
+    }
 
 };
+
 
 // split deck id given as parameter to deck id and revision id
 function splitDeckIdParam(deckId){
