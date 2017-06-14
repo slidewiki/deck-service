@@ -25,16 +25,16 @@ const userService = require('../services/user');
 const tagService = require('../services/tag');
 
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
-    '<div class="bodySlide">' + 
+
     '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid h-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;">'+
-    '<h3 class="h-mid">Title</h3></div>'+
+    '<h3>Title</h3></div>'+
     '<div _id="3" _idx="1" _name="Content Placeholder 2" _type="body" class="block content v-up" style="position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;">'+
     '<ul>'+
     '	<li>Text bullet 1</li>'+
     '	<li>Text bullet 2</li>'+
     '</ul>'+
     '<div class="h-left">&nbsp;</div>'+
-    '</div></div></div>';
+    '</div></div>';
 
 let self = module.exports = {
     //returns a news ID of a legacy deck (with the revision number fort the user owning the legacy revision)
@@ -635,7 +635,7 @@ let self = module.exports = {
             // check if we append at the end (no position argument) or at a position
             let reverseOrder = (request.payload.selector.stype === 'slide');
             if (reverseOrder) {
-                // if we *don't* attach to the end, we need to 
+                // if we *don't* attach to the end, we need to
                 // reverse the node specs because they are added right after
                 // the position specified in selector, like in a stack (LIFO)
                 // we would like to provide the semantics of a queue (FIFO)
@@ -907,7 +907,7 @@ let self = module.exports = {
                                 }
 
                                 // omitting the top_root_deck means this change won't be tracked,
-                                // as it will be tracked right after this code, we just need to attach 
+                                // as it will be tracked right after this code, we just need to attach
                                 // first so that the rest of the tracking will work
                                 deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
                                     // track all created forks AFTER it's attached
