@@ -457,8 +457,12 @@ let self = module.exports = {
                 deckRevision.language = deck.language;
                 existingDeck.description = deck.description;
                 existingDeck.license = deck.license;
-                //add comment, abstract, footer
-                deckRevision.tags = deck.tags;
+
+                // TODO add comment, abstract, footer
+
+                if (!_.isEmpty(deck.tags)) {
+                    deckRevision.tags = deck.tags;
+                }
 
                 if(!deck.hasOwnProperty('theme') || deck.theme === null){
                     deckRevision.theme = 'default';
@@ -2225,6 +2229,29 @@ let self = module.exports = {
 
                 col.save(deck);
                 return deck.revisions[revisionId].tags;
+            });
+        });
+    },
+
+    replaceTags: function(deckIdParam, tagArray){
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deckId)})
+            .then((deck) => {
+                if(!deck) return;
+
+                if(revisionId === null){
+                    revisionId = getActiveRevision(deck);
+                }
+
+                if(!deck.revisions[revisionId]) return;
+
+                deck.revisions[revisionId].tags = tagArray;
+
+                return col.findOneAndReplace({_id: parseInt(deckId)}, deck, { returnOriginal: false })
+                .then((updated) => updated.value);;
             });
         });
     },

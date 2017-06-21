@@ -1716,6 +1716,19 @@ let self = module.exports = {
         });
     },
 
+    replaceDeckTags: function(request, reply){
+        deckDB.replaceTags(request.params.id, request.payload).then( (tagsInserted) => {
+            if(!tagsInserted){
+                reply(boom.notFound());
+            } else {
+                reply(tagsInserted);
+            }
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
     getSlideTags: function(request, reply){
         slideDB.getTags(request.params.id).then( (tagsList) => {
             if(!tagsList){
