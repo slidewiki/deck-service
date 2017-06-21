@@ -457,8 +457,12 @@ let self = module.exports = {
                 deckRevision.language = deck.language;
                 existingDeck.description = deck.description;
                 existingDeck.license = deck.license;
-                //add comment, abstract, footer
-                deckRevision.tags = deck.tags;
+
+                // TODO add comment, abstract, footer
+
+                if (!_.isEmpty(deck.tags)) {
+                    deckRevision.tags = deck.tags;
+                }
 
                 if(!deck.hasOwnProperty('theme') || deck.theme === null){
                     deckRevision.theme = 'default';
