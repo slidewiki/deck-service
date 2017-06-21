@@ -717,14 +717,18 @@ let self = module.exports = {
                 existingDeck.contributors = contributors = [];
             }
 
-            let existingContributor = contributors.find((c) => c.user === userId);
-            if (existingContributor) {
-                // if found, simply increment the count
-                existingContributor.count++;
-            } else {
-                // otherwise add it
-                existingContributor = { user: userId, count: 1};
-                contributors.push(existingContributor);
+            // should a user that simply creates a revision be considered a contributor?
+            // for now, the answer is yes, but only if it's an actual user
+            if (userId > 0) {
+                let existingContributor = contributors.find((c) => c.user === userId);
+                if (existingContributor) {
+                    // if found, simply increment the count
+                    existingContributor.count++;
+                } else {
+                    // otherwise add it
+                    existingContributor = { user: userId, count: 1};
+                    contributors.push(existingContributor);
+                }
             }
 
             // final metadata
@@ -1668,9 +1672,36 @@ let self = module.exports = {
 
     },
 
+    // we guard the fork deck revision method against abuse, by checking for change logs of one
+    forkDeckRevision(deck_id, user, forAttach) {
+        let deck = util.parseIdentifier(deck_id);
+        return self.get(deck.id).then((existingDeck) => {
+            let [latestRevision] = existingDeck.revisions.slice(-1);
+            if (deck.revision && latestRevision.id !== deck.revision) {
+                // we want to fork a read-only revision, all's well
+                return self._forkDeckRevision(deck_id, user, forAttach);
+            } else {
+                // make the deck id canonical just in case
+                deck.revision = latestRevision.id;
+            }
+
+            // before we fork it, let's check if it's a fresh revision
+            return self.getChangesCounts(deck.id).then((counts) => {
+                if (counts[deck.revision] === 1) {
+                    // we want to fork a fresh revision, let's fork the one before it
+                    console.log(`forking ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
+                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach);
+                } else {
+                    // unknown revision, old deck without changelog, or a revision with changes, just fork it!
+                    return self._forkDeckRevision(deck_id, user, forAttach);
+                }
+            });
+        });
+    },
+
     // forks a given deck revision by copying all of its sub-decks into new decks
     // forAttach is true when forking is done during deck attach process
-    forkDeckRevision(deck_id, user, forAttach) {
+    _forkDeckRevision(deck_id, user, forAttach) {
 
         return self.getFlatDecksFromDB(deck_id)
         .then((res) => {
@@ -1811,7 +1842,50 @@ let self = module.exports = {
                     });
                 });
             });
+
+        }).then((forkResult) => {
+            // after forking the deck and if the revision we forked is the latest,
+            // we create a new revision for the original deck;
+            // this way the fork points to a read-only revision
+
+            let deck = util.parseIdentifier(deck_id);
+            return self.get(deck.id).then((existingDeck) => {
+                let [latestRevision] = existingDeck.revisions.slice(-1);
+                if (deck.revision && latestRevision.id !== deck.revision) {
+                    // we forked a read-only revision, nothing to do here
+                    return forkResult;
+                } else {
+                    // make the deck id canonical just in case
+                    deck.revision = latestRevision.id;
+                }
+
+                // this is an automatic revision, the user should be 'system'
+                // deck autorevision is created with same deck as root
+                return self.createDeckRevision(deck.id, -1, deck.id).then((updatedDeck) => {
+                    // we need to update all parents of the deck to keep them updated
+                    // with the latest revision we have just created now
+                    return self.getUsage(util.toIdentifier(deck)).then((usage) => {
+                        // if a deck has no roots, itself is the root
+                        console.log(`updating deck revision used for ${deck.id} in ${usage.length} parent decks`);
+
+                        usage.reduce((p, parentDeck) => {
+                            return p.then(() => {
+                                // citem, revertedRevId, root_deck, ckind, user, top_root_deck, parentOperations
+                                let parentDeckId = util.toIdentifier(parentDeck);
+                                return self.updateContentItem(updatedDeck, '', parentDeckId, 'deck', -1, parentDeckId);
+                            });
+                        }, Promise.resolve());
+                    }).then(() => {
+                        // return the same result
+                        return forkResult;
+                    });
+
+                });
+
+            });
+
         });
+
     },
 
     // TODO make this actually private after code in handler.js has been moved here
