@@ -126,11 +126,11 @@ let self = module.exports = {
                     else{
 
                         // send tags to tag-service
-                        if(request.payload.tags && request.payload.tags.length > 0){
-                            tagService.upload(request.payload.tags, request.payload.user).catch( (e) => {
-                                request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
-                            });
-                        }
+                        // if(request.payload.tags && request.payload.tags.length > 0){
+                        //     tagService.upload(request.payload.tags, request.payload.user).catch( (e) => {
+                        //         request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
+                        //     });
+                        // }
 
                         //we must update all decks in the 'usage' attribute
                         return slideDB.get(replaced.value._id).then((newSlide) => {
@@ -460,11 +460,11 @@ let self = module.exports = {
                 if (replaced.ok !== 1) throw replaced;
 
                 // send tags to tag-service
-                if (!_.isEmpty(request.payload.tags)) {
-                    tagService.upload(request.payload.tags, userId).catch((e) => {
-                        request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id + ': ' + e.message);
-                    });
-                }
+                // if (!_.isEmpty(request.payload.tags)) {
+                //     tagService.upload(request.payload.tags, userId).catch((e) => {
+                //         request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id + ': ' + e.message);
+                //     });
+                // }
 
                 return replaced.value;
             });
@@ -1712,6 +1712,19 @@ let self = module.exports = {
             }
         }).catch((error) => {
             request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
+    replaceDeckTags: function(request, reply){
+        deckDB.replaceTags(request.params.id, request.payload).then( (tagsInserted) => {
+            if(!tagsInserted){
+                reply(boom.notFound());
+            } else {
+                reply(tagsInserted);
+            }
+        }).catch((err) => {
+            request.log('error', err);
             reply(boom.badImplementation());
         });
     },

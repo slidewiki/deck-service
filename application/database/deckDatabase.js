@@ -2155,6 +2155,29 @@ let self = module.exports = {
         });
     },
 
+    replaceTags: function(deckIdParam, tagArray){
+        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deckId)})
+            .then((deck) => {
+                if(!deck) return;
+
+                if(revisionId === null){
+                    revisionId = getActiveRevision(deck);
+                }
+
+                if(!deck.revisions[revisionId]) return;
+
+                deck.revisions[revisionId].tags = tagArray;
+
+                return col.findOneAndReplace({_id: parseInt(deckId)}, deck, { returnOriginal: false })
+                .then((updated) => updated.value);;
+            });
+        });
+    },
+
     // fetches specified media-type files that are present inside the deck
     getMedia: function(deckId, mediaType){
         return self.getFlatSlides(deckId, undefined, false).then( (flatSlides) => {
