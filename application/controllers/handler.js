@@ -1716,17 +1716,29 @@ let self = module.exports = {
         });
     },
 
-    replaceDeckTags: function(request, reply){
-        deckDB.replaceTags(request.params.id, request.payload).then( (tagsInserted) => {
-            if(!tagsInserted){
-                reply(boom.notFound());
-            } else {
-                reply(tagsInserted);
-            }
-        }).catch((err) => {
+    replaceDeckTags: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
+        let deckId = request.params.id;
+        let rootDeckId = request.payload.top_root_deck;
+
+        authorizeUser(userId, deckId, rootDeckId).then((boomError) => {
+            if (boomError) return boomError;
+
+            return deckDB.replaceTags(deckId, request.payload.tags, userId, rootDeckId).then((tagsInserted) => {
+                if (!tagsInserted) {
+                    // should never come here, but if it does it is probably correct
+                    return boom.notFound();
+                }
+
+                return tagsInserted;
+            });
+
+        }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
         });
+
     },
 
     getSlideTags: function(request, reply){

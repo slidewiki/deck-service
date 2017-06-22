@@ -2233,27 +2233,29 @@ let self = module.exports = {
         });
     },
 
-    replaceTags: function(deckIdParam, tagArray){
-        let {deckId, revisionId} = splitDeckIdParam(deckIdParam);
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(deckId)})
-            .then((deck) => {
-                if(!deck) return;
+    replaceTags: function(deckId, tags, userId, rootDeckId){
+        let deck = util.parseIdentifier(deckId);
 
-                if(revisionId === null){
-                    revisionId = getActiveRevision(deck);
-                }
+        return self.get(deck.id).then((existingDeck) => {
+            if (!existingDeck) return;
 
-                if(!deck.revisions[revisionId]) return;
+            // only the latest can be edited!
+            let [latestRevision] = existingDeck.revisions.slice(-1);
+            if (!latestRevision) return;
 
-                deck.revisions[revisionId].tags = tagArray;
+            // start tracking changes
+            let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId);
 
-                return col.findOneAndReplace({_id: parseInt(deckId)}, deck, { returnOriginal: false })
-                .then((updated) => updated.value);;
-            });
+            latestRevision.tags = tags;
+
+            // changes ended here
+            deckTracker.applyChangeLog();
+
+            return helper.getCollection('decks')
+            .then((col) => col.findOneAndReplace({ _id: deck.id }, existingDeck, { returnOriginal: false }) )
+            .then((updated) => updated.value);
         });
+
     },
 
     // fetches specified media-type files that are present inside the deck

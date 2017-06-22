@@ -818,11 +818,19 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
                 },
-                payload:
-                    Joi.array().items(apiModels.tag)
+                payload: Joi.object().keys({
+                    top_root_deck: Joi.string().description('The deck id-revision string for the root of the deck tree'),
+                    tags: Joi.array().items(apiModels.tag).single(),
+                }).requiredKeys('top_root_deck', 'tags'),
+
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),                
+
             },
             tags: ['api'],
-            description: 'Replace tags of a deck',
+            auth: 'jwt',
+            description: 'Replace tags of a deck -- JWT needed',
         }
     });
 
