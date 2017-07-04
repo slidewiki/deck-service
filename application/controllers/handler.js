@@ -1720,6 +1720,32 @@ let self = module.exports = {
             request.log('error', error);
             reply(boom.badImplementation());
         });
+    }, 
+
+    getDeckDeepUsage: function(request, reply){
+        deckDB.getDeepUsage(request.params.id, 'deck', request.query.keepVisibleOnly).then( (usage) => {
+            if(!usage){
+                reply(boom.notFound());
+            } else {
+                reply(usage);
+            }
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
+    getSlideDeepUsage: function(request, reply){
+        deckDB.getDeepUsage(request.params.id, 'slide', request.query.keepVisibleOnly).then( (usage) => {
+            if(!usage){
+                reply(boom.notFound());
+            } else {
+                reply(usage);
+            }
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
     }
 };
 

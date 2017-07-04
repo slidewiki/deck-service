@@ -910,4 +910,42 @@ module.exports = function(server) {
         }
     });
 
+
+    //------------------------------- Deep Usage Routes -----------------------------//
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/deepUsage',
+        handler: handlers.getDeckDeepUsage,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+                query: {
+                    keepVisibleOnly: Joi.boolean().default(true)
+                },
+            },
+            tags: ['api'],
+            description: 'Get deep usage (decks that point to it directly or indirectly) of a deck',
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/deepUsage',
+        handler: handlers.getSlideDeepUsage,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+                query: {
+                    keepVisibleOnly: Joi.boolean().default(true)
+                },
+            },
+            tags: ['api'],
+            description: 'Get deep usage (decks that point to it directly or indirectly) of a slide',
+        }
+    });
 };
