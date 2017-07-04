@@ -948,4 +948,22 @@ module.exports = function(server) {
             description: 'Get deep usage (decks that point to it directly or indirectly) of a slide',
         }
     });
+
+    //------------------------------- Fork Group Route -----------------------------//
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/forkGroup',
+        handler: handlers.getForkGroup,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the set of all decks that are part of a deck fork chain',
+        }
+    });
+
 };

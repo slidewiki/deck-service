@@ -1746,6 +1746,19 @@ let self = module.exports = {
             request.log('error', err);
             reply(boom.badImplementation());
         });
+    }, 
+
+    getForkGroup: function(request, reply){
+        deckDB.computeForkGroup(request.params.id).then( (forkGroup) => {
+            if(_.isEmpty(forkGroup)){
+                reply(boom.notFound());
+            } else {
+                reply(forkGroup);
+            }
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
     }
 };
 
