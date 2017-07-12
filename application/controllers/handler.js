@@ -726,10 +726,23 @@ let self = module.exports = {
             .then((deckTree) => {
                 if (!deckTree) return reply(boom.notFound());
 
-                if (co.isEmpty(deckTree))
+                if (co.isEmpty(deckTree)) {
                     reply(boom.notFound());
-                else{
-                    reply(deckTree);
+                } else {
+                    deckTree.isSameAsLatest = true;
+
+                    if (deckTree.revisionId !== deckTree.latestRevisionId) {
+                        // compute if it's same as latest here
+                        let deckId = parseInt(request.params.id);
+                        return deckDB.getChangesCounts(deckId).then((counts) => {
+                            deckTree.isSameAsLatest = isSameAsLatest(deckTree, counts);
+
+                            reply(deckTree);
+                        });
+
+                    } else {
+                        reply(deckTree);
+                    }
                 }
             }).catch((err) => {
                 request.log('error', err);
@@ -2194,5 +2207,30 @@ function authorizeUser(userId, deckId, rootDeckId) {
 
         // return nothing if all's ok :)
     });
+
+}
+
+// helper function to compute whether latest revision for deck is the same as the selected revisionId
+function isSameAsLatest(deckTree, changesCounts) {
+    let revisionId = deckTree.revisionId;
+    let latestRevisionId = deckTree.latestRevisionId;
+
+    if (revisionId === latestRevisionId) return true;
+
+    let totalCount = 0;
+    for (let i = latestRevisionId; i > revisionId; i--) {
+        if (!changesCounts[i]) {
+            // means we are looking at legacy deck (no change log for some revision)
+            // we don't know, so safest choice is
+            return false;
+        }
+
+        // a fresh revision has a count of 1
+        // so we decrement each count by one to get actual change count
+        totalCount += changesCounts[i] - 1;
+    }
+
+    // if total count is zero, means we are same as latest revision
+    return totalCount === 0;
 
 }
