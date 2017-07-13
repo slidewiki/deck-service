@@ -765,6 +765,37 @@ module.exports = function(server) {
         },
     });
 
+    //----------------------------- Usage Routes -----------------------------//
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/rootDecks',
+        handler: handlers.getDeckRootDecks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Locate the root parent decks of the deck if any',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/rootDecks',
+        handler: handlers.getSlideRootDecks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: slideId-slideRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Locate the root parent decks of the slide',
+        },
+    });
+
     //------------------------------- Tag Routes -----------------------------//
     server.route({
         method: 'GET',
