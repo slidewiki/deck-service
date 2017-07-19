@@ -9,6 +9,7 @@ const changeLog = require('./controllers/changeLog');
 const apiModels = {};
 apiModels.tag = Joi.object().keys({
     tagName: Joi.string(),
+    defaultName: Joi.string()
 }).requiredKeys('tagName');
 
 module.exports = function(server) {
@@ -808,7 +809,7 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Get tags of a deck',
+            description: 'Get tags of a deck #DEPRECATED',
             response: {
                 schema: Joi.array().items(apiModels.tag),
             },
@@ -832,10 +833,35 @@ module.exports = function(server) {
                     }).requiredKeys('operation', 'user', 'tag')
             },
             tags: ['api'],
-            description: 'Add/Remove a tag from a deck',
+            description: 'Add/Remove a tag from a deck #DEPRECATED',
             response: {
                 schema: Joi.array().items(apiModels.tag),
             },
+        }
+    });
+
+    server.route({
+        method: 'PUT',
+        path: '/deck/{id}/tags',
+        handler: handlers.replaceDeckTags,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                },
+                payload: Joi.object().keys({
+                    top_root_deck: Joi.string().description('The deck id-revision string for the root of the deck tree'),
+                    tags: Joi.array().items(apiModels.tag).single(),
+                }).requiredKeys('top_root_deck', 'tags'),
+
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),                
+
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Replace tags of a deck -- JWT needed',
         }
     });
 
@@ -850,7 +876,7 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Get tags of a slide',
+            description: 'Get tags of a slide #DEPRECATED',
             response: {
                 schema: Joi.array().items(apiModels.tag),
             },
@@ -874,7 +900,7 @@ module.exports = function(server) {
                     }).requiredKeys('operation', 'user', 'tag'),
             },
             tags: ['api'],
-            description: 'Add/Remove a tag from a slide',
+            description: 'Add/Remove a tag from a slide #DEPRECATED',
             response: {
                 schema: Joi.array().items(apiModels.tag),
             },
