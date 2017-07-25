@@ -1494,7 +1494,7 @@ let self = module.exports = {
                                         user: found.user,
                                     },
                                     description: found.description,
-                                    language: found.revisions[ind].language,
+                                    language: language,//found.revisions[ind].language,
                                     license: found.license,
                                     user: parseInt(user),
                                     translated_from: found.translated_from,
@@ -1521,19 +1521,21 @@ let self = module.exports = {
                                 // renew creation date for fresh revision
                                 copiedDeck.revisions[0].timestamp = timestamp;
                                 copiedDeck.revisions[0].lastUpdate = timestamp;
+                                copiedDeck.revisions[0].language = language;
                                 let contentItemsMap = {};
                                 //console.log('before loop for content items');
                                 async.eachSeries(copiedDeck.revisions[0].contentItems, (nextSlide, callback) => {
                                     if(nextSlide.kind === 'slide'){
+                                        console.log('NEXT SLIDE', nextSlide);
                                         //we have to copy the slide, not like when forking
                                         let root_deck_path = [copiedDeck._id, '1'];
-                                        return helper.connectToDatabase()
+                                        helper.connectToDatabase()
                                         .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
                                         .then((newSlideId) => {
-                                            return helper.connectToDatabase()
+                                            helper.connectToDatabase()
                                             .then((db2) => db2.collection('slides'))
                                             .then((col2) => {
-                                                return col2.findOne({_id: parseInt(nextSlide.ref.id)})
+                                                col2.findOne({_id: parseInt(nextSlide.ref.id)})
                                                 .then((slide) => {
                                                     let slideRevisionIndex = parseInt(nextSlide.ref.revision)-1;
                                                     slide.revisions = [slide.revisions[slideRevisionIndex]];
@@ -1553,26 +1555,31 @@ let self = module.exports = {
                                                                 'Cache-Control': 'no-cache'
                                                             },
                                                             body :{
-                                                                'target': 'de_DE',
+                                                                'target': language,
                                                                 'user': copiedDeck.user+''
                                                             },
                                                             json: true
                                                         };
                                                         rp(options).then(function (original){
-                                                            //console.log('response', original);
+                                                            //console.log('SLIDE response', original);
                                                             if (original.error){
                                                                 //console.log(original);
                                                                 resolve({});
                                                             }else{
                                                                 slide.revisions[0].title = original.revisions[0].title;
                                                                 slide.revisions[0].content = original.revisions[0].content;
-                                                                //slide.description = original.description;
-                                                                col2.save(slide);
-                                                                //new_decks.push(copiedDeck);
-                                                                // return col.insertOne(copiedDeck).then(() => {
-                                                                //     callback();
-                                                                // });
-
+                                                                
+                                                                //Change usage of slide
+                                                                for(let i = 0; i < slide.revisions[0].usage.length; i++){
+                                                                    for(let j in id_map){
+                                                                        if(id_map.hasOwnProperty(j) && slide.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                                            slide.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                                            slide.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
+                                                                        }
+                                                                    }
+                                                                }
+                                                                slide.language = language;
+                                                                col2.save(slide);                                                            
                                                                 resolve();
 
                                                             }
@@ -1588,10 +1595,10 @@ let self = module.exports = {
                                                     for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                                         if(copiedDeck.revisions[0].contentItems[i].ref.id === oldSlideId){
                                                             copiedDeck.revisions[0].contentItems[i].ref.id = newSlideId;
-                                                            copiedDeck.revisions[0].contentItems[i].ref.revision = '1';
-                                                            callback();
+                                                            copiedDeck.revisions[0].contentItems[i].ref.revision = 1;                                                            
                                                         }
                                                     }
+                                                    callback();
                                                 });
                                             });
                                         });
@@ -1605,7 +1612,7 @@ let self = module.exports = {
                                     }
 
                                     //console.log('outside root_deck_path', root_deck_path);
-                                    console.log('check point 1');
+                                    //console.log('check point 1');
 
                                     for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                         for(let j in id_map){
@@ -1615,7 +1622,7 @@ let self = module.exports = {
                                             }
                                         }
                                     }
-                                    console.log('check point 2');
+                                    //console.log('check point 2');
                                     for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
                                         for(let j in id_map){
                                             if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
@@ -1624,21 +1631,21 @@ let self = module.exports = {
                                             }
                                         }
                                     }
-                                    console.log('check point 3');
+                                    //console.log('check point 3');
                                     for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                         let nextSlide = copiedDeck.revisions[0].contentItems[i];
-                                        console.log('nextSlide', nextSlide);
+                                        //console.log('nextSlide', nextSlide);
                                         if(nextSlide.kind === 'slide'){
                                             let root_deck_path = [copiedDeck._id, '1'];
-                                            console.log('outside root_deck_path', root_deck_path);
-                                            console.log('contentItemsMap', contentItemsMap);
+                                            //console.log('outside root_deck_path', root_deck_path);
+                                            //console.log('contentItemsMap', contentItemsMap);
                                             self.addToUsage(nextSlide, root_deck_path);
                                         }
                                         else{
                                             continue;
                                         }
                                     }
-                                    console.log('check point 4');
+                                    //console.log('check point 4');
 
                                     //translate copiedDeck
                                     //console.log('translation uri', Microservices.translation.uri+'/deck/'+found._id);
@@ -1653,7 +1660,7 @@ let self = module.exports = {
                                                 'Cache-Control': 'no-cache'
                                             },
                                             body :{
-                                                'target': 'de_DE',
+                                                'target': language,
                                                 'user': copiedDeck.user+''
                                             },
                                             json: true
