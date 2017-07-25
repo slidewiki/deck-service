@@ -1847,6 +1847,7 @@ let self = module.exports = {
                 });
             });
 
+
         }).then((forkResult) => {
             // after forking the deck and if the revision we forked is the latest,
             // we create a new revision for the original deck;
@@ -1885,6 +1886,7 @@ let self = module.exports = {
                     });
 
                 });
+
 
             });
 
