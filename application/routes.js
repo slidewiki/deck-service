@@ -78,6 +78,21 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deckarchive/{id}',
+        handler: handlers.archiveDeckTree,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+            },
+            tags: ['api'],
+            description: 'Archive a deck tree'
+        }
+    });
+
+    server.route({
+        method: 'GET',
         path: '/legacy/{oldId}',
         handler: handlers.getLegacyDeckId,
         config: {

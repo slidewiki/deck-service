@@ -19,12 +19,12 @@ let self = module.exports = {
     get: function(identifier) {
         identifier = String(identifier);
         let idArray = identifier.split('-');
+        
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => col.findOne({ _id: parseInt(idArray[0]) }))
         .then((found) => {
-            if (!found) return;
-
+            if (!found) return;            
             // add some extra revision metadata
             let [latestRevision] = found.revisions.slice(-1);
             found.latestRevisionId = latestRevision.id;
@@ -2425,7 +2425,43 @@ let self = module.exports = {
         }
 
         return firstSlide;
+    },
+
+    archiveDeck: function(existingDeck) {        
+        helper.connectToDatabase()
+        .then((db) => db.collection('decks_archived'))
+        .then((col) => {            
+            col.save(existingDeck);
+            helper.connectToDatabase()
+            .then((db) => db.collection('decks'))
+            .then((col) => {
+                col.remove({'_id': existingDeck._id});                
+            });
+        });            
+    },
+
+    archiveDeckTree: function(root_deck_id){
+        self.getFlatDecksFromDB(root_deck_id)
+        .then((res) => {
+            for(let i = 0; i < res.children.length; i++){
+                helper.connectToDatabase()
+                .then((db) => db.collection('decks'))
+                .then((col) => col.findOne({ _id: parseInt( res.children[i].id) }))
+                .then((found) => {
+                    self.archiveDeck(found);
+                });
+            }
+            helper.connectToDatabase()
+                .then((db) => db.collection('decks'))
+                .then((col) => col.findOne({ _id: parseInt( root_deck_id) }))
+                .then((found_root) => {
+                    self.archiveDeck(found_root);
+                });
+
+        });
     }
+        
+      
 
 };
 

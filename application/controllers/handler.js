@@ -222,7 +222,11 @@ let self = module.exports = {
             reply(boom.badImplementation());
         });
     },
-
+    archiveDeckTree: function(request, reply) {
+        deckDB.archiveDeckTree(encodeURIComponent(request.params.id)).then((deck) => {
+            reply();
+        });
+    },
     //gets a single deck from the database, containing all revisions, unless a specific revision is specified in the id
     getDeck: function(request, reply) {
         deckDB.get(encodeURIComponent(request.params.id)).then((deck) => {
