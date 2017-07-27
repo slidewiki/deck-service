@@ -383,6 +383,21 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/translations',
+        handler: handlers.getDeckTranslations,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+            },
+            tags: ['api'],
+            description: 'List all deck translations for current deck',
+        },
+    });
+
+    server.route({
         method: 'POST',
         path: '/deck/{id}/revision',
         handler: handlers.createDeckRevision,
