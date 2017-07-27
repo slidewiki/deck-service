@@ -345,6 +345,21 @@ let self = module.exports = {
         });
     },
 
+    getDeckTranslations: function(request, reply){
+        let deckId = request.params.id; // it should already be a number
+        console.log(_.isNumber(deckId));
+        deckDB.get(deckId).then((deck) => {
+            if (!deck) return reply(boom.notFound());
+
+            let currentLang = {'deck_id':deckId, 'language': deck.revisions[0].language};
+            reply({'translations': deck.translations, 'currentLang':currentLang});
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
     getDeckRevisions: function(request, reply) {
         let deckId = request.params.id; // it should already be a number
 
