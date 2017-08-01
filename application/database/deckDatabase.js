@@ -1066,9 +1066,13 @@ let self = module.exports = {
                             .then((col) => {
                                 return col.findOne({_id: parseInt(citem.ref.id)})
                                 .then((slide) => {
-                                    let slide_revision = citem.ref.revision-1;
-                                    deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, user: String(slide.revisions[slide_revision].user), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
-                                    callback();
+                                    if (!slide){
+                                        console.log(citem.ref.id);
+                                    }else{
+                                        let slide_revision = citem.ref.revision-1;
+                                        deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, user: String(slide.revisions[slide_revision].user), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                                        callback();
+                                    }                                    
                                 });
                             }).catch(callback);
                         }
@@ -1435,6 +1439,62 @@ let self = module.exports = {
         });
     },
 
+    fill_translations(kind, translations_array){
+        if (kind === 'deck'){
+            return new Promise((resolve, reject) => {
+                async.each(translations_array, (translation, cbEach) => {
+                    return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                    .then((db2) => db2.collection('decks'))
+                    .then((col) => {
+                        return col.findOne({_id: parseInt(translation.deck_id)})
+                        .then((found) => {
+                            if (found){
+                                found.translations = translations_array;
+                                col.save(found);
+                                resolve();
+                            }else{
+                                console.log('Deck not found: ' + translation.deck_id);
+                                reject('Deck not found: ' + translation.deck_id);
+                            }
+
+                        })
+                        .catch(cbEach);
+                    });
+                }, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+                });
+            });
+        }else{
+            return new Promise((resolve, reject) => {
+                async.each(translations_array, (translation, cbEach) => {
+                    return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                    .then((db2) => db2.collection('slides'))
+                    .then((col) => {
+                        return col.findOne({_id: parseInt(translation.slide_id)})
+                        .then((found) => {
+                            if (found){
+                                found.translations = translations_array;
+                                col.save(found);
+                                resolve();
+                            }else{
+                                console.log('Slide not found: ' + translation.slide_id);
+                                reject('Slide not found: ' + translation.slide_id);
+                            }
+                        })
+                        .catch(cbEach);
+                    });
+                }, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+                });
+            });
+        }
+
+    },
+
     //forks a given deck revision by copying all of its sub-decks into new decks
     translateDeckRevision(deck_id, user, language){
 
@@ -1492,6 +1552,7 @@ let self = module.exports = {
                                         revision: found.revisions[ind].id,
                                         title: found.revisions[ind].title,
                                         user: found.user,
+                                        kind: 'translation'
                                     },
                                     description: found.description,
                                     language: language,//found.revisions[ind].language,
@@ -1499,7 +1560,8 @@ let self = module.exports = {
                                     user: parseInt(user),
                                     translated_from: found.translated_from,
                                     contributors: contributorsArray,
-                                    active: 1
+                                    active: 1,
+                                    translations: found.translations
                                 };
 
                                 let now = new Date();
@@ -1568,7 +1630,7 @@ let self = module.exports = {
                                                             }else{
                                                                 slide.revisions[0].title = original.revisions[0].title;
                                                                 slide.revisions[0].content = original.revisions[0].content;
-                                                                
+
                                                                 //Change usage of slide
                                                                 for(let i = 0; i < slide.revisions[0].usage.length; i++){
                                                                     for(let j in id_map){
@@ -1579,8 +1641,12 @@ let self = module.exports = {
                                                                     }
                                                                 }
                                                                 slide.language = language;
-                                                                col2.save(slide);                                                            
-                                                                resolve();
+                                                                col2.save(slide);
+                                                                let translations = slide.translations;
+                                                                translations.push({'slide_id':slide._id, 'language':language});//filling in the translations array for all decks in the 'family'
+                                                                self.fill_translations('slide', translations)
+                                                                .then(resolve)
+                                                                .catch(reject);
 
                                                             }
                                                         })
@@ -1595,7 +1661,7 @@ let self = module.exports = {
                                                     for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
                                                         if(copiedDeck.revisions[0].contentItems[i].ref.id === oldSlideId){
                                                             copiedDeck.revisions[0].contentItems[i].ref.id = newSlideId;
-                                                            copiedDeck.revisions[0].contentItems[i].ref.revision = 1;                                                            
+                                                            copiedDeck.revisions[0].contentItems[i].ref.revision = 1;
                                                         }
                                                     }
                                                     callback();
@@ -1613,85 +1679,90 @@ let self = module.exports = {
 
                                     //console.log('outside root_deck_path', root_deck_path);
                                     //console.log('check point 1');
-
-                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                        for(let j in id_map){
-                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
-                                                copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
-                                                copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
+                                    // let translations = copiedDeck.translations;
+                                    // translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
+                                    // self.fill_translations(translations)
+                                     //.then(() => {
+                                        for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                            for(let j in id_map){
+                                                if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
+                                                    copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
+                                                    copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
+                                                }
                                             }
                                         }
-                                    }
-                                    //console.log('check point 2');
-                                    for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
-                                        for(let j in id_map){
-                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                                copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
-                                                copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
+                                        //console.log('check point 2');
+                                        for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
+                                            for(let j in id_map){
+                                                if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                    copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                    copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
+                                                }
                                             }
                                         }
-                                    }
-                                    //console.log('check point 3');
-                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                        let nextSlide = copiedDeck.revisions[0].contentItems[i];
-                                        //console.log('nextSlide', nextSlide);
-                                        if(nextSlide.kind === 'slide'){
-                                            let root_deck_path = [copiedDeck._id, '1'];
-                                            //console.log('outside root_deck_path', root_deck_path);
-                                            //console.log('contentItemsMap', contentItemsMap);
-                                            self.addToUsage(nextSlide, root_deck_path);
-                                        }
-                                        else{
-                                            continue;
-                                        }
-                                    }
-                                    //console.log('check point 4');
-
-                                    //translate copiedDeck
-                                    //console.log('translation uri', Microservices.translation.uri+'/deck/'+found._id);
-                                    let rp = require('request-promise-native');
-                                    let myPromise = new Promise((resolve, reject) => {
-
-                                        var options = {
-                                            method: 'POST',
-                                            uri: Microservices.translation.uri+'/deck/'+found._id,
-                                            headers : {
-                                                'Content-Type': 'application/json',
-                                                'Cache-Control': 'no-cache'
-                                            },
-                                            body :{
-                                                'target': language,
-                                                'user': copiedDeck.user+''
-                                            },
-                                            json: true
-                                        };
-                                        rp(options).then(function (original){
-                                            //console.log('response', original);
-                                            if (original.error){
-                                                //console.log(original);
-                                                resolve({});
-                                            }else{
-                                                copiedDeck.revisions[0].title = original.revisions[0].title;
-                                                copiedDeck.description = original.description;
-                                                new_decks.push(copiedDeck);
-                                                return col.insertOne(copiedDeck).then(() => {
-                                                    callback();
-                                                });
-
-                                                resolve();
-
+                                        //console.log('check point 3');
+                                        for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                            let nextSlide = copiedDeck.revisions[0].contentItems[i];
+                                            //console.log('nextSlide', nextSlide);
+                                            if(nextSlide.kind === 'slide'){
+                                                let root_deck_path = [copiedDeck._id, '1'];
+                                                //console.log('outside root_deck_path', root_deck_path);
+                                                //console.log('contentItemsMap', contentItemsMap);
+                                                self.addToUsage(nextSlide, root_deck_path);
                                             }
-                                        })
-                                        .catch(function (e){
-                                            console.log('problem with request deck: ' + e.message);
-                                            reject(e);
+                                            else{
+                                                continue;
+                                            }
+                                        }
+
+                                        //console.log('check point 4');
+
+                                        //translate copiedDeck
+                                        //console.log('translation uri', Microservices.translation.uri+'/deck/'+found._id);
+                                        let rp = require('request-promise-native');
+                                        let myPromise = new Promise((resolve, reject) => {
+
+                                            var options = {
+                                                method: 'POST',
+                                                uri: Microservices.translation.uri+'/deck/'+found._id,
+                                                headers : {
+                                                    'Content-Type': 'application/json',
+                                                    'Cache-Control': 'no-cache'
+                                                },
+                                                body :{
+                                                    'target': language,
+                                                    'user': copiedDeck.user+''
+                                                },
+                                                json: true
+                                            };
+                                            rp(options).then(function (original){
+                                                //console.log('response', original);
+                                                if (original.error){
+                                                    //console.log(original);
+                                                    resolve({});
+                                                }else{
+                                                    copiedDeck.revisions[0].title = original.revisions[0].title;
+                                                    copiedDeck.description = original.description;
+                                                    new_decks.push(copiedDeck);
+                                                    return col.insertOne(copiedDeck).then(() => {
+                                                        let translations = copiedDeck.translations;
+                                                        translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
+                                                        self.fill_translations('deck', translations)
+                                                        .then(callback)
+                                                        .catch(callback);
+                                                    });
+
+                                                    resolve();
+
+                                                }
+                                            })
+                                            .catch(function (e){
+                                                console.log('problem with request deck: ' + e.message);
+                                                reject(e);
+                                            });
                                         });
-                                    });
-
+                                    //}).catch(reject);
                                 });
-
-
-
                             });
                         }).catch(callback);
                     }, (err2) => {
