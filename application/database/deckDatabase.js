@@ -1762,6 +1762,7 @@ let self = module.exports = {
                                         revision: found.revisions[ind].id,
                                         title: found.revisions[ind].title,
                                         user: found.user,
+                                        kind: 'fork'
                                     },
                                     description: found.description,
                                     language: found.revisions[ind].language,
@@ -2101,15 +2102,12 @@ let self = module.exports = {
                                                             },
                                                             json: true
                                                         };
-                                                        rp(options).then(function (original){
+                                                        rp(options).then(function (translated){
                                                             //console.log('SLIDE response', original);
-                                                            if (original.error){
+                                                            if (translated.error){
                                                                 //console.log(original);
                                                                 resolve({});
                                                             }else{
-                                                                slide.revisions[0].title = original.revisions[0].title;
-                                                                slide.revisions[0].content = original.revisions[0].content;
-
                                                                 //Change usage of slide
                                                                 for(let i = 0; i < slide.revisions[0].usage.length; i++){
                                                                     for(let j in id_map){
@@ -2119,8 +2117,9 @@ let self = module.exports = {
                                                                         }
                                                                     }
                                                                 }
-                                                                slide.language = language;
-                                                                col2.save(slide);
+                                                                translated._id = newSlideId;
+                                                                translated.revisions[0].usage = slide.revisions[0].usage;
+                                                                col2.save(translated);
                                                                 let translations = slide.translations;
                                                                 translations.push({'slide_id':slide._id, 'language':language});//filling in the translations array for all decks in the 'family'
                                                                 self.fill_translations('slide', translations)
@@ -2162,84 +2161,84 @@ let self = module.exports = {
                                     // translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
                                     // self.fill_translations(translations)
                                      //.then(() => {
-                                        for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                            for(let j in id_map){
-                                                if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
-                                                    copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
-                                                    copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
-                                                }
+                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
+                                                copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
                                             }
                                         }
-                                        //console.log('check point 2');
-                                        for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
-                                            for(let j in id_map){
-                                                if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                                    copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
-                                                    copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
-                                                }
+                                    }
+                                    //console.log('check point 2');
+                                    for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
                                             }
                                         }
-                                        //console.log('check point 3');
-                                        for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                            let nextSlide = copiedDeck.revisions[0].contentItems[i];
-                                            //console.log('nextSlide', nextSlide);
-                                            if(nextSlide.kind === 'slide'){
-                                                let root_deck_path = [copiedDeck._id, '1'];
-                                                //console.log('outside root_deck_path', root_deck_path);
-                                                //console.log('contentItemsMap', contentItemsMap);
-                                                self.addToUsage(nextSlide, root_deck_path);
-                                            }
-                                            else{
-                                                continue;
-                                            }
+                                    }
+                                    //console.log('check point 3');
+                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                        let nextSlide = copiedDeck.revisions[0].contentItems[i];
+                                        //console.log('nextSlide', nextSlide);
+                                        if(nextSlide.kind === 'slide'){
+                                            let root_deck_path = [copiedDeck._id, '1'];
+                                            //console.log('outside root_deck_path', root_deck_path);
+                                            //console.log('contentItemsMap', contentItemsMap);
+                                            self.addToUsage(nextSlide, root_deck_path);
                                         }
+                                        else{
+                                            continue;
+                                        }
+                                    }
 
-                                        //console.log('check point 4');
+                                    //console.log('check point 4');
 
-                                        //translate copiedDeck
-                                        //console.log('translation uri', Microservices.translation.uri+'/deck/'+found._id);
-                                        let rp = require('request-promise-native');
-                                        let myPromise = new Promise((resolve, reject) => {
+                                    //translate copiedDeck
+                                    //console.log('translation uri', Microservices.translation.uri+'/deck/'+found._id);
+                                    let rp = require('request-promise-native');
+                                    let myPromise = new Promise((resolve, reject) => {
 
-                                            var options = {
-                                                method: 'POST',
-                                                uri: Microservices.translation.uri+'/deck/'+found._id,
-                                                headers : {
-                                                    'Content-Type': 'application/json',
-                                                    'Cache-Control': 'no-cache'
-                                                },
-                                                body :{
-                                                    'target': language,
-                                                    'user': copiedDeck.user+''
-                                                },
-                                                json: true
-                                            };
-                                            rp(options).then(function (original){
-                                                //console.log('response', original);
-                                                if (original.error){
-                                                    //console.log(original);
-                                                    resolve({});
-                                                }else{
-                                                    copiedDeck.revisions[0].title = original.revisions[0].title;
-                                                    copiedDeck.description = original.description;
-                                                    new_decks.push(copiedDeck);
-                                                    return col.insertOne(copiedDeck).then(() => {
-                                                        let translations = copiedDeck.translations;
-                                                        translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
-                                                        self.fill_translations('deck', translations)
-                                                        .then(callback)
-                                                        .catch(callback);
-                                                    });
+                                        var options = {
+                                            method: 'POST',
+                                            uri: Microservices.translation.uri+'/deck/'+found._id,
+                                            headers : {
+                                                'Content-Type': 'application/json',
+                                                'Cache-Control': 'no-cache'
+                                            },
+                                            body :{
+                                                'target': language,
+                                                'user': copiedDeck.user+''
+                                            },
+                                            json: true
+                                        };
+                                        rp(options).then(function (original){
+                                            //console.log('response', original);
+                                            if (original.error){
+                                                //console.log(original);
+                                                resolve({});
+                                            }else{
+                                                copiedDeck.revisions[0].title = original.revisions[0].title;
+                                                copiedDeck.description = original.description;
+                                                new_decks.push(copiedDeck);
+                                                return col.insertOne(copiedDeck).then(() => {
+                                                    let translations = copiedDeck.translations;
+                                                    translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
+                                                    self.fill_translations('deck', translations)
+                                                    .then(callback)
+                                                    .catch(callback);
+                                                });
 
-                                                    resolve();
+                                                resolve();
 
-                                                }
-                                            })
-                                            .catch(function (e){
-                                                console.log('problem with request deck: ' + e.message);
-                                                reject(e);
-                                            });
+                                            }
+                                        })
+                                        .catch(function (e){
+                                            console.log('problem with request deck: ' + e.message);
+                                            reject(e);
                                         });
+                                    });
                                     //}).catch(reject);
                                 });
                             });
