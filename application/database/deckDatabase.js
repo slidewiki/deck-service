@@ -1477,7 +1477,7 @@ let self = module.exports = {
                 });
             });
         });
-},
+    },
 
     //returns a flattened structure of a deck's sub-decks
     getFlatDecksFromDB: function(deck_id, deckTree){
