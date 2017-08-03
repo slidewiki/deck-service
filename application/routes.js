@@ -859,7 +859,7 @@ module.exports = function(server) {
 
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
-                }).unknown(),                
+                }).unknown(),
 
             },
             tags: ['api'],

@@ -1477,7 +1477,7 @@ let self = module.exports = {
                 });
             });
         });
-    },
+},
 
     //returns a flattened structure of a deck's sub-decks
     getFlatDecksFromDB: function(deck_id, deckTree){
@@ -1762,7 +1762,6 @@ let self = module.exports = {
                                         revision: found.revisions[ind].id,
                                         title: found.revisions[ind].title,
                                         user: found.user,
-                                        kind: 'fork'
                                     },
                                     description: found.description,
                                     language: found.revisions[ind].language,
