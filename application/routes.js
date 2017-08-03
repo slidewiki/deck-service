@@ -365,6 +365,25 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'PUT',
+        path: '/deck/{id}/translate',
+        handler: handlers.translateDeckRevision,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                payload: Joi.object().keys({
+                    user: Joi.string().alphanum().lowercase(),
+                    language: Joi.string(),
+                }).requiredKeys('user', 'language'),
+            },
+            tags: ['api'],
+            description:'Translate a deck and store as a new fork'
+        }
+    });
+
+    server.route({
         method: 'GET',
         path: '/deck/{id}/revisions',
         handler: handlers.getDeckRevisions,
@@ -376,21 +395,6 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'List all deck revisions meta data for current deck',
-        },
-    });
-
-    server.route({
-        method: 'GET',
-        path: '/deck/{id}/translations',
-        handler: handlers.getDeckTranslations,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.number().integer().description('The deck id (without revision)'),
-                },
-            },
-            tags: ['api'],
-            description: 'List all deck translations for current deck',
         },
     });
 
@@ -855,7 +859,7 @@ module.exports = function(server) {
 
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
-                }).unknown(),                
+                }).unknown(),
 
             },
             tags: ['api'],

@@ -9,7 +9,8 @@ const userService = require('../services/user');
 
 const helper = require('./helper'),
     striptags = require('striptags'),
-    validateDeck = require('../models/deck').validateDeck;
+    validateDeck = require('../models/deck').validateDeck,
+    Microservices = require('../configs/microservices');
 
 const async = require('async');
 
@@ -1431,27 +1432,13 @@ let self = module.exports = {
                 });
             }
 
-
             return new Promise( (resolve, reject) => {
                 async.eachSeries(deckRevision.contentItems, (citem, callback) => {
 
                     if(citem.kind === 'slide'){
-                            helper.connectToDatabase()
-                            .then((db) => db.collection('slides'))
-                            .then((col) => {
-                                return col.findOne({_id: parseInt(citem.ref.id)})
-                                .then((slide) => {
-                                    if (!slide){
-                                        console.log(citem.ref.id);
-                                    }else{
-                                        let slide_revision = citem.ref.revision-1;
-                                        deckTree.children.push({title: slide.revisions[slide_revision].title, content: slide.revisions[slide_revision].content, speakernotes: slide.revisions[slide_revision].speakernotes, user: String(slide.revisions[slide_revision].user), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
-                                        callback();
-                                    }
-                                });
-                            }).catch(callback);
-                        }
-                        else{
+                        helper.connectToDatabase()
+                        .then((db) => db.collection('slides'))
+                        .then((col) => {
                             col.findOne({_id: parseInt(citem.ref.id)})
                             .then((slide) => {
                                 let slideRevision =  slide.revisions.find((rev) => (rev.id === citem.ref.revision));
@@ -1490,7 +1477,7 @@ let self = module.exports = {
                 });
             });
         });
-    },
+},
 
     //returns a flattened structure of a deck's sub-decks
     getFlatDecksFromDB: function(deck_id, deckTree){
@@ -1775,7 +1762,6 @@ let self = module.exports = {
                                         revision: found.revisions[ind].id,
                                         title: found.revisions[ind].title,
                                         user: found.user,
-                                        kind: 'fork'
                                     },
                                     description: found.description,
                                     language: found.revisions[ind].language,
@@ -1862,62 +1848,51 @@ let self = module.exports = {
                 });
             });
 
+        }).then((forkResult) => {
+            // after forking the deck and if the revision we forked is the latest,
+            // we create a new revision for the original deck;
+            // this way the fork points to a read-only revision
 
-    fill_translations(kind, translations_array){
-        if (kind === 'deck'){
-            return new Promise((resolve, reject) => {
-                async.each(translations_array, (translation, cbEach) => {
-                    return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
-                    .then((db2) => db2.collection('decks'))
-                    .then((col) => {
-                        return col.findOne({_id: parseInt(translation.deck_id)})
-                        .then((found) => {
-                            if (found){
-                                found.translations = translations_array;
-                                col.save(found);
-                                resolve();
-                            }else{
-                                console.log('Deck not found: ' + translation.deck_id);
-                                reject('Deck not found: ' + translation.deck_id);
-                            }
+            let deck = util.parseIdentifier(deck_id);
+            return self.get(deck.id).then((existingDeck) => {
+                let [latestRevision] = existingDeck.revisions.slice(-1);
+                if (deck.revision && latestRevision.id !== deck.revision) {
+                    // we forked a read-only revision, nothing to do here
+                    return forkResult;
+                } else {
+                    // make the deck id canonical just in case
+                    deck.revision = latestRevision.id;
+                }
 
-                        })
-                        .catch(cbEach);
+                // this is an automatic revision, the user should be 'system'
+                // deck autorevision is created with same deck as root
+                return self.createDeckRevision(deck.id, -1, deck.id).then((updatedDeck) => {
+                    // we need to update all parents of the deck to keep them updated
+                    // with the latest revision we have just created now
+                    return self.getUsage(util.toIdentifier(deck)).then((usage) => {
+                        // if a deck has no roots, itself is the root
+                        console.log(`updating deck revision used for ${deck.id} in ${usage.length} parent decks`);
+
+                        usage.reduce((p, parentDeck) => {
+                            return p.then(() => {
+                                // citem, revertedRevId, root_deck, ckind, user, top_root_deck, parentOperations
+                                let parentDeckId = util.toIdentifier(parentDeck);
+                                return self.updateContentItem(updatedDeck, '', parentDeckId, 'deck', -1, parentDeckId);
+                            });
+                        }, Promise.resolve());
+                    }).then(() => {
+                        // return the same result
+                        return forkResult;
                     });
-                }, (err) => {
-                    if (err) {
-                        return reject(err);
-                    }
+
                 });
+
             });
-        }else{
-            return new Promise((resolve, reject) => {
-                async.each(translations_array, (translation, cbEach) => {
-                    return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
-                    .then((db2) => db2.collection('slides'))
-                    .then((col) => {
-                        return col.findOne({_id: parseInt(translation.slide_id)})
-                        .then((found) => {
-                            if (found){
-                                found.translations = translations_array;
-                                col.save(found);
-                                resolve();
-                            }else{
-                                console.log('Slide not found: ' + translation.slide_id);
-                                reject('Slide not found: ' + translation.slide_id);
-                            }
-                        })
-                        .catch(cbEach);
-                    });
-                }, (err) => {
-                    if (err) {
-                        return reject(err);
-                    }
-                });
-            });
-        }
+
+        });
 
     },
+
 
     fill_translations(kind, translations_array){
         if (kind === 'deck'){
@@ -1978,47 +1953,19 @@ let self = module.exports = {
     //forks a given deck revision by copying all of its sub-decks into new decks
     translateDeckRevision(deck_id, user, language){
 
-            let deck = util.parseIdentifier(deck_id);
-            return self.get(deck.id).then((existingDeck) => {
-                let [latestRevision] = existingDeck.revisions.slice(-1);
-                if (deck.revision && latestRevision.id !== deck.revision) {
-                    // we forked a read-only revision, nothing to do here
-                    return forkResult;
-                } else {
-                    // make the deck id canonical just in case
-                    deck.revision = latestRevision.id;
-                }
-
-                // this is an automatic revision, the user should be 'system'
-                // deck autorevision is created with same deck as root
-                return self.createDeckRevision(deck.id, -1, deck.id).then((updatedDeck) => {
-                    // we need to update all parents of the deck to keep them updated
-                    // with the latest revision we have just created now
-                    return self.getUsage(util.toIdentifier(deck)).then((usage) => {
-                        // if a deck has no roots, itself is the root
-                        console.log(`updating deck revision used for ${deck.id} in ${usage.length} parent decks`);
-
-                        usage.reduce((p, parentDeck) => {
-                            return p.then(() => {
-                                // citem, revertedRevId, root_deck, ckind, user, top_root_deck, parentOperations
-                                let parentDeckId = util.toIdentifier(parentDeck);
-                                return self.updateContentItem(updatedDeck, '', parentDeckId, 'deck', -1, parentDeckId);
-                            });
-                        }, Promise.resolve());
-                    }).then(() => {
-                        // return the same result
-                        return forkResult;
-                    });
-
-                });
-
-
-            });
-
-        });
-
-    },
-
+        return self.getFlatDecksFromDB(deck_id)
+        .then((res) => {
+            //we have a flat sub-deck structure
+            let flatDeckArray = [];
+            flatDeckArray.push(res.id); //push root deck into array
+            for(let i = 0; i < res.children.length; i++){
+                flatDeckArray.push(res.children[i].id); //push next sub-deck into array
+            }
+            //init maps for new ids
+            let id_map = {}, id_noRev_map = {}, slide_id_map = {};
+            //reverse in order to iterate from bottom to top
+            flatDeckArray.reverse();
+            //feed the array for serial processing
 
             let new_decks = [];
             return new Promise((resolve, reject) => {
@@ -2280,34 +2227,34 @@ let self = module.exports = {
                     });
                 });
             });
-        }, Promise.resolve([]));
-
+        });
     },
 
 
-_trackDecksForked(rootDeckId, forkIdsMap, userId, forAttach) {
-        // we reverse the array to track the root first, then the children in order
-        let newDeckIds = Object.keys(forkIdsMap).map((key) => forkIdsMap[key]).reverse();
+    // TODO make this actually private after code in handler.js has been moved here
+    _trackDecksForked(rootDeckId, forkIdsMap, userId, forAttach) {
+            // we reverse the array to track the root first, then the children in order
+            let newDeckIds = Object.keys(forkIdsMap).map((key) => forkIdsMap[key]).reverse();
 
-        let parentOperations = [];
-        // taken from https://stackoverflow.com/questions/30823653/is-node-js-native-promise-all-processing-in-parallel-or-sequentially/#30823708
-        // this starts with a promise that resolves to empty array,
-        // then takes each new deck id and applies the tracking and returns a new promise that resolves
-        // to the tracking results, that are picked up by the next iteration, etc...
-        return newDeckIds.reduce((p, newDeckId) => {
-            return p.then((deckChanges) => {
-                // if errored somewhere return nothing, chain will just end without doing the rest
-                if (!deckChanges) return;
+            let parentOperations = [];
+            // taken from https://stackoverflow.com/questions/30823653/is-node-js-native-promise-all-processing-in-parallel-or-sequentially/#30823708
+            // this starts with a promise that resolves to empty array,
+            // then takes each new deck id and applies the tracking and returns a new promise that resolves
+            // to the tracking results, that are picked up by the next iteration, etc...
+            return newDeckIds.reduce((p, newDeckId) => {
+                return p.then((deckChanges) => {
+                    // if errored somewhere return nothing, chain will just end without doing the rest
+                    if (!deckChanges) return;
 
-                // parent operations is only the ops for the forking of the first deck (the root of the fork tree)
-                // the first time this runs, deckChanges is empty!
-                if (_.isEmpty(parentOperations)) parentOperations.push(...deckChanges);
-                // we track everything as rooted to the deck_id
-                return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forAttach);
-            });
-        }, Promise.resolve([]));
+                    // parent operations is only the ops for the forking of the first deck (the root of the fork tree)
+                    // the first time this runs, deckChanges is empty!
+                    if (_.isEmpty(parentOperations)) parentOperations.push(...deckChanges);
+                    // we track everything as rooted to the deck_id
+                    return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forAttach);
+                });
+            }, Promise.resolve([]));
 
-},
+    },
 
 
 
