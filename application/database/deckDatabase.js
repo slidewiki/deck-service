@@ -2010,7 +2010,7 @@ let self = module.exports = {
                                         kind: 'translation'
                                     },
                                     description: found.description,
-                                    language: language,//found.revisions[ind].language,
+                                    language: found.revisions[ind].language,
                                     license: found.license,
                                     user: parseInt(user),
                                     translated_from: found.translated_from,
@@ -2038,7 +2038,7 @@ let self = module.exports = {
                                 // renew creation date for fresh revision
                                 copiedDeck.revisions[0].timestamp = timestamp;
                                 copiedDeck.revisions[0].lastUpdate = timestamp;
-                                copiedDeck.revisions[0].language = language;
+
                                 let contentItemsMap = {};
                                 //console.log('before loop for content items');
                                 async.eachSeries(copiedDeck.revisions[0].contentItems, (nextSlide, callback) => {
@@ -2095,8 +2095,15 @@ let self = module.exports = {
                                                                 translated._id = newSlideId;
                                                                 translated.revisions[0].usage = slide.revisions[0].usage;
                                                                 col2.save(translated);
-                                                                let translations = slide.translations;
-                                                                translations.push({'slide_id':slide._id, 'language':language});//filling in the translations array for all decks in the 'family'
+                                                                let translations = [];
+                                                                if (slide.translations){
+                                                                    translations = slide.translations;
+                                                                    translations.push({'slide_id':slide._id, 'language':language});
+                                                                }else{
+                                                                    translations.push({'slide_id':slide._id, 'language':language});
+                                                                    translations.push({'slide_id':oldSlideId, 'language':slide.language});
+                                                                }
+                                                                //filling in the translations array for all decks in the 'family'
                                                                 self.fill_translations('slide', translations)
                                                                 .then(resolve)
                                                                 .catch(reject);
@@ -2196,13 +2203,26 @@ let self = module.exports = {
                                             }else{
                                                 copiedDeck.revisions[0].title = original.revisions[0].title;
                                                 copiedDeck.description = original.description;
+                                                let original_language = copiedDeck.language;
+                                                copiedDeck.language = language;
+                                                copiedDeck.revisions[0].language = language;
                                                 new_decks.push(copiedDeck);
                                                 return col.insertOne(copiedDeck).then(() => {
-                                                    let translations = copiedDeck.translations;
-                                                    translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
+                                                    let translations = [];
+                                                    if (copiedDeck.translations) {
+                                                        translations = copiedDeck.translations;
+                                                        translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
+                                                    }else{
+                                                        translations.push({'deck_id':copiedDeck._id, 'language':language});
+                                                        translations.push({'deck_id':original._id, 'language': original_language});
+                                                    }
+
                                                     self.fill_translations('deck', translations)
                                                     .then(callback)
-                                                    .catch(callback);
+                                                    .catch((err) => {
+                                                        console.log(err);
+                                                        reject(err);
+                                                    });
                                                 });
 
                                                 resolve();
