@@ -1477,7 +1477,7 @@ let self = module.exports = {
                 });
             });
         });
-},
+    },
 
     //returns a flattened structure of a deck's sub-decks
     getFlatDecksFromDB: function(deck_id, deckTree){
@@ -2234,25 +2234,25 @@ let self = module.exports = {
     // TODO make this actually private after code in handler.js has been moved here
     _trackDecksForked(rootDeckId, forkIdsMap, userId, forAttach) {
             // we reverse the array to track the root first, then the children in order
-            let newDeckIds = Object.keys(forkIdsMap).map((key) => forkIdsMap[key]).reverse();
+        let newDeckIds = Object.keys(forkIdsMap).map((key) => forkIdsMap[key]).reverse();
 
-            let parentOperations = [];
-            // taken from https://stackoverflow.com/questions/30823653/is-node-js-native-promise-all-processing-in-parallel-or-sequentially/#30823708
-            // this starts with a promise that resolves to empty array,
-            // then takes each new deck id and applies the tracking and returns a new promise that resolves
-            // to the tracking results, that are picked up by the next iteration, etc...
-            return newDeckIds.reduce((p, newDeckId) => {
-                return p.then((deckChanges) => {
-                    // if errored somewhere return nothing, chain will just end without doing the rest
-                    if (!deckChanges) return;
+        let parentOperations = [];
+        // taken from https://stackoverflow.com/questions/30823653/is-node-js-native-promise-all-processing-in-parallel-or-sequentially/#30823708
+        // this starts with a promise that resolves to empty array,
+        // then takes each new deck id and applies the tracking and returns a new promise that resolves
+        // to the tracking results, that are picked up by the next iteration, etc...
+        return newDeckIds.reduce((p, newDeckId) => {
+            return p.then((deckChanges) => {
+                // if errored somewhere return nothing, chain will just end without doing the rest
+                if (!deckChanges) return;
 
-                    // parent operations is only the ops for the forking of the first deck (the root of the fork tree)
-                    // the first time this runs, deckChanges is empty!
-                    if (_.isEmpty(parentOperations)) parentOperations.push(...deckChanges);
-                    // we track everything as rooted to the deck_id
-                    return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forAttach);
-                });
-            }, Promise.resolve([]));
+                // parent operations is only the ops for the forking of the first deck (the root of the fork tree)
+                // the first time this runs, deckChanges is empty!
+                if (_.isEmpty(parentOperations)) parentOperations.push(...deckChanges);
+                // we track everything as rooted to the deck_id
+                return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forAttach);
+            });
+        }, Promise.resolve([]));
 
     },
 
