@@ -19,7 +19,6 @@ function createThumbnailForSlide(slideId, slideTitle, slideContent) {
         headers: {
             'Content-Type': 'text/plain',
         },
-        json: true,
     }).then(() => {
         // console.log(`created thumbnail for ${slideId}`);
         return true;
