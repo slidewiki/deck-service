@@ -1646,6 +1646,33 @@ let self = module.exports = {
 
     },
 
+    getDeckRootDecks: function(request, reply){
+        let deckId = request.params.id;
+        let deck = util.parseIdentifier(deckId);
+        deckDB.get(deck.id).then((existingDeck) => {
+            if (!existingDeck) return boom.notFound();
+
+            return deckDB.getRootDecks(deckId)
+            .then((roots) => {
+                return roots;
+                // TODO dead code
+                return Promise.all(roots.map((r) => {
+                    return deckDB.findPath(util.toIdentifier(r), deckId)
+                    .then((path) => {
+                        let [leaf] = path.slice(-1);
+                        leaf.id = deck.id;
+                        leaf.revision = deck.revision || r.using;
+                        return path;
+                    });
+                })).then((paths) => paths.map(util.toPlatformPath));
+            });
+
+        }).then(reply).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
     getSlideUsage: function(request, reply) {
         let slideId = request.params.id;
         let slide = util.parseIdentifier(slideId);
@@ -1677,6 +1704,35 @@ let self = module.exports = {
             reply(boom.badImplementation());
         });
 
+    },
+
+    getSlideRootDecks: function(request, reply){
+        let slideId = request.params.id;
+        let slide = util.parseIdentifier(slideId);
+        slideDB.get(slide.id).then((existingSlide) => {
+            if (!existingSlide) return boom.notFound();
+
+            return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
+                return roots;
+                // TODO dead code
+                return Promise.all(roots.map((r) => {
+                    // path method does not return the slide id, so we take it from the root
+                    return deckDB.findPath(util.toIdentifier(r), slideId, 'slide')
+                    .then((path) => {
+                        let [leaf] = path.slice(-1);
+                        leaf.id = slide.id;
+                        leaf.revision = slide.revision || r.using;
+                        leaf.kind = 'slide';
+
+                        return path;
+                    });
+                })).then((paths) => paths.map(util.toPlatformPath));
+
+            });
+        }).then(reply).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
     },
 
     getDeckTags: function(request, reply){
@@ -1788,6 +1844,45 @@ let self = module.exports = {
             }
         }).catch( (error) => {
             request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    }, 
+
+    getDeckDeepUsage: function(request, reply){
+        deckDB.getDeepUsage(request.params.id, 'deck', request.query.keepVisibleOnly).then( (usage) => {
+            if(!usage){
+                reply(boom.notFound());
+            } else {
+                reply(usage);
+            }
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
+    getSlideDeepUsage: function(request, reply){
+        deckDB.getDeepUsage(request.params.id, 'slide', request.query.keepVisibleOnly).then( (usage) => {
+            if(!usage){
+                reply(boom.notFound());
+            } else {
+                reply(usage);
+            }
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    }, 
+
+    getForkGroup: function(request, reply){
+        deckDB.computeForkGroup(request.params.id).then( (forkGroup) => {
+            if(_.isEmpty(forkGroup)){
+                reply(boom.notFound());
+            } else {
+                reply(forkGroup);
+            }
+        }).catch( (err) => {
+            request.log('error', err);
             reply(boom.badImplementation());
         });
     }

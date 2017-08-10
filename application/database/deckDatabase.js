@@ -1952,8 +1952,69 @@ let self = module.exports = {
         });
     },
 
+    // queries the database to return the set of all decks that are part of a deck fork chain
+    // the group can be identified by the deck with minimum id (earliest created one)
+    // if it returns an empty array, it means the deck id is NOT in the database
+    computeForkGroup(deckId) {
+        deckId = parseInt(deckId);
+        let pipeline = [
+            { $match: { _id: deckId } },
+            { $project: { origin: 1 } },
+            // add the origins
+            { $graphLookup: {
+                from: 'decks',
+                startWith: '$origin.id',
+                connectFromField: 'origin.id',
+                connectToField: '_id',
+                as: 'origins',
+            } },
+            { $project: {
+                origins: { _id: 1 },
+            } },
+            // add self in origins, it could be the fork group root
+            { $project: {
+                origins: { $setUnion: [ '$origins', [{ _id: '$_id' }] ] },
+            } },
+            // add the forks of origins
+            { $graphLookup: {
+                from: 'decks',
+                startWith: '$origins._id',
+                connectFromField: '_id',
+                connectToField: 'origin.id',
+                as: 'originsforks',
+            } },
+            { $project: {
+                origins: 1,
+                originsforks: { _id: 1 },
+            } },
+            // add the forks
+            { $graphLookup: {
+                from: 'decks',
+                startWith: '$_id',
+                connectFromField: '_id',
+                connectToField: 'origin.id',
+                as: 'forks',
+            } },
+            { $project: {
+                _id: 0,
+                origins: 1,
+                originsforks: 1,
+                forks: { _id: 1 },
+            } },
+            { $project: {
+                forkGroup: { $setUnion: [ '$origins', '$forks', '$originsforks' ] },
+            } },
+            { $unwind: '$forkGroup' },
+            { $project: { id: '$forkGroup._id' } },
+        ];
+
+        return helper.getCollection('decks')
+        .then((decks) => decks.aggregate(pipeline))
+        .then((result) => result.map((d) => d.id).toArray());
+    },
+
     // computes the usage of the item, i.e. the decks that point to it
-    getUsage(itemId, itemKind='deck') {
+    getUsage(itemId, itemKind='deck', keepVisibleOnly=false) {
         let item = util.parseIdentifier(itemId);
         let elemMatchQuery = {
             kind: itemKind,
@@ -2018,18 +2079,39 @@ let self = module.exports = {
 
         return helper.getCollection('decks')
         .then((decks) => decks.aggregate(pipeline))
-        .then((result) => result.toArray());
+        .then((result) => result.toArray())
+        .then((usage) => {
+            if (keepVisibleOnly) {
+                // remove parents that are not visible
+                return usage.reduce((promise, parent) => {
+                    return promise.then((visibleUsage) => {
+                        return self.get(parent.id).then((parentDeck) => {
+                            let [latestRevision] = parentDeck.revisions.slice(-1);
+                            if (latestRevision.id !== parent.revision) {
+                                return visibleUsage;
+                            } else {
+                                return visibleUsage.concat(parent);
+                            }
+                        });
+                    });
+                }, Promise.resolve([]));
+
+            } else {
+                return usage;
+            }
+
+        });
 
     },
 
     // computes the usage of the item, i.e. the decks that point to it directly or indirectly
-    getDeepUsage(itemId, itemKind='deck') {
-        return self.getUsage(itemId, itemKind).then((parents) => {
+    getDeepUsage(itemId, itemKind='deck', keepVisibleOnly=true) {
+        return self.getUsage(itemId, itemKind, keepVisibleOnly).then((parents) => {
             return parents.reduce((promise, parent) => {
                 return promise.then((usage) => {
                     let parentId = util.toIdentifier(parent);
                     // a deck/slide parent is always a deck
-                    return self.getDeepUsage(parentId).then((deepUsage) => {
+                    return self.getDeepUsage(parentId, 'deck', keepVisibleOnly).then((deepUsage) => {
                         // when method is called by client code the itemId may have revision
                         // in such a case `parent` includes a `using` attribute
                         // let's propagate that that in deep results
@@ -2045,7 +2127,23 @@ let self = module.exports = {
 
     // computes the decks that point to it directly or indirectly, and are roots themselves (their own parents is empty)
     // when item type is 'deck', includes the deck in question if it's a root deck (i.e. has no parents in the db)
-    getRootDecks(itemId, itemKind='deck') {
+    getRootDecks(itemId, itemKind='deck', keepVisibleOnly=true) {
+        let item = util.parseIdentifier(itemId);
+        if (keepVisibleOnly && itemKind === 'deck' && item.revision) {
+            return self.get(item.id).then((existingDeck) => {
+                let [latestRevision] = existingDeck.revisions.slice(-1);
+                if (latestRevision.id === item.revision) {
+                    return self._getRootDecks(itemId, itemKind, keepVisibleOnly);
+                } else {
+                    return [];
+                }
+            });
+        }
+
+        return self._getRootDecks(itemId, itemKind, keepVisibleOnly);
+    },
+
+    _getRootDecks(itemId, itemKind='deck', keepVisibleOnly=true) {
         return self.getUsage(itemId, itemKind).then((parents) => {
             // return self if is deck and is root
             if (parents.length === 0) {
@@ -2061,7 +2159,7 @@ let self = module.exports = {
                 return promise.then((roots) => {
                     let parentId = util.toIdentifier(parent);
                     // a deck/slide parent is always a deck
-                    return self.getRootDecks(parentId).then((deepRoots) => {
+                    return self.getRootDecks(parentId, 'deck', keepVisibleOnly).then((deepRoots) => {
                         // when method is called by client code the itemId may have revision
                         // in such a case `parent` includes a `using` attribute
                         // let's propagate that that in deep results
