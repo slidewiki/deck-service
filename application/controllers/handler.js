@@ -345,6 +345,21 @@ let self = module.exports = {
         });
     },
 
+    getDeckTranslations: function(request, reply){
+        let deckId = request.params.id; // it should already be a number
+        console.log(_.isNumber(deckId));
+        deckDB.get(deckId).then((deck) => {
+            if (!deck) return reply(boom.notFound());
+
+            let currentLang = {'deck_id':deckId, 'language': deck.revisions[0].language};
+            reply({'translations': deck.translations, 'currentLang':currentLang});
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
     getDeckRevisions: function(request, reply) {
         let deckId = request.params.id; // it should already be a number
 
@@ -536,6 +551,26 @@ let self = module.exports = {
         });
 
     },
+
+    translateDeckRevision: function(request, reply) {
+        return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
+        .then((forkAllowed) => {
+            if (!forkAllowed) {
+                return reply(boom.forbidden());
+            }
+            
+            return deckDB.translateDeckRevision(request.params.id, request.payload.user, request.payload.language).then((id_map) => {
+                //We must iterate through all objects in the decktree of the fork and translate each one
+                reply(id_map);
+            });
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation(error));
+        });
+
+    },
+
 
     // simply creates a new deck revision without updating anything
     createDeckRevision: function(request, reply) {
