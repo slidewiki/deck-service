@@ -785,6 +785,37 @@ module.exports = function(server) {
         },
     });
 
+    //----------------------------- Usage Routes -----------------------------//
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/rootDecks',
+        handler: handlers.getDeckRootDecks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Locate the root parent decks of the deck if any',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/rootDecks',
+        handler: handlers.getSlideRootDecks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: slideId-slideRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Locate the root parent decks of the slide',
+        },
+    });
+
     //------------------------------- Tag Routes -----------------------------//
     server.route({
         method: 'GET',
@@ -952,6 +983,62 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Get the change log array for a slide',
+        }
+    });
+
+
+    //------------------------------- Deep Usage Routes -----------------------------//
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/deepUsage',
+        handler: handlers.getDeckDeepUsage,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+                query: {
+                    keepVisibleOnly: Joi.boolean().default(true)
+                },
+            },
+            tags: ['api'],
+            description: 'Get deep usage (decks that point to it directly or indirectly) of a deck',
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/deepUsage',
+        handler: handlers.getSlideDeepUsage,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+                query: {
+                    keepVisibleOnly: Joi.boolean().default(true)
+                },
+            },
+            tags: ['api'],
+            description: 'Get deep usage (decks that point to it directly or indirectly) of a slide',
+        }
+    });
+
+    //------------------------------- Fork Group Route -----------------------------//
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/forkGroup',
+        handler: handlers.getForkGroup,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the set of all decks that are part of a deck fork chain',
         }
     });
 
