@@ -78,21 +78,6 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
-        path: '/deckarchive/{id}',
-        handler: handlers.archiveDeckTree,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string()
-                },
-            },
-            tags: ['api'],
-            description: 'Archive a deck tree'
-        }
-    });
-
-    server.route({
-        method: 'GET',
         path: '/legacy/{oldId}',
         handler: handlers.getLegacyDeckId,
         config: {
@@ -747,6 +732,25 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Move a node (slide/deck) in a different position in the deck tree'
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/decktree/{id}/archive',
+        handler: handlers.archiveDeckTree,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck')
+                },
+                payload:
+                    Joi.object().keys({
+                        user: Joi.string().alphanum().lowercase()
+                    }).requiredKeys('user')
+            },
+            tags: ['api'],
+            description: 'Archive a deck tree',
         }
     });
 

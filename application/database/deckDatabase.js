@@ -2427,38 +2427,95 @@ let self = module.exports = {
         return firstSlide;
     },
 
-    archiveDeck: function(existingDeck) {        
-        helper.connectToDatabase()
-        .then((db) => db.collection('decks_archived'))
-        .then((col) => {            
-            col.save(existingDeck);
-            helper.connectToDatabase()
-            .then((db) => db.collection('decks'))
-            .then((col) => {
-                col.remove({'_id': existingDeck._id});                
+    archiveDeck: function(deckId) {   
+        return helper.getCollection('decks')
+        .then((col) => col.findOne({_id: parseInt(deckId)}))
+        .then((existingDeck) => {
+
+            // store deck in 'deck_archived' collection
+            return helper.getCollection('decks_archived')
+            .then((archivedCol) => {            
+                archivedCol.save(existingDeck);
+
+                // remove from 'deck' collection
+                let removeDeckPromise = helper.getCollection('decks')
+                .then((col) => {
+                    col.remove({'_id': existingDeck._id});                
+                });
+
+                // update usage of its content slides
+                let updateSlidesUsagePromise = new Promise( (resolve, reject) => {
+                    let activeRevisionIndex = getActiveRevision(existingDeck);
+                    let activeRevision = existingDeck.revisions[activeRevisionIndex];
+
+                    async.eachSeries(activeRevision.contentItems, (item, callback) => {
+                        console.log(item);
+                        if(item.kind === 'slide'){
+                            return helper.getCollection('slides').then((col) => {
+                                return col.findOneAndUpdate(
+                                    {
+                                        _id: item.ref.id,
+                                        'revisions.id': item.ref.revision,
+                                    },
+                                    { $pull: {
+                                        'revisions.$.usage': {
+                                            id: existingDeck._id,
+                                            revision: activeRevision.id,
+                                        },
+                                    } }
+                                );
+                            }).then( () => {
+                                callback();
+                            }).catch( (err) => {
+                                callback(err);
+                            });
+                        } else {
+                            // subdecks are also archived so no need to update their usage
+                            callback();
+                        }
+                    }, (err) => {
+                        if(err){
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+
+                return Promise.all([removeDeckPromise, updateSlidesUsagePromise]);
             });
-        });            
+        });     
     },
 
-    archiveDeckTree: function(root_deck_id){
-        self.getFlatDecksFromDB(root_deck_id)
-        .then((res) => {
-            for(let i = 0; i < res.children.length; i++){
-                helper.connectToDatabase()
-                .then((db) => db.collection('decks'))
-                .then((col) => col.findOne({ _id: parseInt( res.children[i].id) }))
-                .then((found) => {
-                    self.archiveDeck(found);
-                });
-            }
-            helper.connectToDatabase()
-                .then((db) => db.collection('decks'))
-                .then((col) => col.findOne({ _id: parseInt( root_deck_id) }))
-                .then((found_root) => {
-                    self.archiveDeck(found_root);
-                });
+    archiveDeckTree: function(deckId){
+        // archive subdecks 
+        let archiveSubdecksPromise = new Promise( (resolve, reject) => {
+            self.getFlatDecksFromDB(deckId)
+            .then((res) => {
+                async.eachSeries(res.children, (subdeckChild, callback) => {
+                    let subdeck = util.parseIdentifier(subdeckChild.id);
 
+                    self.archiveDeck(subdeck.id).then( () => {
+                        callback();
+                    }).catch( (err) => {
+                        callback(err);
+                    });
+                    
+                }, (err) => {
+                    if(err){
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
         });
+
+        // archive root deck
+        let deck = util.parseIdentifier(deckId);
+        let archiveRootDeckPromise = self.archiveDeck(deck.id);
+
+        return Promise.all([archiveRootDeckPromise, archiveSubdecksPromise]);
     }
         
       

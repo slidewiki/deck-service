@@ -222,11 +222,22 @@ let self = module.exports = {
             reply(boom.badImplementation());
         });
     },
+
     archiveDeckTree: function(request, reply) {
-        deckDB.archiveDeckTree(encodeURIComponent(request.params.id)).then((deck) => {
-            reply();
+        deckDB.get(request.params.id).then( (deck) => {
+            if(!deck){
+                return reply(boom.notFound());
+            }
+
+            deckDB.archiveDeckTree(request.params.id).then(() => {
+                reply(`deck with id: ${request.params.id} was archived`);
+            }).catch( (err) => {
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });
         });
     },
+
     //gets a single deck from the database, containing all revisions, unless a specific revision is specified in the id
     getDeck: function(request, reply) {
         deckDB.get(encodeURIComponent(request.params.id)).then((deck) => {
