@@ -2173,6 +2173,25 @@ let self = module.exports = {
         });
     },
 
+    getDeckOwners(query) {
+
+        return helper.getCollection('decks').then((decks) => {
+
+            return decks.aggregate([
+                // apply filter
+                { $match: query },
+                // group by user and count decks
+                { $group: {
+                    _id: '$user',
+                    'decksCount': { $sum: 1 },
+                } },
+                { $sort: { _id: 1 } },
+            ]);
+
+        }).then((cursor) => cursor.toArray());
+
+    },
+
     // computes all deck permissions the user has been granted
     userPermissions(deckId, userId) {
         userId = parseInt(userId);

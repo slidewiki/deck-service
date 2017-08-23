@@ -4,6 +4,7 @@ const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
 const changeLog = require('./controllers/changeLog');
+const decks = require('./controllers/decks');
 
 // TODO better organize joi validation models
 const apiModels = {};
@@ -1020,6 +1021,21 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Get the set of all decks that are part of a deck fork chain',
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/deckOwners',
+        handler: decks.getDeckOwners,
+        config: {
+            validate: {
+                query: {
+                    user: Joi.string().regex(/[0-9](,[0-9])*/).empty('').description('A comma delimited list of user ids'),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve decks with optional filter, sorting, and paging parameters'
         }
     });
 
