@@ -347,7 +347,7 @@ let self = module.exports = {
 
     getDeckTranslations: function(request, reply){
         let deckId = request.params.id; // it should already be a number
-        console.log(_.isNumber(deckId));
+
         deckDB.get(deckId).then((deck) => {
             if (!deck) return reply(boom.notFound());
 
@@ -535,13 +535,16 @@ let self = module.exports = {
     },
 
     forkDeckRevision: function(request, reply) {
-        return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
+        let deckId = request.params.id;
+        let userId = request.payload.user;
+
+        return deckDB.forkAllowed(deckId, userId)
         .then((forkAllowed) => {
             if (!forkAllowed) {
                 return reply(boom.forbidden());
             }
 
-            return deckDB.forkDeckRevision(request.params.id, request.payload.user).then((id_map) => {
+            return deckDB.forkDeckRevision(deckId, userId).then((id_map) => {
                 reply(id_map);
             });
 
@@ -553,13 +556,16 @@ let self = module.exports = {
     },
 
     translateDeckRevision: function(request, reply) {
-        return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
+        let deckId = request.params.id;
+        let userId = request.payload.user;
+
+        return deckDB.forkAllowed(deckId, userId)
         .then((forkAllowed) => {
             if (!forkAllowed) {
                 return reply(boom.forbidden());
             }
 
-            return deckDB.translateDeckRevision(request.params.id, request.payload.user, request.payload.language).then((id_map) => {
+            return deckDB.translateDeckRevision(deckId, userId, request.payload.language).then((id_map) => {
                 //We must iterate through all objects in the decktree of the fork and translate each one
                 reply(id_map);
             });
