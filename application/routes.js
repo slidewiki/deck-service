@@ -4,6 +4,7 @@ const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
 const changeLog = require('./controllers/changeLog');
+const archives = require('./controllers/archives');
 
 // TODO better organize joi validation models
 const apiModels = {};
@@ -738,7 +739,7 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/decktree/{id}/archive',
-        handler: handlers.archiveDeckTree,
+        handler: archives.archiveDeckTree,
         config: {
             validate: {
                 params: {
@@ -751,7 +752,38 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Archive a deck tree',
-        }
+        },
+    });
+
+    //----------------------------- Archives Routes -----------------------------//
+    server.route({
+        method: 'GET',
+        path: '/archives/decks/',
+        handler: archives.listArchivedDecks,
+        config: {
+            validate: {
+                query: {
+                    user: Joi.number().integer().description('Identifier of a user that originally owned the archived decks requested'),
+                },
+            },
+            tags: ['api'],
+            description: 'List archived decks',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/archives/deck/{id}',
+        handler: archives.getArchivedDeck,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('Identifier of an archived deck'),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve information about an archived deck',
+        },
     });
 
     //----------------------------- Usage Routes -----------------------------//
