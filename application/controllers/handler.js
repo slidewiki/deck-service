@@ -225,17 +225,19 @@ let self = module.exports = {
 
     archiveDeckTree: function(request, reply) {
         deckDB.get(request.params.id).then( (deck) => {
-            if(!deck){
+            if (!deck) {
                 return reply(boom.notFound());
             }
 
-            deckDB.archiveDeckTree(request.params.id).then(() => {
-                reply(`deck with id: ${request.params.id} was archived`);
-            }).catch( (err) => {
-                request.log('error', err);
-                reply(boom.badImplementation());
+            return deckDB.archiveDeckTree(request.params.id).then(() => {
+                reply();
             });
+
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
+
     },
 
     //gets a single deck from the database, containing all revisions, unless a specific revision is specified in the id

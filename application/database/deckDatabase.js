@@ -2532,9 +2532,8 @@ let self = module.exports = {
 
             // store deck in 'deck_archived' collection
             return helper.getCollection('decks_archived')
-            .then((archivedCol) => {            
-                archivedCol.save(existingDeck);
-
+            .then((archivedCol) => archivedCol.save(existingDeck))
+            .then(() => {
                 // remove from 'deck' collection
                 let removeDeckPromise = helper.getCollection('decks')
                 .then((col) => {
