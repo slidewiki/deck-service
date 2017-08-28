@@ -743,11 +743,11 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck')
+                    id: Joi.number().integer().description('The deck id (without revision)'),
                 },
                 payload:
                     Joi.object().keys({
-                        user: Joi.string().alphanum().lowercase()
+                        user: Joi.number().integer(),
                     }).requiredKeys('user')
             },
             tags: ['api'],

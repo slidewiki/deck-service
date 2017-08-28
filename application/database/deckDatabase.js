@@ -2,6 +2,7 @@
 
 const _ = require('lodash');
 const util = require('../lib/util');
+const boom = require('boom');
 
 const ChangeLog = require('../lib/ChangeLog');
 
@@ -1492,6 +1493,8 @@ let self = module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(deck_id)})
             .then((deck) => {
+                if (!deck) return;
+
                 if(revision_id === -1){
                     revision_id = deck.active-1;
                 }
@@ -2584,38 +2587,46 @@ let self = module.exports = {
         });     
     },
 
-    archiveDeckTree: function(deckId){
-        // archive subdecks 
-        let archiveSubdecksPromise = new Promise( (resolve, reject) => {
-            self.getFlatDecksFromDB(deckId)
-            .then((res) => {
-                async.eachSeries(res.children, (subdeckChild, callback) => {
-                    let subdeck = util.parseIdentifier(subdeckChild.id);
+    // moves the entire deck tree including all subdecks to the archive
+    // can only be used for root decks, i.e. decks that are subdecks of none
+    archiveDeckTree: function(deckId) {
+        // verify if it's a root deck
+        return self.getUsage(deckId).then((parents) => {
+            // if it's a root deck, parents should be empty
+            if (_.size(parents) > 0) {
+                // abort!
+                throw boom.methodNotAllowed(`cannot archive a non-root deck ${deckId}`);
+            }
 
-                    self.archiveDeck(subdeck.id).then( () => {
-                        callback();
-                    }).catch( (err) => {
-                        callback(err);
+            // archive subdecks 
+            let archiveSubdecks = new Promise( (resolve, reject) => {
+                self.getFlatDecksFromDB(String(deckId)).then((res) => {
+                    if (!res) return reject(boom.notFound());
+
+                    async.eachSeries(res.children, (subdeckChild, callback) => {
+                        let subdeck = util.parseIdentifier(subdeckChild.id);
+
+                        self.archiveDeck(subdeck.id).then( () => {
+                            callback();
+                        }).catch( (err) => {
+                            callback(err);
+                        });
+                        
+                    }, (err) => {
+                        if(err){
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
                     });
-                    
-                }, (err) => {
-                    if(err){
-                        reject(err);
-                    } else {
-                        resolve();
-                    }
                 });
             });
+
+            // when it's done, continue with archiving the root deck
+            return archiveSubdecks.then(() => self.archiveDeck(deckId));
         });
 
-        // archive root deck
-        let deck = util.parseIdentifier(deckId);
-        let archiveRootDeckPromise = self.archiveDeck(deck.id);
-
-        return Promise.all([archiveRootDeckPromise, archiveSubdecksPromise]);
-    }
-        
-      
+    },
 
 };
 

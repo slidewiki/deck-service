@@ -42,6 +42,8 @@ let self = module.exports = {
             });
 
         }).catch( (err) => {
+            if (err.isBoom) return reply(err);
+
             request.log('error', err);
             reply(boom.badImplementation());
         });
