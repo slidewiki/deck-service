@@ -1153,7 +1153,7 @@ let self = module.exports = {
         let itemId = itemToRemove.ref.id;
         let itemRevision = itemToRemove.ref.revision;
         if(itemToRemove.kind === 'slide'){
-            helper.connectToDatabase()
+            return helper.connectToDatabase()
             .then((db) => db.collection('slides'))
             .then((col2) => {
                 return col2.findOne({_id: parseInt(itemId)})
@@ -1172,7 +1172,7 @@ let self = module.exports = {
             });
         }
         else{
-            helper.connectToDatabase()
+            return helper.connectToDatabase()
             .then((db) => db.collection('decks'))
             .then((col) => {
                 return col.findOne({_id: parseInt(itemId)})
@@ -3214,7 +3214,7 @@ let self = module.exports = {
                             resolve();
                         }
                     });
-                });
+                }).catch(reject);
             });
 
             // when it's done, continue with archiving the root deck

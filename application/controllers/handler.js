@@ -1036,27 +1036,25 @@ let self = module.exports = {
                                 // omitting the top_root_deck means this change won't be tracked,
                                 // as it will be tracked right after this code, we just need to attach
                                 // first so that the rest of the tracking will work
-                                let insertNewNodeContentItemPromise = deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
-                                    // track all created forks AFTER it's attached
-                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, 'attach');
+                                return deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
+                                    return Promise.all([
+                                        // track all created forks AFTER it's attached
+                                        deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, true),
+                                        // add to usage AFTER it's attached
+                                        deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-')),
+                                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                                        self.getDeckTree({
+                                            'params': {'id' : deck.id},
+                                            'log': request.log.bind(request),
+                                        }, (deckTree) => {
+                                            if (deckTree.isBoom) return reply(deckTree);
+
+                                            reply(deckTree);
+                                        }),
+                                    ]);
+
                                 });
 
-                                let addToUsagePromise = deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
-
-                                Promise.all([insertNewNodeContentItemPromise, addToUsagePromise]).then( () => {
-                                    //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                                    self.getDeckTree({
-                                        'params': {'id' : deck.id},
-                                        'log': request.log.bind(request),
-                                    }, (deckTree) => {
-                                        if (deckTree.isBoom) return reply(deckTree);
-
-                                        reply(deckTree);
-                                    });
-                                }).catch( (err) => {
-                                    request.log('error', err);
-                                    reply(boom.badImplementation());
-                                }); 
                             }
                         });
 
@@ -2050,6 +2048,9 @@ let self = module.exports = {
                 }
             });
 
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
 
     },
