@@ -7,7 +7,11 @@ const archivesDB = require('../database/archivesDatabase');
 let self = module.exports = {
 
     listArchivedDecks: function(request, reply) {
-        archivesDB.index({ userId: request.query.user }).then((decks) => {
+        archivesDB.index({
+            userId: request.query.user,
+            archivedBy: request.query.archivedBy,
+            reason: request.query.reason,
+        }).then((decks) => {
             reply(decks);
         }).catch((err) => {
             request.log('error', err);
@@ -44,7 +48,7 @@ let self = module.exports = {
                 throw boom.forbidden();
             }
 
-            return deckDB.archiveDeckTree(deckId).then(() => {
+            return deckDB.archiveDeckTree(deckId, userId, request.payload.reason, request.payload.comment).then(() => {
                 reply();
             });
 
@@ -61,7 +65,7 @@ let self = module.exports = {
 
 // checks if a request has proper reviewer authorization
 function authorizedForReview(request) {
-    let secret = request.query && request.query.secret;
+    let secret = request.payload && request.payload.secret;
     let userIsReviewer = request.auth && request.auth.credentials.isReviewer;
 
     return (secret === process.env.SECRET_REVIEW_KEY && userIsReviewer && true) || false;

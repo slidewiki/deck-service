@@ -2575,15 +2575,25 @@ let self = module.exports = {
         return firstSlide;
     },
 
-    archiveDeck: function(deckId) {   
+    archiveDeck: function(deckId, userId, reason='spam', comment) {
         return helper.getCollection('decks')
         .then((col) => col.findOne({_id: parseInt(deckId)}))
         .then((existingDeck) => {
 
             // store deck in 'deck_archived' collection
-            return helper.getCollection('decks_archived')
-            .then((archivedCol) => archivedCol.save(existingDeck))
-            .then(() => {
+            return helper.getCollection('decks_archived').then((archivedCol) => {
+                // add some archival metadata
+                existingDeck.archiveInfo = {
+                    archivedAt: new Date().toISOString(),
+                    archivedBy: userId,
+                    reason: reason,
+                };
+
+                if (comment) existingDeck.archiveInfo.comment = comment;
+
+                return archivedCol.save(existingDeck);
+
+            }).then(() => {
                 // remove from 'deck' collection
                 let removeDeckPromise = helper.getCollection('decks')
                 .then((col) => {
@@ -2636,7 +2646,7 @@ let self = module.exports = {
 
     // moves the entire deck tree including all subdecks to the archive
     // can only be used for root decks, i.e. decks that are subdecks of none
-    archiveDeckTree: function(deckId) {
+    archiveDeckTree: function(deckId, userId, reason='spam', comment) {
         // verify if it's a root deck
         return self.getUsage(deckId).then((parents) => {
             // if it's a root deck, parents should be empty
@@ -2653,7 +2663,7 @@ let self = module.exports = {
                     async.eachSeries(res.children, (subdeckChild, callback) => {
                         let subdeck = util.parseIdentifier(subdeckChild.id);
 
-                        self.archiveDeck(subdeck.id).then( () => {
+                        self.archiveDeck(subdeck.id, userId).then( () => {
                             callback();
                         }).catch( (err) => {
                             callback(err);
@@ -2670,7 +2680,7 @@ let self = module.exports = {
             });
 
             // when it's done, continue with archiving the root deck
-            return archiveSubdecks.then(() => self.archiveDeck(deckId));
+            return archiveSubdecks.then(() => self.archiveDeck(deckId, userId, reason, comment));
         });
 
     },

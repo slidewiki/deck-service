@@ -757,6 +757,11 @@ module.exports = function(server) {
         }
     });
 
+    //----------------------------- Archives Routes -----------------------------//
+
+    // TODO add other valid values
+    let archiveReason = Joi.string().valid('spam', 'delete').description('Reason for archiving the deck tree');
+
     server.route({
         method: 'POST',
         path: '/decktree/{id}/archive',
@@ -766,8 +771,10 @@ module.exports = function(server) {
                 params: {
                     id: Joi.number().integer().description('The deck id (without revision)'),
                 },
-                query: {
+                payload: {
                     secret: Joi.string(),
+                    reason: archiveReason.required(),
+                    comment: Joi.string().description('A comment with more details about the reason for archiving'),
                 },
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login'),
@@ -779,7 +786,6 @@ module.exports = function(server) {
         },
     });
 
-    //----------------------------- Archives Routes -----------------------------//
     server.route({
         method: 'GET',
         path: '/archives/decks/',
@@ -788,6 +794,8 @@ module.exports = function(server) {
             validate: {
                 query: {
                     user: Joi.number().integer().description('Identifier of a user that originally owned the archived decks requested'),
+                    archivedBy: Joi.number().integer().description('Identifier of the user that performed the archiving'),
+                    reason: archiveReason,
                 },
             },
             tags: ['api'],
