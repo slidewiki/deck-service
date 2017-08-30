@@ -44,7 +44,6 @@ let self = module.exports = {
                         },
                     } },
                     { $match: { 'usageCount': 0 } },
-                    { $project: { _id: 1} },
                 ]);
 
                 if (options.idOnly) {
@@ -59,7 +58,7 @@ let self = module.exports = {
                 return decks.find(query);
             }
 
-        }).then((result) => result.project(projectStage).toArray());
+        }).then((result) => result.project(projectStage).sort({ _id: 1 }).toArray());
 
     },
 
