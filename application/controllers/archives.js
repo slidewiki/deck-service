@@ -32,12 +32,19 @@ let self = module.exports = {
     },
 
     archiveDeckTree: function(request, reply) {
-        deckDB.get(request.params.id).then( (deck) => {
-            if (!deck) {
-                return reply(boom.notFound());
+        let deckId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        deckDB.get(deckId).then((existingDeck) => {
+            if (!existingDeck) {
+                throw boom.notFound();
             }
 
-            return deckDB.archiveDeckTree(request.params.id).then(() => {
+            if (!authorizedForReview(request)) {
+                throw boom.forbidden();
+            }
+
+            return deckDB.archiveDeckTree(deckId).then(() => {
                 reply();
             });
 
@@ -51,3 +58,11 @@ let self = module.exports = {
     },
 
 };
+
+// checks if a request has proper reviewer authorization
+function authorizedForReview(request) {
+    let secret = request.query && request.query.secret;
+    let userIsReviewer = request.auth && request.auth.credentials.isReviewer;
+
+    return (secret === process.env.SECRET_REVIEW_KEY && userIsReviewer && true) || false;
+}

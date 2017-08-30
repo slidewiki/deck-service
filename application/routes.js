@@ -745,12 +745,15 @@ module.exports = function(server) {
                 params: {
                     id: Joi.number().integer().description('The deck id (without revision)'),
                 },
-                payload:
-                    Joi.object().keys({
-                        user: Joi.number().integer(),
-                    }).requiredKeys('user')
+                query: {
+                    secret: Joi.string(),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login'),
+                }).unknown(),                
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Archive a deck tree',
         },
     });
