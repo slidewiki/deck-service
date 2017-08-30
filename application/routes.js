@@ -3,6 +3,7 @@
 const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
+const decks = require('./controllers/decks');
 const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
 
@@ -14,6 +15,26 @@ apiModels.tag = Joi.object().keys({
 }).requiredKeys('tagName');
 
 module.exports = function(server) {
+
+    //------------------------------- deck routes -----------------------------//
+
+    server.route({
+        method: 'GET',
+        path: '/decks',
+        handler: decks.listDecks,
+        config: {
+            validate: {
+                query: {
+                    user: Joi.number().integer().description('Return only decks owned by user with set id').required(),
+                    rootsOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only root decks, i.e. decks that are not subdecks'),
+                    idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata'),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve deck metadata with optional filter, sorting, and paging parameters (until paging is implemented, user param is required)',
+        }
+    });
+
 
     server.route({
         method: 'GET',

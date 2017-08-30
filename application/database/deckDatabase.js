@@ -16,6 +16,53 @@ const async = require('async');
 
 let self = module.exports = {
 
+    list: (query, options) => {
+        let projectStage = {};
+        if (options.idOnly) {
+            projectStage._id = 1;
+        } else {
+            Object.assign(projectStage, {
+                timestamp: 1,
+                description: 1,
+                lastUpdate: 1,
+                translation: 1,
+                active: 1,
+                revisions: 1,
+            });
+        }
+
+        return helper.getCollection('decks').then((decks) => {
+            if (options.rootsOnly) {
+                let result = decks.aggregate([
+                    { $match: query },
+                    { $project: { revisions: 1 } },
+                    { $unwind: '$revisions' },
+                    { $group: {
+                        _id: '$_id',
+                        usageCount: {
+                            $sum: { $size: '$revisions.usage' }
+                        },
+                    } },
+                    { $match: { 'usageCount': 0 } },
+                    { $project: { _id: 1} },
+                ]);
+
+                if (options.idOnly) {
+                    return result;
+                }
+
+                return result.map((d) => d._id).toArray().then((deckIds) => {
+                    return decks.find({ _id: { $in: deckIds } });
+                });
+
+            } else {
+                return decks.find(query);
+            }
+
+        }).then((result) => result.project(projectStage).toArray());
+
+    },
+
     //gets a specified deck and all of its revision, or only the given revision
     get: function(identifier) {
         identifier = String(identifier);

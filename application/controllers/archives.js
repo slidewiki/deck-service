@@ -18,7 +18,7 @@ let self = module.exports = {
     getArchivedDeck: function(request, reply) {
         let deckId = request.params.id;
 
-        archivesDB.get(request.params.id).then((archivedDeck) => {
+        archivesDB.get(deckId).then((archivedDeck) => {
             if (!archivedDeck) {
                 return reply(boom.notFound());
             }
