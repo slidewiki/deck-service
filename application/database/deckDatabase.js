@@ -2,6 +2,7 @@
 
 const _ = require('lodash');
 const util = require('../lib/util');
+const boom = require('boom');
 
 const ChangeLog = require('../lib/ChangeLog');
 
@@ -15,16 +16,62 @@ const async = require('async');
 
 let self = module.exports = {
 
+    list: (query, options) => {
+        let projectStage = {};
+        if (options.idOnly) {
+            projectStage._id = 1;
+        } else {
+            Object.assign(projectStage, {
+                timestamp: 1,
+                description: 1,
+                lastUpdate: 1,
+                translation: 1,
+                active: 1,
+                revisions: 1,
+            });
+        }
+
+        return helper.getCollection('decks').then((decks) => {
+            if (options.rootsOnly) {
+                let result = decks.aggregate([
+                    { $match: query },
+                    { $project: { revisions: 1 } },
+                    { $unwind: '$revisions' },
+                    { $group: {
+                        _id: '$_id',
+                        usageCount: {
+                            $sum: { $size: '$revisions.usage' }
+                        },
+                    } },
+                    { $match: { 'usageCount': 0 } },
+                ]);
+
+                if (options.idOnly) {
+                    return result;
+                }
+
+                return result.map((d) => d._id).toArray().then((deckIds) => {
+                    return decks.find({ _id: { $in: deckIds } });
+                });
+
+            } else {
+                return decks.find(query);
+            }
+
+        }).then((result) => result.project(projectStage).sort({ _id: 1 }).toArray());
+
+    },
+
     //gets a specified deck and all of its revision, or only the given revision
     get: function(identifier) {
         identifier = String(identifier);
         let idArray = identifier.split('-');
+        
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => col.findOne({ _id: parseInt(idArray[0]) }))
         .then((found) => {
-            if (!found) return;
-
+            if (!found) return;            
             // add some extra revision metadata
             let [latestRevision] = found.revisions.slice(-1);
             found.latestRevisionId = latestRevision.id;
@@ -1492,6 +1539,8 @@ let self = module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(deck_id)})
             .then((deck) => {
+                if (!deck) return;
+
                 if(revision_id === -1){
                     revision_id = deck.active-1;
                 }
@@ -2542,7 +2591,117 @@ let self = module.exports = {
         }
 
         return firstSlide;
-    }
+    },
+
+    archiveDeck: function(deckId, userId, reason='spam', comment) {
+        return helper.getCollection('decks')
+        .then((col) => col.findOne({_id: parseInt(deckId)}))
+        .then((existingDeck) => {
+
+            // store deck in 'deck_archived' collection
+            return helper.getCollection('decks_archived').then((archivedCol) => {
+                // add some archival metadata
+                existingDeck.archiveInfo = {
+                    archivedAt: new Date().toISOString(),
+                    archivedBy: userId,
+                    reason: reason,
+                };
+
+                if (comment) existingDeck.archiveInfo.comment = comment;
+
+                return archivedCol.save(existingDeck);
+
+            }).then(() => {
+                // remove from 'deck' collection
+                let removeDeckPromise = helper.getCollection('decks')
+                .then((col) => {
+                    col.remove({'_id': existingDeck._id});                
+                });
+
+                // update usage of its content slides
+                let updateSlidesUsagePromise = new Promise( (resolve, reject) => {
+                    let activeRevisionIndex = getActiveRevision(existingDeck);
+                    let activeRevision = existingDeck.revisions[activeRevisionIndex];
+
+                    async.eachSeries(activeRevision.contentItems, (item, callback) => {
+                        console.log(item);
+                        if(item.kind === 'slide'){
+                            return helper.getCollection('slides').then((col) => {
+                                return col.findOneAndUpdate(
+                                    {
+                                        _id: item.ref.id,
+                                        'revisions.id': item.ref.revision,
+                                    },
+                                    { $pull: {
+                                        'revisions.$.usage': {
+                                            id: existingDeck._id,
+                                            revision: activeRevision.id,
+                                        },
+                                    } }
+                                );
+                            }).then( () => {
+                                callback();
+                            }).catch( (err) => {
+                                callback(err);
+                            });
+                        } else {
+                            // subdecks are also archived so no need to update their usage
+                            callback();
+                        }
+                    }, (err) => {
+                        if(err){
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+
+                return Promise.all([removeDeckPromise, updateSlidesUsagePromise]);
+            });
+        });     
+    },
+
+    // moves the entire deck tree including all subdecks to the archive
+    // can only be used for root decks, i.e. decks that are subdecks of none
+    archiveDeckTree: function(deckId, userId, reason='spam', comment) {
+        // verify if it's a root deck
+        return self.getUsage(deckId).then((parents) => {
+            // if it's a root deck, parents should be empty
+            if (_.size(parents) > 0) {
+                // abort!
+                throw boom.methodNotAllowed(`cannot archive a non-root deck ${deckId}`);
+            }
+
+            // archive subdecks 
+            let archiveSubdecks = new Promise( (resolve, reject) => {
+                self.getFlatDecksFromDB(String(deckId)).then((res) => {
+                    if (!res) return reject(boom.notFound());
+
+                    async.eachSeries(res.children, (subdeckChild, callback) => {
+                        let subdeck = util.parseIdentifier(subdeckChild.id);
+
+                        self.archiveDeck(subdeck.id, userId).then( () => {
+                            callback();
+                        }).catch( (err) => {
+                            callback(err);
+                        });
+                        
+                    }, (err) => {
+                        if(err){
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+            });
+
+            // when it's done, continue with archiving the root deck
+            return archiveSubdecks.then(() => self.archiveDeck(deckId, userId, reason, comment));
+        });
+
+    },
 
 };
 

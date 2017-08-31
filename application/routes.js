@@ -3,8 +3,9 @@
 const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
-const changeLog = require('./controllers/changeLog');
 const decks = require('./controllers/decks');
+const changeLog = require('./controllers/changeLog');
+const archives = require('./controllers/archives');
 
 // TODO better organize joi validation models
 const apiModels = {};
@@ -14,6 +15,26 @@ apiModels.tag = Joi.object().keys({
 }).requiredKeys('tagName');
 
 module.exports = function(server) {
+
+    //------------------------------- deck routes -----------------------------//
+
+    server.route({
+        method: 'GET',
+        path: '/decks',
+        handler: decks.listDecks,
+        config: {
+            validate: {
+                query: {
+                    user: Joi.number().integer().description('Return only decks owned by user with set id').required(),
+                    rootsOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only root decks, i.e. decks that are not subdecks'),
+                    idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata'),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve deck metadata with optional filter, sorting, and paging parameters (until paging is implemented, user param is required)',
+        }
+    });
+
 
     server.route({
         method: 'GET',
@@ -734,6 +755,67 @@ module.exports = function(server) {
             tags: ['api'],
             description: 'Move a node (slide/deck) in a different position in the deck tree'
         }
+    });
+
+    //----------------------------- Archives Routes -----------------------------//
+
+    // TODO add other valid values
+    let archiveReason = Joi.string().valid('spam', 'delete').description('Reason for archiving the deck tree');
+
+    server.route({
+        method: 'POST',
+        path: '/decktree/{id}/archive',
+        handler: archives.archiveDeckTree,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+                payload: {
+                    secret: Joi.string(),
+                    reason: archiveReason.required(),
+                    comment: Joi.string().description('A comment with more details about the reason for archiving'),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login'),
+                }).unknown(),                
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Archive a deck tree',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/archives/decks/',
+        handler: archives.listArchivedDecks,
+        config: {
+            validate: {
+                query: {
+                    user: Joi.number().integer().description('Identifier of a user that originally owned the archived decks requested'),
+                    archivedBy: Joi.number().integer().description('Identifier of the user that performed the archiving'),
+                    reason: archiveReason,
+                },
+            },
+            tags: ['api'],
+            description: 'List archived decks',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/archives/deck/{id}',
+        handler: archives.getArchivedDeck,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('Identifier of an archived deck'),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve information about an archived deck',
+        },
     });
 
     //----------------------------- Usage Routes -----------------------------//
