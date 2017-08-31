@@ -1979,7 +1979,8 @@ let self = module.exports = {
                             if (!forAttach) {
                                 // if not attaching, we need to track stuff here
                                 let rootDeckId = id_map[res.id];
-                                self._trackDecksForked(rootDeckId, id_map, user);
+                                let forkType = languageToTranslate ? 'translate' : 'fork';
+                                self._trackDecksForked(rootDeckId, id_map, user, forkType);
                             }
 
                             resolve({'root_deck': id_map[res.id], 'id_map': id_map});
@@ -2034,7 +2035,7 @@ let self = module.exports = {
     },
 
     // TODO make this actually private after code in handler.js has been moved here
-    _trackDecksForked(rootDeckId, forkIdsMap, userId, forAttach) {
+    _trackDecksForked(rootDeckId, forkIdsMap, userId, forkType='fork') {
         // we reverse the array to track the root first, then the children in order
         let newDeckIds = Object.keys(forkIdsMap).map((key) => forkIdsMap[key]).reverse();
 
@@ -2052,7 +2053,7 @@ let self = module.exports = {
                 // the first time this runs, deckChanges is empty!
                 if (_.isEmpty(parentOperations)) parentOperations.push(...deckChanges);
                 // we track everything as rooted to the deck_id
-                return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forAttach);
+                return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forkType);
             });
         }, Promise.resolve([]));
 

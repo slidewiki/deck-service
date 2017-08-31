@@ -550,7 +550,7 @@ let self = module.exports = {
 
         }).catch((error) => {
             request.log('error', error);
-            reply(boom.badImplementation(error));
+            reply(boom.badImplementation());
         });
 
     },
@@ -572,7 +572,7 @@ let self = module.exports = {
 
         }).catch((error) => {
             request.log('error', error);
-            reply(boom.badImplementation(error));
+            reply(boom.badImplementation());
         });
 
     },
@@ -951,7 +951,7 @@ let self = module.exports = {
                                 // first so that the rest of the tracking will work
                                 deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
                                     // track all created forks AFTER it's attached
-                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, true);
+                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, 'attach');
                                 });
 
                                 deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
