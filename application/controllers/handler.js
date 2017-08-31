@@ -345,6 +345,21 @@ let self = module.exports = {
         });
     },
 
+    getDeckTranslations: function(request, reply){
+        let deckId = request.params.id; // it should already be a number
+
+        deckDB.get(deckId).then((deck) => {
+            if (!deck) return reply(boom.notFound());
+
+            let currentLang = {'deck_id':deckId, 'language': deck.revisions[0].language};
+            reply({'translations': deck.translations, 'currentLang':currentLang});
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
     getDeckRevisions: function(request, reply) {
         let deckId = request.params.id; // it should already be a number
 
@@ -520,19 +535,44 @@ let self = module.exports = {
     },
 
     forkDeckRevision: function(request, reply) {
-        return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
+        let deckId = request.params.id;
+        let userId = request.payload.user;
+
+        return deckDB.forkAllowed(deckId, userId)
         .then((forkAllowed) => {
             if (!forkAllowed) {
                 return reply(boom.forbidden());
             }
 
-            return deckDB.forkDeckRevision(request.params.id, request.payload.user).then((id_map) => {
+            return deckDB.forkDeckRevision(deckId, userId).then((id_map) => {
                 reply(id_map);
             });
 
         }).catch((error) => {
             request.log('error', error);
-            reply(boom.badImplementation(error));
+            reply(boom.badImplementation());
+        });
+
+    },
+
+    translateDeckRevision: function(request, reply) {
+        let deckId = request.params.id;
+        let userId = request.payload.user;
+
+        return deckDB.forkAllowed(deckId, userId)
+        .then((forkAllowed) => {
+            if (!forkAllowed) {
+                return reply(boom.forbidden());
+            }
+
+            return deckDB.translateDeckRevision(deckId, userId, request.payload.language).then((id_map) => {
+                //We must iterate through all objects in the decktree of the fork and translate each one
+                reply(id_map);
+            });
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
         });
 
     },
@@ -911,7 +951,7 @@ let self = module.exports = {
                                 // first so that the rest of the tracking will work
                                 deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
                                     // track all created forks AFTER it's attached
-                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, true);
+                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, 'attach');
                                 });
 
                                 deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));

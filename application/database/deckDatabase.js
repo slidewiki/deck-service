@@ -7,10 +7,12 @@ const boom = require('boom');
 const ChangeLog = require('../lib/ChangeLog');
 
 const userService = require('../services/user');
+const translationService = require('../services/translation');
 
 const helper = require('./helper'),
     striptags = require('striptags'),
-    validateDeck = require('../models/deck').validateDeck;
+    validateDeck = require('../models/deck').validateDeck,
+    Microservices = require('../configs/microservices');
 
 const async = require('async');
 
@@ -1726,13 +1728,13 @@ let self = module.exports = {
     },
 
     // we guard the fork deck revision method against abuse, by checking for change logs of one
-    forkDeckRevision(deck_id, user, forAttach) {
+    forkDeckRevision(deck_id, user, forAttach, languageToTranslate) {
         let deck = util.parseIdentifier(deck_id);
         return self.get(deck.id).then((existingDeck) => {
             let [latestRevision] = existingDeck.revisions.slice(-1);
             if (deck.revision && latestRevision.id !== deck.revision) {
                 // we want to fork a read-only revision, all's well
-                return self._forkDeckRevision(deck_id, user, forAttach);
+                return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate);
             } else {
                 // make the deck id canonical just in case
                 deck.revision = latestRevision.id;
@@ -1743,10 +1745,10 @@ let self = module.exports = {
                 if (counts[deck.revision] === 1) {
                     // we want to fork a fresh revision, let's fork the one before it
                     console.log(`forking ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
-                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach);
+                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach, languageToTranslate);
                 } else {
                     // unknown revision, old deck without changelog, or a revision with changes, just fork it!
-                    return self._forkDeckRevision(deck_id, user, forAttach);
+                    return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate);
                 }
             });
         });
@@ -1754,7 +1756,8 @@ let self = module.exports = {
 
     // forks a given deck revision by copying all of its sub-decks into new decks
     // forAttach is true when forking is done during deck attach process
-    _forkDeckRevision(deck_id, user, forAttach) {
+    // languageToTranslate, if set, will result in creating a deck translation (subtype of fork)
+    _forkDeckRevision(deck_id, user, forAttach, languageToTranslate) {
 
         return self.getFlatDecksFromDB(deck_id)
         .then((res) => {
@@ -1765,7 +1768,7 @@ let self = module.exports = {
                 flatDeckArray.push(res.children[i].id); //push next sub-deck into array
             }
             //init maps for new ids
-            let id_map = {}, id_noRev_map = {};
+            let id_map = {}, id_noRev_map = {}, slide_id_map = {};
             //reverse in order to iterate from bottom to top
             flatDeckArray.reverse();
             //feed the array for serial processing
@@ -1788,7 +1791,7 @@ let self = module.exports = {
 
                     //iterate the flat decktree and copy each deck, referring to the new ids in its content items and usage
                     async.eachSeries(flatDeckArray, (next_deck, callback) => {
-                        return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                        helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
                         .then((db2) => db2.collection('decks'))
                         .then((col) => {
                             return col.findOne({_id: parseInt(next_deck.split('-')[0])})
@@ -1817,8 +1820,15 @@ let self = module.exports = {
                                     user: parseInt(user),
                                     translated_from: found.translated_from,
                                     contributors: contributorsArray,
-                                    active: 1
+                                    active: 1,
+                                    // TODO revisit how we maintain this attribute
+                                    translations: found.translations || [],
                                 };
+
+                                // set the fork origin kind to 'translation' if language is also set
+                                if (languageToTranslate) {
+                                    copiedDeck.origin.kind = 'translation';
+                                }
 
                                 let now = new Date();
                                 let timestamp = now.toISOString();
@@ -1846,48 +1856,180 @@ let self = module.exports = {
                                 // isFeatured needs to be removed in forked decks
                                 delete copiedDeck.revisions[0].isFeatured;
 
-                                for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                    for(let j in id_map){
-                                        if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
-                                            copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
-                                            copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
-                                        }
-                                    }
-                                }
-                                for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
-                                    for(let j in id_map){
-                                        if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                            copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
-                                            copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
-                                        }
-                                    }
-                                }
-                                for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                    let nextSlide = copiedDeck.revisions[0].contentItems[i];
-                                    if(nextSlide.kind === 'slide'){
-                                        let root_deck_path = [copiedDeck._id, '1'];
-                                        //console.log('outside root_deck_path', root_deck_path);
-                                        self.addToUsage(nextSlide, root_deck_path);
-                                    }
-                                    else{
-                                        continue;
-                                    }
-                                }
+                                let contentItemsMap = {};
+                                // HACK to combine both translating and non-translating code
+                                let contentItemsToTranslate = languageToTranslate ? copiedDeck.revisions[0].contentItems : [];
 
-                                new_decks.push(copiedDeck);
-                                return col.insertOne(copiedDeck).then(() => {
-                                    callback();
+                                // console.log('before loop for content items');
+                                async.eachSeries(contentItemsToTranslate, (nextSlide, doneTranslation) => {
+                                    if (nextSlide.kind !== 'slide') return doneTranslation();
+
+                                    //console.log('NEXT SLIDE', nextSlide);
+                                    //we have to copy the slide, not like when forking
+                                    let root_deck_path = [copiedDeck._id, '1'];
+                                    helper.connectToDatabase().then((db) => {
+                                        return helper.getNextIncrementationValueForCollection(db, 'slides').then((newSlideId) => {
+                                            return helper.getCollection('slides').then((slides) => {
+                                                return slides.findOne({_id: nextSlide.ref.id}).then((slide) => {
+                                                    // TODO
+                                                    let slideRevisionIndex = nextSlide.ref.revision - 1;
+                                                    slide.revisions = [slide.revisions[slideRevisionIndex]];
+
+                                                    contentItemsMap[slide._id] = newSlideId;
+                                                    slide_id_map[slide._id] = newSlideId;
+
+                                                    let oldSlideId = slide._id;
+                                                    slide._id = newSlideId;
+
+                                                    //slide.translated_from =
+                                                    return translationService.translateSlide(oldSlideId, languageToTranslate, copiedDeck.user).then((translated) => {
+                                                        //console.log('SLIDE response', original);
+                                                        if (translated.error) {
+                                                            //console.log(original);
+
+                                                            // TODO WAT
+                                                            return {};
+                                                        }
+
+                                                        //Change usage of slide
+                                                        for(let i = 0; i < slide.revisions[0].usage.length; i++){
+                                                            for(let j in id_map){
+                                                                if(id_map.hasOwnProperty(j) && slide.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                                    slide.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                                    slide.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
+                                                                }
+                                                            }
+                                                        }
+                                                        translated._id = newSlideId;
+                                                        translated.revisions[0].usage = slide.revisions[0].usage;
+
+                                                        return slides.save(translated).then(() => {
+                                                            // update translations array
+                                                            let translations = [];
+                                                            if (!_.isEmpty(slide.translations)){
+                                                                translations = slide.translations;
+                                                                translations.push({'slide_id':slide._id, 'language': languageToTranslate});
+                                                            }else{
+                                                                translations.push({'slide_id':slide._id, 'language': languageToTranslate});
+                                                                translations.push({'slide_id':oldSlideId, 'language':slide.language});
+                                                            }
+
+                                                            //filling in the translations array for all decks in the 'family'
+                                                            return self.updateTranslations('slide', translations);
+                                                        });
+
+                                                    }).then(() => {
+                                                        // everything was a success!
+
+                                                        //console.log('contentItemsMap', contentItemsMap);
+                                                        //console.log('copiedDeck', copiedDeck);
+                                                        for(let i = 0; i < contentItemsToTranslate.length; i++){
+                                                            if(contentItemsToTranslate[i].ref.id === oldSlideId){
+                                                                contentItemsToTranslate[i].ref.id = newSlideId;
+                                                                contentItemsToTranslate[i].ref.revision = 1;
+                                                            }
+                                                        }
+
+                                                        doneTranslation();
+                                                    });
+                                                });
+                                            });
+                                        });
+                                    }).catch(doneTranslation); // catch ANY error
+
+                                }, (err) => {
+                                    if (err) {
+                                        return callback(err);
+                                    }
+
+                                    // these should be run with or without a translation operation
+                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
+                                                copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
+                                            }
+                                        }
+                                    }
+                                    for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
+                                            }
+                                        }
+                                    }
+                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                        let nextSlide = copiedDeck.revisions[0].contentItems[i];
+                                        //console.log('nextSlide', nextSlide);
+                                        if(nextSlide.kind === 'slide'){
+                                            let root_deck_path = [copiedDeck._id, '1'];
+                                            //console.log('outside root_deck_path', root_deck_path);
+                                            //console.log('contentItemsMap', contentItemsMap);
+                                            self.addToUsage(nextSlide, root_deck_path);
+                                        }
+                                        else{
+                                            continue;
+                                        }
+                                    }
+
+                                    if (languageToTranslate) {
+                                        // translate copiedDeck
+                                        translationService.translateDeck(found._id, languageToTranslate, copiedDeck.user)
+                                        .then((original) => {
+                                            // console.log('response', original);
+                                            if (original.error) {
+                                                // console.log(original);
+                                                // TODO WAT
+                                                return {};
+                                            }
+
+                                            copiedDeck.revisions[0].title = original.revisions[0].title;
+                                            copiedDeck.description = original.description;
+                                            let original_language = copiedDeck.language;
+                                            copiedDeck.language = languageToTranslate;
+                                            copiedDeck.revisions[0].language = languageToTranslate;
+                                            new_decks.push(copiedDeck);
+
+                                            return col.insertOne(copiedDeck).then(() => {
+                                                let translations = [];
+                                                if (!_.isEmpty(copiedDeck.translations)) {
+                                                    translations = copiedDeck.translations;
+                                                    translations.push({'deck_id':copiedDeck._id, 'language': languageToTranslate});//filling in the translations array for all decks in the 'family'
+                                                }else{
+                                                    translations.push({'deck_id':copiedDeck._id, 'language': languageToTranslate});
+                                                    translations.push({'deck_id':original._id, 'language': original_language});
+                                                }
+
+                                                return self.updateTranslations('deck', translations);
+                                            });
+
+                                        }).then(() => {
+                                            callback();
+                                        }).catch(callback);
+
+                                    } else {
+                                        new_decks.push(copiedDeck);
+                                        return col.insertOne(copiedDeck).then(() => {
+                                            callback();
+                                        }).catch(callback);
+                                    }
+
                                 });
+
                             });
+
                         }).catch(callback);
-                    }, (err2) => {
-                        if (err2) {
-                            reject(err2);
+
+                    }, (err) => {
+                        if (err) {
+                            reject(err);
                         } else {
                             if (!forAttach) {
                                 // if not attaching, we need to track stuff here
                                 let rootDeckId = id_map[res.id];
-                                self._trackDecksForked(rootDeckId, id_map, user);
+                                let forkType = languageToTranslate ? 'translate' : 'fork';
+                                self._trackDecksForked(rootDeckId, id_map, user, forkType);
                             }
 
                             resolve({'root_deck': id_map[res.id], 'id_map': id_map});
@@ -1942,7 +2084,7 @@ let self = module.exports = {
     },
 
     // TODO make this actually private after code in handler.js has been moved here
-    _trackDecksForked(rootDeckId, forkIdsMap, userId, forAttach) {
+    _trackDecksForked(rootDeckId, forkIdsMap, userId, forkType='fork') {
         // we reverse the array to track the root first, then the children in order
         let newDeckIds = Object.keys(forkIdsMap).map((key) => forkIdsMap[key]).reverse();
 
@@ -1960,10 +2102,374 @@ let self = module.exports = {
                 // the first time this runs, deckChanges is empty!
                 if (_.isEmpty(parentOperations)) parentOperations.push(...deckChanges);
                 // we track everything as rooted to the deck_id
-                return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forAttach);
+                return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forkType);
             });
         }, Promise.resolve([]));
 
+    },
+
+    updateTranslations(kind, translations_array){
+        if (kind === 'deck'){
+            return new Promise((resolve, reject) => {
+                async.each(translations_array, (translation, cbEach) => {
+                    return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                    .then((db2) => db2.collection('decks'))
+                    .then((col) => {
+                        return col.findOne({_id: parseInt(translation.deck_id)})
+                        .then((found) => {
+                            if (found){
+                                found.translations = translations_array;
+                                col.save(found);
+                                resolve();
+                            }else{
+                                console.log('Deck not found: ' + translation.deck_id);
+                                reject('Deck not found: ' + translation.deck_id);
+                            }
+
+                        })
+                        .catch(cbEach);
+                    });
+                }, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+                });
+            });
+        }else{
+            return new Promise((resolve, reject) => {
+                async.each(translations_array, (translation, cbEach) => {
+                    return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                    .then((db2) => db2.collection('slides'))
+                    .then((col) => {
+                        return col.findOne({_id: parseInt(translation.slide_id)})
+                        .then((found) => {
+                            if (found){
+                                found.translations = translations_array;
+                                col.save(found);
+                                resolve();
+                            }else{
+                                console.log('Slide not found: ' + translation.slide_id);
+                                reject('Slide not found: ' + translation.slide_id);
+                            }
+                        })
+                        .catch(cbEach);
+                    });
+                }, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+                });
+            });
+        }
+
+    },
+
+    // forks a given deck revision by copying all of its sub-decks into new decks
+    translateDeckRevision(deck_id, user, language) {
+        // forAttach=false as it is never used when attaching existing subdecks
+        return self.forkDeckRevision(deck_id, user, false, language);
+    },
+
+    // TODO remove this 
+    // former reference implementation, replaced with combined code in _forkDeckRevision
+    //forks a given deck revision by copying all of its sub-decks into new decks
+    _translateDeckRevision(deck_id, user, language){
+
+        return self.getFlatDecksFromDB(deck_id)
+        .then((res) => {
+            //we have a flat sub-deck structure
+            let flatDeckArray = [];
+            flatDeckArray.push(res.id); //push root deck into array
+            for(let i = 0; i < res.children.length; i++){
+                flatDeckArray.push(res.children[i].id); //push next sub-deck into array
+            }
+            //init maps for new ids
+            let id_map = {}, id_noRev_map = {}, slide_id_map = {};
+            //reverse in order to iterate from bottom to top
+            flatDeckArray.reverse();
+            //feed the array for serial processing
+
+            let new_decks = [];
+            return new Promise((resolve, reject) => {
+                //first we generate all the new ids for the copied decks, and hold them in a map for future reference
+                async.eachSeries(flatDeckArray, (next_deck, callback) => {
+                    return helper.connectToDatabase()
+                    .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
+                    .then((newId) => {
+                        id_map[next_deck] = newId+'-'+1;
+                        id_noRev_map[next_deck.split('-')[0]] = newId;
+                        callback();
+                    }).catch(callback);
+                }, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+
+                    //iterate the flat decktree and copy each deck, referring to the new ids in its content items and usage
+                    async.eachSeries(flatDeckArray, (next_deck, callback) => {
+                        return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                        .then((db2) => db2.collection('decks'))
+                        .then((col) => {
+                            return col.findOne({_id: parseInt(next_deck.split('-')[0])})
+                            .then((found) => {
+                                let ind = parseInt(next_deck.split('-')[1])-1;
+                                let contributorsArray = found.contributors;
+                                //contributorsArray.push({'user': parseInt(user), 'count': 1});
+                                let existingUserContributorIndex = findWithAttr(contributorsArray, 'user', parseInt(user));
+                                if(existingUserContributorIndex > -1)
+                                    contributorsArray[existingUserContributorIndex].count++;
+                                else{
+                                    contributorsArray.push({'user': parseInt(user), 'count': 1});
+                                }
+
+                                let copiedDeck = {
+                                    _id: id_noRev_map[found._id],
+                                    origin: {
+                                        id: found._id,
+                                        revision: found.revisions[ind].id,
+                                        title: found.revisions[ind].title,
+                                        user: found.user,
+                                        kind: 'translation'
+                                    },
+                                    description: found.description,
+                                    language: found.revisions[ind].language,
+                                    license: found.license,
+                                    user: parseInt(user),
+                                    translated_from: found.translated_from,
+                                    contributors: contributorsArray,
+                                    active: 1,
+                                    translations: found.translations
+                                };
+
+                                let now = new Date();
+                                let timestamp = now.toISOString();
+                                copiedDeck.timestamp = timestamp;
+                                copiedDeck.lastUpdate = timestamp;
+                                if(found.hasOwnProperty('datasource')){
+                                    copiedDeck.datasource = found.datasource;
+                                }
+                                else{
+                                    copiedDeck.datasource = null;
+                                }
+                                //copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
+                                copiedDeck.revisions = [found.revisions[ind]];
+                                copiedDeck.revisions[0].id = 1;
+                                // own the revision as well!
+                                copiedDeck.revisions[0].user = copiedDeck.user;
+
+                                // renew creation date for fresh revision
+                                copiedDeck.revisions[0].timestamp = timestamp;
+                                copiedDeck.revisions[0].lastUpdate = timestamp;
+
+                                let contentItemsMap = {};
+                                //console.log('before loop for content items');
+                                async.eachSeries(copiedDeck.revisions[0].contentItems, (nextSlide, callback) => {
+                                    if(nextSlide.kind === 'slide'){
+                                        console.log('NEXT SLIDE', nextSlide);
+                                        //we have to copy the slide, not like when forking
+                                        let root_deck_path = [copiedDeck._id, '1'];
+                                        helper.connectToDatabase()
+                                        .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
+                                        .then((newSlideId) => {
+                                            helper.connectToDatabase()
+                                            .then((db2) => db2.collection('slides'))
+                                            .then((col2) => {
+                                                col2.findOne({_id: parseInt(nextSlide.ref.id)})
+                                                .then((slide) => {
+                                                    let slideRevisionIndex = parseInt(nextSlide.ref.revision)-1;
+                                                    slide.revisions = [slide.revisions[slideRevisionIndex]];
+                                                    contentItemsMap[slide._id] = newSlideId;
+                                                    slide_id_map[slide._id] = newSlideId;
+                                                    let oldSlideId = slide._id;
+                                                    slide._id = newSlideId;
+                                                    //slide.translated_from =
+                                                    let rp = require('request-promise-native');
+                                                    let myPromise = new Promise((resolve, reject) => {
+
+                                                        var options = {
+                                                            method: 'POST',
+                                                            uri: Microservices.translation.uri+'/slide/'+oldSlideId,
+                                                            headers : {
+                                                                'Content-Type': 'application/json',
+                                                                'Cache-Control': 'no-cache'
+                                                            },
+                                                            body :{
+                                                                'target': language,
+                                                                'user': copiedDeck.user+''
+                                                            },
+                                                            json: true
+                                                        };
+                                                        rp(options).then(function (translated){
+                                                            //console.log('SLIDE response', original);
+                                                            if (translated.error){
+                                                                //console.log(original);
+                                                                resolve({});
+                                                            }else{
+                                                                //Change usage of slide
+                                                                for(let i = 0; i < slide.revisions[0].usage.length; i++){
+                                                                    for(let j in id_map){
+                                                                        if(id_map.hasOwnProperty(j) && slide.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                                            slide.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                                            slide.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
+                                                                        }
+                                                                    }
+                                                                }
+                                                                translated._id = newSlideId;
+                                                                translated.revisions[0].usage = slide.revisions[0].usage;
+                                                                col2.save(translated);
+                                                                let translations = [];
+                                                                if (slide.translations){
+                                                                    translations = slide.translations;
+                                                                    translations.push({'slide_id':slide._id, 'language':language});
+                                                                }else{
+                                                                    translations.push({'slide_id':slide._id, 'language':language});
+                                                                    translations.push({'slide_id':oldSlideId, 'language':slide.language});
+                                                                }
+                                                                //filling in the translations array for all decks in the 'family'
+                                                                self.updateTranslations('slide', translations)
+                                                                .then(resolve)
+                                                                .catch(reject);
+
+                                                            }
+                                                        })
+                                                        .catch(function (e){
+                                                            console.log('problem with request deck: ' + e.message);
+                                                            reject(e);
+                                                        });
+                                                    });
+
+                                                    //console.log('contentItemsMap', contentItemsMap);
+                                                    //console.log('copiedDeck', copiedDeck);
+                                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                                        if(copiedDeck.revisions[0].contentItems[i].ref.id === oldSlideId){
+                                                            copiedDeck.revisions[0].contentItems[i].ref.id = newSlideId;
+                                                            copiedDeck.revisions[0].contentItems[i].ref.revision = 1;
+                                                        }
+                                                    }
+                                                    callback();
+                                                });
+                                            });
+                                        });
+                                    }
+                                    else{
+                                        callback();
+                                    }
+                                },(err) => {
+                                    if (err) {
+                                        return reject(err);
+                                    }
+
+                                    //console.log('outside root_deck_path', root_deck_path);
+                                    //console.log('check point 1');
+                                    // let translations = copiedDeck.translations;
+                                    // translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
+                                    // self.updateTranslations(translations)
+                                     //.then(() => {
+                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
+                                                copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
+                                            }
+                                        }
+                                    }
+                                    //console.log('check point 2');
+                                    for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
+                                        for(let j in id_map){
+                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
+                                            }
+                                        }
+                                    }
+                                    //console.log('check point 3');
+                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
+                                        let nextSlide = copiedDeck.revisions[0].contentItems[i];
+                                        //console.log('nextSlide', nextSlide);
+                                        if(nextSlide.kind === 'slide'){
+                                            let root_deck_path = [copiedDeck._id, '1'];
+                                            //console.log('outside root_deck_path', root_deck_path);
+                                            //console.log('contentItemsMap', contentItemsMap);
+                                            self.addToUsage(nextSlide, root_deck_path);
+                                        }
+                                        else{
+                                            continue;
+                                        }
+                                    }
+
+                                    //console.log('check point 4');
+
+                                    //translate copiedDeck
+                                    //console.log('translation uri', Microservices.translation.uri+'/deck/'+found._id);
+                                    let rp = require('request-promise-native');
+                                    let myPromise = new Promise((resolve, reject) => {
+
+                                        var options = {
+                                            method: 'POST',
+                                            uri: Microservices.translation.uri+'/deck/'+found._id,
+                                            headers : {
+                                                'Content-Type': 'application/json',
+                                                'Cache-Control': 'no-cache'
+                                            },
+                                            body :{
+                                                'target': language,
+                                                'user': copiedDeck.user+''
+                                            },
+                                            json: true
+                                        };
+                                        rp(options).then(function (original){
+                                            //console.log('response', original);
+                                            if (original.error){
+                                                //console.log(original);
+                                                resolve({});
+                                            }else{
+                                                copiedDeck.revisions[0].title = original.revisions[0].title;
+                                                copiedDeck.description = original.description;
+                                                let original_language = copiedDeck.language;
+                                                copiedDeck.language = language;
+                                                copiedDeck.revisions[0].language = language;
+                                                new_decks.push(copiedDeck);
+                                                return col.insertOne(copiedDeck).then(() => {
+                                                    let translations = [];
+                                                    if (copiedDeck.translations) {
+                                                        translations = copiedDeck.translations;
+                                                        translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
+                                                    }else{
+                                                        translations.push({'deck_id':copiedDeck._id, 'language':language});
+                                                        translations.push({'deck_id':original._id, 'language': original_language});
+                                                    }
+
+                                                    self.updateTranslations('deck', translations)
+                                                    .then(callback)
+                                                    .catch((err) => {
+                                                        console.log(err);
+                                                        reject(err);
+                                                    });
+                                                });
+
+                                                resolve();
+
+                                            }
+                                        })
+                                        .catch(function (e){
+                                            console.log('problem with request deck: ' + e.message);
+                                            reject(e);
+                                        });
+                                    });
+                                    //}).catch(reject);
+                                });
+                            });
+                        }).catch(callback);
+                    }, (err2) => {
+                        if (err2) {
+                            reject(err2);
+                        } else {
+                            resolve({'root_deck': id_map[res.id], 'id_map': id_map, 'slide_id_map': slide_id_map});
+                        }
+                    });
+                });
+            });
+        });
     },
 
     getDeckForks(deckId, userId) {
