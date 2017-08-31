@@ -1106,4 +1106,19 @@ module.exports = function(server) {
         }
     });
 
+    server.route({
+        method: 'GET',
+        path: '/deckOwners',
+        handler: decks.getDeckOwners,
+        config: {
+            validate: {
+                query: {
+                    user: Joi.string().regex(/[0-9](,[0-9])*/).empty('').description('A comma delimited list of user ids'),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve decks with optional filter, sorting, and paging parameters'
+        }
+    });
+
 };
