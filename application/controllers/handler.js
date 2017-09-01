@@ -80,31 +80,47 @@ let self = module.exports = {
 
     //inserts a new slide into the database
     newSlide: function(request, reply) {
-        //insert the slide
-        slideDB.insert(request.payload).then((inserted) => {
-            // empty results means something wrong with the payload
-            if (!inserted) return reply(boom.badData());
+        let userId = request.auth.credentials.userid;
 
-            if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
-                throw inserted;
-            else{
-                //create thumbnail from the newly created slide revision
-                let content = inserted.ops[0].revisions[0].content, slideId = inserted.ops[0]._id+'-'+1;
-                if(content === ''){
-                    content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
-                    //for now we use hardcoded template for new slides
-                    content = slidetemplate;
-                }
-                fileService.createThumbnail(content, slideId).catch((err) => {
-                    request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
-                });
+        self._newSlide(request.payload, userId, request)
+        .then(reply)
+        .catch((error) => {
+            if (error.isBoom) return reply(error);
 
-                reply(co.rewriteID(inserted.ops[0]));
-            }
-        }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
         });
+
+    },
+
+    // reusable version of newSlide
+    _newSlide: function(payload, userId, logger) {
+        // make sure user id is set
+        payload.user = userId;
+
+        // insert the slide
+        return slideDB.insert(payload).then((inserted) => {
+            // empty results means something wrong with the payload
+            if (!inserted) throw boom.badData();
+
+            if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0])) {
+                throw inserted;
+            } else {
+                // create thumbnail from the newly created slide revision
+                let content = inserted.ops[0].revisions[0].content, slideId = inserted.ops[0]._id+'-'+1;
+                if (content === '') {
+                    // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                    // TODO for now we use hardcoded template for new slides
+                    content = slidetemplate;
+                }
+                fileService.createThumbnail(content, slideId).catch((err) => {
+                    logger.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+                });
+
+                return co.rewriteID(inserted.ops[0]);
+            }
+        });
+
     },
 
     //updates slide by creating a new revision
@@ -398,6 +414,8 @@ let self = module.exports = {
 
     //creates a new deck in the database
     newDeck: function(request, reply) {
+        request.payload.user = request.auth.credentials.userid;
+
         //insert the deck into the database
         deckDB.insert(request.payload).then((inserted) => {
             // empty results means something wrong with the payload
@@ -653,7 +671,7 @@ let self = module.exports = {
 
     // authorize node creation and iterate nodeSpec array to apply each insert
     createDeckTreeNodeWithCheck: function(request, reply) {
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
         let rootDeckId = request.payload.selector.id;
 
         // TODO proper authorization checking the actual parent id
@@ -727,7 +745,7 @@ let self = module.exports = {
     createDeckTreeNode: function(request, reply) {
         let node = {};
         let top_root_deck = request.payload.selector.id;
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
 
         //check if it is a slide or a deck
         if(request.payload.nodeSpec.type === 'slide'){
@@ -843,7 +861,6 @@ let self = module.exports = {
                             'content': slidetemplate,
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
-                            'user': request.payload.user,
                             'root_deck': parentID,
                             'position' : slidePosition
                         };
@@ -861,17 +878,17 @@ let self = module.exports = {
                             slide.speakernotes = request.payload.speakernotes;
                         }
 
-                        //create the new slide into the database
-                        self.newSlide({
-                            'payload' : slide,
-                            'log': request.log.bind(request),
-                        }, (createdSlide) => {
-                            if (createdSlide.isBoom) return reply(createdSlide);
-
+                        // create the new slide into the database
+                        self._newSlide(slide, userId, request).then((createdSlide) => {
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
                             deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck);
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             reply(node);
+                        }).catch((err) => {
+                            if (err.isBoom) return reply(err);
+
+                            request.log('error', err);
+                            reply(boom.badImplementation());
                         });
                     });
                 }
@@ -934,7 +951,7 @@ let self = module.exports = {
                     });
                 }
                 else{
-                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, request.payload.user, true).then((forkResult) => {
+                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, userId, true).then((forkResult) => {
                         // get the new deck we are going to attach
                         request.payload.nodeSpec.id = forkResult.id_map[request.payload.nodeSpec.id];
 
@@ -1020,7 +1037,7 @@ let self = module.exports = {
                             'content': slidetemplate,
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
-                            'user': request.payload.user,
+                            'user': userId,
                             'root_deck': parentID,
                             'top_root_deck': top_root_deck,
                             'position' : deckPosition

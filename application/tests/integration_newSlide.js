@@ -6,6 +6,9 @@
 
 describe('REST API', () => {
 
+    const JWT = require('jsonwebtoken');
+    const secret = 'NeverShareYourSecret';
+
     let server;
 
     beforeEach((done) => {
@@ -27,11 +30,12 @@ describe('REST API', () => {
                 global.process.exit();
             } else {
                 server.auth.strategy('jwt', 'jwt', {
-                    key: 'dummy',
+                    key: secret,
                     validateFunc: (decoded, request, callback) => {callback(null, true);},
                     verifyOptions: {
                         ignoreExpiration: true
-                    }
+                    },
+                    headerKey: '----jwt----',
                 });
 
                 server.start(() => {
@@ -48,21 +52,24 @@ describe('REST API', () => {
         content: 'dummy',
         language: 'en',
         license: 'CC0',
-        user: '1',
         root_deck: '25-1'
     };
+
+    let authToken = JWT.sign( { userid: 1 }, secret );
+
     let options = {
         method: 'POST',
         url: '/slide/new',
         payload: slide,
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            '----jwt----': authToken,
         }
     };
 
     context('when creating a slide it', () => {
-        it('should reply it', (done) => {
-            server.inject(options, (response) => {
+        it('should reply it', () => {
+            return server.inject(options).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
@@ -70,8 +77,83 @@ describe('REST API', () => {
                 payload.should.be.an('object').and.contain.keys('language', 'timestamp', 'user');
                 payload.language.should.equal('en');
                 payload.user.should.equal(1);
-                done();
             });
         });
     });
+
+    context('when creating a deck it', () => {
+        it('should reply it', () => {
+            return server.inject({
+                method: 'POST',
+                url: '/deck/new',
+                payload: {
+                    title: 'new deck',
+                },
+                headers: {
+                    'Content-Type': 'application/json',
+                    '----jwt----': authToken,
+                },
+            }).then((response) => {
+                response.should.be.an('object').and.contain.keys('statusCode','payload');
+                response.statusCode.should.equal(200);
+                response.payload.should.be.a('string');
+                let payload = JSON.parse(response.payload);
+                payload.should.be.an('object').and.contain.keys('license', 'timestamp', 'user');
+                payload.license.should.equal('CC BY-SA');
+                payload.user.should.equal(1);
+            });
+        });
+    });
+
+    context('when appending a slide to a deck', () => {
+        it('should reply it', () => {
+            return server.inject({
+                method: 'POST',
+                url: '/deck/new',
+                payload: {
+                    title: 'new deck',
+                },
+                headers: {
+                    'Content-Type': 'application/json',
+                    '----jwt----': authToken,
+                },
+            }).then((response) => {
+                response.should.be.an('object').and.contain.keys('statusCode','payload');
+                response.statusCode.should.equal(200);
+                response.payload.should.be.a('string');
+                let payload = JSON.parse(response.payload);
+                payload.should.be.an('object').and.contain.keys('license', 'timestamp', 'user');
+                payload.license.should.equal('CC BY-SA');
+                payload.user.should.equal(1);
+
+                return server.inject({
+                    method: 'POST',
+                    url: '/decktree/node/create',
+                    payload: {
+                        selector: {
+                            id: '1',
+                            spath: '',
+                        },
+                        nodeSpec: {
+                            type: 'slide',
+                        },
+                    },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        '----jwt----': authToken,
+                    },
+                }).then((addResponse) => {
+                    addResponse.should.be.an('object').and.contain.keys('statusCode','payload');
+                    addResponse.statusCode.should.equal(200);
+                    addResponse.payload.should.be.a('string');
+                    let payload = JSON.parse(addResponse.payload);
+                    console.log(payload);
+                    payload.should.be.an('object').and.contain.keys('title', 'id', 'type');
+                });
+
+            });
+
+        });
+    });
+
 });
