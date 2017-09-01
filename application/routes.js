@@ -184,7 +184,7 @@ module.exports = function(server) {
             },
             tags: ['api'],
             auth: 'jwt',
-            description: 'Replace the users and groups authorized for editing the deck - JWT needed',
+            description: 'Replace the users and groups authorized for editing the deck',
             response: {
                 emptyStatusCode: 204,
                 status: { '204' : false }
@@ -207,7 +207,7 @@ module.exports = function(server) {
             },
             tags: ['api'],
             auth: 'jwt',
-            description: 'Get the permissions the current user has on the deck (revision) - JWT needed',
+            description: 'Get the permissions the current user has on the deck (revision)',
             response: {
                 schema: Joi.object({
                     fork: Joi.boolean(),
@@ -281,7 +281,6 @@ module.exports = function(server) {
                     }),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
-                    user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string().alphanum().lowercase(),
                     parent_deck: Joi.object().keys({
                         id: Joi.string().alphanum().lowercase(),
@@ -295,7 +294,7 @@ module.exports = function(server) {
                         title: Joi.string().allow(''),
                         speakernotes: Joi.string().allow('')
                     }),
-                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                     theme: Joi.string().allow(''),
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
@@ -307,9 +306,14 @@ module.exports = function(server) {
                             joined: Joi.string().isoDate().required(),
                         })).default([])
                     })
-                }).requiredKeys('user', 'license'),
+                }),
+
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Create a new deck'
         }
     });
@@ -329,7 +333,6 @@ module.exports = function(server) {
                     translation: Joi.string().alphanum().lowercase(),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
-                    user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string(),
                     top_root_deck: Joi.string(),
                     parent_deck: Joi.object().keys({
@@ -343,9 +346,14 @@ module.exports = function(server) {
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     theme: Joi.string().allow(''),
                     new_revision: Joi.boolean(),
-                }).requiredKeys('user'),
+                }),
+
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Replace a deck by creating a new revision'
         }
     });
@@ -377,11 +385,12 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string()
                 },
-                payload: Joi.object().keys({
-                    user: Joi.string().alphanum().lowercase()
-                }).requiredKeys('user'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Create a fork of a deck, by creating a new revision'
         }
     });
@@ -396,11 +405,14 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 payload: Joi.object().keys({
-                    user: Joi.string().alphanum().lowercase(),
                     language: Joi.string(),
-                }).requiredKeys('user', 'language'),
+                }).requiredKeys('language'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description:'Translate a deck and store as a new fork'
         }
     });
@@ -454,7 +466,7 @@ module.exports = function(server) {
             },
             tags: ['api'],
             auth: 'jwt',
-            description: 'Create a new revision for the deck, and optionally update reference of parent deck - JWT needed',
+            description: 'Create a new revision for the deck, and optionally update reference of parent deck',
         },
     });
 
@@ -478,7 +490,7 @@ module.exports = function(server) {
             },
             tags: ['api'],
             auth: 'jwt',
-            description: 'Revert a deck to an old revision, and optionally update reference of parent deck - JWT needed',
+            description: 'Revert a deck to an old revision, and optionally update reference of parent deck',
         }
     });
 
@@ -541,7 +553,6 @@ module.exports = function(server) {
                     title: Joi.string(),
                     content: Joi.string(),
                     speakernotes: Joi.string(),
-                    user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string(),
                     parent_deck: Joi.object().keys({
                         id: Joi.string().alphanum().lowercase(),
@@ -556,10 +567,14 @@ module.exports = function(server) {
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
-                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA')
-                }).requiredKeys('user', 'content', 'root_deck', 'license'),
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
+                }).requiredKeys('content', 'root_deck'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Create a new slide'
         }
     });
@@ -577,7 +592,6 @@ module.exports = function(server) {
                     title: Joi.string(),
                     content: Joi.string(),
                     speakernotes: Joi.string(),
-                    user: Joi.string().alphanum().lowercase(),
                     root_deck: Joi.string(),
                     top_root_deck: Joi.string(),
                     parent_deck: Joi.object().keys({
@@ -602,9 +616,13 @@ module.exports = function(server) {
                         authors: Joi.string().allow(''),
                         year: Joi.string().allow('')
                     })).default([])
-                }).requiredKeys('user', 'content', 'root_deck'),
+                }).requiredKeys('content', 'root_deck'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Replace a slide with a new revision'
         }
     });
@@ -667,8 +685,12 @@ module.exports = function(server) {
                         year: Joi.string().allow('')
                     })).default([])
                 }).requiredKeys('dataSources'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Replace slide data sources'
         }
     });
@@ -708,14 +730,17 @@ module.exports = function(server) {
                             type: Joi.string(),
                         })
                     ).single(),
-                    user: Joi.string().alphanum().lowercase(),
                     content: Joi.string(),
                     title: Joi.string(),
                     license: Joi.string(),
                     speakernotes: Joi.string()
-                }).requiredKeys('selector', 'user'),
+                }).requiredKeys('selector'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Create a new node (slide/deck) in the deck tree'
         }
     });
@@ -734,10 +759,13 @@ module.exports = function(server) {
                         sid: Joi.string()
                     }),
                     name: Joi.string(),
-                    user: Joi.string().alphanum().lowercase()
-                }).requiredKeys('selector', 'user'),
+                }).requiredKeys('selector'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Rename a node (slide/deck) in the deck tree'
         }
     });
@@ -755,10 +783,13 @@ module.exports = function(server) {
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
-                    user: Joi.string().alphanum().lowercase()
-                }).requiredKeys('selector', 'user'),
+                }).requiredKeys('selector'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Delete a node (slide/deck) from the deck tree'
         }
     });
@@ -782,11 +813,14 @@ module.exports = function(server) {
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
-                    user: Joi.string().alphanum().lowercase(),
                     targetIndex: Joi.number()
-                }).requiredKeys('sourceSelector', 'targetSelector', 'user', 'targetIndex'),
+                }).requiredKeys('sourceSelector', 'targetSelector', 'targetIndex'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Move a node (slide/deck) in a different position in the deck tree'
         }
     });
