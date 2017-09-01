@@ -1,25 +1,14 @@
 #!/usr/bin/env node
 'use strict';
 
-const Microservices = require('../configs/microservices');
-
-const rp = require('request-promise-native');
-const he = require('he');
+const fileService = require('../services/file');
 
 function createThumbnailForSlide(slideId, slideTitle, slideContent) {
-
     if (!slideContent) {
         slideContent = `<h2>${slideTitle}</h2>`;
     }
 
-    let encodedContent = he.encode(slideContent, { allowUnsafeSymbols: true });
-    return rp.post({
-        uri: Microservices.file.uri + '/slideThumbnail/' + slideId,
-        body: encodedContent,
-        headers: {
-            'Content-Type': 'text/plain',
-        },
-    }).then(() => {
+    return fileService.createThumbnail(slideContent, slideId).then(() => {
         // console.log(`created thumbnail for ${slideId}`);
         return true;
     }).catch((err) => {

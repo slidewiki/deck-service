@@ -14,15 +14,14 @@ const boom = require('boom'),
     deckDB = require('../database/deckDatabase'),
     co = require('../common'),
     Joi = require('joi'),
-    async = require('async'),
-    Microservices = require('../configs/microservices');
+    async = require('async');
 
 // TODO remove this from here after we've refactored all database-specific code into slide/deck database js files
 const ChangeLog = require('../lib/ChangeLog');
 
 const userService = require('../services/user');
-
 const tagService = require('../services/tag');
+const fileService = require('../services/file');
 
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
 
@@ -96,7 +95,9 @@ let self = module.exports = {
                     //for now we use hardcoded template for new slides
                     content = slidetemplate;
                 }
-                createThumbnail(content, slideId);
+                fileService.createThumbnail(content, slideId).catch((err) => {
+                    request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+                });
 
                 reply(co.rewriteID(inserted.ops[0]));
             }
@@ -145,7 +146,9 @@ let self = module.exports = {
                                 //for now we use hardcoded template for new slides
                                 content = slidetemplate;
                             }
-                            createThumbnail(content, newSlideId);
+                            fileService.createThumbnail(content, newSlideId).catch((err) => {
+                                request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                            });
 
                             // update the content item of the parent deck with the new revision id
                             return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
@@ -443,7 +446,10 @@ let self = module.exports = {
                         //for now we use hardcoded template for new slides
                         content = slidetemplate;
                     }
-                    createThumbnail(content, slideId);
+
+                    fileService.createThumbnail(content, slideId).catch((err) => {
+                        request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+                    });
 
                     return insertPromise;
                 });
@@ -774,7 +780,10 @@ let self = module.exports = {
                             deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
                             slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
 
-                            createThumbnail(insertedDuplicate.revisions[0].content, insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id);
+                            let slideId = insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id;
+                            fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId).catch((err) => {
+                                request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
+                            });
 
                             reply(node);
                         }).catch((err) => {
@@ -1951,22 +1960,4 @@ function authorizeUser(userId, deckId, rootDeckId) {
         // return nothing if all's ok :)
     });
 
-}
-
-//creates a thumbnail for a given slide
-function createThumbnail(slideContent, slideId) {
-    let rp = require('request-promise-native');
-    let he = require('he');
-
-    let encodedContent = he.encode(slideContent, {allowUnsafeSymbols: true});
-
-    rp.post({
-        uri: Microservices.file.uri + '/slideThumbnail/' + slideId, //is created as slideId.jpeg
-        body: encodedContent,
-        headers: {
-            'Content-Type': 'text/plain'
-        }
-    }).catch((e) => {
-        console.log('Can not create thumbnail of a slide: ' + e.message);
-    });
 }

@@ -8,6 +8,7 @@ const ChangeLog = require('../lib/ChangeLog');
 
 const userService = require('../services/user');
 const translationService = require('../services/translation');
+const fileService = require('../services/file');
 
 const helper = require('./helper'),
     striptags = require('striptags'),
@@ -1913,6 +1914,12 @@ let self = module.exports = {
                                                                 translations.push({'slide_id':slide._id, 'language': languageToTranslate});
                                                                 translations.push({'slide_id':oldSlideId, 'language':slide.language});
                                                             }
+
+                                                            // create the thumbnail
+                                                            let traslatedSlideId = `${translated._id}-1`;
+                                                            fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId).catch((err) => {
+                                                                console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
+                                                            });
 
                                                             //filling in the translations array for all decks in the 'family'
                                                             return self.updateTranslations('slide', translations);
