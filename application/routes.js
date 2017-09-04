@@ -649,6 +649,36 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/deck/{id}/datasources',
+        handler: handlers.getDeckDataSources,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the data sources for a deck',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/datasources',
+        handler: handlers.getSlideDataSources,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the data sources for a slide',
+        },
+    });
+
+    server.route({
         method: 'PUT',
         path: '/slide/datasources/{id}',
         handler: handlers.saveDataSources,
