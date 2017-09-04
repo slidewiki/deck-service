@@ -147,7 +147,6 @@ describe('REST API', () => {
                     addResponse.statusCode.should.equal(200);
                     addResponse.payload.should.be.a('string');
                     let payload = JSON.parse(addResponse.payload);
-                    console.log(payload);
                     payload.should.be.an('object').and.contain.keys('title', 'id', 'type');
                 });
 

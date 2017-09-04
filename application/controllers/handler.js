@@ -125,7 +125,7 @@ let self = module.exports = {
 
     //updates slide by creating a new revision
     updateSlide: function(request, reply) {
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
         let slideId = request.params.id;
 
         { // these brackets are kept during handleChange removal to keep git blame under control
@@ -144,7 +144,7 @@ let self = module.exports = {
 
                         // send tags to tag-service
                         if(request.payload.tags && request.payload.tags.length > 0){
-                            tagService.upload(request.payload.tags, request.payload.user).catch( (e) => {
+                            tagService.upload(request.payload.tags, userId).catch( (e) => {
                                 request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
                             });
                         }
@@ -480,7 +480,7 @@ let self = module.exports = {
 
     // new simpler implementation of deck update with permission checking and NO new_revision: true option
     updateDeck: function(request, reply) {
-        let userId = request.payload.user; // use JWT for this
+        let userId = request.auth.credentials.userid;
 
         let deckId = request.params.id;
         // TODO we should keep this required, no fall-back values!
@@ -560,7 +560,7 @@ let self = module.exports = {
 
     forkDeckRevision: function(request, reply) {
         let deckId = request.params.id;
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
 
         return deckDB.forkAllowed(deckId, userId)
         .then((forkAllowed) => {
@@ -581,7 +581,7 @@ let self = module.exports = {
 
     translateDeckRevision: function(request, reply) {
         let deckId = request.params.id;
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
 
         return deckDB.forkAllowed(deckId, userId)
         .then((forkAllowed) => {
@@ -1078,6 +1078,8 @@ let self = module.exports = {
 
     //renames a decktree node (slide or deck)
     renameDeckTreeNode: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
         //check if it is deck or slide
         if(request.payload.selector.stype === 'deck'){
             let root_deck = request.payload.selector.sid;
@@ -1085,7 +1087,7 @@ let self = module.exports = {
             { // these brackets are kept during handleChange removal to keep git blame under control
 
                 let top_root_deck = request.payload.selector.id;
-                deckDB.rename(root_deck, request.payload.name, top_root_deck, request.payload.user).then((renamed) => {
+                deckDB.rename(root_deck, request.payload.name, top_root_deck, userId).then((renamed) => {
                     if (co.isEmpty(renamed.value))
                         throw renamed;
                     else{
@@ -1122,7 +1124,7 @@ let self = module.exports = {
                     'title' : request.payload.name,
                     'content' : slide.revisions[0].content,
                     'speakernotes' : slide.revisions[0].speakernotes,
-                    'user' : request.payload.user,
+                    'user' : String(userId),
                     'root_deck' : root_deck,
                     'top_root_deck' : request.payload.selector.id,
                     'language' : slide.language,
@@ -1152,7 +1154,7 @@ let self = module.exports = {
     },
     //deletes a decktree node by removing its reference from its parent deck (does not actually delete it from the database)
     deleteDeckTreeNode: function(request, reply) {
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
 
         //NOTE no removal in the DB, just unlink from content items, and update the positions of the other elements
         let spath = request.payload.selector.spath;
@@ -1191,9 +1193,11 @@ let self = module.exports = {
     },
     //changes position of a deck tree node inside the decktree
     moveDeckTreeNode: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
         //first delete the node from its current position
         self.deleteDeckTreeNode({
-            'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user, 'isMove' : true},
+            'payload': {'selector' : request.payload.sourceSelector, 'user': String(userId), 'isMove' : true},
             'log': request.log.bind(request),
         },
         (removed) => {
@@ -1267,7 +1271,7 @@ let self = module.exports = {
                 request.payload.targetSelector.id = request.payload.targetSelector.sid;
             }
             let payload  = {'payload': {
-                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user, 'isMove' : true},
+                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': String(userId), 'isMove' : true},
                 'log': request.log.bind(request),
             };
             //append the node (revised or not) in the new position
@@ -1816,6 +1820,7 @@ let self = module.exports = {
     },
 
     updateDeckTags: function(request, reply) {
+        let userId = request.auth.credentials.userid;
         let operation = (request.payload.operation === 'add') ? deckDB.addTag.bind(deckDB) : deckDB.removeTag.bind(deckDB);
 
         operation(request.params.id, request.payload.tag).then( (tagsList) => {
@@ -1825,7 +1830,7 @@ let self = module.exports = {
             else{
                 // send tags to tag-service
                 if(tagsList && tagsList.length > 0){
-                    tagService.upload(tagsList, request.payload.user).catch( (e) => {
+                    tagService.upload(tagsList, userId).catch( (e) => {
                         request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id + ': ' + e.message);
                     });
                 }
@@ -1878,6 +1883,7 @@ let self = module.exports = {
     },
 
     updateSlideTags: function(request, reply) {
+        let userId = request.auth.credentials.userid;
         let operation = (request.payload.operation === 'add') ? slideDB.addTag.bind(slideDB) : slideDB.removeTag.bind(slideDB);
 
         operation(request.params.id, request.payload.tag).then( (tagsList) => {
@@ -1887,7 +1893,7 @@ let self = module.exports = {
             else{
                 // send tags to tag-service
                 if(tagsList && tagsList.length > 0){
-                    tagService.upload(tagsList, request.payload.user).catch( (e) => {
+                    tagService.upload(tagsList, userId).catch( (e) => {
                         request.log('warning', 'Could not save tags to tag-service for slide ' + request.params.id + ': ' + e.message);
                     });
                 }
