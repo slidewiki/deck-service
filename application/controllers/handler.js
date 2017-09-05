@@ -229,7 +229,12 @@ let self = module.exports = {
     getSlideDataSources: function(request, reply) {
         let slideId = request.params.id;
         slideDB.get(slideId).then((slide) => {
-            reply({ items: slide.revisions[0].dataSources || [], revisionOwner: slide.user });
+            let items = slide.revisions[0].dataSources || [];
+            let totalCount = items.length;
+            if (request.query.countOnly) {
+                items = [];
+            }
+            reply({ items, totalCount, revisionOwner: slide.user });
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
@@ -312,7 +317,12 @@ let self = module.exports = {
                         }
                     });
 
-                    reply({ items: dataSources, contentOwner: deckRevision.user });
+                    let items = dataSources;
+                    let totalCount = items.length;
+                    if (request.query.countOnly) {
+                        items = [];
+                    }
+                    reply({ items, totalCount, revisionOwner: deckRevision.user });
                 });
             });
 
