@@ -226,13 +226,121 @@ let self = module.exports = {
         });
     },
 
+    getSlideDataSources: function(request, reply) {
+        let slideId = request.params.id;
+        slideDB.get(slideId).then((slide) => {
+            let items = slide.revisions[0].dataSources || [];
+            let totalCount = items.length;
+            if (request.query.countOnly) {
+                items = [];
+            }
+            reply({ items, totalCount, revisionOwner: slide.user });
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
+    getDeckDataSources: function(request, reply) {
+        deckDB.getRevision(request.params.id).then((deckRevision) => {
+            // create data sources array
+            if (!deckRevision) throw boom.notFound();
+
+            if (_.isEmpty(deckRevision.contentItems)) return [];
+
+            let dataSources = [];
+
+            // get first level of slides - from contentItems
+            let arrayOfSlideIds = [];
+            let slideRevisionsMap = {};
+            let thereAreSubdecks = false;// does this deck have some subdecks
+            deckRevision.contentItems.forEach((contentItem) => {
+                if (contentItem.kind === 'slide') {
+                    const slideId = contentItem.ref.id;
+                    const revisionId = contentItem.ref.revision;
+                    arrayOfSlideIds.push(slideId);
+                    slideRevisionsMap[slideId] = revisionId;
+                } else {
+                    thereAreSubdecks = true;
+                }
+            });
+
+            let promise = Promise.resolve({children: []});
+            if (thereAreSubdecks) {
+                //if there are subdecks, get the rest of slides, from deeper levels ( > 1 )
+                promise = deckDB.getFlatSlides(request.params.id, undefined);
+            }
+
+            return promise.then((deckTree) => {
+                deckTree.children.forEach((child) => {
+                    let idArray = child.id.split('-');
+                    const newSlideId = parseInt(idArray[0]);
+                    const newSlideRevisionId = parseInt(idArray[1]);
+                    if (!(newSlideId in slideRevisionsMap)) {
+                        arrayOfSlideIds.push(newSlideId);
+                        slideRevisionsMap[newSlideId] = newSlideRevisionId;
+                    }
+                });
+            }).then(() => {
+                // get dataSources
+                return slideDB.getSelected({selectedIDs: arrayOfSlideIds})// get slides with ids in arrayOfSlideIds
+                .then((slides) => {
+                    slides.forEach((slide) => {
+                        if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
+                            const slideId = slide._id;
+                            const slideRevisionId = slideRevisionsMap[slideId];
+                            let slideRevision = slide.revisions.find((revision) =>  String(revision.id) ===  String(slideRevisionId));
+                            if (slideRevision !== undefined && slideRevision.dataSources !== null && slideRevision.dataSources !== undefined) {
+                                const slideRevisionTitle = slideRevision.title;
+                                slideRevision.dataSources.forEach((dataSource) => {
+                                    //check that the dataSource has not already been added to the array
+                                    let unique = true;
+                                    for (let i = 0; i < dataSources.length; i++) {
+                                        let dataSourceInArray = dataSources[i];
+                                        if (dataSourceInArray.type === dataSource.type &&
+                                            dataSourceInArray.title === dataSource.title &&
+                                            dataSourceInArray.url === dataSource.url &&
+                                            dataSourceInArray.comment === dataSource.comment &&
+                                            dataSourceInArray.authors === dataSource.authors)
+                                        {
+                                            unique = false;
+                                            break;
+                                        }
+                                    }
+                                    if (unique) {
+                                        dataSource.sid = slideId + '-' + slideRevisionId;
+                                        dataSource.stitle = slideRevisionTitle;
+                                        dataSources.push(dataSource);
+                                    }
+                                });
+                            }
+                        }
+                    });
+
+                    let items = dataSources;
+                    let totalCount = items.length;
+                    if (request.query.countOnly) {
+                        items = [];
+                    }
+                    reply({ items, totalCount, revisionOwner: deckRevision.user });
+                });
+            });
+
+        }).catch((error) => {
+            if (error.isBoom) return reply(error);
+
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+
+    },
+
     //gets a single deck from the database, containing all revisions, unless a specific revision is specified in the id
     getDeck: function(request, reply) {
         deckDB.get(encodeURIComponent(request.params.id)).then((deck) => {
             if (co.isEmpty(deck))
                 reply(boom.notFound());
             else {
-                //create data sources array
                 const deckIdParts = request.params.id.split('-');
                 const deckRevisionId = (deckIdParts.length > 1) ? deckIdParts[deckIdParts.length - 1] : deck.active;
 
@@ -251,90 +359,7 @@ let self = module.exports = {
                         }else{
                             deck.language = 'en';
                         }
-
-                        // get dataSources for the deck
-                        let dataSources = [];
-                        if (deckRevision.contentItems !== undefined) {
-                            // get first level of slides - from contentItems
-                            let arrayOfSlideIds = [];
-                            let slideRevisionsMap = {};
-                            let thereAreSubdecks = false;// does this deck have some subdecks
-                            deckRevision.contentItems.forEach((contentItem) => {
-                                if (contentItem.kind === 'slide') {
-                                    const slideId = contentItem.ref.id;
-                                    const revisionId = contentItem.ref.revision;
-                                    arrayOfSlideIds.push(slideId);
-                                    slideRevisionsMap[slideId] = revisionId;
-                                } else {
-                                    thereAreSubdecks = true;
-                                }
-                            });
-
-                            let promise = Promise.resolve({children: []});
-                            if (thereAreSubdecks) {
-                                //if there are subdecks, get the rest of slides, from deeper levels ( > 1 )
-                                promise = deckDB.getFlatSlides(request.params.id, undefined);
-                            }
-
-                            promise.then((deckTree) => {
-                                deckTree.children.forEach((child) => {
-                                    let idArray = child.id.split('-');
-                                    const newSlideId = parseInt(idArray[0]);
-                                    const newSlideRevisionId = parseInt(idArray[1]);
-                                    if (!(newSlideId in slideRevisionsMap)) {
-                                        arrayOfSlideIds.push(newSlideId);
-                                        slideRevisionsMap[newSlideId] = newSlideRevisionId;
-                                    }
-                                });
-                            }).then(() => {
-                                // get dataSources
-                                slideDB.getSelected({selectedIDs: arrayOfSlideIds})// get slides with ids in arrayOfSlideIds
-                                .then((slides) => {
-                                    slides.forEach((slide) => {
-                                        if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
-                                            const slideId = slide._id;
-                                            const slideRevisionId = slideRevisionsMap[slideId];
-                                            let slideRevision = slide.revisions.find((revision) =>  String(revision.id) ===  String(slideRevisionId));
-                                            if (slideRevision !== undefined && slideRevision.dataSources !== null && slideRevision.dataSources !== undefined) {
-                                                const slideRevisionTitle = slideRevision.title;
-                                                slideRevision.dataSources.forEach((dataSource) => {
-                                                    //check that the dataSource has not already been added to the array
-                                                    let unique = true;
-                                                    for (let i = 0; i < dataSources.length; i++) {
-                                                        let dataSourceInArray = dataSources[i];
-                                                        if (dataSourceInArray.type === dataSource.type &&
-                                                            dataSourceInArray.title === dataSource.title &&
-                                                            dataSourceInArray.url === dataSource.url &&
-                                                            dataSourceInArray.comment === dataSource.comment &&
-                                                            dataSourceInArray.authors === dataSource.authors)
-                                                        {
-                                                            unique = false;
-                                                            break;
-                                                        }
-                                                    }
-                                                    if (unique) {
-                                                        dataSource.sid = slideId + '-' + slideRevisionId;
-                                                        dataSource.stitle = slideRevisionTitle;
-                                                        dataSources.push(dataSource);
-                                                    }
-                                                });
-                                            }
-                                        }
-                                    });
-                                    deckRevision.dataSources = dataSources;
-                                    reply(deck);
-                                }).catch((error) => {
-                                    console.log('error', error);
-                                    reply(deck);
-                                });
-                            }).catch((error) => {
-                                console.log('error', error);
-                                reply(deck);
-                            });
-                        } else {
-                            deckRevision.dataSources = [];
-                            reply(deck);
-                        }
+                        reply(deck);
                     } else {
                         reply(deck);
                     }
