@@ -85,7 +85,11 @@ function prepareChangeLog(changeLog, simplifyOutput) {
         changeLog = changeLog.reduce((acc, cur) => {
             if (hold) {
                 // TODO check timestamps as well
-                if (cur.op === 'add' && _.isEqual(hold.value, cur.value) && hold.user === cur.user) {
+                if (cur.op === 'add' 
+                    && _.isEqual(hold.value, cur.value) 
+                    && hold.user === cur.user
+                    && Math.abs(Date.parse(hold.timestamp) - Date.parse(cur.timestamp)) < 5000
+                ) {
                     // we have a move, so merge and push
                     acc.push({
                         op: 'move',

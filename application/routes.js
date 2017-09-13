@@ -748,7 +748,8 @@ module.exports = function(server) {
                     content: Joi.string(),
                     title: Joi.string(),
                     license: Joi.string(),
-                    speakernotes: Joi.string()
+                    speakernotes: Joi.string(),
+                    isMove: Joi.boolean().default(false),
                 }).requiredKeys('selector', 'user'),
             },
             tags: ['api'],
