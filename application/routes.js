@@ -132,8 +132,8 @@ module.exports = function(server) {
                             id: Joi.number(),
                             username: Joi.string(),
                             picture: Joi.string().allow(['', null]),
-                            country: Joi.string().allow(''),
-                            organization: Joi.string().allow('')
+                            country: Joi.string().allow(['', null]),
+                            organization: Joi.string().allow(['', null]),
                         })),
                     editors: Joi.object().keys({
                         users: Joi.array().items(
@@ -142,8 +142,8 @@ module.exports = function(server) {
                                 username: Joi.string(),
                                 picture: Joi.string().allow(['', null]),
                                 joined: Joi.string().isoDate(),
-                                country: Joi.string().allow(''),
-                                organization: Joi.string().allow('')
+                                country: Joi.string().allow(['', null]),
+                                organization: Joi.string().allow(['', null]),
                             })),
                         groups: Joi.array().items(
                             Joi.object().keys({
@@ -664,6 +664,42 @@ module.exports = function(server) {
             tags: ['api'],
             description: 'Get total count of revisions for this slide'
         }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/datasources',
+        handler: handlers.getDeckDataSources,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                },
+                query: {
+                    countOnly: Joi.boolean().truthy('1').falsy('0', ''),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the data sources for a deck',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/datasources',
+        handler: handlers.getSlideDataSources,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId'),
+                },
+                query: {
+                    countOnly: Joi.boolean().truthy('1').falsy('0', ''),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the data sources for a slide',
+        },
     });
 
     server.route({

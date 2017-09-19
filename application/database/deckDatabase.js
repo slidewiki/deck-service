@@ -1350,6 +1350,7 @@ let self = module.exports = {
                     revisionId: (revision_id + 1),
                     latestRevisionId: latestRevision.id,
                     title: striptags(deck.revisions[revision_id].title),
+                    theme: deck.revisions[revision_id].theme,
                     type: 'deck',
                     children: [],
                 };
