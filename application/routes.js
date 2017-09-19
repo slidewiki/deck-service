@@ -704,23 +704,21 @@ module.exports = function(server) {
 
     server.route({
         method: 'PUT',
-        path: '/slide/datasources/{id}',
+        path: '/slide/{id}/datasources',
         handler: handlers.saveDataSources,
         config: {
             validate: {
                 params: {
                     id: Joi.string()
                 },
-                payload: Joi.object().keys({
-                    dataSources: Joi.array().items(Joi.object().keys({
-                        type: Joi.string(),
-                        title: Joi.string(),
-                        url: Joi.string().allow(''),
-                        comment: Joi.string().allow(''),
-                        authors: Joi.string().allow(''),
-                        year: Joi.string().allow('')
-                    })).default([])
-                }).requiredKeys('dataSources'),
+                payload: Joi.array().items(Joi.object().keys({
+                    type: Joi.string(),
+                    title: Joi.string(),
+                    url: Joi.string().allow(''),
+                    comment: Joi.string().allow(''),
+                    authors: Joi.string().allow(''),
+                    year: Joi.string().allow('')
+                })),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),

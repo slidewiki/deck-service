@@ -237,7 +237,7 @@ let self = module.exports = {
     //saves the data sources of a slide in the database
     saveDataSources: function(request, reply) {
         let slideId = request.params.id;
-        slideDB.saveDataSources(encodeURIComponent(slideId), request.payload.dataSources).then((replaced) => {
+        slideDB.saveDataSources(slideId, request.payload).then((replaced) => {
             reply(replaced);
         }).catch((error) => {
             request.log('error', error);
