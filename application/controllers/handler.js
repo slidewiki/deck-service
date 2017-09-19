@@ -981,7 +981,7 @@ let self = module.exports = {
                 else{
                     deckDB.forkDeckRevision(request.payload.nodeSpec.id, userId, true).then((forkResult) => {
                         // get the new deck we are going to attach
-                        request.payload.nodeSpec.id = forkResult.id_map[request.payload.nodeSpec.id];
+                        request.payload.nodeSpec.id = forkResult.root_deck;
 
                         deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
                         self.getDeck({
