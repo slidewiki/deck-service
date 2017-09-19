@@ -472,7 +472,7 @@ module.exports = function(server) {
 
     server.route({
         method: 'POST',
-        path: '/deck/revert/{id}',
+        path: '/deck/{id}/revert',
         handler: handlers.revertDeckRevision,
         config: {
             validate: {
@@ -629,7 +629,7 @@ module.exports = function(server) {
 
     server.route({
         method: 'POST',
-        path: '/slide/revert/{id}',
+        path: '/slide/{id}/revert',
         handler: handlers.revertSlideRevision,
         config: {
             validate: {
