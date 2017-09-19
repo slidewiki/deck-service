@@ -128,6 +128,9 @@ let self = module.exports = {
         let userId = request.auth.credentials.userid;
         let slideId = request.params.id;
 
+        // fill in the user id from auth
+        request.payload.user = userId;
+
         { // these brackets are kept during handleChange removal to keep git blame under control
 
             deckDB.getActiveRevisionFromDB(request.payload.root_deck).then((parentDeckId) => {
@@ -1070,6 +1073,7 @@ let self = module.exports = {
                         //create the new deck
                         self.newDeck({
                             'payload' : deck,
+                            'auth': request.auth,
                             'log': request.log.bind(request),
                         }, (createdDeck) => {
                             if (createdDeck.isBoom) return reply(createdDeck);
@@ -1166,12 +1170,13 @@ let self = module.exports = {
                 if(new_slide.dataSources === null){
                     new_slide.dataSources = [];
                 }
-                let new_request = {
+                let forwardedRequest = {
                     'params' : {'id' :encodeURIComponent(slide_id)},
                     'payload' : new_slide,
+                    'auth': request.auth,
                     'log': request.log.bind(request),
                 };
-                self.updateSlide(new_request, (updated) => {
+                self.updateSlide(forwardedRequest, (updated) => {
                     reply(updated);
                 });
             });
@@ -1223,6 +1228,7 @@ let self = module.exports = {
         //first delete the node from its current position
         self.deleteDeckTreeNode({
             'payload': {'selector' : request.payload.sourceSelector, 'user': String(userId), 'isMove' : true},
+            'auth': request.auth,
             'log': request.log.bind(request),
         },
         (removed) => {
@@ -1295,12 +1301,17 @@ let self = module.exports = {
             if(request.payload.targetSelector.id.split('-')[0] === request.payload.targetSelector.sid.split('-')[0]){
                 request.payload.targetSelector.id = request.payload.targetSelector.sid;
             }
-            let payload  = {'payload': {
-                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': String(userId), 'isMove' : true},
+            let forwardedRequest  = {
+                'payload': {
+                    'selector': request.payload.targetSelector,
+                    'nodeSpec': nodeSpec,
+                    'isMove' : true
+                },
+                'auth': request.auth,
                 'log': request.log.bind(request),
             };
             //append the node (revised or not) in the new position
-            self.createDeckTreeNode(payload,
+            self.createDeckTreeNode(forwardedRequest,
             (inserted) => {
                 if (inserted.isBoom) return reply(inserted);
 
