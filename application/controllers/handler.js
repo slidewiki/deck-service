@@ -522,6 +522,9 @@ let self = module.exports = {
             // force ignore new_revision
             delete request.payload.new_revision;
 
+            // include user id in the payload!
+            request.payload.user = userId;
+
             // update the deck without creating a new revision
             return deckDB.update(deckId, request.payload).then((replaced) => {
                 if (!replaced) return boom.notFound();
