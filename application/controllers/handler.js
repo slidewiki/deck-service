@@ -265,7 +265,9 @@ let self = module.exports = {
             // create data sources array
             if (!deckRevision) throw boom.notFound();
 
-            if (_.isEmpty(deckRevision.contentItems)) return [];
+            if (_.isEmpty(deckRevision.contentItems)) {
+                return reply({ items: [], totalCount: 0, revisionOwner: deckRevision.user });
+            }
 
             let dataSources = [];
 
