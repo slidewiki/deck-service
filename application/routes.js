@@ -729,6 +729,22 @@ module.exports = function(server) {
         }
     });
 
+    //----------------------------- Thumbnail regen routes -----------------------------//
+    server.route({
+        method: 'POST',
+        path: '/deck/{id}/thumbnails',
+        handler: handlers.regenThumbnails,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                }
+            },
+            tags: ['api'],
+            description: 'Triggers regeneration of thumbnails for all slides under the specified deck.',
+        },
+    });
+
     //------------decktree APIs----------------
     server.route({
         method: 'GET',
