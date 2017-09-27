@@ -279,6 +279,9 @@ const deck = {
                 user: {
                     type: 'integer',
                 },
+                kind: {
+                    type: 'string'
+                }
             },
             required: ['id', 'revision'],
         },

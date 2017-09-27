@@ -1,0 +1,58 @@
+#!/usr/bin/env node
+'use strict';
+
+const fileService = require('../services/file');
+
+function createThumbnailForSlide(slideId, slideTitle, slideContent) {
+    if (!slideContent) {
+        slideContent = `<h2>${slideTitle}</h2>`;
+    }
+
+    return fileService.createThumbnail(slideContent, slideId).then(() => {
+        // console.log(`created thumbnail for ${slideId}`);
+        return true;
+    }).catch((err) => {
+        console.error(`could not create thumbnail for ${slideId}, error was: ${err.message}`);
+        return false;
+    });
+
+}
+
+const helper = require('../database/helper');
+const ProgressBar = require('progress');
+
+let counter = 0;
+let failed = 0;
+
+helper.getCollection('slides')
+.then((col) => col.find({}))
+.then((cursor) => cursor.toArray())
+.then((slides) => {
+    console.log('started regenerating slide thumbnails...');
+    let progressBar = new ProgressBar(':current/:total slides (:percent) :eta sec remaining [:bar]', { total: slides.length });
+    return slides.reduce((p, slide) => {
+        return p.then(() => {
+            // send all thumbnail requests in parallel for each revision
+            return Promise.all(slide.revisions.map((slideRev) => {
+                let slideId = `${slide._id}-${slideRev.id}`;
+
+                return createThumbnailForSlide(slideId, slideRev.title, slideRev.content).then((created) => {
+                    if (created) {
+                        counter++;
+                    } else {
+                        failed++;
+                    }
+                });
+
+            })).then(() => progressBar.tick());
+        });
+    }, Promise.resolve());
+
+}).then(() => {
+    // all is well
+    console.log(`finished regenerating thumbnails for ${counter} slide revisions (${failed} failed)`);
+    process.exit(0);
+}).catch((err) => {
+    console.error(err);
+    process.exit(-1);
+});

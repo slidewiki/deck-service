@@ -352,8 +352,8 @@ let self = module.exports = {
     },
 
     // we create a change log record for deck creation as well
-    trackDeckForked: function(deckId, userId, rootDeckId, parentOperations, forAttach) {
-        return self.trackDeckCreated(deckId, userId, rootDeckId, parentOperations, forAttach ? 'attach' : 'fork')
+    trackDeckForked: function(deckId, userId, rootDeckId, parentOperations, forkType='fork') {
+        return self.trackDeckCreated(deckId, userId, rootDeckId, parentOperations, forkType)
         .catch((err) => {
             console.warn(err);
             return [];
@@ -460,9 +460,12 @@ function fillDeckInfo(deckChanges) {
                     rec.value.ref.title = after.title;
 
                     // check for fork information in add ops
-                    let origin = ['fork', 'attach'].includes(rec.action) && deck.origin;
+                    let origin = ['fork', 'attach', 'translate'].includes(rec.action) && deck.origin;
                     if (origin) {
                         rec.value.origin = origin;
+                        if (rec.action === 'translate') {
+                            rec.translatedTo = deck.language;
+                        }
                     }
 
                     if (rec.oldValue) {

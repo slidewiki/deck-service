@@ -14,15 +14,14 @@ const boom = require('boom'),
     deckDB = require('../database/deckDatabase'),
     co = require('../common'),
     Joi = require('joi'),
-    async = require('async'),
-    Microservices = require('../configs/microservices');
+    async = require('async');
 
 // TODO remove this from here after we've refactored all database-specific code into slide/deck database js files
 const ChangeLog = require('../lib/ChangeLog');
 
 const userService = require('../services/user');
-
 const tagService = require('../services/tag');
+const fileService = require('../services/file');
 
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
 
@@ -81,35 +80,56 @@ let self = module.exports = {
 
     //inserts a new slide into the database
     newSlide: function(request, reply) {
-        //insert the slide
-        slideDB.insert(request.payload).then((inserted) => {
-            // empty results means something wrong with the payload
-            if (!inserted) return reply(boom.badData());
+        let userId = request.auth.credentials.userid;
 
-            if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
-                throw inserted;
-            else{
-                //create thumbnail from the newly created slide revision
-                let content = inserted.ops[0].revisions[0].content, slideId = inserted.ops[0]._id+'-'+1;
-                if(content === ''){
-                    content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
-                    //for now we use hardcoded template for new slides
-                    content = slidetemplate;
-                }
-                createThumbnail(content, slideId);
+        self._newSlide(request.payload, userId, request)
+        .then(reply)
+        .catch((error) => {
+            if (error.isBoom) return reply(error);
 
-                reply(co.rewriteID(inserted.ops[0]));
-            }
-        }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
         });
+
+    },
+
+    // reusable version of newSlide
+    _newSlide: function(payload, userId, logger) {
+        // make sure user id is set
+        payload.user = userId;
+
+        // insert the slide
+        return slideDB.insert(payload).then((inserted) => {
+            // empty results means something wrong with the payload
+            if (!inserted) throw boom.badData();
+
+            if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0])) {
+                throw inserted;
+            } else {
+                // create thumbnail from the newly created slide revision
+                let content = inserted.ops[0].revisions[0].content, slideId = inserted.ops[0]._id+'-'+1;
+                if (content === '') {
+                    // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                    // TODO for now we use hardcoded template for new slides
+                    content = slidetemplate;
+                }
+                fileService.createThumbnail(content, slideId).catch((err) => {
+                    logger.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+                });
+
+                return co.rewriteID(inserted.ops[0]);
+            }
+        });
+
     },
 
     //updates slide by creating a new revision
     updateSlide: function(request, reply) {
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
         let slideId = request.params.id;
+
+        // fill in the user id from auth
+        request.payload.user = userId;
 
         { // these brackets are kept during handleChange removal to keep git blame under control
 
@@ -127,7 +147,7 @@ let self = module.exports = {
 
                         // send tags to tag-service
                         if(request.payload.tags && request.payload.tags.length > 0){
-                            tagService.upload(request.payload.tags, request.payload.user).catch( (e) => {
+                            tagService.upload(request.payload.tags, userId).catch( (e) => {
                                 request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
                             });
                         }
@@ -145,7 +165,9 @@ let self = module.exports = {
                                 //for now we use hardcoded template for new slides
                                 content = slidetemplate;
                             }
-                            createThumbnail(content, newSlideId);
+                            fileService.createThumbnail(content, newSlideId).catch((err) => {
+                                request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                            });
 
                             // update the content item of the parent deck with the new revision id
                             return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
@@ -215,12 +237,123 @@ let self = module.exports = {
     //saves the data sources of a slide in the database
     saveDataSources: function(request, reply) {
         let slideId = request.params.id;
-        slideDB.saveDataSources(encodeURIComponent(slideId), request.payload.dataSources).then((replaced) => {
+        slideDB.saveDataSources(slideId, request.payload).then((replaced) => {
             reply(replaced);
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
         });
+    },
+
+    getSlideDataSources: function(request, reply) {
+        let slideId = request.params.id;
+        slideDB.get(slideId).then((slide) => {
+            let items = slide.revisions[0].dataSources || [];
+            let totalCount = items.length;
+            if (request.query.countOnly) {
+                items = [];
+            }
+            reply({ items, totalCount, revisionOwner: slide.user });
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
+    getDeckDataSources: function(request, reply) {
+        deckDB.getRevision(request.params.id).then((deckRevision) => {
+            // create data sources array
+            if (!deckRevision) throw boom.notFound();
+
+            if (_.isEmpty(deckRevision.contentItems)) {
+                return reply({ items: [], totalCount: 0, revisionOwner: deckRevision.user });
+            }
+
+            let dataSources = [];
+
+            // get first level of slides - from contentItems
+            let arrayOfSlideIds = [];
+            let slideRevisionsMap = {};
+            let thereAreSubdecks = false;// does this deck have some subdecks
+            deckRevision.contentItems.forEach((contentItem) => {
+                if (contentItem.kind === 'slide') {
+                    const slideId = contentItem.ref.id;
+                    const revisionId = contentItem.ref.revision;
+                    arrayOfSlideIds.push(slideId);
+                    slideRevisionsMap[slideId] = revisionId;
+                } else {
+                    thereAreSubdecks = true;
+                }
+            });
+
+            let promise = Promise.resolve({children: []});
+            if (thereAreSubdecks) {
+                //if there are subdecks, get the rest of slides, from deeper levels ( > 1 )
+                promise = deckDB.getFlatSlides(request.params.id, undefined);
+            }
+
+            return promise.then((deckTree) => {
+                deckTree.children.forEach((child) => {
+                    let idArray = child.id.split('-');
+                    const newSlideId = parseInt(idArray[0]);
+                    const newSlideRevisionId = parseInt(idArray[1]);
+                    if (!(newSlideId in slideRevisionsMap)) {
+                        arrayOfSlideIds.push(newSlideId);
+                        slideRevisionsMap[newSlideId] = newSlideRevisionId;
+                    }
+                });
+            }).then(() => {
+                // get dataSources
+                return slideDB.getSelected({selectedIDs: arrayOfSlideIds})// get slides with ids in arrayOfSlideIds
+                .then((slides) => {
+                    slides.forEach((slide) => {
+                        if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
+                            const slideId = slide._id;
+                            const slideRevisionId = slideRevisionsMap[slideId];
+                            let slideRevision = slide.revisions.find((revision) =>  String(revision.id) ===  String(slideRevisionId));
+                            if (slideRevision !== undefined && slideRevision.dataSources !== null && slideRevision.dataSources !== undefined) {
+                                const slideRevisionTitle = slideRevision.title;
+                                slideRevision.dataSources.forEach((dataSource) => {
+                                    //check that the dataSource has not already been added to the array
+                                    let unique = true;
+                                    for (let i = 0; i < dataSources.length; i++) {
+                                        let dataSourceInArray = dataSources[i];
+                                        if (dataSourceInArray.type === dataSource.type &&
+                                            dataSourceInArray.title === dataSource.title &&
+                                            dataSourceInArray.url === dataSource.url &&
+                                            dataSourceInArray.comment === dataSource.comment &&
+                                            dataSourceInArray.authors === dataSource.authors)
+                                        {
+                                            unique = false;
+                                            break;
+                                        }
+                                    }
+                                    if (unique) {
+                                        dataSource.sid = slideId + '-' + slideRevisionId;
+                                        dataSource.stitle = slideRevisionTitle;
+                                        dataSources.push(dataSource);
+                                    }
+                                });
+                            }
+                        }
+                    });
+
+                    let items = dataSources;
+                    let totalCount = items.length;
+                    if (request.query.countOnly) {
+                        items = [];
+                    }
+                    reply({ items, totalCount, revisionOwner: deckRevision.user });
+                });
+            });
+
+        }).catch((error) => {
+            if (error.isBoom) return reply(error);
+
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+
     },
 
     //gets a single deck from the database, containing all revisions, unless a specific revision is specified in the id
@@ -229,7 +362,6 @@ let self = module.exports = {
             if (co.isEmpty(deck))
                 reply(boom.notFound());
             else {
-                //create data sources array
                 const deckIdParts = request.params.id.split('-');
                 const deckRevisionId = (deckIdParts.length > 1) ? deckIdParts[deckIdParts.length - 1] : deck.active;
 
@@ -248,90 +380,7 @@ let self = module.exports = {
                         }else{
                             deck.language = 'en';
                         }
-
-                        // get dataSources for the deck
-                        let dataSources = [];
-                        if (deckRevision.contentItems !== undefined) {
-                            // get first level of slides - from contentItems
-                            let arrayOfSlideIds = [];
-                            let slideRevisionsMap = {};
-                            let thereAreSubdecks = false;// does this deck have some subdecks
-                            deckRevision.contentItems.forEach((contentItem) => {
-                                if (contentItem.kind === 'slide') {
-                                    const slideId = contentItem.ref.id;
-                                    const revisionId = contentItem.ref.revision;
-                                    arrayOfSlideIds.push(slideId);
-                                    slideRevisionsMap[slideId] = revisionId;
-                                } else {
-                                    thereAreSubdecks = true;
-                                }
-                            });
-
-                            let promise = Promise.resolve({children: []});
-                            if (thereAreSubdecks) {
-                                //if there are subdecks, get the rest of slides, from deeper levels ( > 1 )
-                                promise = deckDB.getFlatSlides(request.params.id, undefined);
-                            }
-
-                            promise.then((deckTree) => {
-                                deckTree.children.forEach((child) => {
-                                    let idArray = child.id.split('-');
-                                    const newSlideId = parseInt(idArray[0]);
-                                    const newSlideRevisionId = parseInt(idArray[1]);
-                                    if (!(newSlideId in slideRevisionsMap)) {
-                                        arrayOfSlideIds.push(newSlideId);
-                                        slideRevisionsMap[newSlideId] = newSlideRevisionId;
-                                    }
-                                });
-                            }).then(() => {
-                                // get dataSources
-                                slideDB.getSelected({selectedIDs: arrayOfSlideIds})// get slides with ids in arrayOfSlideIds
-                                .then((slides) => {
-                                    slides.forEach((slide) => {
-                                        if (slide.revisions !== undefined && slide.revisions.length > 0 && slide.revisions[0] !== null) {
-                                            const slideId = slide._id;
-                                            const slideRevisionId = slideRevisionsMap[slideId];
-                                            let slideRevision = slide.revisions.find((revision) =>  String(revision.id) ===  String(slideRevisionId));
-                                            if (slideRevision !== undefined && slideRevision.dataSources !== null && slideRevision.dataSources !== undefined) {
-                                                const slideRevisionTitle = slideRevision.title;
-                                                slideRevision.dataSources.forEach((dataSource) => {
-                                                    //check that the dataSource has not already been added to the array
-                                                    let unique = true;
-                                                    for (let i = 0; i < dataSources.length; i++) {
-                                                        let dataSourceInArray = dataSources[i];
-                                                        if (dataSourceInArray.type === dataSource.type &&
-                                                            dataSourceInArray.title === dataSource.title &&
-                                                            dataSourceInArray.url === dataSource.url &&
-                                                            dataSourceInArray.comment === dataSource.comment &&
-                                                            dataSourceInArray.authors === dataSource.authors)
-                                                        {
-                                                            unique = false;
-                                                            break;
-                                                        }
-                                                    }
-                                                    if (unique) {
-                                                        dataSource.sid = slideId + '-' + slideRevisionId;
-                                                        dataSource.stitle = slideRevisionTitle;
-                                                        dataSources.push(dataSource);
-                                                    }
-                                                });
-                                            }
-                                        }
-                                    });
-                                    deckRevision.dataSources = dataSources;
-                                    reply(deck);
-                                }).catch((error) => {
-                                    console.log('error', error);
-                                    reply(deck);
-                                });
-                            }).catch((error) => {
-                                console.log('error', error);
-                                reply(deck);
-                            });
-                        } else {
-                            deckRevision.dataSources = [];
-                            reply(deck);
-                        }
+                        reply(deck);
                     } else {
                         reply(deck);
                     }
@@ -339,6 +388,21 @@ let self = module.exports = {
                     reply(deck);
                 }
             }
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
+    getDeckTranslations: function(request, reply){
+        let deckId = request.params.id; // it should already be a number
+
+        deckDB.get(deckId).then((deck) => {
+            if (!deck) return reply(boom.notFound());
+
+            let currentLang = {'deck_id':deckId, 'language': deck.revisions[0].language};
+            reply({'translations': deck.translations, 'currentLang':currentLang});
+
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
@@ -380,6 +444,8 @@ let self = module.exports = {
 
     //creates a new deck in the database
     newDeck: function(request, reply) {
+        request.payload.user = request.auth.credentials.userid;
+
         //insert the deck into the database
         deckDB.insert(request.payload).then((inserted) => {
             // empty results means something wrong with the payload
@@ -428,7 +494,10 @@ let self = module.exports = {
                         //for now we use hardcoded template for new slides
                         content = slidetemplate;
                     }
-                    createThumbnail(content, slideId);
+
+                    fileService.createThumbnail(content, slideId).catch((err) => {
+                        request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+                    });
 
                     return insertPromise;
                 });
@@ -441,7 +510,7 @@ let self = module.exports = {
 
     // new simpler implementation of deck update with permission checking and NO new_revision: true option
     updateDeck: function(request, reply) {
-        let userId = request.payload.user; // use JWT for this
+        let userId = request.auth.credentials.userid;
 
         let deckId = request.params.id;
         // TODO we should keep this required, no fall-back values!
@@ -452,6 +521,9 @@ let self = module.exports = {
 
             // force ignore new_revision
             delete request.payload.new_revision;
+
+            // include user id in the payload!
+            request.payload.user = userId;
 
             // update the deck without creating a new revision
             return deckDB.update(deckId, request.payload).then((replaced) => {
@@ -520,19 +592,44 @@ let self = module.exports = {
     },
 
     forkDeckRevision: function(request, reply) {
-        return deckDB.forkAllowed(encodeURIComponent(request.params.id), request.payload.user)
+        let deckId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        return deckDB.forkAllowed(deckId, userId)
         .then((forkAllowed) => {
             if (!forkAllowed) {
                 return reply(boom.forbidden());
             }
 
-            return deckDB.forkDeckRevision(request.params.id, request.payload.user).then((id_map) => {
+            return deckDB.forkDeckRevision(deckId, userId).then((id_map) => {
                 reply(id_map);
             });
 
         }).catch((error) => {
             request.log('error', error);
-            reply(boom.badImplementation(error));
+            reply(boom.badImplementation());
+        });
+
+    },
+
+    translateDeckRevision: function(request, reply) {
+        let deckId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        return deckDB.forkAllowed(deckId, userId)
+        .then((forkAllowed) => {
+            if (!forkAllowed) {
+                return reply(boom.forbidden());
+            }
+
+            return deckDB.translateDeckRevision(deckId, userId, request.payload.language).then((id_map) => {
+                //We must iterate through all objects in the decktree of the fork and translate each one
+                reply(id_map);
+            });
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
         });
 
     },
@@ -607,7 +704,7 @@ let self = module.exports = {
 
     // authorize node creation and iterate nodeSpec array to apply each insert
     createDeckTreeNodeWithCheck: function(request, reply) {
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
         let rootDeckId = request.payload.selector.id;
 
         // TODO proper authorization checking the actual parent id
@@ -681,7 +778,7 @@ let self = module.exports = {
     createDeckTreeNode: function(request, reply) {
         let node = {};
         let top_root_deck = request.payload.selector.id;
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
 
         //check if it is a slide or a deck
         if(request.payload.nodeSpec.type === 'slide'){
@@ -734,7 +831,10 @@ let self = module.exports = {
                             deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
                             slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
 
-                            createThumbnail(insertedDuplicate.revisions[0].content, insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id);
+                            let slideId = insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id;
+                            fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId).catch((err) => {
+                                request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
+                            });
 
                             reply(node);
                         }).catch((err) => {
@@ -794,7 +894,6 @@ let self = module.exports = {
                             'content': slidetemplate,
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
-                            'user': request.payload.user,
                             'root_deck': parentID,
                             'position' : slidePosition
                         };
@@ -812,17 +911,17 @@ let self = module.exports = {
                             slide.speakernotes = request.payload.speakernotes;
                         }
 
-                        //create the new slide into the database
-                        self.newSlide({
-                            'payload' : slide,
-                            'log': request.log.bind(request),
-                        }, (createdSlide) => {
-                            if (createdSlide.isBoom) return reply(createdSlide);
-
+                        // create the new slide into the database
+                        self._newSlide(slide, userId, request).then((createdSlide) => {
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
                             deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck);
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             reply(node);
+                        }).catch((err) => {
+                            if (err.isBoom) return reply(err);
+
+                            request.log('error', err);
+                            reply(boom.badImplementation());
                         });
                     });
                 }
@@ -885,9 +984,9 @@ let self = module.exports = {
                     });
                 }
                 else{
-                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, request.payload.user, true).then((forkResult) => {
+                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, userId, true).then((forkResult) => {
                         // get the new deck we are going to attach
-                        request.payload.nodeSpec.id = forkResult.id_map[request.payload.nodeSpec.id];
+                        request.payload.nodeSpec.id = forkResult.root_deck;
 
                         deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
                         self.getDeck({
@@ -911,7 +1010,7 @@ let self = module.exports = {
                                 // first so that the rest of the tracking will work
                                 deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
                                     // track all created forks AFTER it's attached
-                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, true);
+                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, 'attach');
                                 });
 
                                 deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
@@ -971,7 +1070,7 @@ let self = module.exports = {
                             'content': slidetemplate,
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
-                            'user': request.payload.user,
+                            'user': userId,
                             'root_deck': parentID,
                             'top_root_deck': top_root_deck,
                             'position' : deckPosition
@@ -979,6 +1078,7 @@ let self = module.exports = {
                         //create the new deck
                         self.newDeck({
                             'payload' : deck,
+                            'auth': request.auth,
                             'log': request.log.bind(request),
                         }, (createdDeck) => {
                             if (createdDeck.isBoom) return reply(createdDeck);
@@ -1012,6 +1112,8 @@ let self = module.exports = {
 
     //renames a decktree node (slide or deck)
     renameDeckTreeNode: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
         //check if it is deck or slide
         if(request.payload.selector.stype === 'deck'){
             let root_deck = request.payload.selector.sid;
@@ -1019,7 +1121,7 @@ let self = module.exports = {
             { // these brackets are kept during handleChange removal to keep git blame under control
 
                 let top_root_deck = request.payload.selector.id;
-                deckDB.rename(root_deck, request.payload.name, top_root_deck, request.payload.user).then((renamed) => {
+                deckDB.rename(root_deck, request.payload.name, top_root_deck, userId).then((renamed) => {
                     if (co.isEmpty(renamed.value))
                         throw renamed;
                     else{
@@ -1056,7 +1158,7 @@ let self = module.exports = {
                     'title' : request.payload.name,
                     'content' : slide.revisions[0].content,
                     'speakernotes' : slide.revisions[0].speakernotes,
-                    'user' : request.payload.user,
+                    'user' : String(userId),
                     'root_deck' : root_deck,
                     'top_root_deck' : request.payload.selector.id,
                     'language' : slide.language,
@@ -1073,12 +1175,13 @@ let self = module.exports = {
                 if(new_slide.dataSources === null){
                     new_slide.dataSources = [];
                 }
-                let new_request = {
+                let forwardedRequest = {
                     'params' : {'id' :encodeURIComponent(slide_id)},
                     'payload' : new_slide,
+                    'auth': request.auth,
                     'log': request.log.bind(request),
                 };
-                self.updateSlide(new_request, (updated) => {
+                self.updateSlide(forwardedRequest, (updated) => {
                     reply(updated);
                 });
             });
@@ -1086,7 +1189,7 @@ let self = module.exports = {
     },
     //deletes a decktree node by removing its reference from its parent deck (does not actually delete it from the database)
     deleteDeckTreeNode: function(request, reply) {
-        let userId = request.payload.user;
+        let userId = request.auth.credentials.userid;
 
         //NOTE no removal in the DB, just unlink from content items, and update the positions of the other elements
         let spath = request.payload.selector.spath;
@@ -1125,9 +1228,12 @@ let self = module.exports = {
     },
     //changes position of a deck tree node inside the decktree
     moveDeckTreeNode: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
         //first delete the node from its current position
         self.deleteDeckTreeNode({
-            'payload': {'selector' : request.payload.sourceSelector, 'user': request.payload.user, 'isMove' : true},
+            'payload': {'selector' : request.payload.sourceSelector, 'user': String(userId), 'isMove' : true},
+            'auth': request.auth,
             'log': request.log.bind(request),
         },
         (removed) => {
@@ -1200,12 +1306,17 @@ let self = module.exports = {
             if(request.payload.targetSelector.id.split('-')[0] === request.payload.targetSelector.sid.split('-')[0]){
                 request.payload.targetSelector.id = request.payload.targetSelector.sid;
             }
-            let payload  = {'payload': {
-                'selector' : request.payload.targetSelector, 'nodeSpec': nodeSpec, 'user': request.payload.user, 'isMove' : true},
+            let forwardedRequest  = {
+                'payload': {
+                    'selector': request.payload.targetSelector,
+                    'nodeSpec': nodeSpec,
+                    'isMove' : true
+                },
+                'auth': request.auth,
                 'log': request.log.bind(request),
             };
             //append the node (revised or not) in the new position
-            self.createDeckTreeNode(payload,
+            self.createDeckTreeNode(forwardedRequest,
             (inserted) => {
                 if (inserted.isBoom) return reply(inserted);
 
@@ -1646,6 +1757,33 @@ let self = module.exports = {
 
     },
 
+    getDeckRootDecks: function(request, reply){
+        let deckId = request.params.id;
+        let deck = util.parseIdentifier(deckId);
+        deckDB.get(deck.id).then((existingDeck) => {
+            if (!existingDeck) return boom.notFound();
+
+            return deckDB.getRootDecks(deckId)
+            .then((roots) => {
+                return roots;
+                // TODO dead code
+                return Promise.all(roots.map((r) => {
+                    return deckDB.findPath(util.toIdentifier(r), deckId)
+                    .then((path) => {
+                        let [leaf] = path.slice(-1);
+                        leaf.id = deck.id;
+                        leaf.revision = deck.revision || r.using;
+                        return path;
+                    });
+                })).then((paths) => paths.map(util.toPlatformPath));
+            });
+
+        }).then(reply).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
     getSlideUsage: function(request, reply) {
         let slideId = request.params.id;
         let slide = util.parseIdentifier(slideId);
@@ -1679,6 +1817,35 @@ let self = module.exports = {
 
     },
 
+    getSlideRootDecks: function(request, reply){
+        let slideId = request.params.id;
+        let slide = util.parseIdentifier(slideId);
+        slideDB.get(slide.id).then((existingSlide) => {
+            if (!existingSlide) return boom.notFound();
+
+            return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
+                return roots;
+                // TODO dead code
+                return Promise.all(roots.map((r) => {
+                    // path method does not return the slide id, so we take it from the root
+                    return deckDB.findPath(util.toIdentifier(r), slideId, 'slide')
+                    .then((path) => {
+                        let [leaf] = path.slice(-1);
+                        leaf.id = slide.id;
+                        leaf.revision = slide.revision || r.using;
+                        leaf.kind = 'slide';
+
+                        return path;
+                    });
+                })).then((paths) => paths.map(util.toPlatformPath));
+
+            });
+        }).then(reply).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
     getDeckTags: function(request, reply){
         deckDB.getTags(request.params.id).then( (tagsList) => {
             if(!tagsList){
@@ -1694,6 +1861,7 @@ let self = module.exports = {
     },
 
     updateDeckTags: function(request, reply) {
+        let userId = request.auth.credentials.userid;
         let operation = (request.payload.operation === 'add') ? deckDB.addTag.bind(deckDB) : deckDB.removeTag.bind(deckDB);
 
         operation(request.params.id, request.payload.tag).then( (tagsList) => {
@@ -1703,7 +1871,7 @@ let self = module.exports = {
             else{
                 // send tags to tag-service
                 if(tagsList && tagsList.length > 0){
-                    tagService.upload(tagsList, request.payload.user).catch( (e) => {
+                    tagService.upload(tagsList, userId).catch( (e) => {
                         request.log('warning', 'Could not save tags to tag-service for deck ' + request.params.id + ': ' + e.message);
                     });
                 }
@@ -1716,17 +1884,29 @@ let self = module.exports = {
         });
     },
 
-    replaceDeckTags: function(request, reply){
-        deckDB.replaceTags(request.params.id, request.payload).then( (tagsInserted) => {
-            if(!tagsInserted){
-                reply(boom.notFound());
-            } else {
-                reply(tagsInserted);
-            }
-        }).catch((err) => {
+    replaceDeckTags: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+
+        let deckId = request.params.id;
+        let rootDeckId = request.payload.top_root_deck;
+
+        authorizeUser(userId, deckId, rootDeckId).then((boomError) => {
+            if (boomError) return boomError;
+
+            return deckDB.replaceTags(deckId, request.payload.tags, userId, rootDeckId).then((tagsInserted) => {
+                if (!tagsInserted) {
+                    // should never come here, but if it does it is probably correct
+                    return boom.notFound();
+                }
+
+                return tagsInserted;
+            });
+
+        }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
         });
+
     },
 
     getSlideTags: function(request, reply){
@@ -1744,6 +1924,7 @@ let self = module.exports = {
     },
 
     updateSlideTags: function(request, reply) {
+        let userId = request.auth.credentials.userid;
         let operation = (request.payload.operation === 'add') ? slideDB.addTag.bind(slideDB) : slideDB.removeTag.bind(slideDB);
 
         operation(request.params.id, request.payload.tag).then( (tagsList) => {
@@ -1753,7 +1934,7 @@ let self = module.exports = {
             else{
                 // send tags to tag-service
                 if(tagsList && tagsList.length > 0){
-                    tagService.upload(tagsList, request.payload.user).catch( (e) => {
+                    tagService.upload(tagsList, userId).catch( (e) => {
                         request.log('warning', 'Could not save tags to tag-service for slide ' + request.params.id + ': ' + e.message);
                     });
                 }
@@ -1776,6 +1957,45 @@ let self = module.exports = {
             }
         }).catch( (error) => {
             request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    }, 
+
+    getDeckDeepUsage: function(request, reply){
+        deckDB.getDeepUsage(request.params.id, 'deck', request.query.keepVisibleOnly).then( (usage) => {
+            if(!usage){
+                reply(boom.notFound());
+            } else {
+                reply(usage);
+            }
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
+    getSlideDeepUsage: function(request, reply){
+        deckDB.getDeepUsage(request.params.id, 'slide', request.query.keepVisibleOnly).then( (usage) => {
+            if(!usage){
+                reply(boom.notFound());
+            } else {
+                reply(usage);
+            }
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    }, 
+
+    getForkGroup: function(request, reply){
+        deckDB.computeForkGroup(request.params.id).then( (forkGroup) => {
+            if(_.isEmpty(forkGroup)){
+                reply(boom.notFound());
+            } else {
+                reply(forkGroup);
+            }
+        }).catch( (err) => {
+            request.log('error', err);
             reply(boom.badImplementation());
         });
     }
@@ -1804,22 +2024,4 @@ function authorizeUser(userId, deckId, rootDeckId) {
         // return nothing if all's ok :)
     });
 
-}
-
-//creates a thumbnail for a given slide
-function createThumbnail(slideContent, slideId) {
-    let rp = require('request-promise-native');
-    let he = require('he');
-
-    let encodedContent = he.encode(slideContent, {allowUnsafeSymbols: true});
-
-    rp.post({
-        uri: Microservices.file.uri + '/slideThumbnail/' + slideId, //is created as slideId.jpeg
-        body: encodedContent,
-        headers: {
-            'Content-Type': 'text/plain'
-        }
-    }).catch((e) => {
-        console.log('Can not create thumbnail of a slide: ' + e.message);
-    });
 }
