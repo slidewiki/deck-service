@@ -4,14 +4,12 @@
 
 describe('REST API', () => {
 
-    const config = require('../configuration'),
-		  // no jwt, for now
-        //jwt = require('../controllers/jwt'),
-        db = require('../database/helper');
-    let server;
-    //let jwtHeader, userid;
+    const JWT = require('jsonwebtoken');
+    const secret = 'NeverShareYourSecret';
     
-    before(() => { // TODO cleanDatabase
+    let server;
+
+    before((done) => {
         //Clean everything up before doing new tests
         Object.keys(require.cache).forEach((key) => delete require.cache[key]);
         require('chai').should();
@@ -24,67 +22,37 @@ describe('REST API', () => {
         let plugins = [
             require('hapi-auth-jwt2')
         ];
-        return server.register(plugins, (err) => {
+        server.register(plugins, (err) => {
             if (err) {
                 console.error(err);
                 global.process.exit();
             } else {
                 server.auth.strategy('jwt', 'jwt', {
-                    key: 'dummy',
+                    key: secret,
                     validateFunc: (decoded, request, callback) => {callback(null, true);},
                     verifyOptions: {
                         ignoreExpiration: true
-                    }
+                    },
+                    headerKey: '----jwt----',
                 });
                 
-                //return db.cleanDatabase(config.MongoDB.SLIDEWIKIDATABASE).then(() => {
-                    /*
-                    let options = {
-                        method: 'POST',
-                        url: '/register',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        payload: fullData
-                    };
-                    return server.inject(options)
-                        .then((response) => {
-                            return server.inject({
-                                method: 'GET',
-                                url: '/user/activate/'+fullData.email+'/'+JSON.parse(response.payload).secret,
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                }
-                            });
-                    });
-                }).then(() => {
-                    let options = {
-                        method: 'POST',
-                        url: '/login',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        payload: {email: fullData.email, password: fullData.password}
-                    };
-                    return server.inject(options);
-                }).then((response) => {
-                    jwtHeader = response.headers['----jwt----'];
-                    let payload = JSON.parse(response.payload);
-                    userid = payload.userid;
+                /*
+                const config = require('../configuration'),
+                    db = require('../database/helper');
+                db.cleanDatabase(config.MongoDB.SLIDEWIKIDATABASE);
                 */
-                //});
-                return server.start(() => {
+                
+                server.start(() => {
                     server.log('info', 'Server started at ' + server.info.uri);
                     require('../routes.js')(server);
+                    done();
                 });
             }
         });
     });
 
     const minimumDeckData = {
-        user: '1',
-        title: ' ', // warning appears if no title is set, temporary fix
-        license: 'CC0'
+        title: 'new deck', // warning appears if no title is set, temporary fix
     };
     const fullDeckData = {
         description: 'dummy',
@@ -100,8 +68,7 @@ describe('REST API', () => {
                 tagName: 'tagTwo'
             }
         ],
-        title: 'Dummy',
-        user: '2',
+        title: 'new deck',
         root_deck: '1',
         parent_deck: {
             id: '1',
@@ -115,7 +82,6 @@ describe('REST API', () => {
             title: 'Dummy',
             speakernotes: 'dummy'
         },
-        license: 'CC0',
         theme: 'dummy',
         editors: {
             groups: [
@@ -137,11 +103,15 @@ describe('REST API', () => {
         }
     };
     
+    let authToken1 = JWT.sign( { userid: 1 }, secret );
+    let authToken2 = JWT.sign( { userid: 2 }, secret );
+    
     let options = {
         method: 'POST',
         url: '/deck/', // + 'new'
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            '----jwt----': '',
         }
     };
     let options2 = {
@@ -150,21 +120,23 @@ describe('REST API', () => {
                        // + '{id}/revisions', + '{id}/revisionCount', + '{id}/slides?limit={string}'
                        // + '{id}/slideCount'
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
         }
     };   
     let options3 = {
         method: 'PUT',
-        url: '/deck/', // + '{id}/fork', '{id}/tags'
+        url: '/deck/', // + '{id}/fork'
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            '----jwt----': '',
         }
     };        
     
     context('when creating a deck', () => {
         it('it should reply it for minimum data', () => {
-            options.payload = minimumDeckData;
             let opt = JSON.parse(JSON.stringify(options));
+            opt.payload = minimumDeckData;
+            opt.headers['----jwt----'] = authToken1;
             opt.url += 'new';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
@@ -174,7 +146,7 @@ describe('REST API', () => {
                 payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'lastUpdate', 'revisions', 'id', 'editors', 'license', 'contributors');
                 payload.user.should.equal(1);
                 payload.id.should.equal(1);
-                payload.license.should.equal('CC0');
+                payload.license.should.equal('CC BY-SA');
                 payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                 payload.editors.users.should.be.an('array').and.have.length(0);
                 payload.editors.groups.should.be.an('array').and.have.length(0);
@@ -192,8 +164,9 @@ describe('REST API', () => {
             });
         });
         it('it should reply it for full data', () => {
-            options.payload = fullDeckData;
             let opt = JSON.parse(JSON.stringify(options));
+            opt.payload = fullDeckData;
+            opt.headers['----jwt----'] = authToken2;
             opt.url += 'new';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
@@ -203,7 +176,7 @@ describe('REST API', () => {
                 payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'lastUpdate', 'revisions', 'id', 'editors', 'license', 'contributors');
                 payload.user.should.equal(2);
                 payload.id.should.equal(2);
-                payload.license.should.equal('CC0');
+                payload.license.should.equal('CC BY-SA');
                 payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                 payload.editors.users.should.be.an('array').and.have.length(2);
                 payload.editors.groups.should.be.an('array').and.have.length(1);
@@ -217,20 +190,20 @@ describe('REST API', () => {
                 revision.user.should.equal(2);
                 revision.id.should.equal(1);
                 revision.usage.should.be.an('array').and.have.length(1);
-                revision.tags.should.be.an('array').and.have.length(2);;
+                revision.tags.should.be.an('array').and.have.length(2);
             });
         });
-        it('it should return 400 if required input is missing', () => {
-            options.payload = {};
+        it('it should return 401 if JWT-login is wrong', () => {
             let opt = JSON.parse(JSON.stringify(options));
+            opt.payload = {};
             opt.url += 'new';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(400);
+                response.statusCode.should.equal(401);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
                 payload.should.be.an('object').and.contain.keys('statusCode', 'error');
-                payload.error.should.equal('Bad Request');
+                payload.error.should.equal('Unauthorized');
             })
         });
     });
@@ -248,7 +221,7 @@ describe('REST API', () => {
                                                                'latestRevisionId', 'revisionId', 'language');
                 payload._id.should.equal(2);
                 payload.user.should.equal(2);
-                payload.license.should.equal('CC0');
+                payload.license.should.equal('CC BY-SA');
                 payload.latestRevisionId.should.equal(1);
                 payload.revisionId.should.equal(1);
                 payload.language.should.equal('en');
@@ -282,53 +255,11 @@ describe('REST API', () => {
         });               
     });
     
-    context('when replacing the tags of a deck', () => {
-        it('it should reply the deck with replaced tags', () => {
-            options3.payload = [
-                {
-                    tagName: 'replacedTag'
-                }
-            ];
-            let opt = JSON.parse(JSON.stringify(options3));
-            opt.url += '2/tags';
-            return server.inject(opt).then((response) => {
-                response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(200);
-                response.payload.should.be.a('string');
-                let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('_id', 'user', 'timestamp', 'lastUpdate', 'license', 'revisions');
-                payload.revisions.should.be.an('array').and.have.length(1);
-                let revision = payload.revisions[0];
-                revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'lastUpdate', 'user', 'tags');
-                revision.user.should.equal(2);
-                revision.id.should.equal(1);
-                revision.usage.should.be.an('array').and.have.length(1);
-                revision.tags.should.be.an('array').and.have.length(1);
-                revision.tags[0].should.be.an('object').and.contain.keys('tagName');
-                revision.tags[0].tagName.should.equal('replacedTag');
-            })
-        });
-        it('it should return 404 if not an existing deck', () => {
-            options3.payload = [];
-            let opt = JSON.parse(JSON.stringify(options3));
-            opt.url += 'dummy/tags'; // string works
-            return server.inject(opt).then((response) => {
-                response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(404);
-                response.payload.should.be.a('string');
-                let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('statusCode', 'error');
-                payload.error.should.equal('Not Found');
-            });
-        });  
-    });  
-    
     context('when creating a fork for a deck', () => {
         it('it should reply the new root deck and id map', () => {
-            options3.payload = {
-                user: '1'
-            };
             let opt = JSON.parse(JSON.stringify(options3));
+            opt.payload = {};
+            opt.headers['----jwt----'] = authToken1;
             opt.url += '2/fork';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
@@ -340,10 +271,11 @@ describe('REST API', () => {
                 payload.id_map.should.be.an('object').and.contain.keys('2-1');
                 payload.id_map['2-1'].should.be.a('string').and.equal('3-1');
             }).then((response) => {
-                options3.payload = {
+                let opt = JSON.parse(JSON.stringify(options3));
+                opt.payload = {
                     user: '2'
                 };
-                let opt = JSON.parse(JSON.stringify(options3));
+                opt.headers['----jwt----'] = authToken2;
                 opt.url += '2/fork';
                 return server.inject(opt).then((response) => {
                     response.should.be.an('object').and.contain.keys('statusCode','payload');
@@ -358,10 +290,9 @@ describe('REST API', () => {
             });
         });
         it('it should return 403 if not a valid deck to fork from', () => { // QUESTION why not 404?
-            options3.payload = {
-                    user: '1'
-            };
             let opt = JSON.parse(JSON.stringify(options3));
+            options3.payload = {};
+            opt.headers['----jwt----'] = authToken1;
             opt.url += 'dummy/fork'; // string works
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
@@ -372,17 +303,17 @@ describe('REST API', () => {
                 payload.error.should.equal('Forbidden');
             });
         });
-        it('it should return 400 if required input is missing', () => {
-            options3.payload = {};
+        it('it should return 401 if JWT-login is wrong', () => {
             let opt = JSON.parse(JSON.stringify(options3));
+            options3.payload = {};
             opt.url += '2/fork';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(400);
+                response.statusCode.should.equal(401);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
                 payload.should.be.an('object').and.contain.keys('statusCode', 'error');
-                payload.error.should.equal('Bad Request');
+                payload.error.should.equal('Unauthorized');
             })
         });
     });
