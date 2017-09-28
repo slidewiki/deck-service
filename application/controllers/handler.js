@@ -1998,7 +1998,37 @@ let self = module.exports = {
             request.log('error', err);
             reply(boom.badImplementation());
         });
-    }
+    },
+
+    regenThumbnails: function(request, reply) {
+        let deckId = request.params.id;
+
+        deckDB.getFlatSlides(deckId).then((deckTree) => {
+            if (!deckTree) return reply(boom.notFound());
+
+            async.concatSeries(deckTree.children, (slide, done) => {
+                if (!slide.content) {
+                    slide.content = `<h2>${slide.title}</h2>`;
+                }
+
+                fileService.createThumbnail(slide.content, slide.id).then(() => {
+                    done(null, { id: slide.id, status: 'OK' });
+                }).catch((err) => {
+                    done(null, { id: slide.id, status: err.message });
+                });
+            }, (err, results) => {
+                if (err) {
+                    request.log('error', err);
+                    reply(boom.badImplementation());
+                } else {
+                    reply(results);
+                }
+            });
+
+        });
+
+    },
+
 };
 
 // TODO move these to services / utility libs
