@@ -124,7 +124,7 @@ describe('REST API', () => {
                     revision.should.be.an('object').and.contain.keys('timestamp', 'user', 'tags');
                     revision.user.should.equal(1);
                     revision.tags.should.be.an('array').and.have.length(1);
-                })
+                });
             });
         });
         it('it should return 404 if not an existing deck', () => {   
