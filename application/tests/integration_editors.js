@@ -156,7 +156,7 @@ describe('REST API', () => {
     });
     
     context('when getting permissions of a user for a deck', () => {
-        it('it should reply all permissions', () => {
+        it('it should reply them', () => {
             let opt = JSON.parse(JSON.stringify(options));
             opt.headers['----jwt----'] = authToken;
             opt.url += deckID + '-1' + '/permissions';
@@ -231,9 +231,9 @@ describe('REST API', () => {
         });
     });
     
-    context('when replacing the editors of a deck', () => {
+    context('when replacing the editors of a deck // BUG', () => { // internal server error! // TODO
         /*
-        it('it should reply ...', () => { //TODO
+        it('it should reply the new editors', () => { // response not known
             let opt = JSON.parse(JSON.stringify(options2));
             opt.payload = {
                 editors: {
@@ -249,21 +249,17 @@ describe('REST API', () => {
             opt.headers['----jwt----'] = authToken;
             opt.url += deckID + '/editors';
             return server.inject(opt).then((response) => {
-                console.log(response.payload); // response not known
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'license', 'revisions');
-                payload.user.should.equal(1);
-                payload.revisions.should.be.an('array').and.have.length(1);
-                let revision = payload.revisions[0];
-                revision.should.be.an('object').and.contain.keys('timestamp', 'user', 'tags');
-                revision.user.should.equal(1);
-                revision.tags.should.be.an('array').and.have.length(1);
+                payload.should.be.an('object').and.contain.keys('editors');
+                payload.editors.should.be.an('object').and.contain.keys('groups', 'users');
+                payload.editors.groups.should.be.an('array').and.have.length(0);
+                payload.editors.users.should.be.an('array').and.have.length(1);
             });
         });
-        it('it should return 404 if not an existing deck', () => {   //TODO
+        it('it should return 404 if not an existing deck', () => { // might reply 200
             let opt = JSON.parse(JSON.stringify(options2));
             opt.payload = {
                 editors: {
@@ -282,7 +278,7 @@ describe('REST API', () => {
                 payload.error.should.equal('Not Found');
             });
         });  
-        */ // TODO internal server error!
+        */
         it('it should return 401 if JWT-login is wrong', () => {
             let opt = JSON.parse(JSON.stringify(options2));
             opt.payload = {

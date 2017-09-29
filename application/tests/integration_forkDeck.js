@@ -50,10 +50,6 @@ describe('REST API', () => {
             }
         });
     });
-
-    const deckData = {
-        title: 'new deck',
-    };
     
     let authToken = JWT.sign( { userid: 1 }, secret );
     let authToken2 = JWT.sign( { userid: 2 }, secret );
@@ -82,7 +78,9 @@ describe('REST API', () => {
             return server.inject({
                 method: 'POST',
                 url: '/deck/new',
-                payload: deckData,
+                payload: {
+                    title: 'new deck',
+                },
                 headers: {
                     'Content-Type': 'application/json',
                     '----jwt----': authToken,
@@ -185,7 +183,7 @@ describe('REST API', () => {
                 payload[0].user.should.equal(1);
             });
         });
-        it('it should reply the correct count of forks', () => {
+        it('it should reply the count of forks', () => {
             let opt = JSON.parse(JSON.stringify(options2));
             opt.url += deckID + '/forkCount';
             return server.inject(opt).then((response) => {
@@ -194,7 +192,7 @@ describe('REST API', () => {
                 response.payload.should.be.a('string').and.equal('2');
             });
         });
-        it('it should reply the correct count of forks for a user', () => {
+        it('it should reply the count of forks for a user', () => {
             let opt = JSON.parse(JSON.stringify(options2));
             opt.url += deckID + '/forkCount?user=1';
             return server.inject(opt).then((response) => {
