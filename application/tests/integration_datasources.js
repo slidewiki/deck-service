@@ -79,7 +79,7 @@ describe('REST API', () => {
     let deckID; // id of the newly greated deck
     let slideID; // id of the newly greated slide
     
-    context('when replacing the datasources of a deck // BUG', () => { // no 404 response // TODO
+    context('when replacing the datasources of a slide', () => {  //BUG //TODO
         it('it should reply the new datasources', () => {
             return server.inject({
                 method: 'POST',
@@ -122,7 +122,7 @@ describe('REST API', () => {
                     payload.user.should.equal(1);
                     slideID = String(payload.id);
                     payload.license.should.equal('CC BY-SA');
-                    /* TODO append slide to deck
+                    /* //TODO append slide to deck
                     return server.inject({
                     method: 'PUT',
                     url: '/decktree/node/move',
@@ -175,8 +175,7 @@ describe('REST API', () => {
                 });
             });
         });
-        /* FAILING still get response with code 200
-        it('it should return 404 if not an existing deck', () => {   
+        it('it should return 404 if not an existing slide', () => { // still get response with code 200
             let opt = JSON.parse(JSON.stringify(options));
             opt.payload = [{
                 type: 'book',
@@ -197,7 +196,6 @@ describe('REST API', () => {
                 payload.error.should.equal('Not Found');
             });
         });  
-        */
         it('it should return 401 if JWT-login is wrong', () => {
             let opt = JSON.parse(JSON.stringify(options));
             opt.payload = [{
@@ -234,8 +232,8 @@ describe('REST API', () => {
         });
     });  
     
-    context('when getting datasources of a slide // BUG', () => { // returns empty but should have one source // TODO
-        it('it should reply them', () => {
+    context('when getting datasources of a slide', () => { //BUG //TODO
+        it('it should reply them', () => { // returns empty but should have one source
             let opt = JSON.parse(JSON.stringify(options2));
             opt.url += slideID + '/datasources';
             return server.inject(opt).then((response) => {
@@ -248,8 +246,7 @@ describe('REST API', () => {
                 payload.revisionOwner.should.equal(1);
             });
         });
-        /* same as standard response
-        it('it should reply the count for countOnly', () => {
+        it('it should reply the count for countOnly', () => { // returns the same as countOnly=false
             let opt = JSON.parse(JSON.stringify(options2));
             opt.url += slideID + '/datasources?countOnly=true';
             return server.inject(opt).then((response) => {
@@ -260,9 +257,7 @@ describe('REST API', () => {
                 // TODO assertion
             });
         });
-        */
-        /* return 500 - internal server error!
-        it('it should return 404 if no deck exists for given id', () => {
+        it('it should return 404 if no slide exists for given id', () => { // returns 500 - internal server error
             let opt = JSON.parse(JSON.stringify(options2));
             opt.url += 'dummy/datasources'; // number required?
             return server.inject(opt).then((response) => {
@@ -274,11 +269,10 @@ describe('REST API', () => {
                 payload.error.should.equal('Not Found');
             });
         });  
-        */
     });
-    
-    context('when getting datasources of a deck // BUG', () => { // returns empty but should have one source // TODO
-        it('it should reply them', () => {
+    /* appending the slide has to work first, could also add datasources to auto-generated slide but getting doesnt work either way
+    context('when getting datasources of a deck', () => { //BUG //TODO
+        it('it should reply them', () => { // returns empty but should have one source
             let opt = JSON.parse(JSON.stringify(options3));
             opt.url += deckID + '/datasources';
             return server.inject(opt).then((response) => {
@@ -291,8 +285,7 @@ describe('REST API', () => {
                 payload.revisionOwner.should.equal(1);
             });
         });
-        /*
-        it('SLIDE TEST PLEASE DELETE AFTER SLIDE APPENDING WORKS', () => { // only for testing!
+        it('SLIDE TEST PLEASE DELETE AFTER SLIDE APPENDING WORKS', () => { // only for test output!
             let opt = JSON.parse(JSON.stringify(options3));
             opt.url += deckID + '/slides';
             return server.inject(opt).then((response) => {
@@ -303,9 +296,7 @@ describe('REST API', () => {
                 let payload = JSON.parse(response.payload);
             });
         });
-        */
-        /* same as standard response
-        it('it should reply the count for countOnly', () => {
+        it('it should reply the count for countOnly', () => { // returns the same as countOnly=false
             let opt = JSON.parse(JSON.stringify(options3));
             opt.url += deckID + '/datasources?countOnly=true';
             return server.inject(opt).then((response) => {
@@ -316,7 +307,6 @@ describe('REST API', () => {
                 // TODO assertion
             });
         });
-        */
         it('it should return 404 if no deck exists for given id', () => {
             let opt = JSON.parse(JSON.stringify(options3));
             opt.url += 'dummy/datasources'; // number required?
@@ -330,4 +320,5 @@ describe('REST API', () => {
             });
         });               
     });
+    */
 });

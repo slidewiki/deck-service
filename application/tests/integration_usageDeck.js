@@ -72,8 +72,8 @@ describe('REST API', () => {
     
 	let deckID; // id of the newly created deck
     
-    context('when getting usage for a deck // BUG', () => { // response is empty // TODO
-        it('it should reply the parent decks', () => {
+    context('when getting usage for a deck', () => { //BUG //TODO
+        it('it should reply the parent decks', () => { // response is empty array
             return server.inject({
                 method: 'POST',
                 url: '/deck/new',
@@ -105,7 +105,7 @@ describe('REST API', () => {
                     response.statusCode.should.equal(200);
                     response.payload.should.be.a('string');
                     let payload = JSON.parse(response.payload);
-                    //payload.should.be.an('array').and.have.length(1); // FAILING
+                    payload.should.be.an('array').and.have.length(1); // FAILING
                 });
             });
         });
@@ -132,7 +132,6 @@ describe('REST API', () => {
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                console.log(payload);
                 payload.should.be.an('array').and.have.length(1);
             });
         });
@@ -150,21 +149,20 @@ describe('REST API', () => {
         });               
     });
     
-    context('when getting deep usage of a deck // BUG', () => { // response empty // TODO
-        it('it should reply it', () => {
+    context('when getting deep usage of a deck', () => { //BUG //TODO
+        it('it should reply it', () => { // response is empty array
             let opt = JSON.parse(JSON.stringify(options));
-            opt.url += '1' + '/deepUsage'; // TODO find an id
+            opt.url += '1' + '/deepUsage'; // TODO maybe choose other id
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
                 console.log(payload);
-                //payload.should.be.an('array').and.have.length(1); // FAILING
+                payload.should.be.an('array').and.have.length(1); // FAILING
             });
         });
-        /* FAILING still get response with code 200
-        it('it should return 404 if no deck exists for given id', () => {
+        it('it should return 404 if no deck exists for given id', () => { // still get same response with code 200
             let opt = JSON.parse(JSON.stringify(options));
             opt.url += '999/deepUsage'; // number required?
             return server.inject(opt).then((response) => {
@@ -177,6 +175,5 @@ describe('REST API', () => {
                 payload.error.should.equal('Not Found');
             });
         });  
-        */
     });
 });

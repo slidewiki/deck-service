@@ -143,9 +143,9 @@ describe('REST API', () => {
                 payload.editors.users.should.be.an('array').and.have.length(0);
                 payload.editors.groups.should.be.an('array').and.have.length(0);
                 payload.contributors.should.be.an('array').and.have.length(1);
-                payload.contributors[0].should.be.an('object').and.contain.keys('user'); // 'count' not used
+                payload.contributors[0].should.be.an('object').and.contain.keys('user');
                 payload.contributors[0].user.should.equal(1);
-                //payload.contributors[0].count.should.equal(1);
+                //payload.contributors[0].count.should.equal(1); // 'count' not used
                 payload.revisions.should.be.an('array').and.have.length(1);
                 let revision = payload.revisions[0];
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'user', 'tags');
@@ -173,9 +173,9 @@ describe('REST API', () => {
                 payload.editors.users.should.be.an('array').and.have.length(2);
                 payload.editors.groups.should.be.an('array').and.have.length(1);
                 payload.contributors.should.be.an('array').and.have.length(1);
-                payload.contributors[0].should.be.an('object').and.contain.keys('user'); // 'count' not used
+                payload.contributors[0].should.be.an('object').and.contain.keys('user');
                 payload.contributors[0].user.should.equal(2);
-                //payload.contributors[0].count.should.equal(1);
+                //payload.contributors[0].count.should.equal(1); // 'count' not used
                 payload.revisions.should.be.an('array').and.have.length(1);
                 let revision = payload.revisions[0];
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'user', 'tags');
@@ -220,9 +220,9 @@ describe('REST API', () => {
                 payload.editors.users.should.be.an('array').and.have.length(2);
                 payload.editors.groups.should.be.an('array').and.have.length(1);
                 payload.contributors.should.be.an('array').and.have.length(1);
-                payload.contributors[0].should.be.an('object').and.contain.keys('user'); // 'count' not used
+                payload.contributors[0].should.be.an('object').and.contain.keys('user');
                 payload.contributors[0].user.should.equal(2);
-                //payload.contributors[0].count.should.equal(2);
+                //payload.contributors[0].count.should.equal(2); // 'count' not used
                 payload.revisions.should.be.an('array').and.have.length(1);
                 let revision = payload.revisions[0];
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'lastUpdate', 'user', 'tags');
@@ -246,7 +246,7 @@ describe('REST API', () => {
         });               
     });
     
-    context('when appending a deck to a deck', () => {
+    context('when appending a deck to a deck', () => { //BUG //TODO
         it('it should reply it', () => {
             let opt = JSON.parse(JSON.stringify(options));
             opt.url = '/decktree/node/create';
@@ -265,7 +265,6 @@ describe('REST API', () => {
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                console.log(payload);
                 payload.should.be.an('object').and.contain.keys('id', 'title', 'type', 'children');
             });
         });
@@ -283,13 +282,13 @@ describe('REST API', () => {
                 payload.children.should.be.an('array').and.have.length(2);
             });
         });
-        it('it should merge the slides and update /slideCount // BUG', () => { // after appending decks /slides return 2 slides but count returns 1
+        it('it should merge the slides and update /slideCount', () => { // after appending decks /slides return 2 slides but count returns 1
             let opt = JSON.parse(JSON.stringify(options2));
             opt.url += deckID + '/slideCount';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
                 response.statusCode.should.equal(200);
-                //response.payload.should.be.a('string').and.equal('2'); // FAILING
+                response.payload.should.be.a('string').and.equal('2'); // FAILING
             });
         });
         it('it should return 400 if input is invalid', () => {
@@ -327,116 +326,5 @@ describe('REST API', () => {
                 payload.error.should.equal('Unauthorized');
             });
         });
-    });
-    // split in other file
-    context('when getting the revisions and the revision count for a deck', () => {
-        it('it should reply all revisions', () => {
-            let opt = JSON.parse(JSON.stringify(options2));
-            opt.url += deckID + '/revisions';
-            return server.inject(opt).then((response) => {
-                response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(200);
-                response.payload.should.be.a('string');
-                let payload = JSON.parse(response.payload);
-                payload.should.be.an('array').and.have.length(1);
-                payload[0].should.be.an('object').and.contain.keys('id', 'user', 'timestamp', 'lastUpdate', 'changesCount');
-                payload[0].id.should.equal(1);
-                payload[0].user.should.equal(2);
-            });
-        });
-        it('it should reply the count of revisions', () => {
-            let opt = JSON.parse(JSON.stringify(options2));
-            opt.url += deckID + '/revisionCount';
-            return server.inject(opt).then((response) => {
-                response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(200);
-                response.payload.should.be.a('string').and.equal('1');
-            });
-        });
-        it('it should return 404 if not an existing deck', () => {
-            let opt = JSON.parse(JSON.stringify(options2));
-            opt.url += '9999/revisions'; // number required
-            return server.inject(opt).then((response) => {
-                response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(404);
-                response.payload.should.be.a('string');
-                let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('statusCode', 'error');
-                payload.error.should.equal('Not Found');
-            }).then((response) => {
-                let opt = JSON.parse(JSON.stringify(options2));
-                opt.url += 'dummy/revisionCount'; // string works
-                return server.inject(opt).then((response) => {
-                    response.should.be.an('object').and.contain.keys('statusCode','payload');
-                    response.statusCode.should.equal(404);
-                    response.payload.should.be.a('string');
-                    let payload = JSON.parse(response.payload);
-                    payload.should.be.an('object').and.contain.keys('statusCode', 'error');
-                    payload.error.should.equal('Not Found');
-                });
-            });
-        });  
-    });
-    // split in other file
-    context('when getting the slides and the slide count for a deck', () => {
-        it('it should reply all slides', () => {
-            let opt = JSON.parse(JSON.stringify(options2));
-            opt.url += deckID + '/slides';
-            return server.inject(opt).then((response) => {
-                response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(200);
-                response.payload.should.be.a('string');
-                let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('id', 'user', 'children', 'type');
-                payload.user.should.equal('2');
-                payload.type.should.equal('deck');
-                payload.children.should.be.an('array').and.have.length(2); // only while in this file
-            });
-        });
-        it('it should reply limited slides if limit is set', () => { // QUESTION why are limit and offset strings?
-            let opt = JSON.parse(JSON.stringify(options2));
-            opt.url += deckID + '/slides?limit=0';
-            return server.inject(opt).then((response) => {
-                response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(200);
-                response.payload.should.be.a('string');
-                let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('id', 'user', 'children');
-                payload.user.should.equal('2');
-                payload.children.should.be.an('array').and.have.length(0);
-            });
-        });
-        it('it should reply the count of slides', () => {
-            let opt = JSON.parse(JSON.stringify(options2));
-            opt.url += deckID + '/slideCount';
-            return server.inject(opt).then((response) => {
-                response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(200);
-                response.payload.should.be.a('string').and.equal('1'); // only while in this file
-            });
-        });
-        it('it should return 404 if not an existing deck', () => {
-            let opt = JSON.parse(JSON.stringify(options2));
-            opt.url += 'dummy/slides'; // string works
-            return server.inject(opt).then((response) => {
-                response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(404);
-                response.payload.should.be.a('string');
-                let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('statusCode', 'error');
-                payload.error.should.equal('Not Found');
-            }).then((response) => {
-                let opt = JSON.parse(JSON.stringify(options2));
-                opt.url += 'dummy/slideCount'; // string works
-                return server.inject(opt).then((response) => {
-                    response.should.be.an('object').and.contain.keys('statusCode','payload');
-                    response.statusCode.should.equal(404);
-                    response.payload.should.be.a('string');
-                    let payload = JSON.parse(response.payload);
-                    payload.should.be.an('object').and.contain.keys('statusCode', 'error');
-                    payload.error.should.equal('Not Found');
-                });
-            });
-        });  
     });
 });

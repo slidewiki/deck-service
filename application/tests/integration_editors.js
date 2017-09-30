@@ -117,9 +117,9 @@ describe('REST API', () => {
                 payload.editors.users.should.be.an('array').and.have.length(2);
                 payload.editors.groups.should.be.an('array').and.have.length(1);
                 payload.contributors.should.be.an('array').and.have.length(1);
-                payload.contributors[0].should.be.an('object').and.contain.keys('user'); // 'count' not used
+                payload.contributors[0].should.be.an('object').and.contain.keys('user');
                 payload.contributors[0].user.should.equal(1);
-                //payload.contributors[0].count.should.equal(1);
+                //payload.contributors[0].count.should.equal(1); // 'count' not used
             }).then((response) => {
                 let opt = JSON.parse(JSON.stringify(options));
                 opt.url += deckID + '/editors';
@@ -231,9 +231,8 @@ describe('REST API', () => {
         });
     });
     
-    context('when replacing the editors of a deck // BUG', () => { // internal server error! // TODO
-        /*
-        it('it should reply the new editors', () => { // response not known
+    context('when replacing the editors of a deck', () => { //BUG //TODO
+        it('it should reply the new editors', () => { // response empty, code 204
             let opt = JSON.parse(JSON.stringify(options2));
             opt.payload = {
                 editors: {
@@ -259,7 +258,7 @@ describe('REST API', () => {
                 payload.editors.users.should.be.an('array').and.have.length(1);
             });
         });
-        it('it should return 404 if not an existing deck', () => { // might reply 200
+        it('it should return 404 if not an existing deck', () => { // might reply 200/204, internal server error
             let opt = JSON.parse(JSON.stringify(options2));
             opt.payload = {
                 editors: {
@@ -278,7 +277,6 @@ describe('REST API', () => {
                 payload.error.should.equal('Not Found');
             });
         });  
-        */
         it('it should return 401 if JWT-login is wrong', () => {
             let opt = JSON.parse(JSON.stringify(options2));
             opt.payload = {
