@@ -246,7 +246,7 @@ describe('REST API', () => {
         });               
     });
     
-    context('when appending a deck to a deck', () => { //BUG //TODO
+    context('when appending a deck to a deck', () => { //BUG //TODO //TODO check if editors/contributors, datasources, etc change
         it('it should reply it', () => {
             let opt = JSON.parse(JSON.stringify(options));
             opt.url = '/decktree/node/create';
