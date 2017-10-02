@@ -85,20 +85,20 @@ describe('REST API', () => {
         theme: 'dummy',
         editors: {
             groups: [
-              {
-                id: '1',
-                joined: '1111-11-11'
-              }
+                {
+                    id: '1',
+                    joined: '1111-11-11'
+                }
             ],
             users: [
-              {
-                id: '3',
-                joined:'1111-11-11'
-              },
-              {
-                id: '4',
-                joined:'1111-11-11'
-              }
+                {
+                    id: '3',
+                    joined:'1111-11-11'
+                },
+                {
+                    id: '4',
+                    joined:'1111-11-11'
+                }
             ]
         }
     };

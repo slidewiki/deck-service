@@ -71,7 +71,7 @@ describe('REST API', () => {
         }
     };
     
-	let deckID; // id of the newly created deck
+    let deckID; // id of the newly created deck
     
     context('when creating a fork for a deck', () => {
         it('it should reply the new root deck and id map', () => {
@@ -95,7 +95,7 @@ describe('REST API', () => {
                 deckID = String(payload.id);
                 payload.license.should.equal('CC BY-SA');
                 payload.revisions.should.be.an('array').and.have.length(1);
-            }).then((response) => {
+            }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
                 opt.payload = {};
                 opt.headers['----jwt----'] = authToken;
@@ -108,7 +108,7 @@ describe('REST API', () => {
                     payload.should.be.an('object').and.contain.keys('root_deck', 'id_map');
                     payload.root_deck.should.be.a('string').and.equal( ( parseInt(deckID) + 1 ) + '-1' );
                     payload.id_map.should.be.an('object').and.contain.keys( deckID + '-1' );
-                }).then((response) => {
+                }).then(() => {
                     let opt = JSON.parse(JSON.stringify(options));
                     opt.payload = {};
                     opt.headers['----jwt----'] = authToken2;
@@ -211,7 +211,7 @@ describe('REST API', () => {
                 let payload = JSON.parse(response.payload);
                 payload.should.be.an('object').and.contain.keys('statusCode', 'error');
                 payload.error.should.equal('Not Found');
-            }).then((response) => {
+            }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options2));
                 opt.url += '9999/forkCount'; // number required
                 return server.inject(opt).then((response) => {

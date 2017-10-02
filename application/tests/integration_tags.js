@@ -74,7 +74,7 @@ describe('REST API', () => {
         }
     };        
     
-	let deckID; // id of the newly greated deck
+    let deckID; // id of the newly greated deck
     
     context('when replacing the tags of a deck', () => {
         it('it should reply the deck with replaced tags', () => {
@@ -100,7 +100,7 @@ describe('REST API', () => {
                 revision.should.be.an('object').and.contain.keys('timestamp', 'user', 'tags');
                 revision.user.should.equal(1);
                 revision.tags.should.be.an('array').and.have.length(2);
-            }).then((response) => {
+            }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
                 opt.payload = {
                     top_root_deck: deckID,
@@ -147,7 +147,7 @@ describe('REST API', () => {
         it('it should return 401 if JWT-login is wrong', () => {
             let opt = JSON.parse(JSON.stringify(options));
             opt.payload = {
-            top_root_deck: deckID,
+                top_root_deck: deckID,
                 tags: []
             };
             opt.url += deckID + '/tags';
@@ -163,7 +163,7 @@ describe('REST API', () => {
         it('it should return 400 if input is invalid', () => {
             let opt = JSON.parse(JSON.stringify(options));
             opt.payload = {};
-            opt.headers['----jwt----'] = authToken
+            opt.headers['----jwt----'] = authToken;
             opt.url += deckID + '/tags';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');

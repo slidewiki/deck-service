@@ -70,7 +70,7 @@ describe('REST API', () => {
         }
     };
     
-	let deckID; // id of the newly created deck
+    let deckID; // id of the newly created deck
     
     context('when getting usage for a deck', () => { //BUG //TODO
         it('it should reply the parent decks', () => { // response is empty array
@@ -97,7 +97,7 @@ describe('REST API', () => {
                 revision.user.should.equal(1);
                 revision.id.should.equal(1);
                 revision.usage.should.be.an('array').and.have.length(1);
-            }).then((response) => {
+            }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
                 opt.url += deckID + '/usage';
                 return server.inject(opt).then((response) => {

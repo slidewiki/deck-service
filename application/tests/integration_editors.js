@@ -55,20 +55,20 @@ describe('REST API', () => {
         title: 'new deck',
         editors: {
             groups: [
-              {
-                id: '1',
-                joined: '1111-11-11'
-              }
+                {
+                    id: '1',
+                    joined: '1111-11-11'
+                }
             ],
             users: [
-              {
-                id: '3',
-                joined:'1111-11-11'
-              },
-              {
-                id: '4',
-                joined:'1111-11-11'
-              }
+                {
+                    id: '3',
+                    joined:'1111-11-11'
+                },
+                {
+                    id: '4',
+                    joined:'1111-11-11'
+                }
             ]
         }
     };
@@ -92,7 +92,7 @@ describe('REST API', () => {
         }
     };
     
-	let deckID; // id of the newly created deck
+    let deckID; // id of the newly created deck
     
     context('when getting editors of a deck', () => {
         it('it should reply all contributors and editors', () => {
@@ -120,7 +120,7 @@ describe('REST API', () => {
                 payload.contributors[0].should.be.an('object').and.contain.keys('user');
                 payload.contributors[0].user.should.equal(1);
                 //payload.contributors[0].count.should.equal(1); // 'count' not used
-            }).then((response) => {
+            }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
                 opt.url += deckID + '/editors';
                 return server.inject(opt).then((response) => {
@@ -170,7 +170,7 @@ describe('REST API', () => {
                 payload.edit.should.equal(true);
                 payload.admin.should.equal(true);
                 payload.readOnly.should.equal(false);
-            }).then((response) => {
+            }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
                 let authToken = JWT.sign( { userid: 3 }, secret );
                 opt.headers['----jwt----'] = authToken;
@@ -186,7 +186,7 @@ describe('REST API', () => {
                     payload.admin.should.equal(false);
                     payload.readOnly.should.equal(false);
                 });
-            }).then((response) => {
+            }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
                 let authToken = JWT.sign( { userid: 2 }, secret );
                 opt.headers['----jwt----'] = authToken;
@@ -298,7 +298,7 @@ describe('REST API', () => {
         it('it should return 400 if input is invalid', () => {
             let opt = JSON.parse(JSON.stringify(options2));
             opt.payload = {};
-            opt.headers['----jwt----'] = authToken
+            opt.headers['----jwt----'] = authToken;
             opt.url += deckID + '/editors'; // string works
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');

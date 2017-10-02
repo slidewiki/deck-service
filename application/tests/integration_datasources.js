@@ -153,24 +153,24 @@ describe('REST API', () => {
                         let payload = JSON.parse(response.payload);
                         // TODO assertion
                         */
-                        let opt = JSON.parse(JSON.stringify(options));
-                        opt.payload = [{
-                            type: 'book',
-                            title: 'new book',
-                            url: 'test.test/book',
-                            comment: 'testing datasources',
-                            authors: 'book writer',
-                            year: '1999'
-                        }];
-                        opt.headers['----jwt----'] = authToken;
-                        opt.url += slideID + '/datasources';
-                        return server.inject(opt).then((response) => {
-                            response.should.be.an('object').and.contain.keys('statusCode','payload');
-                            response.statusCode.should.equal(200);
-                            response.payload.should.be.a('string');
-                            let payload = JSON.parse(response.payload);
-                            payload.should.be.an('array').and.have.length(1);
-                        });
+                    let opt = JSON.parse(JSON.stringify(options));
+                    opt.payload = [{
+                        type: 'book',
+                        title: 'new book',
+                        url: 'test.test/book',
+                        comment: 'testing datasources',
+                        authors: 'book writer',
+                        year: '1999'
+                    }];
+                    opt.headers['----jwt----'] = authToken;
+                    opt.url += slideID + '/datasources';
+                    return server.inject(opt).then((response) => {
+                        response.should.be.an('object').and.contain.keys('statusCode','payload');
+                        response.statusCode.should.equal(200);
+                        response.payload.should.be.a('string');
+                        let payload = JSON.parse(response.payload);
+                        payload.should.be.an('array').and.have.length(1);
+                    });
                     //});
                 });
             });
@@ -219,7 +219,7 @@ describe('REST API', () => {
         it('it should return 400 if input is invalid', () => {
             let opt = JSON.parse(JSON.stringify(options));
             opt.payload = {};
-            opt.headers['----jwt----'] = authToken
+            opt.headers['----jwt----'] = authToken;
             opt.url += slideID + '/datasources';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
