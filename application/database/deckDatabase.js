@@ -2928,6 +2928,12 @@ let self = module.exports = {
 
             latestRevision.tags = tags;
 
+            // update lastUpdate of deck and revision
+            let now = new Date().toISOString();
+
+            existingDeck.lastUpdate = now;
+            latestRevision.lastUpdate = now;
+
             // changes ended here
             deckTracker.applyChangeLog();
 

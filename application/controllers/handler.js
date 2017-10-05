@@ -1882,16 +1882,17 @@ let self = module.exports = {
         authorizeUser(userId, deckId, rootDeckId).then((boomError) => {
             if (boomError) return boomError;
 
-            return deckDB.replaceTags(deckId, request.payload.tags, userId, rootDeckId).then((tagsInserted) => {
-                if (!tagsInserted) {
-                    // should never come here, but if it does it is probably correct
-                    return boom.notFound();
-                }
+            return deckDB.get(deckId).then( (deck) => { 
+                if(!deck) return boom.notFound();
 
-                return tagsInserted;
+                return deckDB.replaceTags(deckId, request.payload.tags, userId, rootDeckId).then((updatedDeck) => {
+                    return updatedDeck;
+                });
             });
-
-        }).then(reply).catch((err) => {
+        }).then( (response) => {
+            // response is either the deck update or boom
+            reply(response);
+        }).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
         });
