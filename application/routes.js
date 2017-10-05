@@ -253,21 +253,6 @@ module.exports = function(server) {
     });
 
     server.route({
-        method: 'GET',
-        path: '/deck/{id}/slideCount',
-        handler: handlers.countSlides,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string()
-                },
-            },
-            tags: ['api'],
-            description: 'Get total count of slides for this deck'
-        }
-    });
-
-    server.route({
         method: 'POST',
         path: '/deck/new',
         handler: handlers.newDeck,
@@ -535,7 +520,8 @@ module.exports = function(server) {
                 },
                 query: {
                     limit: Joi.string().optional(),
-                    offset: Joi.string().optional()
+                    offset: Joi.string().optional(), 
+                    countOnly: Joi.boolean().truthy('1').falsy('0', ''),
                 }
             },
             tags: ['api'],
