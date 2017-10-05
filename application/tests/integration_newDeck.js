@@ -282,13 +282,15 @@ describe('REST API', () => {
                 payload.children.should.be.an('array').and.have.length(2);
             });
         });
-        it('it should merge the slides and update /slideCount', () => { // after appending decks /slides return 2 slides but count returns 1
+        it('it should merge the slides and update slideCount', () => { // after appending decks /slides return 2 slides but count returns 1
             let opt = JSON.parse(JSON.stringify(options2));
-            opt.url += deckID + '/slideCount';
+            opt.url += deckID + '/slides?countOnly=true';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
                 response.statusCode.should.equal(200);
-                response.payload.should.be.a('string').and.equal('2');
+                let payload = JSON.parse(response.payload);
+                payload.should.be.an('object').and.contain.keys('slidesCount');
+                payload.slidesCount.should.equal(2);
             });
         });
         it('it should return 400 if input is invalid', () => {
