@@ -2,7 +2,7 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-describe('REST API', () => {
+describe('REST API datasources', () => {
 
     const JWT = require('jsonwebtoken');
     const secret = 'NeverShareYourSecret';

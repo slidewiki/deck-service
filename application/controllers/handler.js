@@ -237,9 +237,17 @@ let self = module.exports = {
     //saves the data sources of a slide in the database
     saveDataSources: function(request, reply) {
         let slideId = request.params.id;
-        slideDB.saveDataSources(slideId, request.payload).then((replaced) => {
-            reply(replaced);
-        }).catch((error) => {
+
+        slideDB.get(slideId).then( (slide) => {
+            if(!slide)  return reply(boom.notFound());
+
+            slideDB.saveDataSources(slideId, request.payload).then((replaced) => {
+                reply(replaced);
+            }).catch((error) => {
+                request.log('error', error);
+                reply(boom.badImplementation());
+            });
+        }).catch( (error) => {
             request.log('error', error);
             reply(boom.badImplementation());
         });
@@ -248,6 +256,8 @@ let self = module.exports = {
     getSlideDataSources: function(request, reply) {
         let slideId = request.params.id;
         slideDB.get(slideId).then((slide) => {
+            if(!slide) return reply(boom.notFound());
+            
             let items = slide.revisions[0].dataSources || [];
             let totalCount = items.length;
             if (request.query.countOnly) {
@@ -263,7 +273,7 @@ let self = module.exports = {
     getDeckDataSources: function(request, reply) {
         deckDB.getRevision(request.params.id).then((deckRevision) => {
             // create data sources array
-            if (!deckRevision) throw boom.notFound();
+            if (!deckRevision) return reply(boom.notFound());
 
             if (_.isEmpty(deckRevision.contentItems)) {
                 return reply({ items: [], totalCount: 0, revisionOwner: deckRevision.user });
