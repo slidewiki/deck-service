@@ -249,13 +249,13 @@ describe('REST API', () => {
             opt.url += deckID + '/editors';
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
-                response.statusCode.should.equal(200);
-                response.payload.should.be.a('string');
-                let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('editors');
-                payload.editors.should.be.an('object').and.contain.keys('groups', 'users');
-                payload.editors.groups.should.be.an('array').and.have.length(0);
-                payload.editors.users.should.be.an('array').and.have.length(1);
+                response.statusCode.should.equal(204);
+                // response.payload.should.be.a('string');
+                // let payload = JSON.parse(response.payload);
+                // payload.should.be.an('object').and.contain.keys('editors');
+                // payload.editors.should.be.an('object').and.contain.keys('groups', 'users');
+                // payload.editors.groups.should.be.an('array').and.have.length(0);
+                // payload.editors.users.should.be.an('array').and.have.length(1);
             });
         });
         it('it should return 404 if not an existing deck', () => { // might reply 200/204, internal server error

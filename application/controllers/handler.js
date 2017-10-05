@@ -1448,6 +1448,8 @@ let self = module.exports = {
         let userId = request.auth.credentials.userid;
 
         deckDB.get(deckId).then((deck) => {
+            if(!deck)   return reply(boom.notFound());
+
             // permit deck owner only to use this
             if (userId !== deck.user) return reply(boom.forbidden());
 
@@ -1713,23 +1715,17 @@ let self = module.exports = {
 
     //counts the slides in a given deck
     countSlides: function(request, reply){
-        deckDB.get(request.params.id).then((foundDeck) => {
-            if(!foundDeck){
-                reply(boom.notFound());
-            }
-            else{
-                let activeRevision = 1;
-                if(request.params.id.split('-').length > 1){
-                    activeRevision = parseInt(request.params.id.split('-')[1]);
-                }
-                let slideCount = 0;
-                for(let i = 0; i < foundDeck.revisions[activeRevision-1].contentItems.length; i++){
-                    if(foundDeck.revisions[activeRevision-1].contentItems[i].kind === 'slide'){
-                        slideCount++;
-                    }
-                }
-                reply(slideCount);
-            }
+        let deckId = request.params.id;
+
+        deckDB.get(deckId).then((foundDeck) => {
+            if(!foundDeck) return reply(boom.notFound());
+            
+            deckDB.getFlatSlides(deckId).then( (deckTree) => { 
+                reply(deckTree.children.length);
+            }).catch( (err) => { 
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });      
         }).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1972,12 +1968,21 @@ let self = module.exports = {
     }, 
 
     getDeckDeepUsage: function(request, reply){
-        deckDB.getDeepUsage(request.params.id, 'deck', request.query.keepVisibleOnly).then( (usage) => {
-            if(!usage){
-                reply(boom.notFound());
-            } else {
-                reply(usage);
-            }
+        let deckId = request.params.id;
+
+        deckDB.get(deckId).then( (deck) => {
+            if(!deck)   return reply(boom.notFound());
+
+            deckDB.getDeepUsage(deckId, 'deck', request.query.keepVisibleOnly).then( (usage) => {
+                if(!usage){
+                    reply(boom.notFound());
+                } else {
+                    reply(usage);
+                }
+            }).catch( (err) => {
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });
         }).catch( (err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1985,12 +1990,21 @@ let self = module.exports = {
     },
 
     getSlideDeepUsage: function(request, reply){
-        deckDB.getDeepUsage(request.params.id, 'slide', request.query.keepVisibleOnly).then( (usage) => {
-            if(!usage){
-                reply(boom.notFound());
-            } else {
-                reply(usage);
-            }
+        let slideId = request.params.id;
+
+        slideDB.exists(slideId).then( (exists) => { 
+            if(!exists) return reply(boom.notFound());
+
+            deckDB.getDeepUsage(slideId, 'slide', request.query.keepVisibleOnly).then( (usage) => {
+                if(!usage){
+                    reply(boom.notFound());
+                } else {
+                    reply(usage);
+                }
+            }).catch( (err) => {
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });
         }).catch( (err) => {
             request.log('error', err);
             reply(boom.badImplementation());

@@ -246,7 +246,7 @@ describe('REST API', () => {
         });               
     });
     
-    context('when appending a deck to a deck', () => { //BUG //TODO //TODO check if editors/contributors, datasources, etc change
+    context('when appending a deck to a deck', () => { //TODO //TODO check if editors/contributors, datasources, etc change
         it('it should reply it', () => {
             let opt = JSON.parse(JSON.stringify(options));
             opt.url = '/decktree/node/create';
@@ -288,7 +288,7 @@ describe('REST API', () => {
             return server.inject(opt).then((response) => {
                 response.should.be.an('object').and.contain.keys('statusCode','payload');
                 response.statusCode.should.equal(200);
-                response.payload.should.be.a('string').and.equal('2'); // FAILING
+                response.payload.should.be.a('string').and.equal('2');
             });
         });
         it('it should return 400 if input is invalid', () => {
