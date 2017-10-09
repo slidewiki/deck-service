@@ -16,9 +16,22 @@ apiModels.tag = Joi.object().keys({
 }).requiredKeys('tagName');
 
 apiModels.group = Joi.object().keys({
+    _id: Joi.number().integer(),
     owner: Joi.number().integer(), 
     title: Joi.string(), 
-    description: Joi.string(),
+    description: Joi.string().allow(['', null]),
+    timestamp: Joi.string(), 
+    lastUpdate: Joi.string(),
+    decks: Joi.array().items(Joi.number().integer())
+});
+
+apiModels.group.ret = Joi.object().keys({
+    _id: Joi.number().integer(),
+    owner: Joi.number().integer(), 
+    title: Joi.string(), 
+    description: Joi.string().allow(['', null]),
+    timestamp: Joi.string(), 
+    lastUpdate: Joi.string(),
     decks: Joi.array().items(Joi.number().integer())
 });
 
@@ -1251,7 +1264,7 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
-        path: '/group/{id}',
+        path: '/groups/{id}',
         handler: groups.get,
         config: {
             validate: {
@@ -1260,26 +1273,32 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Retrieve a deck group'
+            description: 'Retrieve a deck group', 
+            response: {
+                schema: apiModels.group
+            }
         }
     });
 
     server.route({
         method: 'POST',
-        path: '/group',
+        path: '/groups',
         handler: groups.insert,
         config: {
             validate: {
                 payload: apiModels.group.requiredKeys('owner', 'title', 'decks')
             },
             tags: ['api'],
-            description: 'Create a new deck group'
+            description: 'Create a new deck group', 
+            response: {
+                schema: apiModels.group
+            }
         }
     });
 
     server.route({
         method: 'PUT',
-        path: '/group/{id}',
+        path: '/groups/{id}',
         handler: groups.replace,
         config: {
             validate: {
@@ -1289,13 +1308,16 @@ module.exports = function(server) {
                 payload: apiModels.group.requiredKeys('owner', 'title', 'decks')
             },
             tags: ['api'],
-            description: 'Replace an existing deck group'
+            description: 'Replace an existing deck group', 
+            response: {
+                schema: apiModels.group
+            }
         }
     });
 
     server.route({
         method: 'DELETE',
-        path: '/group/{id}',
+        path: '/groups/{id}',
         handler: groups.delete,
         config: {
             validate: {
@@ -1323,6 +1345,37 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Retrieve the deck\'s deck groups'
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/groups',
+        handler: groups.list,
+        config: {
+            validate: {
+                query: {
+                    user: Joi.number().integer().description('id of a user'), 
+                    page: Joi.number().integer().min(0).default(0).required().description('page to be retrieved'), 
+                    per_page: Joi.number().integer().positive().default(20).required().description('number of results within a page')
+                },
+            },
+            tags: ['api'],
+            description: 'Get a list of deck groups', 
+            response: {
+                schema: Joi.object().keys({
+                    metadata: Joi.object().keys({
+                        page: Joi.number(),
+                        per_page: Joi.number(),
+                        total_count: Joi.number(),
+                        links: Joi.object().keys({
+                            previous: Joi.string().allow(['', null]),
+                            next: Joi.string().allow(['', null]),
+                        }),
+                    }),
+                    documents: Joi.array().items(apiModels.group),
+                }),
+            },
         }
     });
 

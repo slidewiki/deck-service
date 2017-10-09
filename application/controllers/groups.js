@@ -26,7 +26,7 @@ let self = module.exports = {
         if(!identifier) return reply(boom.badData());
 
         let deckId = identifier.id;
-        
+
         deckDB.get(deckId).then( (deck) => {
             if(!deck)   return reply(boom.notFound());
 
@@ -56,10 +56,10 @@ let self = module.exports = {
     replace: function(request, reply){
         let groupId = request.params.id;
 
-        groupDB.exists(groupId).then( (exists) => {
-            if(!exists) return reply(boom.notFound());
+        groupDB.get(groupId).then( (existingGroup) => {
+            if(!existingGroup) return reply(boom.notFound());
 
-            return groupDB.replace(groupId, request.payload).then( (group) => {
+            return groupDB.replace(existingGroup, request.payload).then( (group) => {
                 return reply(group.value);
             });
         }).catch( (err) => {
@@ -78,6 +78,44 @@ let self = module.exports = {
                 reply();
             });
 
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    }, 
+
+    list: function(request, reply){
+
+        let query = (request.query.user) ? {owner: request.query.user} : {};
+
+        let pagination = {};
+        pagination.page = request.query.page;
+        pagination.per_page = request.query.per_page;
+
+        groupDB.count(query).then( (total_count) => {
+            return groupDB.list(query, pagination).then( (groups) => {
+                // form links for previous and next results
+                let links = {};
+
+                if(pagination.page > 0){
+                    links['previous'] = `/groups?page=${pagination.page-1}&per_page=${pagination.per_page}`;
+                }
+
+                if(pagination.page * pagination.per_page + pagination.per_page < total_count){
+                    links['next'] = `/groups?page=${pagination.page+1}&per_page=${pagination.per_page}`;
+                }
+
+                // build repsonse body
+                let response = {};
+                response.metadata = {
+                    page: pagination.page, 
+                    per_page: pagination.per_page, 
+                    total_count: total_count, 
+                    links: links
+                };
+                response.documents = groups;
+                reply(response);
+            });
         }).catch( (err) => {
             request.log('error', err);
             reply(boom.badImplementation());

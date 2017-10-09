@@ -33,7 +33,7 @@ let self = module.exports = {
         .then((groups) => groups.find({
             decks: deckId
         }))
-        .then((stream) => stream.toArray());;
+        .then((stream) => stream.toArray());
     },
 
     insert: function(group){
@@ -45,6 +45,10 @@ let self = module.exports = {
                     throw validateGroup.errors;
                 }
 
+                let now = (new Date()).toISOString();
+                group.timestamp = now;
+                group.lastUpdate = now;
+
                 return groups.insertOne(group).then( (insertedGroup) => {
                     return insertedGroup.ops[0];
                 });
@@ -52,10 +56,16 @@ let self = module.exports = {
         });
     }, 
 
-    replace: function(id, group){
+    replace: function(existingGroup, newGroup){
         return getGroupsCollection()
         .then((groups) => {
-            return groups.findOneAndReplace( { _id: id }, group, { returnOriginal: false });
+
+            // keep existing group's timestamp and _id
+            newGroup._id = existingGroup._id;
+            newGroup.timestamp = existingGroup.timestamp;
+            newGroup.lastUpdate = (new Date()).toISOString();
+
+            return groups.findOneAndReplace( { _id: existingGroup._id }, newGroup, { returnOriginal: false });
         });
     }, 
 
@@ -64,6 +74,22 @@ let self = module.exports = {
         .then( (groups) => {
             return groups.remove({_id: id});
         });
+    }, 
+
+    count: function(query){
+        return getGroupsCollection()
+        .then( (groups) => groups.find(query).count());
+    }, 
+
+    list: function(query, pagination){
+
+        let offset = pagination.page * pagination.per_page;
+        let limit = pagination.per_page;
+        let sort = { _id: 1 };      // sort with ASC _id
+
+        return getGroupsCollection()
+        .then( (groups) => groups.find(query).sort(sort).skip(offset).limit(limit))
+        .then((stream) => stream.toArray());
     }
 
 };
