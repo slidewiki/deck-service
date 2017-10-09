@@ -7,28 +7,28 @@ let ajv = Ajv({
 });
 
 const id = {
-	type: 'integer',
+    type: 'integer',
     minLength: 1,
     maxLength: 24
 };
 
 const group = {
-	type: 'object',
-	properties: {
-		_id: id, 
-		owner: id,
-		title: {
+    type: 'object',
+    properties: {
+        _id: id, 
+        owner: id,
+        title: {
             type: 'string'
         },
-		description: {
+        description: {
             type: 'string'
         }, 
         decks: {
-        	type: 'array',
-        	items: id
+            type: 'array',
+            items: id
         }
-	}, 
-	required: ['_id', 'owner', 'title', 'decks']
+    }, 
+    required: ['_id', 'owner', 'title', 'decks']
 };
 
 

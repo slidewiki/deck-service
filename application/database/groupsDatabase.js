@@ -17,7 +17,7 @@ let self = module.exports = {
 
     exists: function(id) {
         return getGroupsCollection().then( (groups) => {
-            return groups.find({_id : id}).hasNext()
+            return groups.find({_id : id}).hasNext();
         });
     },
 

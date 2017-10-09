@@ -33,9 +33,9 @@ let self = module.exports = {
             return groupDB.getDeckGroups(deckId).then( (groups) => {
                 return reply(groups.map( (group) => {
                     // remove contained deck ids from deck groups found
-                    delete group.decks
+                    delete group.decks;
                     return group;
-                }))
+                }));
             });
         }).catch( (err) => {
             request.log('error', err);
@@ -98,11 +98,11 @@ let self = module.exports = {
                 let links = {};
 
                 if(pagination.page > 0){
-                    links['previous'] = `/groups?page=${pagination.page-1}&per_page=${pagination.per_page}`;
+                    links.previous = `/groups?page=${pagination.page-1}&per_page=${pagination.per_page}`;
                 }
 
                 if(pagination.page * pagination.per_page + pagination.per_page < total_count){
-                    links['next'] = `/groups?page=${pagination.page+1}&per_page=${pagination.per_page}`;
+                    links.next = `/groups?page=${pagination.page+1}&per_page=${pagination.per_page}`;
                 }
 
                 // build repsonse body

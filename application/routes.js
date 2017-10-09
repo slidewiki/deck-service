@@ -25,16 +25,6 @@ apiModels.group = Joi.object().keys({
     decks: Joi.array().items(Joi.number().integer())
 });
 
-apiModels.group.ret = Joi.object().keys({
-    _id: Joi.number().integer(),
-    owner: Joi.number().integer(), 
-    title: Joi.string(), 
-    description: Joi.string().allow(['', null]),
-    timestamp: Joi.string(), 
-    lastUpdate: Joi.string(),
-    decks: Joi.array().items(Joi.number().integer())
-});
-
 module.exports = function(server) {
 
     //------------------------------- deck routes -----------------------------//
@@ -1326,7 +1316,7 @@ module.exports = function(server) {
                 },
             },
             response: {
-              emptyStatusCode: 204
+                emptyStatusCode: 204
             },
             tags: ['api'],
             description: 'Delete a deck group'
