@@ -6,6 +6,7 @@ const Joi = require('joi'),
 const decks = require('./controllers/decks');
 const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
+const groups = require('./controllers/groups');
 
 // TODO better organize joi validation models
 const apiModels = {};
@@ -13,6 +14,13 @@ apiModels.tag = Joi.object().keys({
     tagName: Joi.string(),
     defaultName: Joi.string()
 }).requiredKeys('tagName');
+
+apiModels.group = Joi.object().keys({
+    owner: Joi.number().integer(), 
+    title: Joi.string(), 
+    description: Joi.string(),
+    decks: Joi.array().items(Joi.number().integer())
+});
 
 module.exports = function(server) {
 
@@ -1236,6 +1244,85 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Retrieve decks with optional filter, sorting, and paging parameters'
+        }
+    });
+
+    //------------------------------- Deck Group Routes -----------------------------//
+
+    server.route({
+        method: 'GET',
+        path: '/group/{id}',
+        handler: groups.get,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('id of the group to retrieve'),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve a deck group'
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/group',
+        handler: groups.insert,
+        config: {
+            validate: {
+                payload: apiModels.group.requiredKeys('owner', 'title', 'decks')
+            },
+            tags: ['api'],
+            description: 'Create a new deck group'
+        }
+    });
+
+    server.route({
+        method: 'PUT',
+        path: '/group/{id}',
+        handler: groups.replace,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer()
+                },
+                payload: apiModels.group.requiredKeys('owner', 'title', 'decks')
+            },
+            tags: ['api'],
+            description: 'Replace an existing deck group'
+        }
+    });
+
+    server.route({
+        method: 'DELETE',
+        path: '/group/{id}',
+        handler: groups.delete,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer()
+                },
+            },
+            response: {
+              emptyStatusCode: 204
+            },
+            tags: ['api'],
+            description: 'Delete a deck group'
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/groups',
+        handler: groups.getDeckGroups,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve the deck\'s deck groups'
         }
     });
 
