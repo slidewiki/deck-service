@@ -25,8 +25,8 @@ describe('Database', () => {
     });
 
     context('when having an empty database', () => {
-        it('should return null when requesting a non existant slide', () => {
-            return db.get('asd7db2daasd').should.be.fulfilled.and.become(null);
+        it('should return nothing when requesting a non existant slide', () => {
+            return db.get('asd7db2daasd').should.be.fulfilled.and.become(undefined);
         });
 
 

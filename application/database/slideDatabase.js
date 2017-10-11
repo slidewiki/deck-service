@@ -29,34 +29,36 @@ let self = module.exports = {
     },
 
     get: function(identifier) {
-        identifier = String(identifier);
-        let idArray = identifier.split('-');
-        return helper.connectToDatabase()
-        .then((db) => db.collection('slides'))
-        //must parse the identifier to check if it is dash separated (get revision) or not (get the whole slide)
-        .then((col) => col.findOne({
-            _id: parseInt(idArray[0])
-        })
-        )
-        .then((found) => {
-            if (!found) return null;
+        let slide = util.parseIdentifier(identifier);
+        if (!slide) return Promise.resolve();
 
-            if(idArray.length === 1){
+        return helper.getCollection('slides')
+        .then((col) => col.findOne({ _id: slide.id }))
+        .then((found) => {
+            if (!found) return;
+
+            if (!slide.revision) {
+                // no revision specified, return all
+
+                // TODO migration fix remove _id from data sources
+                found.revisions.forEach((rev) => {
+                    if (!rev.dataSources) return;
+                    rev.dataSources.forEach((i) => delete i._id);
+                });
+
                 return found;
             }
-            else{
-                //array index of revision is revision number minus 1
-                let revision = found.revisions[parseInt(idArray[1])-1];
-                if(typeof revision === 'undefined'){
-                    return ;
-                }
-                else{
-                    found.revisions = [revision];
-                    return found;
-                }
+
+            let revision = found.revisions.find((rev) => rev.id === slide.revision);
+            if (!revision) {
+                return;
             }
-        }).catch((error) => {
-            throw error;
+
+            // TODO migration fix remove _id from data sources
+            if (revision.dataSources) revision.dataSources.forEach((i) => delete i._id);
+            found.revisions = [revision];
+
+            return found;
         });
 
     },
