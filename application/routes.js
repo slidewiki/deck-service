@@ -17,7 +17,7 @@ apiModels.tag = Joi.object().keys({
 
 apiModels.group = Joi.object().keys({
     _id: Joi.number().integer(),
-    owner: Joi.number().integer(), 
+    user: Joi.number().integer(), 
     title: Joi.string(), 
     description: Joi.string().allow(['', null]),
     timestamp: Joi.string(), 
@@ -1276,10 +1276,14 @@ module.exports = function(server) {
         handler: groups.insert,
         config: {
             validate: {
-                payload: apiModels.group.requiredKeys('owner', 'title', 'decks')
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                payload: apiModels.group.requiredKeys('user', 'title', 'decks')
             },
             tags: ['api'],
-            description: 'Create a new deck group', 
+            description: 'Create a new deck group',
+            auth: 'jwt',
             response: {
                 schema: apiModels.group
             }
@@ -1292,13 +1296,17 @@ module.exports = function(server) {
         handler: groups.replace,
         config: {
             validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
                 params: {
                     id: Joi.number().integer()
                 },
-                payload: apiModels.group.requiredKeys('owner', 'title', 'decks')
+                payload: apiModels.group.requiredKeys('user', 'title', 'decks')
             },
             tags: ['api'],
-            description: 'Replace an existing deck group', 
+            description: 'Replace an existing deck group',
+            auth: 'jwt',
             response: {
                 schema: apiModels.group
             }
@@ -1311,6 +1319,9 @@ module.exports = function(server) {
         handler: groups.delete,
         config: {
             validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
                 params: {
                     id: Joi.number().integer()
                 },
@@ -1319,7 +1330,8 @@ module.exports = function(server) {
                 emptyStatusCode: 204
             },
             tags: ['api'],
-            description: 'Delete a deck group'
+            description: 'Delete a deck group',
+            auth: 'jwt'
         }
     });
 
@@ -1345,7 +1357,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 query: {
-                    user: Joi.number().integer().description('id of a user'), 
+                    user: Joi.number().integer().description('a user id'), 
                     page: Joi.number().integer().min(0).default(0).required().description('page to be retrieved'), 
                     per_page: Joi.number().integer().positive().default(20).required().description('number of results within a page')
                 },

@@ -16,19 +16,27 @@ const group = {
     type: 'object',
     properties: {
         _id: id, 
-        owner: id,
+        user: id,
         title: {
             type: 'string'
         },
         description: {
             type: 'string'
         }, 
+        timestamp: {
+            type: 'string',
+            format: 'date-time'
+        }, 
+        lastUpdate: {
+            type: 'string',
+            format: 'date-time'
+        },
         decks: {
             type: 'array',
             items: id
         }
     }, 
-    required: ['_id', 'owner', 'title', 'decks']
+    required: ['_id', 'user', 'title', 'decks']
 };
 
 

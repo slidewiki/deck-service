@@ -44,6 +44,10 @@ let self = module.exports = {
     },
 
     insert: function(request, reply){
+        let userId = request.auth.credentials.userid;
+
+        request.payload.user = userId; 
+
         groupDB.insert(request.payload).then( (group) => {
             return reply(group);
         }).catch( (err) => {
@@ -55,13 +59,20 @@ let self = module.exports = {
 
     replace: function(request, reply){
         let groupId = request.params.id;
+        let userId = request.auth.credentials.userid;
 
-        groupDB.get(groupId).then( (existingGroup) => {
-            if(!existingGroup) return reply(boom.notFound());
+        authorizeUser(groupId, userId).then( (authError) => {
+            if(authError) return authError;
 
-            return groupDB.replace(existingGroup, request.payload).then( (group) => {
-                return reply(group.value);
+            return groupDB.get(groupId).then( (existingGroup) => {
+                if(!existingGroup) return boom.notFound();
+
+                return groupDB.replace(existingGroup, request.payload).then( (group) => {
+                    return group.value;
+                });
             });
+        }).then( (response) => {
+            reply(response);
         }).catch( (err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -70,14 +81,20 @@ let self = module.exports = {
 
     delete: function(request, reply){
         let groupId = request.params.id; 
+        let userId = request.auth.credentials.userid;
 
-        groupDB.exists(groupId).then( (exists) => {
-            if(!exists) return reply(boom.notFound());
+        authorizeUser(groupId, userId).then( (authError) => {
+            if(authError) return authError;
 
-            return groupDB.delete(groupId).then( () => {
-                reply();
+            return groupDB.exists(groupId).then( (exists) => {
+                if(!exists) return reply(boom.notFound());
+
+                return groupDB.delete(groupId).then( () => {
+                    return;
+                });
             });
-
+        }).then( (response) => {
+            reply(response);
         }).catch( (err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -86,7 +103,7 @@ let self = module.exports = {
 
     list: function(request, reply){
 
-        let query = (request.query.user) ? {owner: request.query.user} : {};
+        let query = (request.query.user) ? {user: request.query.user} : {};
 
         let pagination = {};
         pagination.page = request.query.page;
@@ -123,3 +140,16 @@ let self = module.exports = {
     }
 
 };
+
+function authorizeUser(groupId, userId){
+    return groupDB.userPermissions(groupId, userId).then( (perms) => {
+        
+        console.log(perms);
+
+        if(!perms) return boom.notFound();
+
+        if(!perms.admin) return boom.forbidden();
+
+        if(!perms.edit) return boom.forbidden();
+    });
+}

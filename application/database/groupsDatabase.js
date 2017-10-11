@@ -41,13 +41,13 @@ let self = module.exports = {
             return getGroupsCollection().then( (groups) => {
                 group._id = id;
 
-                if (!validateGroup(group)) {
-                    throw validateGroup.errors;
-                }
-
                 let now = (new Date()).toISOString();
                 group.timestamp = now;
                 group.lastUpdate = now;
+
+                if (!validateGroup(group)) {
+                    throw validateGroup.errors;
+                }
 
                 return groups.insertOne(group).then( (insertedGroup) => {
                     return insertedGroup.ops[0];
@@ -64,6 +64,7 @@ let self = module.exports = {
             newGroup._id = existingGroup._id;
             newGroup.timestamp = existingGroup.timestamp;
             newGroup.lastUpdate = (new Date()).toISOString();
+            newGroup.user = existingGroup.user;
 
             return groups.findOneAndReplace( { _id: existingGroup._id }, newGroup, { returnOriginal: false });
         });
@@ -90,6 +91,27 @@ let self = module.exports = {
         return getGroupsCollection()
         .then( (groups) => groups.find(query).sort(sort).skip(offset).limit(limit))
         .then((stream) => stream.toArray());
+    }, 
+
+    userPermissions: function(groupId, userId){
+        userId = parseInt(userId);
+
+        return self.get(groupId).then( (group) => {
+            if(!group) return null;
+
+            // give all rights to group owner
+            if(group.user === userId){
+                return {
+                    admin: true,
+                    edit: true
+                };
+            }
+
+            return {
+                admin: false, 
+                edit: false
+            };
+        });
     }
 
 };
