@@ -710,7 +710,7 @@ let self = module.exports = {
     },
 
     // authorize node creation and iterate nodeSpec array to apply each insert
-    createDeckTreeNodeWithCheck: function(request, reply) {
+    createDeckTreeNodeWithCheck: function(request, reply) {       
         let userId = request.auth.credentials.userid;
         let rootDeckId = request.payload.selector.id;
 
@@ -835,15 +835,21 @@ let self = module.exports = {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
-                            slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
+                            
+                            let insertContentItemPromise = deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
+                            let addToUsagePromise = slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
+                            
+                            Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
+                                reply(node);
+                            }).catch( (err) => {
+                                request.log('error', err);
+                                reply(boom.badImplementation());
+                            });
 
                             let slideId = insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id;
                             fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId).catch((err) => {
                                 request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
                             });
-
-                            reply(node);
                         }).catch((err) => {
                             request.log('error', err);
                             reply(boom.badImplementation());
@@ -855,17 +861,19 @@ let self = module.exports = {
 
                         { // these brackets are kept during handleChange removal to keep git blame under control
 
-                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck);
-                            node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
-                            slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
+                            let insertContentItemPromise = deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck);
+                            let addToUsagePromise = slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
 
-                            reply(node);
+                            Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
+                                node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
+                                reply(node);
+                            }).catch( (err) => {
+                                request.log('error', err);
+                                reply(boom.badImplementation());
+                            });
                         }
-
                     }
-
                 });
-
             }else{
                 //need to make a new slide
                 let spath = request.payload.selector.spath;
@@ -921,9 +929,15 @@ let self = module.exports = {
                         // create the new slide into the database
                         self._newSlide(slide, userId, request).then((createdSlide) => {
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck);
+                            
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                            reply(node);
+                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck).then( () => {
+                                reply(node);
+                            }).catch( (err) => {
+                                request.log('error', err);
+                                reply(boom.badImplementation());
+                            });
+
                         }).catch((err) => {
                             if (err.isBoom) return reply(err);
 
@@ -976,17 +990,24 @@ let self = module.exports = {
                                 parentID = request.payload.selector.id;
                             }
 
-                            deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId, top_root_deck);
-                            deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
-                            //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                            self.getDeckTree({
-                                'params': {'id' : deck.id},
-                                'log': request.log.bind(request),
-                            }, (deckTree) => {
-                                if (deckTree.isBoom) return reply(deckTree);
+                            let insertContentItemPromise = deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId, top_root_deck);
+                            let addToUsagePromise = deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
+                            
+                            Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
+                                //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                                self.getDeckTree({
+                                    'params': {'id' : deck.id},
+                                    'log': request.log.bind(request),
+                                }, (deckTree) => {
+                                    if (deckTree.isBoom) return reply(deckTree);
 
-                                reply(deckTree);
+                                    reply(deckTree);
+                                });
+                            }).catch( (err) => {
+                                request.log('error', err);
+                                reply(boom.badImplementation());
                             });
+                            
                         }
                     });
                 }
@@ -1015,22 +1036,27 @@ let self = module.exports = {
                                 // omitting the top_root_deck means this change won't be tracked,
                                 // as it will be tracked right after this code, we just need to attach
                                 // first so that the rest of the tracking will work
-                                deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
+                                let insertNewNodeContentItemPromise = deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
                                     // track all created forks AFTER it's attached
                                     deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, 'attach');
                                 });
 
-                                deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
+                                let addToUsagePromise = deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
 
-                                //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                                self.getDeckTree({
-                                    'params': {'id' : deck.id},
-                                    'log': request.log.bind(request),
-                                }, (deckTree) => {
-                                    if (deckTree.isBoom) return reply(deckTree);
+                                Promise.all([insertNewNodeContentItemPromise, addToUsagePromise]).then( () => {
+                                    //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                                    self.getDeckTree({
+                                        'params': {'id' : deck.id},
+                                        'log': request.log.bind(request),
+                                    }, (deckTree) => {
+                                        if (deckTree.isBoom) return reply(deckTree);
 
-                                    reply(deckTree);
-                                });
+                                        reply(deckTree);
+                                    });
+                                }).catch( (err) => {
+                                    request.log('error', err);
+                                    reply(boom.badImplementation());
+                                }); 
                             }
                         });
 
@@ -1039,9 +1065,6 @@ let self = module.exports = {
                         reply(boom.badImplementation());
                     });
                 }
-
-
-
             }else{
                 //id is not specified, we need to make a new deck
                 let spath = request.payload.selector.spath;
