@@ -32,7 +32,7 @@
     "no-warning-comments": 0,
     "no-undef": 2,
     "promise/param-names": 1,
-    "promise/catch-or-return": 1
+    "promise/catch-or-return": 2
   },
   "plugins": [
         "promise"
