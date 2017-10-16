@@ -3283,7 +3283,7 @@ let self = module.exports = {
                                 .then((slide) => {
                                     if(!slide) callback();
 
-                                    let revision = slide.revisions.find( (rev) => {return rev.id === item.ref.revision});
+                                    let revision = slide.revisions.find( (rev) => {return rev.id === item.ref.revision; });
                                     if(!revision) callback();
 
                                     let slideDetails = {
