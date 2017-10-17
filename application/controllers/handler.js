@@ -694,8 +694,7 @@ let self = module.exports = {
 
     //gets the decktree with the given deck as root
     getDeckTree: function(request, reply) {
-
-        if(request.query.enrich) {
+        if(request.query && request.query.enrich) {
             deckDB.get(request.params.id).then( (existingDeck) => {
                 if(!existingDeck) return reply(boom.notFound());
 

@@ -2805,13 +2805,7 @@ let self = module.exports = {
             identifier.revision = (identifier.revision) ? identifier.revision : deck.revisionId;
             deckId = util.toIdentifier(identifier);
 
-            let revisionPromise = self.getRevision(deckId);
-            let forkGroupPromise = self.computeForkGroup(deckId);
-
-            return Promise.all([revisionPromise, forkGroupPromise]).then( (response) => {
-                
-                let revision = response[0];
-                let curForkGroup = response[1];
+            return self.getRevision(deckId).then( (revision) => {
 
                 path.push({id: deck._id, revision: deck.revisionId});
 
@@ -2828,7 +2822,6 @@ let self = module.exports = {
                     owner: deck.user, 
                     tags: deck.tags,
                     contributors: deck.contributors.map( (contr) => {return contr.user;}),
-                    forkGroup: curForkGroup,
                     path: path,
                     contents: []
                 };
