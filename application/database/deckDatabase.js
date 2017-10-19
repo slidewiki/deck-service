@@ -2820,7 +2820,7 @@ let self = module.exports = {
                     lastUpdate: deck.lastUpdate, 
                     language: revision.language, 
                     owner: deck.user, 
-                    tags: deck.tags,
+                    tags: revision.tags.map ( (tag) => { return tag.tagName; }),
                     contributors: deck.contributors.map( (contr) => {return contr.user;}),
                     path: path,
                     contents: []
