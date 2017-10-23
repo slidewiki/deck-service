@@ -694,19 +694,34 @@ let self = module.exports = {
 
     //gets the decktree with the given deck as root
     getDeckTree: function(request, reply) {
-        deckDB.getDeckTreeFromDB(request.params.id)
-        .then((deckTree) => {
-            if (!deckTree) return reply(boom.notFound());
+        if(request.query && request.query.enrich) {
+            deckDB.get(request.params.id).then( (existingDeck) => {
+                if(!existingDeck) return reply(boom.notFound());
 
-            if (co.isEmpty(deckTree))
-                reply(boom.notFound());
-            else{
-                reply(deckTree);
-            }
-        }).catch((err) => {
-            request.log('error', err);
-            reply(boom.badImplementation());
-        });
+                return deckDB.getEnrichedDeckTree(request.params.id).then( (decktree) => {
+                    reply(decktree);
+                });
+            }).catch( (err) => {
+                if(err.isBoom) return reply(err);
+
+                request.log('error', err);
+                reply(boom.badImplementation());                
+            });
+        } else {
+            deckDB.getDeckTreeFromDB(request.params.id)
+            .then((deckTree) => {
+                if (!deckTree) return reply(boom.notFound());
+
+                if (co.isEmpty(deckTree))
+                    reply(boom.notFound());
+                else{
+                    reply(deckTree);
+                }
+            }).catch((err) => {
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });
+        }
     },
 
     // authorize node creation and iterate nodeSpec array to apply each insert
