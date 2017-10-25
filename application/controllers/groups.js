@@ -44,9 +44,7 @@ let self = module.exports = {
     },
 
     insert: function(request, reply){
-        let userId = request.auth.credentials.userid;
-
-        request.payload.user = userId; 
+        request.payload.user = request.auth.credentials.userid; 
 
         groupDB.insert(request.payload).then( (group) => {
             return reply(group);
@@ -57,7 +55,7 @@ let self = module.exports = {
     }, 
 
 
-    replace: function(request, reply){
+    replaceMetadata: function(request, reply){
         let groupId = request.params.id;
         let userId = request.auth.credentials.userid;
 
@@ -67,7 +65,29 @@ let self = module.exports = {
             return groupDB.get(groupId).then( (existingGroup) => {
                 if(!existingGroup) return boom.notFound();
 
-                return groupDB.replace(existingGroup, request.payload).then( (group) => {
+                return groupDB.replaceMetadata(existingGroup, request.payload).then( (group) => {
+                    return group.value;
+                });
+            });
+        }).then( (response) => {
+            reply(response);
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    }, 
+
+    replaceDecks: function(request, reply){
+        let groupId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        authorizeUser(groupId, userId).then( (authError) => {
+            if(authError) return authError;
+
+            return groupDB.get(groupId).then( (existingGroup) => {
+                if(!existingGroup) return boom.notFound();
+
+                return groupDB.replaceDecks(existingGroup, request.payload.decks).then( (group) => {
                     return group.value;
                 });
             });
@@ -143,8 +163,6 @@ let self = module.exports = {
 
 function authorizeUser(groupId, userId){
     return groupDB.userPermissions(groupId, userId).then( (perms) => {
-        
-        console.log(perms);
 
         if(!perms) return boom.notFound();
 

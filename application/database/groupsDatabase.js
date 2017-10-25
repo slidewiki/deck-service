@@ -56,15 +56,26 @@ let self = module.exports = {
         });
     }, 
 
-    replace: function(existingGroup, newGroup){
+    replaceMetadata: function(existingGroup, newMetadata){
         return getGroupsCollection()
         .then((groups) => {
 
-            // keep existing group's timestamp and _id
-            newGroup._id = existingGroup._id;
-            newGroup.timestamp = existingGroup.timestamp;
+            let newGroup = Object.assign({}, existingGroup);
             newGroup.lastUpdate = (new Date()).toISOString();
-            newGroup.user = existingGroup.user;
+            newGroup.title = newMetadata.title;
+            newGroup.description = newMetadata.description || '';
+
+            return groups.findOneAndReplace( { _id: existingGroup._id }, newGroup, { returnOriginal: false });
+        });
+    }, 
+
+    replaceDecks: function(existingGroup, newDecks){
+        return getGroupsCollection()
+        .then((groups) => {
+
+            let newGroup = Object.assign({}, existingGroup);
+            newGroup.lastUpdate = (new Date()).toISOString();
+            newGroup.decks = newDecks;
 
             return groups.findOneAndReplace( { _id: existingGroup._id }, newGroup, { returnOriginal: false });
         });

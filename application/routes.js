@@ -8,22 +8,11 @@ const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
 const groups = require('./controllers/groups');
 
-// TODO better organize joi validation models
+// joi validation models
 const apiModels = {};
-apiModels.tag = Joi.object().keys({
-    tagName: Joi.string(),
-    defaultName: Joi.string()
-}).requiredKeys('tagName');
 
-apiModels.group = Joi.object().keys({
-    _id: Joi.number().integer(),
-    user: Joi.number().integer(), 
-    title: Joi.string(), 
-    description: Joi.string().allow(['', null]),
-    timestamp: Joi.string(), 
-    lastUpdate: Joi.string(),
-    decks: Joi.array().items(Joi.number().integer())
-});
+apiModels.tag = require('./models/JoiModels/tag');
+apiModels.group = require('./models/JoiModels/group');
 
 module.exports = function(server) {
 
@@ -1254,7 +1243,7 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
-        path: '/groups/{id}',
+        path: '/group/{id}',
         handler: groups.get,
         config: {
             validate: {
@@ -1265,7 +1254,7 @@ module.exports = function(server) {
             tags: ['api'],
             description: 'Retrieve a deck group', 
             response: {
-                schema: apiModels.group
+                schema: apiModels.group.getModel
             }
         }
     });
@@ -1279,21 +1268,21 @@ module.exports = function(server) {
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),
-                payload: apiModels.group.requiredKeys('user', 'title', 'decks')
+                payload: apiModels.group.newModel
             },
             tags: ['api'],
             description: 'Create a new deck group',
             auth: 'jwt',
             response: {
-                schema: apiModels.group
+                schema: apiModels.group.getModel
             }
         }
     });
 
     server.route({
         method: 'PUT',
-        path: '/groups/{id}',
-        handler: groups.replace,
+        path: '/group/{id}',
+        handler: groups.replaceMetadata,
         config: {
             validate: {
                 headers: Joi.object({
@@ -1302,20 +1291,43 @@ module.exports = function(server) {
                 params: {
                     id: Joi.number().integer()
                 },
-                payload: apiModels.group.requiredKeys('user', 'title', 'decks')
+                payload: apiModels.group.onlyMetadata
             },
             tags: ['api'],
-            description: 'Replace an existing deck group',
+            description: 'Replace metadata of an existing deck group',
             auth: 'jwt',
             response: {
-                schema: apiModels.group
+                schema: apiModels.group.getModel
+            }
+        }
+    });
+
+    server.route({
+        method: 'PUT',
+        path: '/group/{id}/decks',
+        handler: groups.replaceDecks,
+        config: {
+            validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                params: {
+                    id: Joi.number().integer()
+                },
+                payload: apiModels.group.onlyDecks
+            },
+            tags: ['api'],
+            description: 'Replace decks of an existing deck group',
+            auth: 'jwt',
+            response: {
+                schema: apiModels.group.getModel
             }
         }
     });
 
     server.route({
         method: 'DELETE',
-        path: '/groups/{id}',
+        path: '/group/{id}',
         handler: groups.delete,
         config: {
             validate: {
@@ -1375,7 +1387,7 @@ module.exports = function(server) {
                             next: Joi.string().allow(['', null]),
                         }),
                     }),
-                    documents: Joi.array().items(apiModels.group),
+                    documents: Joi.array().items(apiModels.group.getModel),
                 }),
             },
         }
