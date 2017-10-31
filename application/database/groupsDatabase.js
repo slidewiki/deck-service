@@ -28,11 +28,17 @@ let self = module.exports = {
         }));
     },
 
-    getDeckGroups: function(deckId){
-        return getGroupsCollection()
-        .then((groups) => groups.find({
+    getDeckGroups: function(deckId, userId){
+        let query = {
             decks: deckId
-        }))
+        };
+
+        if(userId){
+            query.user = userId;
+        };
+
+        return getGroupsCollection()
+        .then((groups) => groups.find(query))
         .then((stream) => stream.toArray());
     },
 

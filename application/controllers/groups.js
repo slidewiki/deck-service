@@ -26,11 +26,11 @@ let self = module.exports = {
         if(!identifier) return reply(boom.badData());
 
         let deckId = identifier.id;
-
+        
         deckDB.get(deckId).then( (deck) => {
             if(!deck)   return reply(boom.notFound());
 
-            return groupDB.getDeckGroups(deckId).then( (groups) => {
+            return groupDB.getDeckGroups(deckId, request.query.user).then( (groups) => {
                 return reply(groups.map( (group) => {
                     // remove contained deck ids from deck groups found
                     delete group.decks;

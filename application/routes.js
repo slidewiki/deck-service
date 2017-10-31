@@ -1356,6 +1356,9 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
                 },
+                query: {
+                    user: Joi.number().integer().description('Optionally filter with deck group owner id')
+                }
             },
             tags: ['api'],
             description: 'Retrieve the deck\'s deck groups'
