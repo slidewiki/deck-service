@@ -1326,6 +1326,29 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'PATCH',
+        path: '/group/{id}/decks',
+        handler: groups.updateDecks,
+        config: {
+            validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                params: {
+                    id: Joi.number().integer()
+                },
+                payload: Joi.array().items(apiModels.group.updateOp)
+            },
+            tags: ['api'],
+            description: 'Add/Remove deck ids from the deck group',
+            auth: 'jwt',
+            response: {
+                schema: apiModels.group.getModel
+            }
+        }
+    });
+
+    server.route({
         method: 'DELETE',
         path: '/group/{id}',
         handler: groups.delete,

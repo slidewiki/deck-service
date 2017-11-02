@@ -87,6 +87,34 @@ let self = module.exports = {
         });
     }, 
 
+    addDeck: function(groupId, deckIdToAdd){       
+        return getGroupsCollection()
+        .then((groups) => {
+            return groups.updateOne({
+                _id: groupId
+            }, 
+                {
+                    $addToSet: {
+                        decks: deckIdToAdd
+                    }
+                });
+        });
+    },
+
+    removeDeck: function(groupId, deckIdToRemove){
+        return getGroupsCollection()
+        .then((groups) => {
+            return groups.updateOne({
+                _id: groupId
+            }, 
+                {
+                    $pull: {
+                        decks: deckIdToRemove
+                    }
+                });
+        });
+    },
+
     delete: function(id){
         return getGroupsCollection()
         .then( (groups) => {

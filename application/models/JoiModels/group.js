@@ -27,9 +27,15 @@ const onlyDecks = Joi.object().keys({
     decks: Joi.array().items(Joi.number().integer())
 }).requiredKeys('decks');
 
+const updateOp = Joi.object().keys({
+    op: Joi.string().valid('add', 'remove'), 
+    deckId: Joi.number().integer()
+}).requiredKeys('op', 'deckId');
+
 module.exports = {
     getModel: getModel, 
     newModel: newModel, 
     onlyMetadata: onlyMetadata, 
-    onlyDecks: onlyDecks
+    onlyDecks: onlyDecks, 
+    updateOp: updateOp,
 };

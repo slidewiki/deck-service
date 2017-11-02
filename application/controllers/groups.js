@@ -4,6 +4,7 @@ const boom = require('boom');
 const groupDB = require('../database/groupsDatabase');
 const deckDB = require('../database/deckDatabase');
 const util = require('../lib/util');
+const async = require('async');
 
 let self = module.exports = {
 
@@ -98,6 +99,50 @@ let self = module.exports = {
             reply(boom.badImplementation());
         });
     }, 
+
+    updateDecks: function(request, reply){
+        let groupId = request.params.id;
+        let userId = request.auth.credentials.userid;
+        let updateOps = request.payload;
+
+        authorizeUser(groupId, userId).then( (authError) => {
+            if(authError) return authError;
+
+            return groupDB.get(groupId).then( (existingGroup) => {
+                if(!existingGroup) return boom.notFound();
+
+                return new Promise( (resolve, reject) => {
+                    async.eachSeries(updateOps, (updateOp, done) => {
+                        if(updateOp.op === 'add') {
+                            groupDB.addDeck(groupId, updateOp.deckId)
+                            .then( () => done())
+                            .catch(done);
+                        } else if (updateOp.op === 'remove'){
+                            groupDB.removeDeck(groupId, updateOp.deckId)
+                            .then( () => done())
+                            .catch(done);
+                        }
+                    }, (err) => {
+                        if(err){
+                            reject(err);
+                        }
+
+                        // reply with the updated deck group
+                        groupDB.get(groupId).then( (updatedDeckGroup) => {
+                            resolve(updatedDeckGroup);
+                        }).catch( (err) => {
+                            reject(err);
+                        });
+                    });
+                });
+            });
+        }).then( (response) => {
+            reply(response);
+        }).catch( (err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
 
     delete: function(request, reply){
         let groupId = request.params.id; 
