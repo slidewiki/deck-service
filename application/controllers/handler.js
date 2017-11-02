@@ -81,7 +81,7 @@ let self = module.exports = {
     //inserts a new slide into the database
     newSlide: function(request, reply) {
         let userId = request.auth.credentials.userid;
-
+        request.log('newSlide', request);
         self._newSlide(request.payload, userId, request)
         .then(reply)
         .catch((error) => {
@@ -97,7 +97,7 @@ let self = module.exports = {
     _newSlide: function(payload, userId, logger) {
         // make sure user id is set
         payload.user = userId;
-
+        console.log('_newSlide', payload);
         // insert the slide
         return slideDB.insert(payload).then((inserted) => {
             // empty results means something wrong with the payload
@@ -113,7 +113,8 @@ let self = module.exports = {
                     // TODO for now we use hardcoded template for new slides
                     content = slidetemplate;
                 }
-                fileService.createThumbnail(content, slideId).catch((err) => {
+
+                fileService.createThumbnail(content, slideId, payload.theme).catch((err) => {
                     logger.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
                 });
 
@@ -165,7 +166,7 @@ let self = module.exports = {
                                 //for now we use hardcoded template for new slides
                                 content = slidetemplate;
                             }
-                            fileService.createThumbnail(content, newSlideId).catch((err) => {
+                            fileService.createThumbnail(content, newSlideId, request.payload.theme).catch((err) => {
                                 request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
                             });
 
@@ -254,7 +255,7 @@ let self = module.exports = {
         let slideId = request.params.id;
         slideDB.get(slideId).then((slide) => {
             if(!slide) return reply(boom.notFound());
-            
+
             let items = slide.revisions[0].dataSources || [];
             let totalCount = items.length;
             if (request.query.countOnly) {
@@ -710,7 +711,7 @@ let self = module.exports = {
     },
 
     // authorize node creation and iterate nodeSpec array to apply each insert
-    createDeckTreeNodeWithCheck: function(request, reply) {       
+    createDeckTreeNodeWithCheck: function(request, reply) {
         let userId = request.auth.credentials.userid;
         let rootDeckId = request.payload.selector.id;
 
@@ -835,10 +836,10 @@ let self = module.exports = {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
-                            
+
                             let insertContentItemPromise = deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
                             let addToUsagePromise = slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
-                            
+
                             Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
                                 reply(node);
                             }).catch( (err) => {
@@ -847,7 +848,7 @@ let self = module.exports = {
                             });
 
                             let slideId = insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id;
-                            fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId).catch((err) => {
+                            fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId, request.payload.selector.theme).catch((err) => {
                                 request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
                             });
                         }).catch((err) => {
@@ -910,7 +911,8 @@ let self = module.exports = {
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
                             'root_deck': parentID,
-                            'position' : slidePosition
+                            'position' : slidePosition,
+                            'theme' : request.payload.theme
                         };
 
                         if(request.payload.hasOwnProperty('content')){
@@ -927,9 +929,10 @@ let self = module.exports = {
                         }
 
                         // create the new slide into the database
+                        request.log('Line 932: ', slide, 'theme: ', request.payload.theme);
                         self._newSlide(slide, userId, request).then((createdSlide) => {
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
-                            
+
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck).then( () => {
                                 reply(node);
@@ -992,7 +995,7 @@ let self = module.exports = {
 
                             let insertContentItemPromise = deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId, top_root_deck);
                             let addToUsagePromise = deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
-                            
+
                             Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
                                 //we have to return from the callback, else empty node is returned because it is updated asynchronously
                                 self.getDeckTree({
@@ -1007,7 +1010,7 @@ let self = module.exports = {
                                 request.log('error', err);
                                 reply(boom.badImplementation());
                             });
-                            
+
                         }
                     });
                 }
@@ -1903,7 +1906,7 @@ let self = module.exports = {
         authorizeUser(userId, deckId, rootDeckId).then((boomError) => {
             if (boomError) return boomError;
 
-            return deckDB.get(deckId).then( (deck) => { 
+            return deckDB.get(deckId).then( (deck) => {
                 if(!deck) return boom.notFound();
 
                 return deckDB.replaceTags(deckId, request.payload.tags, userId, rootDeckId).then((updatedDeck) => {
@@ -1970,7 +1973,7 @@ let self = module.exports = {
             request.log('error', error);
             reply(boom.badImplementation());
         });
-    }, 
+    },
 
     getDeckDeepUsage: function(request, reply){
         let deckId = request.params.id;
@@ -1994,7 +1997,7 @@ let self = module.exports = {
     getSlideDeepUsage: function(request, reply){
         let slideId = request.params.id;
 
-        slideDB.exists(slideId).then( (exists) => { 
+        slideDB.exists(slideId).then( (exists) => {
             if(!exists) return reply(boom.notFound());
 
             return deckDB.getDeepUsage(slideId, 'slide', request.query.keepVisibleOnly).then( (usage) => {
@@ -2008,7 +2011,7 @@ let self = module.exports = {
             request.log('error', err);
             reply(boom.badImplementation());
         });
-    }, 
+    },
 
     getForkGroup: function(request, reply){
         deckDB.computeForkGroup(request.params.id).then( (forkGroup) => {
@@ -2027,6 +2030,7 @@ let self = module.exports = {
         let deckId = request.params.id;
 
         deckDB.getFlatSlides(deckId).then((deckTree) => {
+
             if (!deckTree) return reply(boom.notFound());
 
             async.concatSeries(deckTree.children, (slide, done) => {
@@ -2034,7 +2038,7 @@ let self = module.exports = {
                     slide.content = `<h2>${slide.title}</h2>`;
                 }
 
-                fileService.createThumbnail(slide.content, slide.id).then(() => {
+                fileService.createThumbnail(slide.content, slide.id, deckTree.theme).then(() => {
                     done(null, { id: slide.id, status: 'OK' });
                 }).catch((err) => {
                     done(null, { id: slide.id, status: err.message });

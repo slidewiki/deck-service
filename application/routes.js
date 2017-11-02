@@ -520,7 +520,7 @@ module.exports = function(server) {
                 },
                 query: {
                     limit: Joi.string().optional(),
-                    offset: Joi.string().optional(), 
+                    offset: Joi.string().optional(),
                     countOnly: Joi.boolean().truthy('1').falsy('0', ''),
                 }
             },
@@ -548,6 +548,7 @@ module.exports = function(server) {
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
                     }),
+                    theme : Joi.string().optional().valid('blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub'),
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     comment: Joi.string().allow(''),
@@ -588,6 +589,7 @@ module.exports = function(server) {
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
                     }),
+                    theme : Joi.string().optional().valid('blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub'),
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
@@ -723,7 +725,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional')
                 }
             },
             tags: ['api'],
@@ -758,7 +760,7 @@ module.exports = function(server) {
                         id: Joi.string(), //id of the root deck
                         spath: Joi.string().allow(''),
                         stype: Joi.string(),
-                        sid: Joi.string()
+                        sid: Joi.string(),
                     }),
                     nodeSpec: Joi.array().items(
                         Joi.object().keys({
@@ -769,7 +771,8 @@ module.exports = function(server) {
                     content: Joi.string(),
                     title: Joi.string(),
                     license: Joi.string(),
-                    speakernotes: Joi.string()
+                    speakernotes: Joi.string(),
+                    theme : Joi.string().optional().valid('blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub')
                 }).requiredKeys('selector'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -882,7 +885,7 @@ module.exports = function(server) {
                 },
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login'),
-                }).unknown(),                
+                }).unknown(),
             },
             tags: ['api'],
             auth: 'jwt',
