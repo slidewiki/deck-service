@@ -8,7 +8,7 @@ const Microservices = require('../configs/microservices');
 const self = module.exports = {
 
     // creates a thumbnail for a given slide
-    createThumbnail: function(slideContent, slideId, theme) {
+    createThumbnail: function(slideContent, slideId, theme='default') {
         let encodedContent = he.encode(slideContent, { allowUnsafeSymbols: true });
 
         return rp.post({

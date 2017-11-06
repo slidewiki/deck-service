@@ -742,6 +742,9 @@ module.exports = function(server) {
             validate: {
                 params: {
                     id: Joi.string()
+                }, 
+                query: {
+                    enrich: Joi.boolean().truthy('1').falsy('0', ''),
                 }
             },
             tags: ['api'],

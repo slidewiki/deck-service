@@ -2796,6 +2796,93 @@ let self = module.exports = {
 
     },
 
+    getEnrichedDeckTree: function(deckId, onlyDecks=false, path=[]){
+        return self.get(deckId).then( (deck) => {
+            if(!deck) return;
+
+            // if no revision is specidied, then use the active
+            let identifier = util.parseIdentifier(deckId);
+            identifier.revision = (identifier.revision) ? identifier.revision : deck.revisionId;
+            deckId = util.toIdentifier(identifier);
+
+            return self.getRevision(deckId).then( (revision) => {
+
+                path.push({id: deck._id, revision: deck.revisionId});
+
+                let decktree = {
+                    id: deck._id, 
+                    revisionId: deck.revisionId, 
+                    latestRevisionId: deck.latestRevisionId, 
+                    type: 'deck',
+                    title: revision.title, 
+                    description: deck.description, 
+                    timestamp: deck.timestamp, 
+                    lastUpdate: deck.lastUpdate, 
+                    language: revision.language, 
+                    owner: deck.user, 
+                    tags: revision.tags.map ( (tag) => { return tag.tagName; }),
+                    contributors: deck.contributors.map( (contr) => {return contr.user;}),
+                    path: path,
+                    contents: []
+                };
+
+                return new Promise( (resolve, reject) => {
+                    async.eachSeries(revision.contentItems, (item, callback) => {
+
+                        let subdocumentId = `${item.ref.id}-${item.ref.revision}`;
+
+                        let subPath = _.cloneDeep(path);
+
+                        if(item.kind === 'deck'){
+                            self.getEnrichedDeckTree(subdocumentId, onlyDecks, subPath)
+                            .then( (subdecktree) => {
+                                decktree.contents.push(subdecktree);
+                                callback();
+                            }).catch(callback);
+                        } else {
+                            if(onlyDecks) callback();
+
+                            helper.connectToDatabase()
+                            .then((db) => db.collection('slides'))
+                            .then((col) => {
+                                return col.findOne({_id: parseInt(item.ref.id)})
+                                .then((slide) => {
+                                    if(!slide) callback();
+
+                                    let revision = slide.revisions.find( (rev) => {return rev.id === item.ref.revision; });
+                                    if(!revision) callback();
+
+                                    let slideDetails = {
+                                        id: slide._id, 
+                                        revisionId: revision.id, 
+                                        type: 'slide', 
+                                        title: revision.title, 
+                                        content: revision.content, 
+                                        speakernotes: revision.speakernotes, 
+                                        timestamp: slide.timestamp, 
+                                        lastUpdate: slide.lastUpdate, 
+                                        language: revision.language, 
+                                        owner: slide.user, 
+                                        contributors: slide.contributors.map( (contr) => {return contr.user; }),
+                                        path: path,
+                                    };
+
+                                    decktree.contents.push(slideDetails);
+                                    callback();
+                                });
+                            }).catch(callback);
+                        }
+                    }, (err) => {               
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(decktree);
+                        }
+                    });
+                });
+            });
+        });
+    },
 };
 
 
