@@ -81,7 +81,6 @@ let self = module.exports = {
     //inserts a new slide into the database
     newSlide: function(request, reply) {
         let userId = request.auth.credentials.userid;
-        request.log('newSlide', request);
         self._newSlide(request.payload, userId, request)
         .then(reply)
         .catch((error) => {
@@ -97,7 +96,6 @@ let self = module.exports = {
     _newSlide: function(payload, userId, logger) {
         // make sure user id is set
         payload.user = userId;
-        console.log('_newSlide', payload);
         // insert the slide
         return slideDB.insert(payload).then((inserted) => {
             // empty results means something wrong with the payload
@@ -503,7 +501,7 @@ let self = module.exports = {
                         content = slidetemplate;
                     }
 
-                    fileService.createThumbnail(content, slideId).catch((err) => {
+                    fileService.createThumbnail(content, slideId, request.payload.theme).catch((err) => {
                         request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
                     });
 
@@ -929,7 +927,6 @@ let self = module.exports = {
                         }
 
                         // create the new slide into the database
-                        request.log('Line 932: ', slide, 'theme: ', request.payload.theme);
                         self._newSlide(slide, userId, request).then((createdSlide) => {
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
 
@@ -2030,7 +2027,6 @@ let self = module.exports = {
         let deckId = request.params.id;
 
         deckDB.getFlatSlides(deckId).then((deckTree) => {
-
             if (!deckTree) return reply(boom.notFound());
 
             async.concatSeries(deckTree.children, (slide, done) => {
