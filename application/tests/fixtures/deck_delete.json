@@ -1,0 +1,719 @@
+{
+  "collections": {
+    "decks": [
+      {
+        "_id": 2272,
+        "user": 46,
+        "accessLevel": null,
+        "editors": {
+          "users": [],
+          "groups": []
+        },
+        "timestamp": "2017-11-07T16:12:23.893Z",
+        "description": "delete this",
+        "translated_from": {
+          "status": "original"
+        },
+        "lastUpdate": "2017-11-07T16:13:34.628Z",
+        "datasource": null,
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 6
+          }
+        ],
+        "active": 1,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [],
+            "title": "Test delete a deck",
+            "timestamp": "2017-11-07T16:12:23.893Z",
+            "lastUpdate": "2017-11-07T16:13:34.628Z",
+            "user": 46,
+            "language": "en_GB",
+            "parent": null,
+            "tags": [],
+            "comment": null,
+            "abstract": null,
+            "footer": null,
+            "contentItems": [
+              {
+                "order": 1,
+                "kind": "slide",
+                "ref": {
+                  "id": 15016,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 2,
+                "kind": "slide",
+                "ref": {
+                  "id": 15017,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 3,
+                "kind": "slide",
+                "ref": {
+                  "id": 15018,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 4,
+                "kind": "deck",
+                "ref": {
+                  "id": 2273,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 5,
+                "kind": "deck",
+                "ref": {
+                  "id": 2274,
+                  "revision": 1
+                }
+              }
+            ],
+            "theme": "default"
+          }
+        ]
+      },
+      {
+        "_id": 2273,
+        "user": 48,
+        "accessLevel": null,
+        "editors": {
+          "users": [],
+          "groups": []
+        },
+        "timestamp": "2017-11-07T16:12:33.039Z",
+        "description": "subdeck in deck for deletion",
+        "translated_from": null,
+        "lastUpdate": "2017-11-07T16:13:28.471Z",
+        "datasource": null,
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 6
+          }
+        ],
+        "active": 1,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2272,
+                "revision": 1
+              }
+            ],
+            "title": "Test delete a deck: subdeck",
+            "timestamp": "2017-11-07T16:12:33.039Z",
+            "lastUpdate": "2017-11-07T16:13:28.471Z",
+            "user": 46,
+            "language": "en_GB",
+            "parent": null,
+            "tags": [],
+            "comment": null,
+            "abstract": null,
+            "footer": null,
+            "contentItems": [
+              {
+                "order": 1,
+                "kind": "slide",
+                "ref": {
+                  "id": 15019,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 2,
+                "kind": "slide",
+                "ref": {
+                  "id": 15020,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 3,
+                "kind": "slide",
+                "ref": {
+                  "id": 15021,
+                  "revision": 1
+                }
+              }
+            ],
+            "theme": "default"
+          }
+        ]
+      },
+      {
+        "_id": 2274,
+        "user": 46,
+        "accessLevel": null,
+        "editors": {
+          "users": [],
+          "groups": []
+        },
+        "timestamp": "2017-11-07T16:13:34.617Z",
+        "description": "subdeck 2 in delete a deck",
+        "translated_from": null,
+        "lastUpdate": "2017-11-07T16:13:54.048Z",
+        "datasource": null,
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 4
+          }
+        ],
+        "active": 1,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2272,
+                "revision": 1
+              }
+            ],
+            "title": "subdeck 2 in delete a deck",
+            "timestamp": "2017-11-07T16:13:34.617Z",
+            "lastUpdate": "2017-11-07T16:13:54.048Z",
+            "user": 46,
+            "language": "en_GB",
+            "parent": null,
+            "tags": [],
+            "comment": null,
+            "abstract": null,
+            "footer": null,
+            "contentItems": [
+              {
+                "order": 1,
+                "kind": "slide",
+                "ref": {
+                  "id": 15022,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 2,
+                "kind": "slide",
+                "ref": {
+                  "id": 15023,
+                  "revision": 1
+                }
+              }
+            ],
+            "theme": "default"
+          }
+        ]
+      },
+      {
+        "_id": 2275,
+        "origin": {
+          "id": 2274,
+          "revision": 1,
+          "title": "subdeck 2 in delete a deck",
+          "user": 46
+        },
+        "description": "subdeck 2 in delete a deck",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "user": 46,
+        "translated_from": null,
+        "contributors": [
+          {
+            "user": 46,
+            "count": 5
+          }
+        ],
+        "active": 1,
+        "translations": [],
+        "timestamp": "2017-11-07T16:36:47.505Z",
+        "lastUpdate": "2017-11-07T16:36:47.505Z",
+        "datasource": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2277,
+                "revision": 1
+              }
+            ],
+            "title": "subdeck 2 in delete a deck",
+            "timestamp": "2017-11-07T16:36:47.505Z",
+            "lastUpdate": "2017-11-07T16:36:47.505Z",
+            "user": 46,
+            "language": "en_GB",
+            "parent": null,
+            "tags": [],
+            "comment": null,
+            "abstract": null,
+            "footer": null,
+            "contentItems": [
+              {
+                "order": 1,
+                "kind": "slide",
+                "ref": {
+                  "id": 15022,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 2,
+                "kind": "slide",
+                "ref": {
+                  "id": 15023,
+                  "revision": 1
+                }
+              }
+            ],
+            "theme": "default"
+          }
+        ]
+      },
+      {
+        "_id": 2276,
+        "origin": {
+          "id": 2273,
+          "revision": 1,
+          "title": "Test delete a deck: subdeck",
+          "user": 46
+        },
+        "description": "subdeck in deck for deletion",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "user": 46,
+        "translated_from": null,
+        "contributors": [
+          {
+            "user": 46,
+            "count": 7
+          }
+        ],
+        "active": 1,
+        "translations": [],
+        "timestamp": "2017-11-07T16:36:47.515Z",
+        "lastUpdate": "2017-11-07T16:36:47.515Z",
+        "datasource": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2277,
+                "revision": 1
+              }
+            ],
+            "title": "Test delete a deck: subdeck",
+            "timestamp": "2017-11-07T16:36:47.515Z",
+            "lastUpdate": "2017-11-07T16:36:47.515Z",
+            "user": 46,
+            "language": "en_GB",
+            "parent": null,
+            "tags": [],
+            "comment": null,
+            "abstract": null,
+            "footer": null,
+            "contentItems": [
+              {
+                "order": 1,
+                "kind": "slide",
+                "ref": {
+                  "id": 15019,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 2,
+                "kind": "slide",
+                "ref": {
+                  "id": 15020,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 3,
+                "kind": "slide",
+                "ref": {
+                  "id": 15021,
+                  "revision": 1
+                }
+              }
+            ],
+            "theme": "default"
+          }
+        ]
+      },
+      {
+        "_id": 2277,
+        "origin": {
+          "id": 2272,
+          "revision": 1,
+          "title": "Test delete a deck",
+          "user": 46
+        },
+        "description": "delete this",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "user": 46,
+        "translated_from": {
+          "status": "original"
+        },
+        "contributors": [
+          {
+            "user": 46,
+            "count": 7
+          }
+        ],
+        "active": 1,
+        "translations": [],
+        "timestamp": "2017-11-07T16:36:47.518Z",
+        "lastUpdate": "2017-11-07T16:36:47.518Z",
+        "datasource": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [],
+            "title": "Test delete a deck",
+            "timestamp": "2017-11-07T16:36:47.518Z",
+            "lastUpdate": "2017-11-07T16:36:47.518Z",
+            "user": 46,
+            "language": "en_GB",
+            "parent": null,
+            "tags": [],
+            "comment": null,
+            "abstract": null,
+            "footer": null,
+            "contentItems": [
+              {
+                "order": 1,
+                "kind": "slide",
+                "ref": {
+                  "id": 15016,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 2,
+                "kind": "slide",
+                "ref": {
+                  "id": 15017,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 3,
+                "kind": "slide",
+                "ref": {
+                  "id": 15018,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 4,
+                "kind": "deck",
+                "ref": {
+                  "id": 2276,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 5,
+                "kind": "deck",
+                "ref": {
+                  "id": 2275,
+                  "revision": 1
+                }
+              }
+            ],
+            "theme": "default"
+          }
+        ]
+      }
+    ],
+    "slides": [
+      {
+        "_id": 15016,
+        "user": 46,
+        "timestamp": "2017-11-07T16:12:23.908Z",
+        "lastUpdate": "2017-11-07T16:12:23.908Z",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 1
+          }
+        ],
+        "description": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2272,
+                "revision": 1
+              }
+            ],
+            "timestamp": "2017-11-07T16:12:23.908Z",
+            "user": 46,
+            "title": "New slide",
+            "content": "<div class=\"pptx2html\" style=\"position: relative; width: 960px; height: 720px;\"><div _id=\"2\" _idx=\"undefined\" _name=\"Title 1\" _type=\"title\" class=\"block content v-mid h-mid\" style=\"position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;\"><h3>Title</h3></div><div _id=\"3\" _idx=\"1\" _name=\"Content Placeholder 2\" _type=\"body\" class=\"block content v-up\" style=\"position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;\"><ul>\t<li>Text bullet 1</li>\t<li>Text bullet 2</li></ul><div class=\"h-left\">&nbsp;</div></div></div>",
+            "speakernotes": null,
+            "parent": null,
+            "tags": null,
+            "license": "CC BY-SA"
+          }
+        ]
+      },
+      {
+        "_id": 15017,
+        "user": 46,
+        "timestamp": "2017-11-07T16:12:28.105Z",
+        "lastUpdate": "2017-11-07T16:12:28.105Z",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 1
+          }
+        ],
+        "description": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2272,
+                "revision": 1
+              }
+            ],
+            "timestamp": "2017-11-07T16:12:28.105Z",
+            "user": 46,
+            "title": "New slide",
+            "content": "<div class=\"pptx2html\" style=\"position: relative; width: 960px; height: 720px;\"><div _id=\"2\" _idx=\"undefined\" _name=\"Title 1\" _type=\"title\" class=\"block content v-mid h-mid\" style=\"position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;\"><h3>Title</h3></div><div _id=\"3\" _idx=\"1\" _name=\"Content Placeholder 2\" _type=\"body\" class=\"block content v-up\" style=\"position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;\"><ul>\t<li>Text bullet 1</li>\t<li>Text bullet 2</li></ul><div class=\"h-left\">&nbsp;</div></div></div>",
+            "speakernotes": null,
+            "parent": null,
+            "tags": null,
+            "license": "CC BY-SA"
+          }
+        ]
+      },
+      {
+        "_id": 15018,
+        "user": 46,
+        "timestamp": "2017-11-07T16:12:30.591Z",
+        "lastUpdate": "2017-11-07T16:12:30.591Z",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 1
+          }
+        ],
+        "description": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2272,
+                "revision": 1
+              }
+            ],
+            "timestamp": "2017-11-07T16:12:30.591Z",
+            "user": 46,
+            "title": "New slide",
+            "content": "<div class=\"pptx2html\" style=\"position: relative; width: 960px; height: 720px;\"><div _id=\"2\" _idx=\"undefined\" _name=\"Title 1\" _type=\"title\" class=\"block content v-mid h-mid\" style=\"position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;\"><h3>Title</h3></div><div _id=\"3\" _idx=\"1\" _name=\"Content Placeholder 2\" _type=\"body\" class=\"block content v-up\" style=\"position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;\"><ul>\t<li>Text bullet 1</li>\t<li>Text bullet 2</li></ul><div class=\"h-left\">&nbsp;</div></div></div>",
+            "speakernotes": null,
+            "parent": null,
+            "tags": null,
+            "license": "CC BY-SA"
+          }
+        ]
+      },
+      {
+        "_id": 15019,
+        "user": 46,
+        "timestamp": "2017-11-07T16:12:33.043Z",
+        "lastUpdate": "2017-11-07T16:12:33.043Z",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 1
+          }
+        ],
+        "description": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2273,
+                "revision": 1
+              }
+            ],
+            "timestamp": "2017-11-07T16:12:33.043Z",
+            "user": 46,
+            "title": "New slide",
+            "content": "<div class=\"pptx2html\" style=\"position: relative; width: 960px; height: 720px;\"><div _id=\"2\" _idx=\"undefined\" _name=\"Title 1\" _type=\"title\" class=\"block content v-mid h-mid\" style=\"position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;\"><h3>Title</h3></div><div _id=\"3\" _idx=\"1\" _name=\"Content Placeholder 2\" _type=\"body\" class=\"block content v-up\" style=\"position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;\"><ul>\t<li>Text bullet 1</li>\t<li>Text bullet 2</li></ul><div class=\"h-left\">&nbsp;</div></div></div>",
+            "speakernotes": null,
+            "parent": null,
+            "tags": null,
+            "license": "CC BY-SA"
+          }
+        ]
+      },
+      {
+        "_id": 15020,
+        "user": 46,
+        "timestamp": "2017-11-07T16:13:25.902Z",
+        "lastUpdate": "2017-11-07T16:13:25.902Z",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 1
+          }
+        ],
+        "description": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2273,
+                "revision": 1
+              }
+            ],
+            "timestamp": "2017-11-07T16:13:25.902Z",
+            "user": 46,
+            "title": "New slide",
+            "content": "<div class=\"pptx2html\" style=\"position: relative; width: 960px; height: 720px;\"><div _id=\"2\" _idx=\"undefined\" _name=\"Title 1\" _type=\"title\" class=\"block content v-mid h-mid\" style=\"position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;\"><h3>Title</h3></div><div _id=\"3\" _idx=\"1\" _name=\"Content Placeholder 2\" _type=\"body\" class=\"block content v-up\" style=\"position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;\"><ul>\t<li>Text bullet 1</li>\t<li>Text bullet 2</li></ul><div class=\"h-left\">&nbsp;</div></div></div>",
+            "speakernotes": null,
+            "parent": null,
+            "tags": null,
+            "license": "CC BY-SA"
+          }
+        ]
+      },
+      {
+        "_id": 15021,
+        "user": 46,
+        "timestamp": "2017-11-07T16:13:28.461Z",
+        "lastUpdate": "2017-11-07T16:13:28.461Z",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 1
+          }
+        ],
+        "description": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2273,
+                "revision": 1
+              }
+            ],
+            "timestamp": "2017-11-07T16:13:28.461Z",
+            "user": 46,
+            "title": "New slide",
+            "content": "<div class=\"pptx2html\" style=\"position: relative; width: 960px; height: 720px;\"><div _id=\"2\" _idx=\"undefined\" _name=\"Title 1\" _type=\"title\" class=\"block content v-mid h-mid\" style=\"position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;\"><h3>Title</h3></div><div _id=\"3\" _idx=\"1\" _name=\"Content Placeholder 2\" _type=\"body\" class=\"block content v-up\" style=\"position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;\"><ul>\t<li>Text bullet 1</li>\t<li>Text bullet 2</li></ul><div class=\"h-left\">&nbsp;</div></div></div>",
+            "speakernotes": null,
+            "parent": null,
+            "tags": null,
+            "license": "CC BY-SA"
+          }
+        ]
+      },
+      {
+        "_id": 15022,
+        "user": 46,
+        "timestamp": "2017-11-07T16:13:34.618Z",
+        "lastUpdate": "2017-11-07T16:13:34.618Z",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 1
+          }
+        ],
+        "description": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2274,
+                "revision": 1
+              }
+            ],
+            "timestamp": "2017-11-07T16:13:34.618Z",
+            "user": 46,
+            "title": "New slide",
+            "content": "<div class=\"pptx2html\" style=\"position: relative; width: 960px; height: 720px;\"><div _id=\"2\" _idx=\"undefined\" _name=\"Title 1\" _type=\"title\" class=\"block content v-mid h-mid\" style=\"position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;\"><h3>Title</h3></div><div _id=\"3\" _idx=\"1\" _name=\"Content Placeholder 2\" _type=\"body\" class=\"block content v-up\" style=\"position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;\"><ul>\t<li>Text bullet 1</li>\t<li>Text bullet 2</li></ul><div class=\"h-left\">&nbsp;</div></div></div>",
+            "speakernotes": null,
+            "parent": null,
+            "tags": null,
+            "license": "CC BY-SA"
+          }
+        ]
+      },
+      {
+        "_id": 15023,
+        "user": 46,
+        "timestamp": "2017-11-07T16:13:54.043Z",
+        "lastUpdate": "2017-11-07T16:13:54.043Z",
+        "language": "en_GB",
+        "license": "CC BY-SA",
+        "contributors": [
+          {
+            "user": 46,
+            "count": 1
+          }
+        ],
+        "description": null,
+        "revisions": [
+          {
+            "id": 1,
+            "usage": [
+              {
+                "id": 2274,
+                "revision": 1
+              }
+            ],
+            "timestamp": "2017-11-07T16:13:54.043Z",
+            "user": 46,
+            "title": "New slide",
+            "content": "<div class=\"pptx2html\" style=\"position: relative; width: 960px; height: 720px;\"><div _id=\"2\" _idx=\"undefined\" _name=\"Title 1\" _type=\"title\" class=\"block content v-mid h-mid\" style=\"position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;\"><h3>Title</h3></div><div _id=\"3\" _idx=\"1\" _name=\"Content Placeholder 2\" _type=\"body\" class=\"block content v-up\" style=\"position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;\"><ul>\t<li>Text bullet 1</li>\t<li>Text bullet 2</li></ul><div class=\"h-left\">&nbsp;</div></div></div>",
+            "speakernotes": null,
+            "parent": null,
+            "tags": null,
+            "license": "CC BY-SA"
+          }
+        ]
+      }
+    ]
+  }
+}

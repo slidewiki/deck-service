@@ -2309,6 +2309,28 @@ let self = module.exports = {
         });
     },
 
+    // groups the deck ids in the decktree by deck owner
+    getDeckTreeOwners(rootDeckId) {
+        // getSubdeckIds includes self (rootDeckId)
+        return self.getSubdeckIds(rootDeckId)
+        .then((subdeckIds) => {
+            if (!subdeckIds) return;
+
+            // subdeckIds is array of integers
+            return helper.getCollection('decks').then((decks) => {
+                return decks.aggregate([
+                    // match only the subdecks
+                    { $match: { _id: { $in: subdeckIds }}},
+                    // group by user
+                    { $group: {
+                        _id: '$user',
+                        deckIds: { $push: '$_id' },
+                    } },
+                ]);
+            }).then((cursor) => cursor.toArray());
+        });
+    },
+
     getDeckOwners(query) {
 
         return helper.getCollection('decks').then((decks) => {
@@ -2717,7 +2739,6 @@ let self = module.exports = {
                     let activeRevision = existingDeck.revisions[activeRevisionIndex];
 
                     async.eachSeries(activeRevision.contentItems, (item, callback) => {
-                        console.log(item);
                         if(item.kind === 'slide'){
                             return helper.getCollection('slides').then((col) => {
                                 return col.findOneAndUpdate(
@@ -2763,7 +2784,7 @@ let self = module.exports = {
             // if it's a root deck, parents should be empty
             if (_.size(parents) > 0) {
                 // abort!
-                throw boom.methodNotAllowed(`cannot archive a non-root deck ${deckId}`);
+                throw boom.conflict(`cannot archive a non-root deck ${deckId}`);
             }
 
             // archive subdecks 

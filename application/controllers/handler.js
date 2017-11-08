@@ -724,6 +724,38 @@ let self = module.exports = {
         }
     },
 
+    deleteDeckTree: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+        let rootDeckId = request.params.id;
+
+        // first we need to check the user is the owner of all subdecks in the tree
+        deckDB.getDeckTreeOwners(rootDeckId).then((deckTreeOwners) => {
+            if (!deckTreeOwners) throw boom.notFound();
+
+            // find the user that owns the root
+            let rootOwner = deckTreeOwners.find((owner) => owner.deckIds.includes(rootDeckId));
+            if (rootOwner._id !== userId) {
+                // only the deck owner can delete a deck!
+                throw boom.forbidden();
+            }
+
+            // result must contain a single item
+            if (_.size(deckTreeOwners) === 1) {
+                return deckDB.archiveDeckTree(rootDeckId, userId, 'delete');
+            }
+
+            // else we need to return an error and provide some info
+            throw boom.conflict(`cannot delete deck tree ${rootDeckId}: includes subdecks owned by other users`, deckTreeOwners);
+
+        }).then(() => reply()).catch((err) => {
+            if (err.isBoom) return reply(err);
+
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+
+    },
+
     // authorize node creation and iterate nodeSpec array to apply each insert
     createDeckTreeNodeWithCheck: function(request, reply) {       
         let userId = request.auth.credentials.userid;
