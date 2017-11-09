@@ -2729,39 +2729,32 @@ let self = module.exports = {
             }).then(() => {
                 // remove from 'deck' collection
                 let removeDeckPromise = helper.getCollection('decks')
-                .then((col) => {
-                    col.remove({'_id': existingDeck._id});                
-                });
+                .then((col) => col.deleteOne({'_id': existingDeck._id}));
 
-                // update usage of its content slides
-                let updateSlidesUsagePromise = new Promise( (resolve, reject) => {
-                    let activeRevisionIndex = getActiveRevision(existingDeck);
-                    let activeRevision = existingDeck.revisions[activeRevisionIndex];
-
-                    async.eachSeries(activeRevision.contentItems, (item, callback) => {
-                        if(item.kind === 'slide'){
-                            return helper.getCollection('slides').then((col) => {
-                                return col.findOneAndUpdate(
-                                    {
-                                        _id: item.ref.id,
-                                        'revisions.id': item.ref.revision,
+                // update usage of its content items
+                let updateUsagePromise = new Promise((resolve, reject) => {
+                    let contentItems = _.flatten(
+                        existingDeck.revisions.map((rev) => rev.contentItems
+                            .map((item) => Object.assign({ deckRevision: rev.id }, item)))
+                    );
+                    async.eachSeries(contentItems, (item, done) => {
+                        let collection = item.kind === 'slide' ? 'slides' : 'decks';
+                        helper.getCollection(collection).then((col) => {
+                            return col.findOneAndUpdate(
+                                {
+                                    _id: item.ref.id,
+                                    'revisions.id': item.ref.revision,
+                                },
+                                { $pull: {
+                                    'revisions.$.usage': {
+                                        id: existingDeck._id,
+                                        revision: item.deckRevision,
                                     },
-                                    { $pull: {
-                                        'revisions.$.usage': {
-                                            id: existingDeck._id,
-                                            revision: activeRevision.id,
-                                        },
-                                    } }
-                                );
-                            }).then( () => {
-                                callback();
-                            }).catch( (err) => {
-                                callback(err);
-                            });
-                        } else {
-                            // subdecks are also archived so no need to update their usage
-                            callback();
-                        }
+                                } }
+                            );
+                        })
+                        .then(() => done())
+                        .catch((err) => done(err));
                     }, (err) => {
                         if(err){
                             reject(err);
@@ -2771,7 +2764,7 @@ let self = module.exports = {
                     });
                 });
 
-                return Promise.all([removeDeckPromise, updateSlidesUsagePromise]);
+                return Promise.all([removeDeckPromise, updateUsagePromise]);
             });
         });     
     },

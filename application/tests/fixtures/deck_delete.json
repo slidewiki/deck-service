@@ -81,6 +81,63 @@
               }
             ],
             "theme": "default"
+          },
+          {
+            "id": 2,
+            "usage": [],
+            "title": "Test delete a deck",
+            "timestamp": "2017-11-07T16:12:23.893Z",
+            "lastUpdate": "2017-11-07T16:13:34.628Z",
+            "user": 46,
+            "language": "en_GB",
+            "parent": null,
+            "tags": [],
+            "comment": null,
+            "abstract": null,
+            "footer": null,
+            "contentItems": [
+              {
+                "order": 1,
+                "kind": "slide",
+                "ref": {
+                  "id": 15016,
+                  "revision": 2
+                }
+              },
+              {
+                "order": 2,
+                "kind": "slide",
+                "ref": {
+                  "id": 15017,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 3,
+                "kind": "slide",
+                "ref": {
+                  "id": 15018,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 4,
+                "kind": "deck",
+                "ref": {
+                  "id": 2273,
+                  "revision": 1
+                }
+              },
+              {
+                "order": 5,
+                "kind": "deck",
+                "ref": {
+                  "id": 2274,
+                  "revision": 1
+                }
+              }
+            ],
+            "theme": "default"
           }
         ]
       },
@@ -463,6 +520,23 @@
               {
                 "id": 2272,
                 "revision": 1
+              }
+            ],
+            "timestamp": "2017-11-07T16:12:23.908Z",
+            "user": 46,
+            "title": "New slide",
+            "content": "<div class=\"pptx2html\" style=\"position: relative; width: 960px; height: 720px;\"><div _id=\"2\" _idx=\"undefined\" _name=\"Title 1\" _type=\"title\" class=\"block content v-mid h-mid\" style=\"position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;\"><h3>Title</h3></div><div _id=\"3\" _idx=\"1\" _name=\"Content Placeholder 2\" _type=\"body\" class=\"block content v-up\" style=\"position: absolute; top: 191.667px; left: 66px; width: 828px; height: 456.833px; z-index: 23520;\"><ul>\t<li>Text bullet 1</li>\t<li>Text bullet 2</li></ul><div class=\"h-left\">&nbsp;</div></div></div>",
+            "speakernotes": null,
+            "parent": null,
+            "tags": null,
+            "license": "CC BY-SA"
+          },
+          {
+            "id": 2,
+            "usage": [
+              {
+                "id": 2272,
+                "revision": 2
               }
             ],
             "timestamp": "2017-11-07T16:12:23.908Z",

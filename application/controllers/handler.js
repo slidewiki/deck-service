@@ -692,6 +692,32 @@ let self = module.exports = {
 
     },
 
+    deleteDeck: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+        let deckId = request.params.id;
+
+        deckDB.get(deckId).then((existingDeck) => {
+            if (!existingDeck) throw boom.notFound();
+
+            // only the owner may delete a deck
+            if (existingDeck.user !== userId) throw boom.forbidden();
+
+            // check references across any deck revisions
+            return deckDB.getUsage(deckId).then((parents) => {
+                if (!_.isEmpty(parents)) throw boom.conflict(`cannot archive a non-root deck ${deckId}`);
+
+                return deckDB.archiveDeck(deckId, userId, 'delete');
+            });
+
+        }).then(() => reply()).catch((err) => {
+            if (err.isBoom) return reply(err);
+
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+
+    },
+
     //gets the decktree with the given deck as root
     getDeckTree: function(request, reply) {
         if(request.query && request.query.enrich) {

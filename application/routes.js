@@ -479,6 +479,30 @@ module.exports = function(server) {
         }
     });
 
+    server.route({
+        method: 'DELETE',
+        path: '/deck/{id}',
+        handler: handlers.deleteDeck,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Delete (archive) a deck (must be a root deck tree, i.e. not used as subdeck)',
+            response: {
+                emptyStatusCode: 204,
+                status: { '204' : false }
+            },
+        },
+
+    });
+
     //slides
     server.route({
         method: 'GET',
@@ -765,7 +789,7 @@ module.exports = function(server) {
             },
             tags: ['api'],
             auth: 'jwt',
-            description: 'Delete (archive) a deck tree (must be a root deck tree, i.e. no used as subdeck',
+            description: 'Delete (archive) a deck tree (must be a root deck tree, i.e. not used as subdeck)',
             response: {
                 emptyStatusCode: 204,
                 status: { '204' : false }
