@@ -7,6 +7,8 @@ const decks = require('./controllers/decks');
 const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
 
+const availableThemes = Joi.string().valid('default', 'sky', 'blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub');
+
 // TODO better organize joi validation models
 const apiModels = {};
 apiModels.tag = Joi.object().keys({
@@ -280,7 +282,7 @@ module.exports = function(server) {
                         speakernotes: Joi.string().allow('')
                     }),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
-                    theme : Joi.string().valid('default', 'blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub'),
+                    theme : availableThemes,
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number().required(),
@@ -329,7 +331,7 @@ module.exports = function(server) {
                     comment: Joi.string().allow(''),
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
-                    theme : Joi.string().valid('default', 'blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub'),
+                    theme : availableThemes,
                     new_revision: Joi.boolean(),
                 }),
 
@@ -548,7 +550,7 @@ module.exports = function(server) {
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
                     }),
-                    theme : Joi.string().valid('default', 'blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub'),
+                    theme : availableThemes,
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     comment: Joi.string().allow(''),
@@ -589,7 +591,7 @@ module.exports = function(server) {
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
                     }),
-                    theme : Joi.string().valid('default', 'blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub'),
+                    theme : availableThemes,
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
@@ -772,7 +774,7 @@ module.exports = function(server) {
                     title: Joi.string(),
                     license: Joi.string(),
                     speakernotes: Joi.string(),
-                    theme : Joi.string().valid('default', 'blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub'),
+                    theme : availableThemes,
                 }).requiredKeys('selector'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
