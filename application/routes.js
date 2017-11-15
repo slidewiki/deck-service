@@ -7,7 +7,11 @@ const decks = require('./controllers/decks');
 const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
 
-const availableThemes = Joi.string().valid('default', 'sky', 'blood', 'night', 'beige', 'league', 'serif', 'solarized', 'white', 'black', 'moon', 'simple', 'epub');
+const availableThemes = Joi.string()
+                      .default('default')
+                      .valid('default', 'beige', 'black', 'blood', 'league', 'moon', 'night', 'odimadrid', 'oeg', 'openuniversity', 'simple', 'solarized', 'white')
+                      .description('Available themes to apply to the thumbnail')
+
 
 // TODO better organize joi validation models
 const apiModels = {};
