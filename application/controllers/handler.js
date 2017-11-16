@@ -254,7 +254,7 @@ let self = module.exports = {
         let slideId = request.params.id;
         slideDB.get(slideId).then((slide) => {
             if(!slide) return reply(boom.notFound());
-            
+
             let items = slide.revisions[0].dataSources || [];
             let totalCount = items.length;
             if (request.query.countOnly) {
@@ -409,6 +409,21 @@ let self = module.exports = {
 
             let currentLang = {'deck_id':deckId, 'language': deck.revisions[0].language};
             reply({'translations': deck.translations, 'currentLang':currentLang});
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
+    getSlideTranslations: function(request, reply){
+        let slideId = request.params.id; // it should already be a number
+
+        slideDB.get(slideId).then((slide) => {
+            if (!slide) return reply(boom.notFound());
+
+            let currentLang = {'slide_id':slideId, 'language': slide.language};
+            reply({'translations': slide.translations, 'currentLang':currentLang});
 
         }).catch((error) => {
             request.log('error', error);
@@ -641,6 +656,28 @@ let self = module.exports = {
 
     },
 
+    translateSlideRevision: function(request, reply) {
+        let slideId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        // return slideDB.forkAllowed(slideId, userId)
+        // .then((forkAllowed) => {
+        //     if (!forkAllowed) {
+        //         return reply(boom.forbidden());
+        //     }
+
+        return slideDB.translateSlideRevision(slideId, userId, request.payload.language).then((new_slide) => {
+            //We must iterate through all objects in the decktree of the fork and translate each one
+            reply(new_slide);
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+
+        //})
+
+    },
+
     // simply creates a new deck revision without updating anything
     createDeckRevision: function(request, reply) {
         let userId = request.auth.credentials.userid;
@@ -705,7 +742,7 @@ let self = module.exports = {
                 if(err.isBoom) return reply(err);
 
                 request.log('error', err);
-                reply(boom.badImplementation());                
+                reply(boom.badImplementation());
             });
         } else {
             deckDB.getDeckTreeFromDB(request.params.id)
@@ -725,7 +762,7 @@ let self = module.exports = {
     },
 
     // authorize node creation and iterate nodeSpec array to apply each insert
-    createDeckTreeNodeWithCheck: function(request, reply) {       
+    createDeckTreeNodeWithCheck: function(request, reply) {
         let userId = request.auth.credentials.userid;
         let rootDeckId = request.payload.selector.id;
 
@@ -850,10 +887,10 @@ let self = module.exports = {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
-                            
+
                             let insertContentItemPromise = deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
                             let addToUsagePromise = slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
-                            
+
                             Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
                                 reply(node);
                             }).catch( (err) => {
@@ -944,7 +981,7 @@ let self = module.exports = {
                         // create the new slide into the database
                         self._newSlide(slide, userId, request).then((createdSlide) => {
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
-                            
+
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
                             deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck).then( () => {
                                 reply(node);
@@ -1007,7 +1044,7 @@ let self = module.exports = {
 
                             let insertContentItemPromise = deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId, top_root_deck);
                             let addToUsagePromise = deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
-                            
+
                             Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
                                 //we have to return from the callback, else empty node is returned because it is updated asynchronously
                                 self.getDeckTree({
@@ -1022,7 +1059,7 @@ let self = module.exports = {
                                 request.log('error', err);
                                 reply(boom.badImplementation());
                             });
-                            
+
                         }
                     });
                 }
@@ -1918,7 +1955,7 @@ let self = module.exports = {
         authorizeUser(userId, deckId, rootDeckId).then((boomError) => {
             if (boomError) return boomError;
 
-            return deckDB.get(deckId).then( (deck) => { 
+            return deckDB.get(deckId).then( (deck) => {
                 if(!deck) return boom.notFound();
 
                 return deckDB.replaceTags(deckId, request.payload.tags, userId, rootDeckId).then((updatedDeck) => {
@@ -1985,7 +2022,7 @@ let self = module.exports = {
             request.log('error', error);
             reply(boom.badImplementation());
         });
-    }, 
+    },
 
     getDeckDeepUsage: function(request, reply){
         let deckId = request.params.id;
@@ -2009,7 +2046,7 @@ let self = module.exports = {
     getSlideDeepUsage: function(request, reply){
         let slideId = request.params.id;
 
-        slideDB.exists(slideId).then( (exists) => { 
+        slideDB.exists(slideId).then( (exists) => {
             if(!exists) return reply(boom.notFound());
 
             return deckDB.getDeepUsage(slideId, 'slide', request.query.keepVisibleOnly).then( (usage) => {
@@ -2023,7 +2060,7 @@ let self = module.exports = {
             request.log('error', err);
             reply(boom.badImplementation());
         });
-    }, 
+    },
 
     getForkGroup: function(request, reply){
         deckDB.computeForkGroup(request.params.id).then( (forkGroup) => {
