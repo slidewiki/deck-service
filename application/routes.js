@@ -409,6 +409,28 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'PUT',
+        path: '/slide/{id}/translate',
+        handler: handlers.translateSlideRevision,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                payload: Joi.object().keys({
+                    language: Joi.string(),
+                }).requiredKeys('language'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description:'Translate a slide and store as a new fork'
+        }
+    });
+
+    server.route({
         method: 'GET',
         path: '/deck/{id}/revisions',
         handler: handlers.getDeckRevisions,
@@ -435,6 +457,21 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'List all deck translations for current deck',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/slide/{id}/translations',
+        handler: handlers.getSlideTranslations,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The slide id (without revision)'),
+                },
+            },
+            tags: ['api'],
+            description: 'List all slide translations for current deck',
         },
     });
 
@@ -746,7 +783,7 @@ module.exports = function(server) {
             validate: {
                 params: {
                     id: Joi.string()
-                }, 
+                },
                 query: {
                     enrich: Joi.boolean().truthy('1').falsy('0', ''),
                 }

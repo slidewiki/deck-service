@@ -5,6 +5,10 @@ Controller for handling mongodb and the data model slide while providing CRUD'is
 'use strict';
 
 const util = require('../lib/util');
+const _ = require('lodash');
+const translationService = require('../services/translation');
+const fileService = require('../services/file');
+const async = require('async');
 
 const helper = require('./helper'),
     slideModel = require('../models/slide.js'),
@@ -447,7 +451,112 @@ let self = module.exports = {
 
     },
 
+    translateSlideRevision: function(slide_id, user, language) { //slide_id: {id: x, rev: y}; //TODO origin has to contain the revision number!!!
+
+        return new Promise((resolve, reject) => {
+            let id_array = slide_id.split('-');
+            let id = slide_id;
+            let rev = '1';
+            if (!id_array){ //there was no revision segment
+                return ({error: 'Please, provide slide revision'});
+            } else{
+                id =  slide_id.split('-')[0];
+                rev = slide_id.split('-')[1];
+            }
+            helper.connectToDatabase().then((db) => {
+                return helper.getNextIncrementationValueForCollection(db, 'slides').then((newSlideId) => {
+                    return helper.getCollection('slides').then((slides) => {
+                        return slides.findOne({_id: parseInt(id)}).then((slide) => {
+                            // TODO
+                            let slideRevisionIndex = rev - 1;
+                            slide.revisions = [slide.revisions[slideRevisionIndex]];
+
+                            // contentItemsMap[slide._id] = newSlideId;
+                            // slide_id_map[slide._id] = newSlideId;
+
+                            let oldSlideId = slide._id;
+                            slide._id = newSlideId;
+
+                            //slide.translated_from =
+                            return translationService.translateSlide(oldSlideId, language, user).then((translated) => {
+                                //console.log('SLIDE response', original);
+                                if (translated.error) {
+                                    //console.log(original);
+
+                                    // TODO WAT
+                                    return {};
+                                }
+
+
+                                translated._id = newSlideId;
+                                translated.revisions[0].usage = []; //empty the usage as we only translate the slide and do not replace it
+
+                                return slides.save(translated).then(() => {
+                                    // update translations array
+                                    let translations = [];
+                                    if (!_.isEmpty(slide.translations)){
+                                        translations = slide.translations;
+                                        translations.push({'slide_id':slide._id, 'language': language});
+                                    }else{
+                                        translations.push({'slide_id':slide._id, 'language': language});
+                                        translations.push({'slide_id':oldSlideId, 'language':slide.language});
+                                    }
+
+                                    // create the thumbnail
+                                    let traslatedSlideId = `${translated._id}-1`;
+                                    fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId).catch((err) => {
+                                        console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
+                                    });
+
+                                    //filling in the translations array for all decks in the 'family'
+                                    return self.updateTranslations(translations).then(() => {
+                                        return translated;
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            }).then((new_slide) => {
+                resolve(new_slide);
+            }).catch((e) => {
+                console.log(e);
+                reject(e);
+            });
+        });
+
+    },
+
+    updateTranslations(translations_array){
+        return new Promise((resolve, reject) => {
+            async.each(translations_array, (translation, cbEach) => {
+                return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+                .then((db2) => db2.collection('slides'))
+                .then((col) => {
+                    return col.findOne({_id: parseInt(translation.slide_id)})
+                    .then((found) => {
+                        if (found){
+                            found.translations = translations_array;
+                            col.save(found);
+                            resolve();
+                        }else{
+                            console.log('Slide not found: ' + translation.slide_id);
+                            reject('Slide not found: ' + translation.slide_id);
+                        }
+                    })
+                    .catch(cbEach);
+                });
+            }, (err) => {
+                if (err) {
+                    return reject(err);
+                }
+            });
+        });
+    }
+
+
 };
+
 
 // split slide id given as parameter to slide id and revision id
 function splitSlideIdParam(slideId){
@@ -495,6 +604,8 @@ function convertToNewSlide(slide) {
     };
     return result;
 }
+
+
 
 function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
     let now = new Date();

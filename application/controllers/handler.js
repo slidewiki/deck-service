@@ -422,6 +422,21 @@ let self = module.exports = {
         });
     },
 
+    getSlideTranslations: function(request, reply){
+        let slideId = request.params.id; // it should already be a number
+
+        slideDB.get(slideId).then((slide) => {
+            if (!slide) return reply(boom.notFound());
+
+            let currentLang = {'slide_id':slideId, 'language': slide.language};
+            reply({'translations': slide.translations, 'currentLang':currentLang});
+
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
     getDeckRevisions: function(request, reply) {
         let deckId = request.params.id; // it should already be a number
 
@@ -647,6 +662,28 @@ let self = module.exports = {
 
     },
 
+    translateSlideRevision: function(request, reply) {
+        let slideId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        // return slideDB.forkAllowed(slideId, userId)
+        // .then((forkAllowed) => {
+        //     if (!forkAllowed) {
+        //         return reply(boom.forbidden());
+        //     }
+
+        return slideDB.translateSlideRevision(slideId, userId, request.payload.language).then((new_slide) => {
+            //We must iterate through all objects in the decktree of the fork and translate each one
+            reply(new_slide);
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+
+        //})
+
+    },
+
     // simply creates a new deck revision without updating anything
     createDeckRevision: function(request, reply) {
         let userId = request.auth.credentials.userid;
@@ -711,7 +748,7 @@ let self = module.exports = {
                 if(err.isBoom) return reply(err);
 
                 request.log('error', err);
-                reply(boom.badImplementation());                
+                reply(boom.badImplementation());
             });
         } else {
             deckDB.getDeckTreeFromDB(request.params.id)
