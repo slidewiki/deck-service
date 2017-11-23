@@ -916,11 +916,13 @@ let self = module.exports = {
                     existingDeck.contributors = contributors;
                 }
 
+                let updatedRevision = existingDeck.revisions[activeRevisionId-1];
+
                 existingDeck.lastUpdate = new Date().toISOString();
-                existingDeck.revisions[activeRevisionId-1].lastUpdate = existingDeck.lastUpdate;
+                updatedRevision.lastUpdate = existingDeck.lastUpdate;
 
                 if(position && position > 0){
-                    let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+                    let citems = updatedRevision.contentItems;
                     for(let i = position-1; i < citems.length; i++){
                         citems[i].order = parseInt(citems[i].order)+1;
                     }
@@ -934,18 +936,18 @@ let self = module.exports = {
                         }
                     };
                     citems.splice(position-1, 0, newCitem);
-                    existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+                    updatedRevision.contentItems = citems;
 
                     if (deckTracker) deckTracker.applyChangeLog();
 
-                    col.save(existingDeck);
+                    return col.save(existingDeck).then(() => updatedRevision);
                 }
                 else{
                     // add it to the end
                     // we need to track stuff, this doesn't help
-                    let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+                    let citems = updatedRevision.contentItems;
                     let newCitem = {
-                        order: parseInt(getOrder(existingDeck.revisions[activeRevisionId-1]))+1,
+                        order: parseInt(getOrder(updatedRevision))+1,
                         kind: ckind,
                         ref : {
                             id: parseInt(citem.id),
@@ -953,35 +955,13 @@ let self = module.exports = {
                         }
                     };
                     citems.push(newCitem);
-                    existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+                    updatedRevision.contentItems = citems;
 
                     if (deckTracker) deckTracker.applyChangeLog();
 
-                    col.save(existingDeck);
-
-                    // TODO dead code
-                    return;
-
-                    // we need to track stuff, this doesn't help
-                    col.findOneAndUpdate({
-                        _id: parseInt(root_deck_path[0]),  revisions : {$elemMatch: {id: parseInt(activeRevisionId)}}  },
-                        {
-                            $push: {
-                                'revisions.$.contentItems': {
-                                    order: parseInt(getOrder(existingDeck.revisions[activeRevisionId-1]))+1,
-                                    kind: ckind,
-                                    ref : {
-                                        id: parseInt(citem.id),
-                                        revision:citem_revision_id
-                                    }
-                                }
-                            },
-                            $set: {
-                                'contributors': existingDeck.contributors
-                            }
-                        }
-                    );
+                    return col.save(existingDeck).then(() => updatedRevision);
                 }
+
             });
         });
 
@@ -1117,8 +1097,12 @@ let self = module.exports = {
                 let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user, parentOperations, revertedRevId ? 'revert' : undefined);
 
                 existingDeck.lastUpdate = new Date().toISOString();
+
+                let updatedDeckRevision;
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
+                        // TODO clean up this mess!
+                        updatedDeckRevision = existingDeck.revisions[i];
 
                         for(let j = 0; j < existingDeck.revisions[i].contentItems.length; j++) {
                             if(existingDeck.revisions[i].contentItems[j].ref.id === citem._id && existingDeck.revisions[i].contentItems[j].kind === ckind) {
@@ -1155,6 +1139,7 @@ let self = module.exports = {
                         oldRevision: old_rev_id,
                         newRrevision: newRevId,
                         deckChanges: deckChanges,
+                        updatedDeckRevision,
                     };
                 });
             });
@@ -1793,7 +1778,7 @@ let self = module.exports = {
 
                                                             // create the thumbnail
                                                             let traslatedSlideId = `${translated._id}-1`;
-                                                            fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId).catch((err) => {
+                                                            fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
                                                                 console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
                                                             });
 

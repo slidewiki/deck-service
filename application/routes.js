@@ -10,7 +10,7 @@ const archives = require('./controllers/archives');
 const availableThemes = Joi.string()
                       .default('default')
                       .valid('default', 'beige', 'black', 'blood', 'league', 'moon', 'night', 'odimadrid', 'oeg', 'openuniversity', 'simple', 'solarized', 'white')
-                      .description('Available themes to apply to the thumbnail')
+                      .description('Available themes to apply to the thumbnail');
 
 
 // TODO better organize joi validation models
@@ -554,7 +554,6 @@ module.exports = function(server) {
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
                     }),
-                    theme : availableThemes,
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     comment: Joi.string().allow(''),
@@ -595,7 +594,6 @@ module.exports = function(server) {
                         id: Joi.string().alphanum().lowercase(),
                         revision: Joi.string().alphanum().lowercase()
                     }),
-                    theme : availableThemes,
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
@@ -778,7 +776,6 @@ module.exports = function(server) {
                     title: Joi.string(),
                     license: Joi.string(),
                     speakernotes: Joi.string(),
-                    theme : availableThemes,
                 }).requiredKeys('selector'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
