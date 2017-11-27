@@ -1358,6 +1358,7 @@ let self = module.exports = {
                                     speakernotes: slideRevision.speakernotes,
                                     user: String(slideRevision.user),
                                     id: slide._id+'-'+slideRevision.id,
+                                    theme: deckRevision.theme,
                                     type: 'slide'
                                 });
                                 callback();
