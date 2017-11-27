@@ -12,7 +12,7 @@ const self = module.exports = {
         let encodedContent = he.encode(slideContent, { allowUnsafeSymbols: true });
 
         return rp.post({
-            uri: `${Microservices.file.uri}/slideThumbnail/${slideId}/${theme}`,
+            uri: `${Microservices.file.uri}/thumbnail/slide/${slideId}/${theme}`,
             body: encodedContent,
             headers: {
                 'Content-Type': 'text/plain'
