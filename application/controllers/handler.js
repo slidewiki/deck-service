@@ -1728,6 +1728,7 @@ let self = module.exports = {
                 metadata.translation = revision.translation;
                 metadata.tags = revision.tags;
                 metadata.parent = revision.parent;
+                metadata.theme = revision.theme;
 
                 // get first slide
                 metadata.firstSlide = deckDB.getFirstSlide(revision);
