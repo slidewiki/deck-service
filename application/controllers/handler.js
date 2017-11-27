@@ -668,7 +668,7 @@ let self = module.exports = {
 
         return slideDB.translateSlideRevision(slideId, userId, request.payload.language).then((new_slide) => {
             //We must iterate through all objects in the decktree of the fork and translate each one
-            reply(new_slide);
+            reply({slide: new_slide});
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
