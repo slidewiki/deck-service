@@ -1233,7 +1233,12 @@ let self = module.exports = {
                                     return col.findOne({_id: parseInt(citem.ref.id)})
                                     .then((slide) => {
                                         let slide_revision = citem.ref.revision-1;
-                                        deckTree.children.push({title: striptags(slide.revisions[slide_revision].title), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                                        deckTree.children.push({
+                                            title: striptags(slide.revisions[slide_revision].title),
+                                            id: slide._id+'-'+slide.revisions[slide_revision].id,
+                                            type: 'slide',
+                                            theme: deck.revisions[revision_id].theme,
+                                        });
                                         callback();
                                     });
                                 }).catch(callback);
