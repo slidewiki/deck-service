@@ -2160,6 +2160,7 @@ let self = module.exports = {
             _id : 0,
             id: '$_id',
             revision: '$revisions.id',
+            theme: '$revisions.theme',
         };
 
         if (item.revision) {
@@ -2190,6 +2191,7 @@ let self = module.exports = {
                         kind: 1,
                         ref: 1,
                     },
+                    theme: 1,
                 },
             } },
             { $unwind: '$revisions' },
@@ -2207,6 +2209,7 @@ let self = module.exports = {
                 $project: {
                     id: 1,
                     revision: 1,
+                    theme: 1,
                     using: '$using.ref.revision',
                 },
             });
