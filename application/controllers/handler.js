@@ -1592,6 +1592,7 @@ let self = module.exports = {
                         timestamp: deck.timestamp,
                         language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
                         forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                        theme: activeRevision.theme,
                         firstSlide: deckDB.getFirstSlide(activeRevision),
                         revisionId: activeRevision.id,
                         latestRevisionId: latestRevision.id
@@ -1663,6 +1664,7 @@ let self = module.exports = {
                         timestamp: deck.timestamp,
                         language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
                         forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                        theme: activeRevision.theme,
                         firstSlide: deckDB.getFirstSlide(activeRevision),
                         revisionId: activeRevision.id,
                         latestRevisionId: latestRevision.id

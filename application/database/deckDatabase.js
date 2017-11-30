@@ -1340,7 +1340,7 @@ let self = module.exports = {
                     id: deckId,
                     type: 'deck',
                     user: String(deckRevision.user),
-                    theme: String(deckRevision.theme),
+                    theme: deckRevision.theme,
                     children: []
                 };
             }
