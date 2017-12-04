@@ -9,12 +9,14 @@ const getModel = Joi.object().keys({
     description: Joi.string().allow(['', null]),
     timestamp: Joi.string(), 
     lastUpdate: Joi.string(),
+    userGroup: Joi.number().integer(),
     decks: Joi.array().items(Joi.number().integer())
 });
 
 const newModel = Joi.object().keys({
     title: Joi.string(), 
     description: Joi.string().allow(['', null]),
+    userGroup: Joi.number().integer(),
     decks: Joi.array().items(Joi.number().integer())
 }).requiredKeys('title', 'decks');
 
