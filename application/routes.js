@@ -1380,7 +1380,11 @@ module.exports = function(server) {
                     id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
                 },
                 query: {
-                    user: Joi.number().integer().description('Optionally filter with deck group owner id')
+                    user: Joi.number().integer().description('Optionally filter with deck group owner id'), 
+                    usergroup: [
+                        Joi.number().integer().description('a user group id'),
+                        Joi.array().items(Joi.number().integer()).description('array of user group ids')
+                    ]
                 }
             },
             tags: ['api'],

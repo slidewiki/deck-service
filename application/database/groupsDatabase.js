@@ -2,6 +2,7 @@
 
 const helper = require('./helper');
 const validateGroup = require('../models/group');
+const userService = require('../services/user');
 
 function getGroupsCollection(){
     return helper.connectToDatabase()
@@ -28,17 +29,36 @@ let self = module.exports = {
         }));
     },
 
-    getDeckGroups: function(deckId, userId){
-        let query = {
-            decks: deckId
-        };
+    getDeckGroups: function(deckId, userId, usergroup){
 
+        // form conditions based on the filters given
+        let conditions = [];
         if(userId){
-            query.user = userId;
-        };
+            conditions.push({user: userId});
+        }
+
+        if(usergroup){
+            let userGroupCondition = (Array.isArray(usergroup)) 
+            ? {userGroup: {$in: usergroup}} 
+            : {userGroup: usergroup};
+
+            conditions.push(userGroupCondition);
+        }
+
+        let queryConditions = {};
+        if(conditions.length > 0){
+            queryConditions = {
+                $or: conditions
+            };
+        }
 
         return getGroupsCollection()
-        .then((groups) => groups.find(query))
+        .then((groups) => groups.find({
+            $and: [
+                {decks: deckId}, 
+                queryConditions
+            ]
+        }))
         .then((stream) => stream.toArray());
     },
 
@@ -138,7 +158,7 @@ let self = module.exports = {
         .then((stream) => stream.toArray());
     }, 
 
-    userPermissions: function(groupId, userId){
+    userPermissions: function(groupId, userId, authToken){
         userId = parseInt(userId);
 
         return self.get(groupId).then( (group) => {
@@ -152,10 +172,21 @@ let self = module.exports = {
                 };
             }
 
-            return {
-                admin: false, 
-                edit: false
-            };
+            return userService.fetchGroupsForUser(userId, authToken).then( (usergroups) => {
+                // if the deck group has a user group that is included in the user's user groups 
+                // then give permisson to add/remove decks from the deck group
+                if(usergroups.includes(group.userGroup)){
+                    return {
+                        admin: false,
+                        edit: true
+                    };
+                } else {
+                    return {
+                        admin: false, 
+                        edit: false
+                    };
+                }
+            });
         });
     }
 

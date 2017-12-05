@@ -5,6 +5,7 @@ const groupDB = require('../database/groupsDatabase');
 const deckDB = require('../database/deckDatabase');
 const util = require('../lib/util');
 const async = require('async');
+const _ = require('lodash');
 
 let self = module.exports = {
 
@@ -31,7 +32,7 @@ let self = module.exports = {
         deckDB.get(deckId).then( (deck) => {
             if(!deck)   return reply(boom.notFound());
 
-            return groupDB.getDeckGroups(deckId, request.query.user).then( (groups) => {
+            return groupDB.getDeckGroups(deckId, request.query.user, request.query.usergroup).then( (groups) => {
                 return reply(groups.map( (group) => {
                     // remove contained deck ids from deck groups found
                     delete group.decks;
@@ -70,8 +71,9 @@ let self = module.exports = {
     replaceMetadata: function(request, reply){
         let groupId = request.params.id;
         let userId = request.auth.credentials.userid;
+        let authToken = request.auth.token;
 
-        authorizeUser(groupId, userId).then( (authError) => {
+        authorizeUser(groupId, userId, authToken, 'admin').then( (authError) => {
             if(authError) return authError;
 
             return groupDB.get(groupId).then( (existingGroup) => {
@@ -92,8 +94,9 @@ let self = module.exports = {
     replaceDecks: function(request, reply){
         let groupId = request.params.id;
         let userId = request.auth.credentials.userid;
+        let authToken = request.auth.token;
 
-        authorizeUser(groupId, userId).then( (authError) => {
+        authorizeUser(groupId, userId, authToken, 'edit').then( (authError) => {
             if(authError) return authError;
 
             return groupDB.get(groupId).then( (existingGroup) => {
@@ -120,9 +123,10 @@ let self = module.exports = {
     updateDecks: function(request, reply){
         let groupId = request.params.id;
         let userId = request.auth.credentials.userid;
+        let authToken = request.auth.token;
         let updateOps = request.payload;
 
-        authorizeUser(groupId, userId).then( (authError) => {
+        authorizeUser(groupId, userId, authToken, 'edit').then( (authError) => {
             if(authError) return authError;
 
             return groupDB.get(groupId).then( (existingGroup) => {
@@ -130,7 +134,8 @@ let self = module.exports = {
 
                 return new Promise( (resolve, reject) => {
                     async.eachSeries(updateOps, (updateOp, done) => {
-
+                        console.log(updateOps);
+                        
                         // parse deck identifier
                         let identifier = util.parseIdentifier(updateOp.deckId);
                         if(!identifier) return reply(boom.badData('Couldn\'t parse deck id given'));
@@ -169,8 +174,9 @@ let self = module.exports = {
     delete: function(request, reply){
         let groupId = request.params.id; 
         let userId = request.auth.credentials.userid;
+        let authToken = request.auth.token;
 
-        authorizeUser(groupId, userId).then( (authError) => {
+        authorizeUser(groupId, userId, authToken, 'admin').then( (authError) => {
             if(authError) return authError;
 
             return groupDB.exists(groupId).then( (exists) => {
@@ -190,10 +196,26 @@ let self = module.exports = {
 
     list: function(request, reply){
 
-        let query = (request.query.user) ? {user: request.query.user} : {};
+        // form conditions based on the filters given
+        let conditions = [];
+        if(request.query.user){
+            conditions.push({user: request.query.user});
+        }
 
-        console.log('edw');
-        console.log(request.query.usergroup);
+        if(request.query.usergroup){
+            let userGroupCondition = (Array.isArray(request.query.usergroup)) 
+            ? {userGroup: {$in: request.query.usergroup}} 
+            : {userGroup: request.query.usergroup};
+
+            conditions.push(userGroupCondition);
+        }
+
+        let query = {};
+        if(conditions.length > 0){
+            query = {
+                $or: conditions
+            };
+        }
 
         let pagination = {};
         pagination.page = request.query.page;
@@ -231,14 +253,14 @@ let self = module.exports = {
 
 };
 
-function authorizeUser(groupId, userId){
-    return groupDB.userPermissions(groupId, userId).then( (perms) => {
+function authorizeUser(groupId, userId, authToken, operation){
+    return groupDB.userPermissions(groupId, userId, authToken).then( (perms) => {
 
         if(!perms) return boom.notFound();
 
-        if(!perms.admin) return boom.forbidden();
+        if(operation === 'admin' && !perms.admin) return boom.forbidden();
 
-        if(!perms.edit) return boom.forbidden();
+        if(operation === 'edit' && !perms.edit) return boom.forbidden();
     });
 }
 
