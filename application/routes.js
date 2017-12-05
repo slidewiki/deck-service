@@ -1396,6 +1396,10 @@ module.exports = function(server) {
             validate: {
                 query: {
                     user: Joi.number().integer().description('a user id'), 
+                    usergroup: [
+                        Joi.number().integer().description('a user group id'),
+                        Joi.array().items(Joi.number().integer()).description('array of user group ids')
+                    ],
                     page: Joi.number().integer().min(0).default(0).required().description('page to be retrieved'), 
                     per_page: Joi.number().integer().positive().default(20).required().description('number of results within a page')
                 },

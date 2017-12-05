@@ -17,7 +17,7 @@ const newModel = Joi.object().keys({
     title: Joi.string(), 
     description: Joi.string().allow(['', null]),
     userGroup: Joi.number().integer(),
-    decks: Joi.array().items(Joi.number().integer())
+    decks: Joi.array().items(Joi.string())
 }).requiredKeys('title', 'decks');
 
 const onlyMetadata = Joi.object().keys({
@@ -26,12 +26,12 @@ const onlyMetadata = Joi.object().keys({
 }).requiredKeys('title');
 
 const onlyDecks = Joi.object().keys({
-    decks: Joi.array().items(Joi.number().integer())
+    decks: Joi.array().items(Joi.string())
 }).requiredKeys('decks');
 
 const updateOp = Joi.object().keys({
     op: Joi.string().valid('add', 'remove'), 
-    deckId: Joi.number().integer()
+    deckId: Joi.string()
 }).requiredKeys('op', 'deckId');
 
 module.exports = {

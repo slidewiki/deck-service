@@ -47,6 +47,17 @@ let self = module.exports = {
     insert: function(request, reply){
         request.payload.user = request.auth.credentials.userid; 
 
+        // parse and filter given deck ids
+        let deckIds = parseDeckIds(request.payload.decks);
+
+        // if number of parsed deck ids is not equal
+        // to deck ids given then return bad data
+        if(deckIds.length !== request.payload.decks.length){
+            return reply(boom.badData('Couldn\'t parse all deck ids given'));
+        }
+
+        request.payload.decks = deckIds;
+
         groupDB.insert(request.payload).then( (group) => {
             return reply(group);
         }).catch( (err) => {
@@ -88,7 +99,13 @@ let self = module.exports = {
             return groupDB.get(groupId).then( (existingGroup) => {
                 if(!existingGroup) return boom.notFound();
 
-                return groupDB.replaceDecks(existingGroup, request.payload.decks).then( (group) => {
+                let deckIds = parseDeckIds(request.payload.decks);
+
+                if(deckIds.length !== request.payload.decks.length){
+                    return boom.badData('Couldn\'t parse all deck ids given');
+                }
+
+                return groupDB.replaceDecks(existingGroup, deckIds).then( (group) => {
                     return group.value;
                 });
             });
@@ -113,12 +130,17 @@ let self = module.exports = {
 
                 return new Promise( (resolve, reject) => {
                     async.eachSeries(updateOps, (updateOp, done) => {
+
+                        // parse deck identifier
+                        let identifier = util.parseIdentifier(updateOp.deckId);
+                        if(!identifier) return reply(boom.badData('Couldn\'t parse deck id given'));
+
                         if(updateOp.op === 'add') {
-                            groupDB.addDeck(groupId, updateOp.deckId)
+                            groupDB.addDeck(groupId, identifier.id)
                             .then( () => done())
                             .catch(done);
                         } else if (updateOp.op === 'remove'){
-                            groupDB.removeDeck(groupId, updateOp.deckId)
+                            groupDB.removeDeck(groupId, identifier.id)
                             .then( () => done())
                             .catch(done);
                         }
@@ -170,6 +192,9 @@ let self = module.exports = {
 
         let query = (request.query.user) ? {user: request.query.user} : {};
 
+        console.log('edw');
+        console.log(request.query.usergroup);
+
         let pagination = {};
         pagination.page = request.query.page;
         pagination.per_page = request.query.per_page;
@@ -214,5 +239,16 @@ function authorizeUser(groupId, userId){
         if(!perms.admin) return boom.forbidden();
 
         if(!perms.edit) return boom.forbidden();
+    });
+}
+
+// parse string deck ids to integers and 
+function parseDeckIds(deckIds){
+    return deckIds.map( (deckId) => {
+        let identifier = util.parseIdentifier(deckId);
+        if(!identifier) return;
+        return parseInt(identifier.id);
+    }).filter( (deckId) => {
+        return (deckId !== undefined);
     });
 }
