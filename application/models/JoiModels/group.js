@@ -23,7 +23,8 @@ const newModel = Joi.object().keys({
 const onlyMetadata = Joi.object().keys({
     title: Joi.string(), 
     description: Joi.string().allow(['', null]),
-}).requiredKeys('title');
+    userGroup: Joi.number().integer(),
+}).requiredKeys('title', 'description');
 
 const onlyDecks = Joi.object().keys({
     decks: Joi.array().items(Joi.string())

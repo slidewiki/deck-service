@@ -88,9 +88,10 @@ let self = module.exports = {
 
             let newGroup = Object.assign({}, existingGroup);
             newGroup.lastUpdate = (new Date()).toISOString();
-            newGroup.title = newMetadata.title;
+            newGroup.title = newMetadata.title || '';
             newGroup.description = newMetadata.description || '';
-
+            (newMetadata.hasOwnProperty('userGroup'))  ? newGroup.userGroup = newMetadata.userGroup : delete newGroup.userGroup;
+           
             return groups.findOneAndReplace( { _id: existingGroup._id }, newGroup, { returnOriginal: false });
         });
     }, 
