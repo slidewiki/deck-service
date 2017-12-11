@@ -398,7 +398,7 @@ module.exports = function(server) {
             },
             tags: ['api'],
             auth: 'jwt',
-            description:'Translate a deck and store as a new fork'
+            description:'Add the deck in a table for cronjob or translate it (if it is not too large)'
         }
     });
 

@@ -643,10 +643,27 @@ let self = module.exports = {
             if (!forkAllowed) {
                 return reply(boom.forbidden());
             }
+            return deckDB.getFlatSlides(deckId).then((deckTree) => {
+                if (!deckTree){
+                    console.log('Cannot get deck tree for deckId' + deckId);
+                    return reply(boom.badImplementation());
+                }else{
+                    if (deckTree.children){
+                        let count = deckTree.children.length;
+                        if (count > 20 ){
+                            return reply({'cronjob': 1});
+                        }else{
+                            return deckDB.translateDeckRevision(deckId, userId, request.payload.language).then((id_map) => {
+                                //We must iterate through all objects in the decktree of the fork and translate each one
+                                id_map.cronjob = null;
+                                reply(id_map);
+                            });
+                        }
+                    }else{
+                        return reply(boom.badImplementation());
+                    }
 
-            return deckDB.translateDeckRevision(deckId, userId, request.payload.language).then((id_map) => {
-                //We must iterate through all objects in the decktree of the fork and translate each one
-                reply(id_map);
+                }
             });
 
         }).catch((error) => {
