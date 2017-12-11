@@ -651,7 +651,7 @@ let self = module.exports = {
                     if (deckTree.children){
                         let count = deckTree.children.length;
                         if (count > 20 ){
-                            return reply({'cronjob': 1});
+                            return reply({'cronjob': 1}); //TODO add the deck_id, language to translate to and user_id in the table for cronjob
                         }else{
                             return deckDB.translateDeckRevision(deckId, userId, request.payload.language).then((id_map) => {
                                 //We must iterate through all objects in the decktree of the fork and translate each one
