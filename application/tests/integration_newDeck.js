@@ -82,7 +82,7 @@ describe('REST API', () => {
             title: 'Dummy',
             speakernotes: 'dummy'
         },
-        theme: 'dummy',
+        theme: 'default',
         editors: {
             groups: [
                 {
