@@ -84,7 +84,7 @@ describe('deckDatabase', function() {
 
             });
 
-            it('should return true for a user implicitly authorized', function() {
+            it('should return true for a contributor that is not explicitly authorized', function() {
                 return deckDB.forkAllowed('54', 3)
                 .then((forkAllowed) => {
                     forkAllowed.should.equal(true);
@@ -115,22 +115,6 @@ describe('deckDatabase', function() {
 
     describe('#getDeckUsersGroups()', function() {
 
-        it('should include all implicitly authorized users for decks that are not private', function() {
-            // update first to private and recalculate
-            return Promise.all([
-                deckDB.getDeckUsersGroups('54')
-                .then((editors) => {
-                    editors.users.should.include.members([ 9, 46, 10, 3 ]);
-                }),
-                // deckDB._adminUpdate('54', { accessLevel: 'restricted' })
-                // .then(() => deckDB.getDeckUsersGroups('54'))
-                // .then((editors) => {
-                //     editors.users.should.include.members([ 9, 46, 10, 3 ]);
-                // }),
-            ]);
-
-        });
-
         it.skip('should only include the owner and no groups for decks that are private', function() {
             // update first to private and recalculate
             return deckDB._adminUpdate('54', { accessLevel: 'private' })
@@ -142,20 +126,20 @@ describe('deckDatabase', function() {
 
         });
 
-        it.skip('should exactly include all implicitly or explicitly authorized users and authorized groups for restricted decks', function() {
+        it.skip('should exactly include all explicitly authorized users and authorized groups for restricted decks', function() {
             // update first to restricted and recalculate
             return deckDB._adminUpdate('54', { accessLevel: 'restricted' })
             .then(() => deckDB.getDeckUsersGroups('54'))
             .then((editors) => {
-                editors.users.should.have.members([ 9, 46, 10, 3, 4, 5 ]);
+                editors.users.should.have.members([ 4, 5 ]);
                 editors.groups.should.have.members([ 2 ]);
             });
         });
 
-        it('should exactly include all implicitly or explicitly authorized users and authorized groups for public decks', function() {
+        it('should exactly include all explicitly authorized users and authorized groups for public decks', function() {
             return deckDB.getDeckUsersGroups('54')
             .then((editors) => {
-                editors.users.should.have.members([ 9, 46, 10, 3, 4, 5 ]);
+                editors.users.should.have.members([ 4, 5 ]);
                 editors.groups.should.have.members([ 2 ]);
             });
         });
@@ -185,10 +169,10 @@ describe('deckDatabase', function() {
 
             });
 
-            it('should allow edit for a user implicitly authorized', function() {
+            it('should not allow edit for a contributor that is not explicitly authorized', function() {
                 return deckDB.userPermissions('54', 3)
                 .then((perms) => {
-                    perms.should.have.property('edit', true);
+                    perms.should.have.property('edit', false);
                 });
 
             });
@@ -235,7 +219,7 @@ describe('deckDatabase', function() {
 
         });
 
-        it('should return false for a user implicitly authorized', function() {
+        it('should return false for a contributor that is not explicitly authorized', function() {
             return deckDB.adminAllowed('54', 3)
             .then((allowed) => {
                 allowed.should.equal(false);
