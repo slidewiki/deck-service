@@ -265,7 +265,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 payload: Joi.object().keys({
-                    description: Joi.string(),
+                    description: Joi.string().allow('').default(''),
                     language: Joi.string(),
                     translation: Joi.object().keys({
                         status: Joi.string().valid('original', 'google', 'revised')
@@ -319,7 +319,7 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 payload: Joi.object().keys({
-                    description: Joi.string(),
+                    description: Joi.string().allow('').default(''),
                     language: Joi.string(),
                     translation: Joi.string().alphanum().lowercase(),
                     tags: Joi.array().items(apiModels.tag).default([]),
@@ -557,7 +557,7 @@ module.exports = function(server) {
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     comment: Joi.string().allow(''),
-                    description: Joi.string().allow(''),
+                    description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                 }).requiredKeys('content', 'root_deck'),
@@ -595,7 +595,7 @@ module.exports = function(server) {
                         revision: Joi.string().alphanum().lowercase()
                     }),
                     comment: Joi.string().allow(''),
-                    description: Joi.string().allow(''),
+                    description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
