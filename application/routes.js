@@ -8,8 +8,8 @@ const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
 
 const availableThemes = Joi.string()
-                      .default('default')
-                      .valid('default', 'sky', 'beige', 'black', 'blood', 'league', 'moon', 'night', 'odimadrid', 'oeg', 'openuniversity', 'simple', 'solarized', 'white')
+                      .default('default').empty('')
+                      .valid('', 'default', 'sky', 'beige', 'black', 'blood', 'league', 'moon', 'night', 'odimadrid', 'oeg', 'openuniversity', 'simple', 'solarized', 'white')
                       .description('Available themes to apply to the thumbnail');
 
 
