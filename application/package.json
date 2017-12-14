@@ -25,6 +25,7 @@
     "stop:mongodb": "docker stop mongotest && docker rm mongotest"
   },
   "dependencies": {
+    "agenda": "^1.0.3",
     "ajv": "^4.11.0",
     "async": "^2.0.1",
     "boom": "^4.2.0",

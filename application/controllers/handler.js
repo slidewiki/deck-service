@@ -9,6 +9,8 @@ Handles the requests by executing stuff and replying to the client. Uses promise
 const _ = require('lodash');
 const util = require('../lib/util');
 
+let queue = require('./queue');
+
 const boom = require('boom'),
     slideDB = require('../database/slideDatabase'),
     deckDB = require('../database/deckDatabase'),
@@ -650,7 +652,8 @@ let self = module.exports = {
                 }else{
                     if (deckTree.children){
                         let count = deckTree.children.length;
-                        if (count > 20 ){
+                        if (count >20 ){
+                            queue.addDeckTranslation(deckId, userId, request.payload.language);
                             return reply({'cronjob': 1}); //TODO add the deck_id, language to translate to and user_id in the table for cronjob
                         }else{
                             return deckDB.translateDeckRevision(deckId, userId, request.payload.language).then((id_map) => {
