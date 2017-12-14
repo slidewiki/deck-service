@@ -102,9 +102,9 @@ let self = module.exports = {
             return groupDB.get(groupId).then( (existingGroup) => {
                 if(!existingGroup) return boom.notFound();
 
-                let deckIds = parseDeckIds(request.payload.decks);
+                let deckIds = parseDeckIds(request.payload);
 
-                if(deckIds.length !== request.payload.decks.length){
+                if(deckIds.length !== request.payload.length){
                     return boom.badData('Couldn\'t parse all deck ids given');
                 }
 

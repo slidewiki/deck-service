@@ -26,9 +26,7 @@ const onlyMetadata = Joi.object().keys({
     userGroup: Joi.number().integer(),
 }).requiredKeys('title', 'description');
 
-const onlyDecks = Joi.object().keys({
-    decks: Joi.array().items(Joi.string())
-}).requiredKeys('decks');
+const onlyDecks = Joi.array().items(Joi.string());
 
 const updateOp = Joi.object().keys({
     op: Joi.string().valid('add', 'remove'), 
