@@ -7,11 +7,11 @@ const hapi = require('hapi'),
 
 const server = new hapi.Server();
 
-let port = 8881;
+let port = (!co.isEmpty(process.env.APPLICATION_PORT)) ? process.env.APPLICATION_PORT : 3000;
 server.connection({
     port: port
 });
-let host = 'localhost';
+let host = (!co.isEmpty(process.env.VIRTUAL_HOST)) ? process.env.VIRTUAL_HOST : server.info.host;
 
 module.exports = server;
 
@@ -40,7 +40,7 @@ let plugins = [
     }, {
         register: require('hapi-swagger'),
         options: {
-            host: host+':'+port,
+            host: host,
             info: {
                 title: 'Deck and Slide Management API',
                 description: 'Powered by node, hapi, joi, hapi-swaggered, hapi-swaggered-ui and swagger-ui',
