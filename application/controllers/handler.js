@@ -9,7 +9,9 @@ Handles the requests by executing stuff and replying to the client. Uses promise
 const _ = require('lodash');
 const util = require('../lib/util');
 
-let queue = require('./queue');
+//let queue = require('./queue');
+let agenda_file = require('../lib/agenda.js');
+//let agenda = require('../worker.js');
 
 const boom = require('boom'),
     slideDB = require('../database/slideDatabase'),
@@ -651,29 +653,19 @@ let self = module.exports = {
                     return reply(boom.badImplementation());
                 }else{
                     if (deckTree.children){
-                        let count = deckTree.children.length;
-                        if (count >20 ){
-                            queue.addDeckTranslation(deckId, userId, request.payload.language);
-                            return reply({'cronjob': 1}); //TODO add the deck_id, language to translate to and user_id in the table for cronjob
-                        }else{
-                            return deckDB.translateDeckRevision(deckId, userId, request.payload.language).then((id_map) => {
-                                //We must iterate through all objects in the decktree of the fork and translate each one
-                                id_map.cronjob = null;
-                                reply(id_map);
-                            });
-                        }
+                        agenda_file.getAgenda().then((agenda) => {
+                            agenda.schedule(new Date(Date.now() + 1000), 'translation', { deckId, userId, 'language': request.payload.language});
+                            return reply({cronjob: 1});
+                        }).catch((err) => {console.log(err);});
                     }else{
                         return reply(boom.badImplementation());
                     }
-
                 }
             });
-
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
         });
-
     },
 
     translateSlideRevision: function(request, reply) {
