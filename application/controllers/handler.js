@@ -654,9 +654,12 @@ let self = module.exports = {
                 }else{
                     if (deckTree.children){
                         agenda_file.getAgenda().then((agenda) => {
-                            agenda.schedule(new Date(Date.now() + 1000), 'translation', { deckId, userId, 'language': request.payload.language});
+                            agenda.schedule(new Date(Date.now()), 'translation', { deckId, userId, 'language': request.payload.language});
                             return reply({cronjob: 1});
-                        }).catch((err) => {console.log(err);});
+                        }).catch((error) => {
+                            request.log('error', error);
+                            reply(boom.badImplementation());
+                        });
                     }else{
                         return reply(boom.badImplementation());
                     }

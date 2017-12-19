@@ -6,16 +6,21 @@ const deckDB = require('../../database/deckDatabase.js');
 
 
 let self = module.exports = (agenda) => {
-    agenda.define('translation', (job, done) => {
-        deckDB.translateDeckRevision(job.attrs.data.deckId, job.attrs.data.userId, job.attrs.data.language)
-        .then((id_map) => {
-            console.log(id_map);
-            done();
-        })
-        .catch((err) => {
-            done(err);
+    if (agenda){
+        agenda.define('translation', (job, done) => {
+            deckDB.translateDeckRevision(job.attrs.data.deckId, job.attrs.data.userId, job.attrs.data.language)
+            .then((id_map) => {
+                console.log(id_map);
+                done();
+            })
+            .catch((err) => {
+                done(err);
+            });
         });
-    });
+    }else{
+        throw('Agenda listener was not created');
+    }
+
 };
 
 

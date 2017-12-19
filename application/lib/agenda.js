@@ -9,12 +9,12 @@ let self = module.exports = {
         return helper.connectToDatabase()
         .then((db) => {
             let agenda = new Agenda().mongo(db, 'jobs');
-            return agenda;
+            return (agenda);
         })
         .catch((err) => {
-            return;
-        });
-
+            console.log('Agenda cannot connect to the mongoDB');
+            return ;
+        });;
     },
     startAgenda : (agenda) => {
 
@@ -25,8 +25,15 @@ let self = module.exports = {
         });
 
         if(jobTypes.length) {
-            agenda.start();
-            console.log('Agenda listener is waiting for jobs');
+            try {
+                agenda.start();
+                console.log('Agenda listener is waiting for jobs');
+            }catch(err){
+                console.log('Cannot start agenda listener, error: %s', err);
+            }
+
+        }else{
+            console.log('Agenda listener was called without any jobs specified');
         }
 
     }
