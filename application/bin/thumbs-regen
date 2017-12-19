@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 'use strict';
 
+const _ = require('lodash');
 const fileService = require('../services/file');
+const deckDB = require('../database/deckDatabase');
 
-function createThumbnailForSlide(slideId, slideTitle, slideContent) {
+function createThumbnailForSlide(slideId, slideTitle, slideContent, theme) {
     if (!slideContent) {
         slideContent = `<h2>${slideTitle}</h2>`;
     }
 
-    return fileService.createThumbnail(slideContent, slideId).then(() => {
+    return fileService.createThumbnail(slideContent, slideId, theme).then(() => {
         // console.log(`created thumbnail for ${slideId}`);
         return true;
     }).catch((err) => {
-        console.error(`could not create thumbnail for ${slideId}, error was: ${err.message}`);
+        console.error(`could not create thumbnail for ${slideId} with ${theme} theme, error was: ${err.message}`);
         return false;
     });
 
@@ -30,21 +32,29 @@ helper.getCollection('slides')
 .then((slides) => {
     console.log('started regenerating slide thumbnails...');
     let progressBar = new ProgressBar(':current/:total slides (:percent) :eta sec remaining [:bar]', { total: slides.length });
+
     return slides.reduce((p, slide) => {
         return p.then(() => {
-            // send all thumbnail requests in parallel for each revision
-            return Promise.all(slide.revisions.map((slideRev) => {
-                let slideId = `${slide._id}-${slideRev.id}`;
+            return deckDB.getUsage(slide._id, 'slide').then((usage) => {
+                // usage is a list of deck id/revisions where the slide is being used, 
+                // with each record showing the slide revision and the theme of the parent deck
+                // we only care about the different slide revision/theme combinations
+                let recordsToProcess = _.uniqBy(usage, (u) => `${u.using}/${u.theme || 'default'}`);
 
-                return createThumbnailForSlide(slideId, slideRev.title, slideRev.content).then((created) => {
-                    if (created) {
-                        counter++;
-                    } else {
-                        failed++;
-                    }
-                });
+                // send all thumbnail requests in parallel for each slide
+                return Promise.all(recordsToProcess.map((usageRec) => {
+                    let slideRev = slide.revisions.find((r) => r.id === usageRec.using);
+                    let slideId = `${slide._id}-${slideRev.id}`;
+                    return createThumbnailForSlide(slideId, slideRev.title, slideRev.content, usageRec.theme).then((created) => {
+                        if (created) {
+                            counter++;
+                        } else {
+                            failed++;
+                        }
+                    });
 
-            })).then(() => progressBar.tick());
+                })).then(() => progressBar.tick());
+            });
         });
     }, Promise.resolve());
 
