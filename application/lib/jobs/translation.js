@@ -5,13 +5,17 @@
 const deckDB = require('../../database/deckDatabase.js');
 
 
-let self = module.exports = async function(agenda) {
-    agenda.define('translation', async(job) => {
-            let id_map = await deckDB.translateDeckRevision(job.attrs.data.deckId, job.attrs.data.userId, job.attrs.data.language);
+let self = module.exports = (agenda) => {
+    agenda.define('translation', (job, done) => {
+        deckDB.translateDeckRevision(job.attrs.data.deckId, job.attrs.data.userId, job.attrs.data.language)
+        .then((id_map) => {
             console.log(id_map);
+            done();
+        })
+        .catch((err) => {
+            done(err);
+        });
     });
-    await new Promise(resolve => agenda.once('ready', resolve));
-
 };
 
 
