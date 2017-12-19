@@ -5,13 +5,18 @@ let helper = require('../database/helper.js');
 
 
 let self = module.exports = {
-    getAgenda : async () => {
-        let db = await helper.connectToDatabase()
-        let agenda = await new Agenda().mongo(db, 'jobs');
-        await new Promise(resolve => agenda.once('ready', resolve));
-        return agenda;
+    getAgenda : () => {
+        return helper.connectToDatabase()
+        .then((db) => {
+            let agenda = new Agenda().mongo(db, 'jobs');
+            return agenda;
+        })
+        .catch((err) => {
+            return;
+        });
+
     },
-    startAgenda : async (agenda) => {
+    startAgenda : (agenda) => {
 
         let jobTypes = process.env.JOB_TYPES ? process.env.JOB_TYPES.split(',') : [];
 
