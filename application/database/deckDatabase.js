@@ -513,11 +513,19 @@ let self = module.exports = {
                     deckRevision.tags = deck.tags;
                 }
 
+                let oldTheme = deckRevision.theme;
                 if(!deck.hasOwnProperty('theme') || deck.theme === null){
                     deckRevision.theme = 'default';
                 }
                 else{
                     deckRevision.theme = deck.theme;
+                }
+
+                if (deckRevision.theme !== oldTheme) {
+                    // theme was changed, update thumbs for all direct slides
+                    updateDeckThumbnails(deckRevision, deckRevision.theme).catch((err) => {
+                        console.warn(`could not update slide thumbnails for deck ${id}, error was: ${err.message}`);
+                    });
                 }
 
                 // changes ended here
@@ -916,11 +924,13 @@ let self = module.exports = {
                     existingDeck.contributors = contributors;
                 }
 
+                let updatedRevision = existingDeck.revisions[activeRevisionId-1];
+
                 existingDeck.lastUpdate = new Date().toISOString();
-                existingDeck.revisions[activeRevisionId-1].lastUpdate = existingDeck.lastUpdate;
+                updatedRevision.lastUpdate = existingDeck.lastUpdate;
 
                 if(position && position > 0){
-                    let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+                    let citems = updatedRevision.contentItems;
                     for(let i = position-1; i < citems.length; i++){
                         citems[i].order = parseInt(citems[i].order)+1;
                     }
@@ -934,18 +944,18 @@ let self = module.exports = {
                         }
                     };
                     citems.splice(position-1, 0, newCitem);
-                    existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+                    updatedRevision.contentItems = citems;
 
                     if (deckTracker) deckTracker.applyChangeLog();
 
-                    col.save(existingDeck);
+                    return col.save(existingDeck).then(() => updatedRevision);
                 }
                 else{
                     // add it to the end
                     // we need to track stuff, this doesn't help
-                    let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+                    let citems = updatedRevision.contentItems;
                     let newCitem = {
-                        order: parseInt(getOrder(existingDeck.revisions[activeRevisionId-1]))+1,
+                        order: parseInt(getOrder(updatedRevision))+1,
                         kind: ckind,
                         ref : {
                             id: parseInt(citem.id),
@@ -953,35 +963,13 @@ let self = module.exports = {
                         }
                     };
                     citems.push(newCitem);
-                    existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+                    updatedRevision.contentItems = citems;
 
                     if (deckTracker) deckTracker.applyChangeLog();
 
-                    col.save(existingDeck);
-
-                    // TODO dead code
-                    return;
-
-                    // we need to track stuff, this doesn't help
-                    col.findOneAndUpdate({
-                        _id: parseInt(root_deck_path[0]),  revisions : {$elemMatch: {id: parseInt(activeRevisionId)}}  },
-                        {
-                            $push: {
-                                'revisions.$.contentItems': {
-                                    order: parseInt(getOrder(existingDeck.revisions[activeRevisionId-1]))+1,
-                                    kind: ckind,
-                                    ref : {
-                                        id: parseInt(citem.id),
-                                        revision:citem_revision_id
-                                    }
-                                }
-                            },
-                            $set: {
-                                'contributors': existingDeck.contributors
-                            }
-                        }
-                    );
+                    return col.save(existingDeck).then(() => updatedRevision);
                 }
+
             });
         });
 
@@ -1117,8 +1105,12 @@ let self = module.exports = {
                 let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user, parentOperations, revertedRevId ? 'revert' : undefined);
 
                 existingDeck.lastUpdate = new Date().toISOString();
+
+                let updatedDeckRevision;
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
+                        // TODO clean up this mess!
+                        updatedDeckRevision = existingDeck.revisions[i];
 
                         for(let j = 0; j < existingDeck.revisions[i].contentItems.length; j++) {
                             if(existingDeck.revisions[i].contentItems[j].ref.id === citem._id && existingDeck.revisions[i].contentItems[j].kind === ckind) {
@@ -1155,6 +1147,7 @@ let self = module.exports = {
                         oldRevision: old_rev_id,
                         newRrevision: newRevId,
                         deckChanges: deckChanges,
+                        updatedDeckRevision,
                     };
                 });
             });
@@ -1240,7 +1233,12 @@ let self = module.exports = {
                                     return col.findOne({_id: parseInt(citem.ref.id)})
                                     .then((slide) => {
                                         let slide_revision = citem.ref.revision-1;
-                                        deckTree.children.push({title: striptags(slide.revisions[slide_revision].title), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                                        deckTree.children.push({
+                                            title: striptags(slide.revisions[slide_revision].title),
+                                            id: slide._id+'-'+slide.revisions[slide_revision].id,
+                                            type: 'slide',
+                                            theme: deck.revisions[revision_id].theme,
+                                        });
                                         callback();
                                     });
                                 }).catch(callback);
@@ -1342,7 +1340,7 @@ let self = module.exports = {
                     id: deckId,
                     type: 'deck',
                     user: String(deckRevision.user),
-                    theme: String(deckRevision.theme),
+                    theme: deckRevision.theme,
                     children: []
                 };
             }
@@ -1373,6 +1371,7 @@ let self = module.exports = {
                                     speakernotes: slideRevision.speakernotes,
                                     user: String(slideRevision.user),
                                     id: slide._id+'-'+slideRevision.id,
+                                    theme: deckRevision.theme,
                                     type: 'slide'
                                 });
                                 callback();
@@ -1793,7 +1792,7 @@ let self = module.exports = {
 
                                                             // create the thumbnail
                                                             let traslatedSlideId = `${translated._id}-1`;
-                                                            fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId).catch((err) => {
+                                                            fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
                                                                 console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
                                                             });
 
@@ -2161,6 +2160,7 @@ let self = module.exports = {
             _id : 0,
             id: '$_id',
             revision: '$revisions.id',
+            theme: '$revisions.theme',
         };
 
         if (item.revision) {
@@ -2191,6 +2191,7 @@ let self = module.exports = {
                         kind: 1,
                         ref: 1,
                     },
+                    theme: 1,
                 },
             } },
             { $unwind: '$revisions' },
@@ -2208,6 +2209,7 @@ let self = module.exports = {
                 $project: {
                     id: 1,
                     revision: 1,
+                    theme: 1,
                     using: '$using.ref.revision',
                 },
             });
@@ -2885,6 +2887,25 @@ let self = module.exports = {
     },
 };
 
+// regenerates direct slide thumbnails according to the deck revision theme 
+function updateDeckThumbnails(deckRevision, newTheme) {
+    return deckRevision.contentItems.filter((citem) => citem.kind === 'slide').reduce((p, citem) => {
+        return p.then(() => {
+            let slideId = `${citem.ref.id}-${citem.ref.revision}`;
+
+            // fetch the slide content
+            return helper.getCollection('slides').then((slides) => {
+                return slides.findOne({ _id: citem.ref.id }).then((slide) => {
+                    let slideRevision =  slide.revisions.find((rev) => (rev.id === citem.ref.revision));
+
+                    return fileService.createThumbnail(slideRevision.content, slideId, newTheme).catch((err) => {
+                        console.warn(`could not create thumbnail for slide ${slideId}, error was: ${err.message}`);
+                    });
+                });
+            });
+        });
+    }, Promise.resolve());
+}
 
 // split deck id given as parameter to deck id and revision id
 function splitDeckIdParam(deckId){

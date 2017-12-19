@@ -86,43 +86,34 @@ let self = module.exports = {
     newSlide: function(request, reply) {
         let userId = request.auth.credentials.userid;
 
-        self._newSlide(request.payload, userId, request)
-        .then(reply)
-        .catch((error) => {
+        // make sure user id is set
+        let payload = Object.assign({ user: userId }, request.payload);
+        // insert the slide
+        slideDB.insert(payload).then((inserted) => {
+            // empty results means something wrong with the payload
+            if (!inserted) return reply(boom.badData());
+
+            let createdSlide = co.rewriteID(inserted.ops[0]);
+
+            // create thumbnail from the newly created slide revision
+            let content = createdSlide.revisions[0].content, slideId = createdSlide.id+'-'+1;
+            if (content === '') {
+                // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                // TODO for now we use hardcoded template for new slides
+                content = slidetemplate;
+            }
+
+            // themeless
+            fileService.createThumbnail(content, slideId).catch((err) => {
+                request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+            });
+
+            reply(createdSlide);
+        }).catch((error) => {
             if (error.isBoom) return reply(error);
 
             request.log('error', error);
             reply(boom.badImplementation());
-        });
-
-    },
-
-    // reusable version of newSlide
-    _newSlide: function(payload, userId, logger) {
-        // make sure user id is set
-        payload.user = userId;
-
-        // insert the slide
-        return slideDB.insert(payload).then((inserted) => {
-            // empty results means something wrong with the payload
-            if (!inserted) throw boom.badData();
-
-            if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0])) {
-                throw inserted;
-            } else {
-                // create thumbnail from the newly created slide revision
-                let content = inserted.ops[0].revisions[0].content, slideId = inserted.ops[0]._id+'-'+1;
-                if (content === '') {
-                    // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
-                    // TODO for now we use hardcoded template for new slides
-                    content = slidetemplate;
-                }
-                fileService.createThumbnail(content, slideId).catch((err) => {
-                    logger.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
-                });
-
-                return co.rewriteID(inserted.ops[0]);
-            }
         });
 
     },
@@ -162,20 +153,23 @@ let self = module.exports = {
                             // prepare the newSlide response object
                             newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
 
-                            //create thumbnail for the new slide revision
-                            let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
-                            if(content === ''){
-                                content = '<h2>'+newSlide.revisions[0].title+'</h2>';
-                                //for now we use hardcoded template for new slides
-                                content = slidetemplate;
-                            }
-                            fileService.createThumbnail(content, newSlideId).catch((err) => {
-                                request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
-                            });
-
                             // update the content item of the parent deck with the new revision id
                             return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
-                            .then(() => {
+                            .then(({updatedDeckRevision}) => {
+                                // the updateContentItem returns, amongs other things, the updated revision of the parent (root_deck)
+                                // we need this to have access to the theme for the new updated slide 
+
+                                //create thumbnail for the new slide revision
+                                let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
+                                if(content === ''){
+                                    content = '<h2>'+newSlide.revisions[0].title+'</h2>';
+                                    //for now we use hardcoded template for new slides
+                                    content = slidetemplate;
+                                }
+                                fileService.createThumbnail(content, newSlideId, updatedDeckRevision.theme).catch((err) => {
+                                    request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                                });
+
                                 reply(newSlide);
                             });
 
@@ -222,6 +216,17 @@ let self = module.exports = {
                         // keep only the new slide revision in revisions array for response
                         let slideRevision = updatedSlide.revisions.find((r) => r.id === revisionId);
                         updatedSlide.revisions = [slideRevision];
+
+                        // also, create a thumbnail with the parent deck's theme
+                        let revertedSlideId = `${slide.id}-${revisionId}`;
+                        deckDB.get(parentDeckId).then((existingDeck) => {
+                            // parentDeckId is canonical, so only one revision here
+                            let slideTheme = existingDeck.revisions[0].theme;
+                            return fileService.createThumbnail(slideRevision.content, revertedSlideId, slideTheme);
+                        }).catch((err) => {
+                            request.log('warn', `could not create thumbnail for slide duplicate ${revertedSlideId}: ${err.message || err}`);
+                        });
+
                         return updatedSlide;
                     });
 
@@ -509,23 +514,23 @@ let self = module.exports = {
                     //update the content items of the new deck to contain the new slide
                     // top root is the root_deck if missing from payload
                     let top_root_deck = request.payload.top_root_deck || newSlide.root_deck;
-                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, newSlide.user, top_root_deck)
-                    .then(() => {
+
+                    return deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, newSlide.user, top_root_deck)
+                    .then((updatedDeckRevision) => {
+                        //create the thumbnail for the new slide
+                        let content = newSlide.content, slideId = insertedSlide.ops[0].id+'-'+1;
+                        if(content === ''){
+                            content = '<h2>'+newSlide.title+'</h2>';
+                            //for now we use hardcoded template for new slides
+                            content = slidetemplate;
+                        }
+
+                        fileService.createThumbnail(content, slideId, updatedDeckRevision.theme).catch((err) => {
+                            request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+                        });
+
                         reply(co.rewriteID(inserted.ops[0]));
                     });
-                    //create the thumbnail for the new slide
-                    let content = newSlide.content, slideId = insertedSlide.ops[0].id+'-'+1;
-                    if(content === ''){
-                        content = '<h2>'+newSlide.title+'</h2>';
-                        //for now we use hardcoded template for new slides
-                        content = slidetemplate;
-                    }
-
-                    fileService.createThumbnail(content, slideId).catch((err) => {
-                        request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
-                    });
-
-                    return insertPromise;
                 });
             }
         }).catch((error) => {
@@ -902,21 +907,34 @@ let self = module.exports = {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
+//<<<<<<< SWIK-1287_TranslationUI_Improvements - as I understood, those lines were removed from the code, but still exist in my branch...
 
-                            let insertContentItemPromise = deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
-                            let addToUsagePromise = slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
+//                             let insertContentItemPromise = deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
+//                             let addToUsagePromise = slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
 
-                            Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
-                                reply(node);
-                            }).catch( (err) => {
-                                request.log('error', err);
-                                reply(boom.badImplementation());
+//                             Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
+//                                 reply(node);
+//                             }).catch( (err) => {
+//                                 request.log('error', err);
+//                                 reply(boom.badImplementation());
+//                             });
+//=======
+//>>>>>>> master
+
+                            return deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction)
+                            .then((updatedDeckRevision) => {
+                                // we can now pick the theme of the parent deck and create the thumbnail!
+                                let slideId = insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id;
+                                fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId, updatedDeckRevision.theme).catch((err) => {
+                                    request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
+                                });
+
+                                return slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-')).then( () => {
+                                    reply(node);
+                                });
+
                             });
 
-                            let slideId = insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id;
-                            fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId).catch((err) => {
-                                request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
-                            });
                         }).catch((err) => {
                             request.log('error', err);
                             reply(boom.badImplementation());
@@ -928,12 +946,18 @@ let self = module.exports = {
 
                         { // these brackets are kept during handleChange removal to keep git blame under control
 
-                            let insertContentItemPromise = deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck);
-                            let addToUsagePromise = slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
+                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck)
+                            .then((updatedDeckRevision) => {
+                                // since we moved the slide maybe it's under a deck with a different theme, so let's create the thumbnail as well
+                                let slideId = slide.id+'-'+(slideRevision+1);
+                                fileService.createThumbnail(slide.revisions[slideRevision].content, slideId, updatedDeckRevision.theme).catch((err) => {
+                                    request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
+                                });
 
-                            Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
-                                node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
-                                reply(node);
+                                return slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-')).then(() => {
+                                    node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
+                                    reply(node);
+                                });
                             }).catch( (err) => {
                                 request.log('error', err);
                                 reply(boom.badImplementation());
@@ -977,7 +1001,9 @@ let self = module.exports = {
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
                             'root_deck': parentID,
-                            'position' : slidePosition
+                            'position' : slidePosition,
+                            'user': userId,
+                            'theme' : request.payload.theme
                         };
 
                         if(request.payload.hasOwnProperty('content')){
@@ -994,11 +1020,34 @@ let self = module.exports = {
                         }
 
                         // create the new slide into the database
-                        self._newSlide(slide, userId, request).then((createdSlide) => {
+                                                
+                        // insert the slide
+                        slideDB.insert(slide).then((inserted) => {
+                            // empty results means something wrong with the payload
+                            if (!inserted) throw boom.badData();
+
+                            let createdSlide = co.rewriteID(inserted.ops[0]);
+
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
 
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck).then( () => {
+                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck).then((updatedDeckRevision) => {
+
+                                // slide is now inserted, so we can create the thumbnail using the (direct) parent deck theme
+
+                                // create thumbnail from the newly created slide revision
+                                let content = createdSlide.revisions[0].content, slideId = createdSlide.id+'-'+1;
+                                if (content === '') {
+                                    // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                                    // TODO for now we use hardcoded template for new slides
+                                    content = slidetemplate;
+                                }
+
+                                // don't wait for it before returning
+                                fileService.createThumbnail(content, slideId, updatedDeckRevision.theme).catch((err) => {
+                                    request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+                                });
+
                                 reply(node);
                             }).catch( (err) => {
                                 request.log('error', err);
@@ -1168,6 +1217,7 @@ let self = module.exports = {
                             'user': userId,
                             'root_deck': parentID,
                             'top_root_deck': top_root_deck,
+                            'theme': parentDeck.revisions[0].theme,
                             'position' : deckPosition
                         };
                         //create the new deck
@@ -1622,6 +1672,7 @@ let self = module.exports = {
                         timestamp: deck.timestamp,
                         language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
                         forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                        theme: activeRevision.theme,
                         firstSlide: deckDB.getFirstSlide(activeRevision),
                         revisionId: activeRevision.id,
                         latestRevisionId: latestRevision.id
@@ -1693,6 +1744,7 @@ let self = module.exports = {
                         timestamp: deck.timestamp,
                         language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
                         forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                        theme: activeRevision.theme,
                         firstSlide: deckDB.getFirstSlide(activeRevision),
                         revisionId: activeRevision.id,
                         latestRevisionId: latestRevision.id
@@ -1758,6 +1810,7 @@ let self = module.exports = {
                 metadata.translation = revision.translation;
                 metadata.tags = revision.tags;
                 metadata.parent = revision.parent;
+                metadata.theme = revision.theme;
 
                 // get first slide
                 metadata.firstSlide = deckDB.getFirstSlide(revision);
@@ -2101,7 +2154,7 @@ let self = module.exports = {
                     slide.content = `<h2>${slide.title}</h2>`;
                 }
 
-                fileService.createThumbnail(slide.content, slide.id).then(() => {
+                fileService.createThumbnail(slide.content, slide.id, slide.theme).then(() => {
                     done(null, { id: slide.id, status: 'OK' });
                 }).catch((err) => {
                     done(null, { id: slide.id, status: err.message });
