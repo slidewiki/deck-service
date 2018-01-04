@@ -1800,6 +1800,7 @@ let self = module.exports = {
 
             return deckDB.getUsage(deckId);
 
+            /* eslint-disable no-unreachable */
             // TODO dead code
             return deckDB.getRootDecks(deckId)
             .then((roots) => {
@@ -1815,7 +1816,7 @@ let self = module.exports = {
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
             });
-
+            /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1832,6 +1833,7 @@ let self = module.exports = {
             return deckDB.getRootDecks(deckId)
             .then((roots) => {
                 return roots;
+                /* eslint-disable no-unreachable */
                 // TODO dead code
                 return Promise.all(roots.map((r) => {
                     return deckDB.findPath(util.toIdentifier(r), deckId)
@@ -1842,6 +1844,7 @@ let self = module.exports = {
                         return path;
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
+                /* eslint-enable no-unreachable */
             });
 
         }).then(reply).catch((err) => {
@@ -1858,6 +1861,7 @@ let self = module.exports = {
 
             return deckDB.getUsage(slideId, 'slide');
 
+            /* eslint-disable no-unreachable */
             // TODO dead code
             return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
                 return roots;
@@ -1876,6 +1880,7 @@ let self = module.exports = {
                 })).then((paths) => paths.map(util.toPlatformPath));
 
             });
+            /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1891,6 +1896,7 @@ let self = module.exports = {
 
             return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
                 return roots;
+                /* eslint-disable no-unreachable */
                 // TODO dead code
                 return Promise.all(roots.map((r) => {
                     // path method does not return the slide id, so we take it from the root
@@ -1904,6 +1910,7 @@ let self = module.exports = {
                         return path;
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
+                /* eslint-disable no-unreachable */
 
             });
         }).then(reply).catch((err) => {

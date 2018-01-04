@@ -167,7 +167,7 @@ let self = module.exports = {
                                     if (found.revisions[i].user === old_deck.user_id){
                                         index = parseInt(i)+1;
                                         resolve(found._id+'-'+index); //the last revision for this user
-                                    };
+                                    }
                                 }
                                 resolve(found._id + '-' + found.revisions.length); //the last revision if there is no revision for this user
                                 // async.eachOf(found.revisions, (value, key, cbEach) => {
@@ -1255,7 +1255,7 @@ let self = module.exports = {
                                     deckTree.children.push(res);
                                     callback();
                                 });
-                            }).catch(callback);;
+                            }).catch(callback);
                         }
                     }, (err) => {
                         if (err) {
@@ -2063,7 +2063,7 @@ let self = module.exports = {
             let query = { 'origin.id': deckId };
             if (userId) {
                 query.user = userId;
-            };
+            }
 
             // then run the query itself
             return self.find('decks', query);
