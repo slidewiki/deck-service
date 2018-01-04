@@ -1,5 +1,6 @@
 /* eslint-env mocha */
 /* eslint-disable func-names, prefer-arrow-callback */
+/* eslint promise/no-callback-in-promise: "off" */
 'use strict';
 
 //Mocking is missing completely TODO add mocked objects

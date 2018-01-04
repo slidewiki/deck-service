@@ -1,3 +1,4 @@
+/* eslint promise/always-return: "off" */
 'use strict';
 
 const Db = require('mongodb').Db,
