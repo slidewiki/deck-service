@@ -44,14 +44,14 @@ function getNextId(db, collectionName, fieldName) {
             field: fieldNameCorrected
         },
         null, //no sort
-            {
-                $inc: {
-                    seq: step
-                }
-            }, {
-                upsert: true, //if there is a problem with _id insert will fail
-                new: true //insert returns the updated document
-            })
+        {
+            $inc: {
+                seq: step
+            }
+        }, {
+            upsert: true, //if there is a problem with _id insert will fail
+            new: true //insert returns the updated document
+        })
         .then((result) => {
             //console.log('getNextId: returned result', result);
             if (result.value && result.value.seq) {
@@ -109,16 +109,17 @@ let self = module.exports = {
     connectToDatabase: function(dbname) {
         dbname = testDbName(dbname);
 
-        if (testConnection(dbname))
+        if (testConnection(dbname)) {
             return Promise.resolve(dbConnection);
-        else
-        return MongoClient.connect('mongodb://' + config.HOST + ':' + config.PORT + '/' + dbname)
-        .then((db) => {
-            if (db.s.databaseName !== dbname)
-                throw new 'Wrong Database!';
-            dbConnection = db;
-            return db;
-        });
+        } else {
+            return MongoClient.connect('mongodb://' + config.HOST + ':' + config.PORT + '/' + dbname)
+            .then((db) => {
+                if (db.s.databaseName !== dbname)
+                    throw new 'Wrong Database!';
+                dbConnection = db;
+                return db;
+            });
+        }
     },
 
     getCollection: function(name) {

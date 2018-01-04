@@ -1398,23 +1398,23 @@ let self = module.exports = {
             };
             //append the node (revised or not) in the new position
             self.createDeckTreeNode(forwardedRequest,
-            (inserted) => {
-                if (inserted.isBoom) return reply(inserted);
+                (inserted) => {
+                    if (inserted.isBoom) return reply(inserted);
 
-                if(inserted.hasOwnProperty('changeset') && removed.hasOwnProperty('changeset')){
-                    inserted_changeset = inserted.changeset;
-                    inserted.inserted_changeset = inserted_changeset;
-                    inserted.removed_changeset = removed_changeset;
-                }
-                else if(removed.hasOwnProperty('changeset')){
-                    inserted.changeset = removed_changeset;
-                }
-                if(inserted.hasOwnProperty('changeset')){
-                    inserted_changeset = inserted.changeset;
-                    inserted.changeset = inserted_changeset;
-                }
-                reply(inserted);
-            });
+                    if(inserted.hasOwnProperty('changeset') && removed.hasOwnProperty('changeset')){
+                        inserted_changeset = inserted.changeset;
+                        inserted.inserted_changeset = inserted_changeset;
+                        inserted.removed_changeset = removed_changeset;
+                    }
+                    else if(removed.hasOwnProperty('changeset')){
+                        inserted.changeset = removed_changeset;
+                    }
+                    if(inserted.hasOwnProperty('changeset')){
+                        inserted_changeset = inserted.changeset;
+                        inserted.changeset = inserted_changeset;
+                    }
+                    reply(inserted);
+                });
         });
 
     },
