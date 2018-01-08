@@ -1,5 +1,6 @@
 /* eslint-env mocha */
 /* eslint-disable func-names, prefer-arrow-callback */
+/* eslint promise/no-callback-in-promise: "off" */
 'use strict';
 
 //Mocking is missing completely TODO add mocked objects
@@ -28,7 +29,7 @@ describe('Database', () => {
                 db.should.be.fulfilled,
                 db.should.eventually.not.be.empty,
                 db.should.eventually.have.property('s').that.is.not.empty,
-                db.should.eventually.have.deep.property('s.databaseName', 'local')
+                db.should.eventually.have.property('s').that.has.property('databaseName', 'local')
             ]);
         });
 

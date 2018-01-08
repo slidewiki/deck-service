@@ -116,8 +116,7 @@ describe('REST API', () => {
     };
     let options2 = {
         method: 'GET',
-        url: '/deck/', // + '{id}'
-                       // + '{id}/revisions', + '{id}/revisionCount', + '{id}/slides?limit={string}', + '{id}/slideCount'
+        url: '/deck/',
         headers: {
             'Content-Type': 'application/json',
         }
@@ -209,8 +208,9 @@ describe('REST API', () => {
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('_id', 'user', 'timestamp', 'license', 'revisions', 'editors', 'contributors',
-                                                                'revisionId', 'language');
+                payload.should.be.an('object').and.contain.keys(
+                    '_id', 'user', 'timestamp', 'license', 'revisions', 'editors', 'contributors', 'revisionId', 'language'
+                );
                 payload._id.should.equal(parseInt(deckID));
                 payload.user.should.equal(2);
                 payload.license.should.equal('CC BY-SA');

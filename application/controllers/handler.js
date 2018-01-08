@@ -1,6 +1,7 @@
 /*
 Handles the requests by executing stuff and replying to the client. Uses promises to get stuff done.
 */
+/* eslint promise/always-return: "off" */
 
 
 
@@ -1397,23 +1398,23 @@ let self = module.exports = {
             };
             //append the node (revised or not) in the new position
             self.createDeckTreeNode(forwardedRequest,
-            (inserted) => {
-                if (inserted.isBoom) return reply(inserted);
+                (inserted) => {
+                    if (inserted.isBoom) return reply(inserted);
 
-                if(inserted.hasOwnProperty('changeset') && removed.hasOwnProperty('changeset')){
-                    inserted_changeset = inserted.changeset;
-                    inserted.inserted_changeset = inserted_changeset;
-                    inserted.removed_changeset = removed_changeset;
-                }
-                else if(removed.hasOwnProperty('changeset')){
-                    inserted.changeset = removed_changeset;
-                }
-                if(inserted.hasOwnProperty('changeset')){
-                    inserted_changeset = inserted.changeset;
-                    inserted.changeset = inserted_changeset;
-                }
-                reply(inserted);
-            });
+                    if(inserted.hasOwnProperty('changeset') && removed.hasOwnProperty('changeset')){
+                        inserted_changeset = inserted.changeset;
+                        inserted.inserted_changeset = inserted_changeset;
+                        inserted.removed_changeset = removed_changeset;
+                    }
+                    else if(removed.hasOwnProperty('changeset')){
+                        inserted.changeset = removed_changeset;
+                    }
+                    if(inserted.hasOwnProperty('changeset')){
+                        inserted_changeset = inserted.changeset;
+                        inserted.changeset = inserted_changeset;
+                    }
+                    reply(inserted);
+                });
         });
 
     },
@@ -1799,6 +1800,7 @@ let self = module.exports = {
 
             return deckDB.getUsage(deckId);
 
+            /* eslint-disable no-unreachable */
             // TODO dead code
             return deckDB.getRootDecks(deckId)
             .then((roots) => {
@@ -1814,7 +1816,7 @@ let self = module.exports = {
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
             });
-
+            /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1831,6 +1833,7 @@ let self = module.exports = {
             return deckDB.getRootDecks(deckId)
             .then((roots) => {
                 return roots;
+                /* eslint-disable no-unreachable */
                 // TODO dead code
                 return Promise.all(roots.map((r) => {
                     return deckDB.findPath(util.toIdentifier(r), deckId)
@@ -1841,6 +1844,7 @@ let self = module.exports = {
                         return path;
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
+                /* eslint-enable no-unreachable */
             });
 
         }).then(reply).catch((err) => {
@@ -1857,6 +1861,7 @@ let self = module.exports = {
 
             return deckDB.getUsage(slideId, 'slide');
 
+            /* eslint-disable no-unreachable */
             // TODO dead code
             return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
                 return roots;
@@ -1875,6 +1880,7 @@ let self = module.exports = {
                 })).then((paths) => paths.map(util.toPlatformPath));
 
             });
+            /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1890,6 +1896,7 @@ let self = module.exports = {
 
             return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
                 return roots;
+                /* eslint-disable no-unreachable */
                 // TODO dead code
                 return Promise.all(roots.map((r) => {
                     // path method does not return the slide id, so we take it from the root
@@ -1903,6 +1910,7 @@ let self = module.exports = {
                         return path;
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
+                /* eslint-disable no-unreachable */
 
             });
         }).then(reply).catch((err) => {
