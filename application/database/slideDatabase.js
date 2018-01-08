@@ -493,6 +493,9 @@ function convertToNewSlide(slide) {
             license: slide.license,
         }]
     };
+    if (slide.dimensions) {
+        result.revisions[0].dimensions = slide.dimensions;
+    }
     return result;
 }
 
@@ -519,6 +522,9 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
             license: slide.license
         }]
     };
+    if (slide.dimensions) {
+        result.revisions[0].dimensions = slide.dimensions;
+    }
     return result;
 }
 

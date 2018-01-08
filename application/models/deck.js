@@ -286,6 +286,22 @@ const deck = {
             required: ['id', 'revision'],
         },
 
+        // default slide dimensions (in pixels)
+        slideDimensions: {
+            type: 'object',
+            properties: {
+                width: {
+                    type: 'integer',
+                    minimum: 1,
+                },
+                height:{
+                    type: 'integer',
+                    minimum: 1,
+                },
+            },
+            required: ['width', 'height'],
+        },
+
         // kind: {
         //     type: 'string'
         // },
