@@ -8,7 +8,7 @@ const deckDB = require('../../database/deckDatabase.js');
 let self = module.exports = (agenda) => {
     if (agenda){
         agenda.define('translation', (job, done) => {
-            deckDB.translateDeckRevision(job.attrs.data.deckId, job.attrs.data.userId, job.attrs.data.language)
+            deckDB.translateDeckRevision(job.attrs.data.deckId, job.attrs.data.userId, job.attrs.data.language, job.attrs.data.newId)
             .then((id_map) => {
                 console.log(id_map);
                 done();
