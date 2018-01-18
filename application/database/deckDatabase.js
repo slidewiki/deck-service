@@ -68,12 +68,12 @@ let self = module.exports = {
     get: function(identifier) {
         identifier = String(identifier);
         let idArray = identifier.split('-');
-        
+
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => col.findOne({ _id: parseInt(idArray[0]) }))
         .then((found) => {
-            if (!found) return;            
+            if (!found) return;
             // add some extra revision metadata
             let [latestRevision] = found.revisions.slice(-1);
             found.latestRevisionId = latestRevision.id;
@@ -223,6 +223,14 @@ let self = module.exports = {
             { _id: deckId },
             { revisions: { $slice: -1 } }
         )).then((found) => found && found.revisions[0].id);
+    },
+
+    getNextId: function(){
+        return helper.connectToDatabase()
+        .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
+        .then((newId) => {
+            return newId;
+        });
     },
 
     //gets active revision of deck from database
@@ -1604,13 +1612,13 @@ let self = module.exports = {
     },
 
     // we guard the fork deck revision method against abuse, by checking for change logs of one
-    forkDeckRevision(deck_id, user, forAttach, languageToTranslate) {
+    forkDeckRevision(deck_id, user, forAttach, languageToTranslate, newId = false) {
         let deck = util.parseIdentifier(deck_id);
         return self.get(deck.id).then((existingDeck) => {
             let [latestRevision] = existingDeck.revisions.slice(-1);
             if (deck.revision && latestRevision.id !== deck.revision) {
                 // we want to fork a read-only revision, all's well
-                return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate);
+                return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate, newId);
             } else {
                 // make the deck id canonical just in case
                 deck.revision = latestRevision.id;
@@ -1621,10 +1629,10 @@ let self = module.exports = {
                 if (counts[deck.revision] === 1) {
                     // we want to fork a fresh revision, let's fork the one before it
                     console.log(`forking ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
-                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach, languageToTranslate);
+                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach, languageToTranslate, newId);
                 } else {
                     // unknown revision, old deck without changelog, or a revision with changes, just fork it!
-                    return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate);
+                    return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate, newId);
                 }
             });
         });
@@ -1633,8 +1641,7 @@ let self = module.exports = {
     // forks a given deck revision by copying all of its sub-decks into new decks
     // forAttach is true when forking is done during deck attach process
     // languageToTranslate, if set, will result in creating a deck translation (subtype of fork)
-    _forkDeckRevision(deck_id, user, forAttach, languageToTranslate) {
-
+    _forkDeckRevision(deck_id, user, forAttach, languageToTranslate, newId_fromJob = false) {
         return self.getFlatDecksFromDB(deck_id)
         .then((res) => {
             //we have a flat sub-deck structure
@@ -1648,18 +1655,23 @@ let self = module.exports = {
             //reverse in order to iterate from bottom to top
             flatDeckArray.reverse();
             //feed the array for serial processing
-
             let new_decks = [];
             return new Promise((resolve, reject) => {
                 //first we generate all the new ids for the copied decks, and hold them in a map for future reference
                 async.eachSeries(flatDeckArray, (next_deck, callback) => {
-                    return helper.connectToDatabase()
-                    .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
-                    .then((newId) => {
-                        id_map[next_deck] = newId+'-'+1;
-                        id_noRev_map[next_deck.split('-')[0]] = newId;
+                    if (next_deck.split('-')[0]=== deck_id.split('-')[0] && newId_fromJob){ //if we take the deck for translation from job, where we store the future id
+                        id_map[next_deck] = newId_fromJob+'-'+1;
+                        id_noRev_map[next_deck.split('-')[0]] = newId_fromJob;
                         callback();
-                    }).catch(callback);
+                    }else{
+                        return helper.connectToDatabase()
+                        .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
+                        .then((newId) => {
+                            id_map[next_deck] = newId+'-'+1;
+                            id_noRev_map[next_deck.split('-')[0]] = newId;
+                            callback();
+                        }).catch(callback);
+                    }
                 }, (err) => {
                     if (err) {
                         return reject(err);
@@ -1795,9 +1807,10 @@ let self = module.exports = {
                                                             fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
                                                                 console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
                                                             });
-
                                                             //filling in the translations array for all decks in the 'family'
-                                                            return self.updateTranslations('slide', translations);
+                                                            return self.updateTranslations('slide', translations).then(() => {
+                                                                return self.updateProgress(newId_fromJob);
+                                                            });
                                                         });
 
                                                     }).then(() => {
@@ -1990,6 +2003,39 @@ let self = module.exports = {
 
     },
 
+    updateProgress(newId_fromJob){
+        return new Promise((resolve, reject) => {
+            return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
+            .then((db) => db.collection('jobs'))
+            .then((col) => {
+                return col.findOne({'data.newId': parseInt(newId_fromJob)})
+                .then((found) => {
+                    console.log('updateProgress for job: ' + JSON.stringify(found));
+                    if (found){
+                        if (found.progress){
+                            found.progress++;
+                            col.save(found);
+                            console.log(found.progress);
+                            resolve(null, true);
+                        }else{
+                            found.progress = 1;
+                            col.save(found);
+                            console.log(found.progress);
+                            resolve(null, true);
+                        }
+                    }else{
+                        console.log('Job not found: ' + newId_fromJob);
+                        reject('Job not found: ' + newId_fromJob, false);
+                    }
+                })
+                .catch( (err) => {
+                    console.log(err);
+                    reject(err);
+                });
+            });
+        });
+    },
+
     updateTranslations(kind, translations_array){
         if (kind === 'deck'){
             return new Promise((resolve, reject) => {
@@ -2047,9 +2093,9 @@ let self = module.exports = {
     },
 
     // forks a given deck revision by copying all of its sub-decks into new decks
-    translateDeckRevision(deck_id, user, language) {
+    translateDeckRevision(deck_id, user, language, newId) {
         // forAttach=false as it is never used when attaching existing subdecks
-        return self.forkDeckRevision(deck_id, user, false, language);
+        return self.forkDeckRevision(deck_id, user, false, language, newId);
     },
 
     getDeckForks(deckId, userId) {
@@ -2710,7 +2756,7 @@ let self = module.exports = {
                 // remove from 'deck' collection
                 let removeDeckPromise = helper.getCollection('decks')
                 .then((col) => {
-                    col.remove({'_id': existingDeck._id});                
+                    col.remove({'_id': existingDeck._id});
                 });
 
                 // update usage of its content slides
@@ -2754,7 +2800,7 @@ let self = module.exports = {
 
                 return Promise.all([removeDeckPromise, updateSlidesUsagePromise]);
             });
-        });     
+        });
     },
 
     // moves the entire deck tree including all subdecks to the archive
@@ -2768,7 +2814,7 @@ let self = module.exports = {
                 throw boom.methodNotAllowed(`cannot archive a non-root deck ${deckId}`);
             }
 
-            // archive subdecks 
+            // archive subdecks
             let archiveSubdecks = new Promise( (resolve, reject) => {
                 self.getFlatDecksFromDB(String(deckId)).then((res) => {
                     if (!res) return reject(boom.notFound());
@@ -2781,7 +2827,7 @@ let self = module.exports = {
                         }).catch( (err) => {
                             callback(err);
                         });
-                        
+
                     }, (err) => {
                         if(err){
                             reject(err);
@@ -2812,16 +2858,16 @@ let self = module.exports = {
                 path.push({id: deck._id, revision: deck.revisionId});
 
                 let decktree = {
-                    id: deck._id, 
-                    revisionId: deck.revisionId, 
-                    latestRevisionId: deck.latestRevisionId, 
+                    id: deck._id,
+                    revisionId: deck.revisionId,
+                    latestRevisionId: deck.latestRevisionId,
                     type: 'deck',
-                    title: revision.title, 
-                    description: deck.description, 
-                    timestamp: deck.timestamp, 
-                    lastUpdate: deck.lastUpdate, 
-                    language: revision.language, 
-                    owner: deck.user, 
+                    title: revision.title,
+                    description: deck.description,
+                    timestamp: deck.timestamp,
+                    lastUpdate: deck.lastUpdate,
+                    language: revision.language,
+                    owner: deck.user,
                     tags: revision.tags.map ( (tag) => { return tag.tagName; }),
                     contributors: deck.contributors.map( (contr) => {return contr.user;}),
                     path: path,
@@ -2855,16 +2901,16 @@ let self = module.exports = {
                                     if(!revision) callback();
 
                                     let slideDetails = {
-                                        id: slide._id, 
-                                        revisionId: revision.id, 
-                                        type: 'slide', 
-                                        title: revision.title, 
-                                        content: revision.content, 
-                                        speakernotes: revision.speakernotes, 
-                                        timestamp: slide.timestamp, 
-                                        lastUpdate: slide.lastUpdate, 
-                                        language: revision.language, 
-                                        owner: slide.user, 
+                                        id: slide._id,
+                                        revisionId: revision.id,
+                                        type: 'slide',
+                                        title: revision.title,
+                                        content: revision.content,
+                                        speakernotes: revision.speakernotes,
+                                        timestamp: slide.timestamp,
+                                        lastUpdate: slide.lastUpdate,
+                                        language: revision.language,
+                                        owner: slide.user,
                                         contributors: slide.contributors.map( (contr) => {return contr.user; }),
                                         path: path,
                                     };
@@ -2874,7 +2920,7 @@ let self = module.exports = {
                                 });
                             }).catch(callback);
                         }
-                    }, (err) => {               
+                    }, (err) => {
                         if (err) {
                             reject(err);
                         } else {
@@ -2887,7 +2933,7 @@ let self = module.exports = {
     },
 };
 
-// regenerates direct slide thumbnails according to the deck revision theme 
+// regenerates direct slide thumbnails according to the deck revision theme
 function updateDeckThumbnails(deckRevision, newTheme) {
     return deckRevision.contentItems.filter((citem) => citem.kind === 'slide').reduce((p, citem) => {
         return p.then(() => {

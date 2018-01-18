@@ -158,7 +158,7 @@ let self = module.exports = {
                             return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
                             .then(({updatedDeckRevision}) => {
                                 // the updateContentItem returns, amongs other things, the updated revision of the parent (root_deck)
-                                // we need this to have access to the theme for the new updated slide 
+                                // we need this to have access to the theme for the new updated slide
 
                                 //create thumbnail for the new slide revision
                                 let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
@@ -654,18 +654,22 @@ let self = module.exports = {
                 return reply(boom.forbidden());
             }
             return deckDB.getFlatSlides(deckId).then((deckTree) => {
+
                 if (!deckTree){
                     console.log('Cannot get deck tree for deckId' + deckId);
                     return reply(boom.badImplementation());
                 }else{
                     if (deckTree.children){
-                        agenda_file.getAgenda().then((agenda) => {
-                            agenda.schedule(new Date(Date.now()), 'translation', { deckId, userId, 'language': request.payload.language});
-                            return reply({cronjob: 1});
-                        }).catch((error) => {
-                            request.log('error', error);
-                            reply(boom.badImplementation());
+                        return deckDB.getNextId().then((newId) => {
+                            agenda_file.getAgenda().then((agenda) => {
+                                agenda.schedule(new Date(Date.now()), 'translation', { deckId, userId, 'newId':newId, 'language': request.payload.language});
+                                return reply({cronjob: 1, totalSlides: deckTree.children.length, 'newId': newId});
+                            }).catch((error) => {
+                                request.log('error', error);
+                                reply(boom.badImplementation());
+                            });
                         });
+
                     }else{
                         return reply(boom.badImplementation());
                     }
@@ -1008,7 +1012,7 @@ let self = module.exports = {
                         }
 
                         // create the new slide into the database
-                                                
+
                         // insert the slide
                         slideDB.insert(slide).then((inserted) => {
                             // empty results means something wrong with the payload
