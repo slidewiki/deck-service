@@ -912,20 +912,6 @@ let self = module.exports = {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
-//<<<<<<< SWIK-1287_TranslationUI_Improvements - as I understood, those lines were removed from the code, but still exist in my branch...
-
-//                             let insertContentItemPromise = deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
-//                             let addToUsagePromise = slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
-
-//                             Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
-//                                 reply(node);
-//                             }).catch( (err) => {
-//                                 request.log('error', err);
-//                                 reply(boom.badImplementation());
-//                             });
-//=======
-//>>>>>>> master
-
                             return deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction)
                             .then((updatedDeckRevision) => {
                                 // we can now pick the theme of the parent deck and create the thumbnail!
