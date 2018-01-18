@@ -79,8 +79,8 @@ let self = module.exports = {
         return helper.connectToDatabase()
         .then((db) => db.collection('slides'))
         .then((col) => col.find({ _id:  { $in : identifiers.selectedIDs }}))
-    .then((stream) => stream.sort({timestamp: -1}))
-    .then((stream) => stream.toArray());
+        .then((stream) => stream.sort({timestamp: -1}))
+        .then((stream) => stream.toArray());
     },
 
     getAllFromCollection: function() {
@@ -305,28 +305,28 @@ let self = module.exports = {
         .then((db) => db.collection('slides'))
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
-              .then((existingSlide) => {
-                  //first remove usage of deck from old revision
-                  let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
-                  for(let i = 0; i < usageArray.length; i++){
-                      if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
-                          usageArray.splice(i,1);
-                          break;
-                      }
-                  }
-                  //then update usage array of new/reverted revision
-                  let contains = false;
-                  for(let j = 0; j < existingSlide.revisions[parseInt(new_revision_id)-1].usage.length; j++){
-                      if(existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
-                          contains = true;
-                          break;
-                      }
-                  }
-                  if(!contains)
-                      existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+            .then((existingSlide) => {
+                //first remove usage of deck from old revision
+                let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
+                for(let i = 0; i < usageArray.length; i++){
+                    if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
+                        usageArray.splice(i,1);
+                        break;
+                    }
+                }
+                //then update usage array of new/reverted revision
+                let contains = false;
+                for(let j = 0; j < existingSlide.revisions[parseInt(new_revision_id)-1].usage.length; j++){
+                    if(existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
+                        contains = true;
+                        break;
+                    }
+                }
+                if(!contains)
+                    existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
 
-                  return col.save(existingSlide).then(() => existingSlide);
-              });
+                return col.save(existingSlide).then(() => existingSlide);
+            });
         });
     },
 

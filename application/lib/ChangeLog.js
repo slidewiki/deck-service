@@ -192,10 +192,6 @@ let self = module.exports = {
                 const contentItemsAfter = Immutable.fromJS(revision.contentItems.map(omitOrder));
                 const contentItemOps = diff(contentItemsBefore, contentItemsAfter);
 
-// console.log(contentItemsBefore);
-// console.log(contentItemsAfter);
-// console.log(contentItemOps);
-
                 // we have a list of JSON patch-style operations, which we would like to save in the log
                 // in a reversible way as to provide full log capabilities without need for current state
                 let result = contentItemOps.toJS().map((rec) => {

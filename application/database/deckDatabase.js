@@ -167,7 +167,7 @@ let self = module.exports = {
                                     if (found.revisions[i].user === old_deck.user_id){
                                         index = parseInt(i)+1;
                                         resolve(found._id+'-'+index); //the last revision for this user
-                                    };
+                                    }
                                 }
                                 resolve(found._id + '-' + found.revisions.length); //the last revision if there is no revision for this user
                                 // async.eachOf(found.revisions, (value, key, cbEach) => {
@@ -1169,31 +1169,31 @@ let self = module.exports = {
         .then((db) => db.collection('decks'))
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
-              .then((existingDeck) => {
-                  //first remove usage of deck from old revision
-                  if(root_deck){
-                      let usageArray = existingDeck.revisions[parseInt(idArray[1])-1].usage;
-                      for(let i = 0; i < usageArray.length; i++){
-                          if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
-                              usageArray.splice(i,1);
-                              break;
-                          }
-                      }
-                      //then update usage array of new/reverted revision
-                      let contains = false;
-                      for(let j = 0; j < existingDeck.revisions[parseInt(new_revision_id)-1].usage.length; j++){
-                          if(existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
-                              contains = true;
-                              break;
-                          }
-                      }
-                      if(!contains)
-                          existingDeck.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
-                  }
-                  existingDeck.active = new_revision_id;
-                  col.save(existingDeck);
-                  return existingDeck;
-              });
+            .then((existingDeck) => {
+                //first remove usage of deck from old revision
+                if(root_deck){
+                    let usageArray = existingDeck.revisions[parseInt(idArray[1])-1].usage;
+                    for(let i = 0; i < usageArray.length; i++){
+                        if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
+                            usageArray.splice(i,1);
+                            break;
+                        }
+                    }
+                    //then update usage array of new/reverted revision
+                    let contains = false;
+                    for(let j = 0; j < existingDeck.revisions[parseInt(new_revision_id)-1].usage.length; j++){
+                        if(existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
+                            contains = true;
+                            break;
+                        }
+                    }
+                    if(!contains)
+                        existingDeck.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+                }
+                existingDeck.active = new_revision_id;
+                col.save(existingDeck);
+                return existingDeck;
+            });
         });
     },
 
@@ -1263,7 +1263,7 @@ let self = module.exports = {
                                     deckTree.children.push(res);
                                     callback();
                                 });
-                            }).catch(callback);;
+                            }).catch(callback);
                         }
                     }, (err) => {
                         if (err) {
@@ -2109,7 +2109,7 @@ let self = module.exports = {
             let query = { 'origin.id': deckId };
             if (userId) {
                 query.user = userId;
-            };
+            }
 
             // then run the query itself
             return self.find('decks', query);
