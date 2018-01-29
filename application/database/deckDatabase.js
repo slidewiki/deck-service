@@ -419,6 +419,34 @@ let self = module.exports = {
 
     },
 
+    // returns the new or existing request, with isNew set to true if it was new
+    // returns undefined if deck does not exist
+    addEditRightsRequest: async function(deckId, userId) {
+        let existingDeck = await self.get(deckId);
+        if (!existingDeck) return;
+
+        let editRightsRequests = existingDeck.editRightsRequests;
+        if (!editRightsRequests) {
+            editRightsRequests = [];
+        }
+
+        let existingRequest = editRightsRequests.find((r) => r.user === userId);
+        if (existingRequest) {
+            return existingRequest;
+        }
+
+        let timestamp = new Date().toISOString();
+        let newRequest = { user: userId, requestedAt: timestamp };
+        editRightsRequests.push(newRequest);
+
+        existingDeck.editRightsRequests = editRightsRequests;
+
+        let decks = await helper.getCollection('decks');
+        await decks.findOneAndReplace({ _id: deckId }, existingDeck);
+
+        return Object.assign({ isNew: true }, newRequest);
+    },
+
     // TODO properly implement a PATCH-like method for partial updates
     replaceEditors: function(id, payload) {
         let deckId = parseInt(id);

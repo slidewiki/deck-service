@@ -1539,6 +1539,28 @@ let self = module.exports = {
 
     },
 
+    requestEditRights: function(request, reply) {
+        let deckId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        deckDB.userPermissions(deckId, userId).then((perm) => {
+            if (!perm) return boom.notFound();
+
+            if (perm.edit) {
+                // user already has permissions, return error
+                return boom.badData();
+            }
+
+            return deckDB.addEditRightsRequest(deckId, userId);
+
+        }).then((res) => {
+            reply(res);
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
     userPermissions: function(request, reply) {
         let deckId = request.params.id;
         let userId = request.auth.credentials.userid;
