@@ -662,7 +662,7 @@ let self = module.exports = {
                     if (deckTree.children){
                         return deckDB.getNextId().then((newId) => {
                             agenda_file.getAgenda().then((agenda) => {
-                                agenda.schedule(new Date(Date.now()), 'translation', { deckId, userId, 'newId':newId, 'language': request.payload.language});
+                                agenda.schedule(new Date(Date.now()), 'translation', { deckId, userId, 'newId':newId, 'language': request.payload.language, 'total': deckTree.children.length});
                                 return reply({cronjob: 1, totalSlides: deckTree.children.length, 'newId': newId});
                             }).catch((error) => {
                                 request.log('error', error);

@@ -14,7 +14,7 @@ let self = module.exports = {
         .catch((err) => {
             console.log('Agenda cannot connect to the mongoDB');
             return ;
-        });;
+        });
     },
     startAgenda : (agenda) => {
 
