@@ -29,7 +29,7 @@ let self = module.exports = {
         else if(mediaType === 'audio')
             mediaExtension = 'mp3|wav|wma';
 
-        let urlRegex = new RegExp(`https?:\\/\\/${fileserviceHost}[^\\s]+(\.${mediaExtension})`, 'g');
+        let urlRegex = new RegExp(`https?:\\/\\/${fileserviceHost}[^\\s]+(\\.${mediaExtension})`, 'g');
         let matchArray;
         let media = [];
 

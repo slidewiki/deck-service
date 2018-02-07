@@ -12,8 +12,7 @@ const fileService = require('../services/file');
 
 const helper = require('./helper'),
     striptags = require('striptags'),
-    validateDeck = require('../models/deck').validateDeck,
-    Microservices = require('../configs/microservices');
+    validateDeck = require('../models/deck').validateDeck;
 
 const async = require('async');
 
@@ -168,7 +167,7 @@ let self = module.exports = {
                                     if (found.revisions[i].user === old_deck.user_id){
                                         index = parseInt(i)+1;
                                         resolve(found._id+'-'+index); //the last revision for this user
-                                    };
+                                    }
                                 }
                                 resolve(found._id + '-' + found.revisions.length); //the last revision if there is no revision for this user
                                 // async.eachOf(found.revisions, (value, key, cbEach) => {
@@ -514,11 +513,19 @@ let self = module.exports = {
                     deckRevision.tags = deck.tags;
                 }
 
+                let oldTheme = deckRevision.theme;
                 if(!deck.hasOwnProperty('theme') || deck.theme === null){
                     deckRevision.theme = 'default';
                 }
                 else{
                     deckRevision.theme = deck.theme;
+                }
+
+                if (deckRevision.theme !== oldTheme) {
+                    // theme was changed, update thumbs for all direct slides
+                    updateDeckThumbnails(deckRevision, deckRevision.theme).catch((err) => {
+                        console.warn(`could not update slide thumbnails for deck ${id}, error was: ${err.message}`);
+                    });
                 }
 
                 // changes ended here
@@ -580,130 +587,6 @@ let self = module.exports = {
 
             return col.findOneAndReplace({_id: parseInt(deckId)}, deck);
         }));
-    },
-
-    // DEPRECATED
-    //updates a deck by creating a new revision
-    replace: function(id, deck) {
-        // if not included in the call, the deck itself is the top_root_deck
-        let top_root_deck = deck.top_root_deck || id;
-
-        let idArray = String(id).split('-');
-        if(idArray.length > 1){
-            id = idArray[0];
-        }
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(id)})
-            .then((existingDeck) => {
-                if (!existingDeck) return;
-
-                const maxRevisionId = existingDeck.revisions.reduce((prev, curr) => {
-                    if (curr.id > prev)
-                        return curr.id;
-                    else
-                        return prev;
-                }, 1);
-                let valid = false;
-                const newRevisionId = parseInt(maxRevisionId)+1;
-                //must get previously active revision and copy content items to new revision
-                //NOTE or should we get the id from the request, it contains the revision that is replaced...
-                let activeRevisionIndex = getActiveRevision(existingDeck);
-                if(idArray.length > 1){
-                    activeRevisionIndex = parseInt(idArray[1])-1;
-                }
-
-                let usageArray = existingDeck.revisions[activeRevisionIndex].usage;
-                //we should remove the usage of the previous revision in the root deck
-                let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
-
-                if(deck.root_deck){
-                    let root_deck_array = deck.root_deck.split('-');
-                    for(let i = 0; i < previousUsageArray.length; i++){
-                        if(previousUsageArray[i].id === parseInt(root_deck_array[0]) && previousUsageArray[i].revision === parseInt(root_deck_array[1])){
-                            previousUsageArray.splice(i,1);
-                            break;
-                        }
-                    }
-                    usageArray = [{'id':parseInt(root_deck_array[0]), 'revision': parseInt(root_deck_array[1])}];
-                }
-
-                let content_items = existingDeck.revisions[activeRevisionIndex].contentItems;
-                if(deck.fork){
-                    usageArray = [];
-                }
-
-                const deckWithNewRevision = convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray);
-                deckWithNewRevision.timestamp = existingDeck.timestamp;
-
-                // TODO remove this once migration process is fixed and/or revised
-                if (deckWithNewRevision.timestamp instanceof Date) deckWithNewRevision.timestamp = deckWithNewRevision.timestamp.toISOString();
-
-                deckWithNewRevision.user = existingDeck.user;
-
-                if (existingDeck.origin) {
-                    deckWithNewRevision.origin = existingDeck.origin;
-                }
-
-                if(existingDeck.hasOwnProperty('contributors')){
-                    let contributors = existingDeck.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(deck.user));
-                    if(existingUserContributorIndex > -1)
-                        contributors[existingUserContributorIndex].count++;
-                    else{
-                        contributors.push({'user': parseInt(deck.user), 'count': 1});
-                    }
-                    deckWithNewRevision.contributors = contributors;
-                }
-
-                try {
-                    valid = validateDeck(deckWithNewRevision);
-
-                    if (!valid) {
-                        throw validateDeck.errors;
-                    }
-                    for(let i = 0; i < content_items.length; i++){
-                        let citem = content_items[i];
-                        if(citem.kind === 'slide'){
-                            helper.connectToDatabase()
-                            .then((db) => db.collection('slides'))
-                            .then((col) => {
-                                return col.findOne({_id: parseInt(citem.ref.id)})
-                                .then((slide) => {
-                                    slide.revisions[citem.ref.revision-1].usage.push({'id': parseInt(id), 'revision': newRevisionId});
-                                    return col.save(slide);
-                                });
-                            });
-                        }
-                        else{
-                            col.findOne({_id: parseInt(citem.ref.id)})
-                            .then((innerDeck) => {
-                                innerDeck.revisions[citem.ref.revision-1].usage.push({'id': parseInt(id), 'revision': newRevisionId});
-                                return col.save(innerDeck);
-                            });
-                        }
-                    }
-                    let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, deck.user);
-
-                    let new_revisions = existingDeck.revisions;
-                    new_revisions[activeRevisionIndex].usage = previousUsageArray;
-                    new_revisions.push(deckWithNewRevision.revisions[0]);
-                    deckWithNewRevision.revisions = new_revisions;
-
-                    deckTracker.applyChangeLog(deckWithNewRevision);
-
-                    //col.save(existingDeck);
-                    return col.findOneAndUpdate({
-                        _id: parseInt(id)
-                    }, { $set: deckWithNewRevision }, {new: true});
-                } catch (e) {
-                    console.log('validation failed', e);
-                    throw e;
-                }
-
-            });
-        });
     },
 
     // simpler implementation of replace that does not update anything, just creates the revision
@@ -1041,11 +924,13 @@ let self = module.exports = {
                     existingDeck.contributors = contributors;
                 }
 
+                let updatedRevision = existingDeck.revisions[activeRevisionId-1];
+
                 existingDeck.lastUpdate = new Date().toISOString();
-                existingDeck.revisions[activeRevisionId-1].lastUpdate = existingDeck.lastUpdate;
+                updatedRevision.lastUpdate = existingDeck.lastUpdate;
 
                 if(position && position > 0){
-                    let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+                    let citems = updatedRevision.contentItems;
                     for(let i = position-1; i < citems.length; i++){
                         citems[i].order = parseInt(citems[i].order)+1;
                     }
@@ -1059,18 +944,18 @@ let self = module.exports = {
                         }
                     };
                     citems.splice(position-1, 0, newCitem);
-                    existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+                    updatedRevision.contentItems = citems;
 
                     if (deckTracker) deckTracker.applyChangeLog();
 
-                    col.save(existingDeck);
+                    return col.save(existingDeck).then(() => updatedRevision);
                 }
                 else{
                     // add it to the end
                     // we need to track stuff, this doesn't help
-                    let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+                    let citems = updatedRevision.contentItems;
                     let newCitem = {
-                        order: parseInt(getOrder(existingDeck.revisions[activeRevisionId-1]))+1,
+                        order: parseInt(getOrder(updatedRevision))+1,
                         kind: ckind,
                         ref : {
                             id: parseInt(citem.id),
@@ -1078,35 +963,13 @@ let self = module.exports = {
                         }
                     };
                     citems.push(newCitem);
-                    existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+                    updatedRevision.contentItems = citems;
 
                     if (deckTracker) deckTracker.applyChangeLog();
 
-                    col.save(existingDeck);
-
-                    // TODO dead code
-                    return;
-
-                    // we need to track stuff, this doesn't help
-                    col.findOneAndUpdate({
-                        _id: parseInt(root_deck_path[0]),  revisions : {$elemMatch: {id: parseInt(activeRevisionId)}}  },
-                        {
-                            $push: {
-                                'revisions.$.contentItems': {
-                                    order: parseInt(getOrder(existingDeck.revisions[activeRevisionId-1]))+1,
-                                    kind: ckind,
-                                    ref : {
-                                        id: parseInt(citem.id),
-                                        revision:citem_revision_id
-                                    }
-                                }
-                            },
-                            $set: {
-                                'contributors': existingDeck.contributors
-                            }
-                        }
-                    );
+                    return col.save(existingDeck).then(() => updatedRevision);
                 }
+
             });
         });
 
@@ -1153,7 +1016,7 @@ let self = module.exports = {
         let itemId = itemToRemove.ref.id;
         let itemRevision = itemToRemove.ref.revision;
         if(itemToRemove.kind === 'slide'){
-            helper.connectToDatabase()
+            return helper.connectToDatabase()
             .then((db) => db.collection('slides'))
             .then((col2) => {
                 return col2.findOne({_id: parseInt(itemId)})
@@ -1172,7 +1035,7 @@ let self = module.exports = {
             });
         }
         else{
-            helper.connectToDatabase()
+            return helper.connectToDatabase()
             .then((db) => db.collection('decks'))
             .then((col) => {
                 return col.findOne({_id: parseInt(itemId)})
@@ -1242,8 +1105,12 @@ let self = module.exports = {
                 let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user, parentOperations, revertedRevId ? 'revert' : undefined);
 
                 existingDeck.lastUpdate = new Date().toISOString();
+
+                let updatedDeckRevision;
                 for(let i = 0; i < existingDeck.revisions.length; i++) {
                     if(existingDeck.revisions[i].id === parseInt(rootRev)) {
+                        // TODO clean up this mess!
+                        updatedDeckRevision = existingDeck.revisions[i];
 
                         for(let j = 0; j < existingDeck.revisions[i].contentItems.length; j++) {
                             if(existingDeck.revisions[i].contentItems[j].ref.id === citem._id && existingDeck.revisions[i].contentItems[j].kind === ckind) {
@@ -1280,6 +1147,7 @@ let self = module.exports = {
                         oldRevision: old_rev_id,
                         newRrevision: newRevId,
                         deckChanges: deckChanges,
+                        updatedDeckRevision,
                     };
                 });
             });
@@ -1293,31 +1161,31 @@ let self = module.exports = {
         .then((db) => db.collection('decks'))
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
-              .then((existingDeck) => {
-                  //first remove usage of deck from old revision
-                  if(root_deck){
-                      let usageArray = existingDeck.revisions[parseInt(idArray[1])-1].usage;
-                      for(let i = 0; i < usageArray.length; i++){
-                          if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
-                              usageArray.splice(i,1);
-                              break;
-                          }
-                      }
-                      //then update usage array of new/reverted revision
-                      let contains = false;
-                      for(let j = 0; j < existingDeck.revisions[parseInt(new_revision_id)-1].usage.length; j++){
-                          if(existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
-                              contains = true;
-                              break;
-                          }
-                      }
-                      if(!contains)
-                          existingDeck.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
-                  }
-                  existingDeck.active = new_revision_id;
-                  col.save(existingDeck);
-                  return existingDeck;
-              });
+            .then((existingDeck) => {
+                //first remove usage of deck from old revision
+                if(root_deck){
+                    let usageArray = existingDeck.revisions[parseInt(idArray[1])-1].usage;
+                    for(let i = 0; i < usageArray.length; i++){
+                        if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
+                            usageArray.splice(i,1);
+                            break;
+                        }
+                    }
+                    //then update usage array of new/reverted revision
+                    let contains = false;
+                    for(let j = 0; j < existingDeck.revisions[parseInt(new_revision_id)-1].usage.length; j++){
+                        if(existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
+                            contains = true;
+                            break;
+                        }
+                    }
+                    if(!contains)
+                        existingDeck.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+                }
+                existingDeck.active = new_revision_id;
+                col.save(existingDeck);
+                return existingDeck;
+            });
         });
     },
 
@@ -1365,7 +1233,12 @@ let self = module.exports = {
                                     return col.findOne({_id: parseInt(citem.ref.id)})
                                     .then((slide) => {
                                         let slide_revision = citem.ref.revision-1;
-                                        deckTree.children.push({title: striptags(slide.revisions[slide_revision].title), id: slide._id+'-'+slide.revisions[slide_revision].id, type: 'slide'});
+                                        deckTree.children.push({
+                                            title: striptags(slide.revisions[slide_revision].title),
+                                            id: slide._id+'-'+slide.revisions[slide_revision].id,
+                                            type: 'slide',
+                                            theme: deck.revisions[revision_id].theme,
+                                        });
                                         callback();
                                     });
                                 }).catch(callback);
@@ -1382,7 +1255,7 @@ let self = module.exports = {
                                     deckTree.children.push(res);
                                     callback();
                                 });
-                            }).catch(callback);;
+                            }).catch(callback);
                         }
                     }, (err) => {
                         if (err) {
@@ -1467,7 +1340,7 @@ let self = module.exports = {
                     id: deckId,
                     type: 'deck',
                     user: String(deckRevision.user),
-                    theme: String(deckRevision.theme),
+                    theme: deckRevision.theme,
                     children: []
                 };
             }
@@ -1498,6 +1371,7 @@ let self = module.exports = {
                                     speakernotes: slideRevision.speakernotes,
                                     user: String(slideRevision.user),
                                     id: slide._id+'-'+slideRevision.id,
+                                    theme: deckRevision.theme,
                                     type: 'slide'
                                 });
                                 callback();
@@ -1918,7 +1792,7 @@ let self = module.exports = {
 
                                                             // create the thumbnail
                                                             let traslatedSlideId = `${translated._id}-1`;
-                                                            fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId).catch((err) => {
+                                                            fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
                                                                 console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
                                                             });
 
@@ -2178,308 +2052,6 @@ let self = module.exports = {
         return self.forkDeckRevision(deck_id, user, false, language);
     },
 
-    // TODO remove this 
-    // former reference implementation, replaced with combined code in _forkDeckRevision
-    //forks a given deck revision by copying all of its sub-decks into new decks
-    _translateDeckRevision(deck_id, user, language){
-
-        return self.getFlatDecksFromDB(deck_id)
-        .then((res) => {
-            //we have a flat sub-deck structure
-            let flatDeckArray = [];
-            flatDeckArray.push(res.id); //push root deck into array
-            for(let i = 0; i < res.children.length; i++){
-                flatDeckArray.push(res.children[i].id); //push next sub-deck into array
-            }
-            //init maps for new ids
-            let id_map = {}, id_noRev_map = {}, slide_id_map = {};
-            //reverse in order to iterate from bottom to top
-            flatDeckArray.reverse();
-            //feed the array for serial processing
-
-            let new_decks = [];
-            return new Promise((resolve, reject) => {
-                //first we generate all the new ids for the copied decks, and hold them in a map for future reference
-                async.eachSeries(flatDeckArray, (next_deck, callback) => {
-                    return helper.connectToDatabase()
-                    .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
-                    .then((newId) => {
-                        id_map[next_deck] = newId+'-'+1;
-                        id_noRev_map[next_deck.split('-')[0]] = newId;
-                        callback();
-                    }).catch(callback);
-                }, (err) => {
-                    if (err) {
-                        return reject(err);
-                    }
-
-                    //iterate the flat decktree and copy each deck, referring to the new ids in its content items and usage
-                    async.eachSeries(flatDeckArray, (next_deck, callback) => {
-                        return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
-                        .then((db2) => db2.collection('decks'))
-                        .then((col) => {
-                            return col.findOne({_id: parseInt(next_deck.split('-')[0])})
-                            .then((found) => {
-                                let ind = parseInt(next_deck.split('-')[1])-1;
-                                let contributorsArray = found.contributors;
-                                //contributorsArray.push({'user': parseInt(user), 'count': 1});
-                                let existingUserContributorIndex = findWithAttr(contributorsArray, 'user', parseInt(user));
-                                if(existingUserContributorIndex > -1)
-                                    contributorsArray[existingUserContributorIndex].count++;
-                                else{
-                                    contributorsArray.push({'user': parseInt(user), 'count': 1});
-                                }
-
-                                let copiedDeck = {
-                                    _id: id_noRev_map[found._id],
-                                    origin: {
-                                        id: found._id,
-                                        revision: found.revisions[ind].id,
-                                        title: found.revisions[ind].title,
-                                        user: found.user,
-                                        kind: 'translation'
-                                    },
-                                    description: found.description,
-                                    language: found.revisions[ind].language,
-                                    license: found.license,
-                                    user: parseInt(user),
-                                    translated_from: found.translated_from,
-                                    contributors: contributorsArray,
-                                    active: 1,
-                                    translations: found.translations
-                                };
-
-                                let now = new Date();
-                                let timestamp = now.toISOString();
-                                copiedDeck.timestamp = timestamp;
-                                copiedDeck.lastUpdate = timestamp;
-                                if(found.hasOwnProperty('datasource')){
-                                    copiedDeck.datasource = found.datasource;
-                                }
-                                else{
-                                    copiedDeck.datasource = null;
-                                }
-                                //copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
-                                copiedDeck.revisions = [found.revisions[ind]];
-                                copiedDeck.revisions[0].id = 1;
-                                // own the revision as well!
-                                copiedDeck.revisions[0].user = copiedDeck.user;
-
-                                // renew creation date for fresh revision
-                                copiedDeck.revisions[0].timestamp = timestamp;
-                                copiedDeck.revisions[0].lastUpdate = timestamp;
-
-                                let contentItemsMap = {};
-                                //console.log('before loop for content items');
-                                async.eachSeries(copiedDeck.revisions[0].contentItems, (nextSlide, callback) => {
-                                    if(nextSlide.kind === 'slide'){
-                                        console.log('NEXT SLIDE', nextSlide);
-                                        //we have to copy the slide, not like when forking
-                                        let root_deck_path = [copiedDeck._id, '1'];
-                                        helper.connectToDatabase()
-                                        .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
-                                        .then((newSlideId) => {
-                                            helper.connectToDatabase()
-                                            .then((db2) => db2.collection('slides'))
-                                            .then((col2) => {
-                                                col2.findOne({_id: parseInt(nextSlide.ref.id)})
-                                                .then((slide) => {
-                                                    let slideRevisionIndex = parseInt(nextSlide.ref.revision)-1;
-                                                    slide.revisions = [slide.revisions[slideRevisionIndex]];
-                                                    contentItemsMap[slide._id] = newSlideId;
-                                                    slide_id_map[slide._id] = newSlideId;
-                                                    let oldSlideId = slide._id;
-                                                    slide._id = newSlideId;
-                                                    //slide.translated_from =
-                                                    let rp = require('request-promise-native');
-                                                    let myPromise = new Promise((resolve, reject) => {
-
-                                                        var options = {
-                                                            method: 'POST',
-                                                            uri: Microservices.translation.uri+'/slide/'+oldSlideId,
-                                                            headers : {
-                                                                'Content-Type': 'application/json',
-                                                                'Cache-Control': 'no-cache'
-                                                            },
-                                                            body :{
-                                                                'target': language,
-                                                                'user': copiedDeck.user+''
-                                                            },
-                                                            json: true
-                                                        };
-                                                        rp(options).then(function (translated){
-                                                            //console.log('SLIDE response', original);
-                                                            if (translated.error){
-                                                                //console.log(original);
-                                                                resolve({});
-                                                            }else{
-                                                                //Change usage of slide
-                                                                for(let i = 0; i < slide.revisions[0].usage.length; i++){
-                                                                    for(let j in id_map){
-                                                                        if(id_map.hasOwnProperty(j) && slide.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                                                            slide.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
-                                                                            slide.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
-                                                                        }
-                                                                    }
-                                                                }
-                                                                translated._id = newSlideId;
-                                                                translated.revisions[0].usage = slide.revisions[0].usage;
-                                                                col2.save(translated);
-                                                                let translations = [];
-                                                                if (slide.translations){
-                                                                    translations = slide.translations;
-                                                                    translations.push({'slide_id':slide._id, 'language':language});
-                                                                }else{
-                                                                    translations.push({'slide_id':slide._id, 'language':language});
-                                                                    translations.push({'slide_id':oldSlideId, 'language':slide.language});
-                                                                }
-                                                                //filling in the translations array for all decks in the 'family'
-                                                                self.updateTranslations('slide', translations)
-                                                                .then(resolve)
-                                                                .catch(reject);
-
-                                                            }
-                                                        })
-                                                        .catch(function (e){
-                                                            console.log('problem with request deck: ' + e.message);
-                                                            reject(e);
-                                                        });
-                                                    });
-
-                                                    //console.log('contentItemsMap', contentItemsMap);
-                                                    //console.log('copiedDeck', copiedDeck);
-                                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                                        if(copiedDeck.revisions[0].contentItems[i].ref.id === oldSlideId){
-                                                            copiedDeck.revisions[0].contentItems[i].ref.id = newSlideId;
-                                                            copiedDeck.revisions[0].contentItems[i].ref.revision = 1;
-                                                        }
-                                                    }
-                                                    callback();
-                                                });
-                                            });
-                                        });
-                                    }
-                                    else{
-                                        callback();
-                                    }
-                                },(err) => {
-                                    if (err) {
-                                        return reject(err);
-                                    }
-
-                                    //console.log('outside root_deck_path', root_deck_path);
-                                    //console.log('check point 1');
-                                    // let translations = copiedDeck.translations;
-                                    // translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
-                                    // self.updateTranslations(translations)
-                                     //.then(() => {
-                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                        for(let j in id_map){
-                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
-                                                copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
-                                                copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
-                                            }
-                                        }
-                                    }
-                                    //console.log('check point 2');
-                                    for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
-                                        for(let j in id_map){
-                                            if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                                copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
-                                                copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
-                                            }
-                                        }
-                                    }
-                                    //console.log('check point 3');
-                                    for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                                        let nextSlide = copiedDeck.revisions[0].contentItems[i];
-                                        //console.log('nextSlide', nextSlide);
-                                        if(nextSlide.kind === 'slide'){
-                                            let root_deck_path = [copiedDeck._id, '1'];
-                                            //console.log('outside root_deck_path', root_deck_path);
-                                            //console.log('contentItemsMap', contentItemsMap);
-                                            self.addToUsage(nextSlide, root_deck_path);
-                                        }
-                                        else{
-                                            continue;
-                                        }
-                                    }
-
-                                    //console.log('check point 4');
-
-                                    //translate copiedDeck
-                                    //console.log('translation uri', Microservices.translation.uri+'/deck/'+found._id);
-                                    let rp = require('request-promise-native');
-                                    let myPromise = new Promise((resolve, reject) => {
-
-                                        var options = {
-                                            method: 'POST',
-                                            uri: Microservices.translation.uri+'/deck/'+found._id,
-                                            headers : {
-                                                'Content-Type': 'application/json',
-                                                'Cache-Control': 'no-cache'
-                                            },
-                                            body :{
-                                                'target': language,
-                                                'user': copiedDeck.user+''
-                                            },
-                                            json: true
-                                        };
-                                        rp(options).then(function (original){
-                                            //console.log('response', original);
-                                            if (original.error){
-                                                //console.log(original);
-                                                resolve({});
-                                            }else{
-                                                copiedDeck.revisions[0].title = original.revisions[0].title;
-                                                copiedDeck.description = original.description;
-                                                let original_language = copiedDeck.language;
-                                                copiedDeck.language = language;
-                                                copiedDeck.revisions[0].language = language;
-                                                new_decks.push(copiedDeck);
-                                                return col.insertOne(copiedDeck).then(() => {
-                                                    let translations = [];
-                                                    if (copiedDeck.translations) {
-                                                        translations = copiedDeck.translations;
-                                                        translations.push({'deck_id':copiedDeck._id, 'language':language});//filling in the translations array for all decks in the 'family'
-                                                    }else{
-                                                        translations.push({'deck_id':copiedDeck._id, 'language':language});
-                                                        translations.push({'deck_id':original._id, 'language': original_language});
-                                                    }
-
-                                                    self.updateTranslations('deck', translations)
-                                                    .then(callback)
-                                                    .catch((err) => {
-                                                        console.log(err);
-                                                        reject(err);
-                                                    });
-                                                });
-
-                                                resolve();
-
-                                            }
-                                        })
-                                        .catch(function (e){
-                                            console.log('problem with request deck: ' + e.message);
-                                            reject(e);
-                                        });
-                                    });
-                                    //}).catch(reject);
-                                });
-                            });
-                        }).catch(callback);
-                    }, (err2) => {
-                        if (err2) {
-                            reject(err2);
-                        } else {
-                            resolve({'root_deck': id_map[res.id], 'id_map': id_map, 'slide_id_map': slide_id_map});
-                        }
-                    });
-                });
-            });
-        });
-    },
-
     getDeckForks(deckId, userId) {
         if (userId) userId = parseInt(userId);
         deckId = parseInt(deckId);
@@ -2491,7 +2063,7 @@ let self = module.exports = {
             let query = { 'origin.id': deckId };
             if (userId) {
                 query.user = userId;
-            };
+            }
 
             // then run the query itself
             return self.find('decks', query);
@@ -2588,6 +2160,7 @@ let self = module.exports = {
             _id : 0,
             id: '$_id',
             revision: '$revisions.id',
+            theme: '$revisions.theme',
         };
 
         if (item.revision) {
@@ -2618,6 +2191,7 @@ let self = module.exports = {
                         kind: 1,
                         ref: 1,
                     },
+                    theme: 1,
                 },
             } },
             { $unwind: '$revisions' },
@@ -2635,6 +2209,7 @@ let self = module.exports = {
                 $project: {
                     id: 1,
                     revision: 1,
+                    theme: 1,
                     using: '$using.ref.revision',
                 },
             });
@@ -2928,6 +2503,12 @@ let self = module.exports = {
 
             latestRevision.tags = tags;
 
+            // update lastUpdate of deck and revision
+            let now = new Date().toISOString();
+
+            existingDeck.lastUpdate = now;
+            latestRevision.lastUpdate = now;
+
             // changes ended here
             deckTracker.applyChangeLog();
 
@@ -3208,7 +2789,7 @@ let self = module.exports = {
                             resolve();
                         }
                     });
-                });
+                }).catch(reject);
             });
 
             // when it's done, continue with archiving the root deck
@@ -3217,8 +2798,114 @@ let self = module.exports = {
 
     },
 
+    getEnrichedDeckTree: function(deckId, onlyDecks=false, path=[]){
+        return self.get(deckId).then( (deck) => {
+            if(!deck) return;
+
+            // if no revision is specidied, then use the active
+            let identifier = util.parseIdentifier(deckId);
+            identifier.revision = (identifier.revision) ? identifier.revision : deck.revisionId;
+            deckId = util.toIdentifier(identifier);
+
+            return self.getRevision(deckId).then( (revision) => {
+
+                path.push({id: deck._id, revision: deck.revisionId});
+
+                let decktree = {
+                    id: deck._id, 
+                    revisionId: deck.revisionId, 
+                    latestRevisionId: deck.latestRevisionId, 
+                    type: 'deck',
+                    title: revision.title, 
+                    description: deck.description, 
+                    timestamp: deck.timestamp, 
+                    lastUpdate: deck.lastUpdate, 
+                    language: revision.language, 
+                    owner: deck.user, 
+                    tags: revision.tags.map ( (tag) => { return tag.tagName; }),
+                    contributors: deck.contributors.map( (contr) => {return contr.user;}),
+                    path: path,
+                    contents: []
+                };
+
+                return new Promise( (resolve, reject) => {
+                    async.eachSeries(revision.contentItems, (item, callback) => {
+
+                        let subdocumentId = `${item.ref.id}-${item.ref.revision}`;
+
+                        let subPath = _.cloneDeep(path);
+
+                        if(item.kind === 'deck'){
+                            self.getEnrichedDeckTree(subdocumentId, onlyDecks, subPath)
+                            .then( (subdecktree) => {
+                                decktree.contents.push(subdecktree);
+                                callback();
+                            }).catch(callback);
+                        } else {
+                            if(onlyDecks) callback();
+
+                            helper.connectToDatabase()
+                            .then((db) => db.collection('slides'))
+                            .then((col) => {
+                                return col.findOne({_id: parseInt(item.ref.id)})
+                                .then((slide) => {
+                                    if(!slide) callback();
+
+                                    let revision = slide.revisions.find( (rev) => {return rev.id === item.ref.revision; });
+                                    if(!revision) callback();
+
+                                    let slideDetails = {
+                                        id: slide._id, 
+                                        revisionId: revision.id, 
+                                        type: 'slide', 
+                                        title: revision.title, 
+                                        content: revision.content, 
+                                        speakernotes: revision.speakernotes, 
+                                        timestamp: slide.timestamp, 
+                                        lastUpdate: slide.lastUpdate, 
+                                        language: revision.language, 
+                                        owner: slide.user, 
+                                        contributors: slide.contributors.map( (contr) => {return contr.user; }),
+                                        path: path,
+                                    };
+
+                                    decktree.contents.push(slideDetails);
+                                    callback();
+                                });
+                            }).catch(callback);
+                        }
+                    }, (err) => {               
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(decktree);
+                        }
+                    });
+                });
+            });
+        });
+    },
 };
 
+// regenerates direct slide thumbnails according to the deck revision theme 
+function updateDeckThumbnails(deckRevision, newTheme) {
+    return deckRevision.contentItems.filter((citem) => citem.kind === 'slide').reduce((p, citem) => {
+        return p.then(() => {
+            let slideId = `${citem.ref.id}-${citem.ref.revision}`;
+
+            // fetch the slide content
+            return helper.getCollection('slides').then((slides) => {
+                return slides.findOne({ _id: citem.ref.id }).then((slide) => {
+                    let slideRevision =  slide.revisions.find((rev) => (rev.id === citem.ref.revision));
+
+                    return fileService.createThumbnail(slideRevision.content, slideId, newTheme).catch((err) => {
+                        console.warn(`could not create thumbnail for slide ${slideId}, error was: ${err.message}`);
+                    });
+                });
+            });
+        });
+    }, Promise.resolve());
+}
 
 // split deck id given as parameter to deck id and revision id
 function splitDeckIdParam(deckId){
@@ -3341,54 +3028,6 @@ function convertToNewDeck(deck){
             abstract: deck.abstract,
             footer: deck.footer,
             contentItems: [],
-            theme: deck.theme
-        }]
-    };
-    return result;
-}
-
-function convertDeckWithNewRevision(deck, newRevisionId, content_items, usageArray) {
-    let now = new Date();
-    deck.user = parseInt(deck.user);
-    if(!deck.hasOwnProperty('tags') || deck.tags === null){
-        deck.tags = [];
-    }
-    if(deck.language === null){
-        deck.language = 'en_EN';
-    }
-    if(!deck.hasOwnProperty('theme') || deck.theme === null){
-        deck.theme = 'default';
-    }
-    if(deck.hasOwnProperty('editors') && deck.editors === null){
-        deck.editors = {users: [], groups: []};
-    }
-    else if(!deck.hasOwnProperty('editors')){
-        deck.editors = {users: [], groups: []};
-    }
-    const result = {
-        description: deck.description,
-        lastUpdate: now.toISOString(),
-        datasource: deck.datasource,
-        license: deck.license,
-        active: newRevisionId,
-
-        accessLevel: deck.accessLevel,
-        editors: deck.editors,
-
-        revisions: [{
-            id: newRevisionId,
-            usage: usageArray,
-            title: deck.title,
-            timestamp: now.toISOString(),
-            lastUpdate: now.toISOString(),
-            user: deck.user,
-            language: deck.language,
-            parent: deck.parent_deck,
-            tags: deck.tags,
-            comment: deck.comment,
-            abstract: deck.abstract,
-            footer: deck.footer,
-            contentItems: content_items,
             theme: deck.theme
         }]
     };

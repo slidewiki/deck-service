@@ -29,34 +29,36 @@ let self = module.exports = {
     },
 
     get: function(identifier) {
-        identifier = String(identifier);
-        let idArray = identifier.split('-');
-        return helper.connectToDatabase()
-        .then((db) => db.collection('slides'))
-        //must parse the identifier to check if it is dash separated (get revision) or not (get the whole slide)
-        .then((col) => col.findOne({
-            _id: parseInt(idArray[0])
-        })
-        )
-        .then((found) => {
-            if (!found) return null;
+        let slide = util.parseIdentifier(identifier);
+        if (!slide) return Promise.resolve();
 
-            if(idArray.length === 1){
+        return helper.getCollection('slides')
+        .then((col) => col.findOne({ _id: slide.id }))
+        .then((found) => {
+            if (!found) return;
+
+            if (!slide.revision) {
+                // no revision specified, return all
+
+                // TODO migration fix remove _id from data sources
+                found.revisions.forEach((rev) => {
+                    if (!rev.dataSources) return;
+                    rev.dataSources.forEach((i) => delete i._id);
+                });
+
                 return found;
             }
-            else{
-                //array index of revision is revision number minus 1
-                let revision = found.revisions[parseInt(idArray[1])-1];
-                if(typeof revision === 'undefined'){
-                    return ;
-                }
-                else{
-                    found.revisions = [revision];
-                    return found;
-                }
+
+            let revision = found.revisions.find((rev) => rev.id === slide.revision);
+            if (!revision) {
+                return;
             }
-        }).catch((error) => {
-            throw error;
+
+            // TODO migration fix remove _id from data sources
+            if (revision.dataSources) revision.dataSources.forEach((i) => delete i._id);
+            found.revisions = [revision];
+
+            return found;
         });
 
     },
@@ -73,8 +75,8 @@ let self = module.exports = {
         return helper.connectToDatabase()
         .then((db) => db.collection('slides'))
         .then((col) => col.find({ _id:  { $in : identifiers.selectedIDs }}))
-    .then((stream) => stream.sort({timestamp: -1}))
-    .then((stream) => stream.toArray());
+        .then((stream) => stream.sort({timestamp: -1}))
+        .then((stream) => stream.toArray());
     },
 
     getAllFromCollection: function() {
@@ -240,9 +242,9 @@ let self = module.exports = {
 
             // update the content items of the parent deck to reflect the slide revert
             return deckDB.updateContentItem(slide, revisionId, parentDeckId, 'slide', userId, rootDeckId)
-            .then((updatedIds) => {
+            .then(({oldRevision, updatedDeckRevision}) => {
                 // make old slide id canonical
-                let oldSlideId = util.toIdentifier({ id: slideId, revision: parseInt(updatedIds.oldRevision) });
+                let oldSlideId = util.toIdentifier({ id: slideId, revision: parseInt(oldRevision) });
 
                 //update the usage of the reverted slide to point to the parent deck before returning
                 return self.updateUsage(oldSlideId, revisionId, parentDeckId)
@@ -299,28 +301,28 @@ let self = module.exports = {
         .then((db) => db.collection('slides'))
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
-              .then((existingSlide) => {
-                  //first remove usage of deck from old revision
-                  let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
-                  for(let i = 0; i < usageArray.length; i++){
-                      if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
-                          usageArray.splice(i,1);
-                          break;
-                      }
-                  }
-                  //then update usage array of new/reverted revision
-                  let contains = false;
-                  for(let j = 0; j < existingSlide.revisions[parseInt(new_revision_id)-1].usage.length; j++){
-                      if(existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
-                          contains = true;
-                          break;
-                      }
-                  }
-                  if(!contains)
-                      existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
-                  col.save(existingSlide);
-                  return existingSlide;
-              });
+            .then((existingSlide) => {
+                //first remove usage of deck from old revision
+                let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
+                for(let i = 0; i < usageArray.length; i++){
+                    if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
+                        usageArray.splice(i,1);
+                        break;
+                    }
+                }
+                //then update usage array of new/reverted revision
+                let contains = false;
+                for(let j = 0; j < existingSlide.revisions[parseInt(new_revision_id)-1].usage.length; j++){
+                    if(existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
+                        contains = true;
+                        break;
+                    }
+                }
+                if(!contains)
+                    existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+
+                return col.save(existingSlide).then(() => existingSlide);
+            });
         });
     },
 

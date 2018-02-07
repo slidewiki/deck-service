@@ -110,7 +110,7 @@ function prepareChangeLog(changeLog, simplifyOutput) {
             } else {
                 // push it forward
                 acc.push(cur);
-            };
+            }
             return acc;
 
         }, []);

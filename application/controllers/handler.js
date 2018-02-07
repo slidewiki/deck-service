@@ -1,6 +1,7 @@
 /*
 Handles the requests by executing stuff and replying to the client. Uses promises to get stuff done.
 */
+/* eslint promise/always-return: "off" */
 
 
 
@@ -82,43 +83,34 @@ let self = module.exports = {
     newSlide: function(request, reply) {
         let userId = request.auth.credentials.userid;
 
-        self._newSlide(request.payload, userId, request)
-        .then(reply)
-        .catch((error) => {
+        // make sure user id is set
+        let payload = Object.assign({ user: userId }, request.payload);
+        // insert the slide
+        slideDB.insert(payload).then((inserted) => {
+            // empty results means something wrong with the payload
+            if (!inserted) return reply(boom.badData());
+
+            let createdSlide = co.rewriteID(inserted.ops[0]);
+
+            // create thumbnail from the newly created slide revision
+            let content = createdSlide.revisions[0].content, slideId = createdSlide.id+'-'+1;
+            if (content === '') {
+                // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                // TODO for now we use hardcoded template for new slides
+                content = slidetemplate;
+            }
+
+            // themeless
+            fileService.createThumbnail(content, slideId).catch((err) => {
+                request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+            });
+
+            reply(createdSlide);
+        }).catch((error) => {
             if (error.isBoom) return reply(error);
 
             request.log('error', error);
             reply(boom.badImplementation());
-        });
-
-    },
-
-    // reusable version of newSlide
-    _newSlide: function(payload, userId, logger) {
-        // make sure user id is set
-        payload.user = userId;
-
-        // insert the slide
-        return slideDB.insert(payload).then((inserted) => {
-            // empty results means something wrong with the payload
-            if (!inserted) throw boom.badData();
-
-            if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0])) {
-                throw inserted;
-            } else {
-                // create thumbnail from the newly created slide revision
-                let content = inserted.ops[0].revisions[0].content, slideId = inserted.ops[0]._id+'-'+1;
-                if (content === '') {
-                    // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
-                    // TODO for now we use hardcoded template for new slides
-                    content = slidetemplate;
-                }
-                fileService.createThumbnail(content, slideId).catch((err) => {
-                    logger.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
-                });
-
-                return co.rewriteID(inserted.ops[0]);
-            }
         });
 
     },
@@ -158,20 +150,23 @@ let self = module.exports = {
                             // prepare the newSlide response object
                             newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
 
-                            //create thumbnail for the new slide revision
-                            let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
-                            if(content === ''){
-                                content = '<h2>'+newSlide.revisions[0].title+'</h2>';
-                                //for now we use hardcoded template for new slides
-                                content = slidetemplate;
-                            }
-                            fileService.createThumbnail(content, newSlideId).catch((err) => {
-                                request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
-                            });
-
                             // update the content item of the parent deck with the new revision id
                             return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
-                            .then(() => {
+                            .then(({updatedDeckRevision}) => {
+                                // the updateContentItem returns, amongs other things, the updated revision of the parent (root_deck)
+                                // we need this to have access to the theme for the new updated slide 
+
+                                //create thumbnail for the new slide revision
+                                let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
+                                if(content === ''){
+                                    content = '<h2>'+newSlide.revisions[0].title+'</h2>';
+                                    //for now we use hardcoded template for new slides
+                                    content = slidetemplate;
+                                }
+                                fileService.createThumbnail(content, newSlideId, updatedDeckRevision.theme).catch((err) => {
+                                    request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                                });
+
                                 reply(newSlide);
                             });
 
@@ -218,6 +213,17 @@ let self = module.exports = {
                         // keep only the new slide revision in revisions array for response
                         let slideRevision = updatedSlide.revisions.find((r) => r.id === revisionId);
                         updatedSlide.revisions = [slideRevision];
+
+                        // also, create a thumbnail with the parent deck's theme
+                        let revertedSlideId = `${slide.id}-${revisionId}`;
+                        deckDB.get(parentDeckId).then((existingDeck) => {
+                            // parentDeckId is canonical, so only one revision here
+                            let slideTheme = existingDeck.revisions[0].theme;
+                            return fileService.createThumbnail(slideRevision.content, revertedSlideId, slideTheme);
+                        }).catch((err) => {
+                            request.log('warn', `could not create thumbnail for slide duplicate ${revertedSlideId}: ${err.message || err}`);
+                        });
+
                         return updatedSlide;
                     });
 
@@ -237,9 +243,14 @@ let self = module.exports = {
     //saves the data sources of a slide in the database
     saveDataSources: function(request, reply) {
         let slideId = request.params.id;
-        slideDB.saveDataSources(slideId, request.payload).then((replaced) => {
-            reply(replaced);
-        }).catch((error) => {
+
+        slideDB.get(slideId).then( (slide) => {
+            if(!slide)  return reply(boom.notFound());
+
+            return slideDB.saveDataSources(slideId, request.payload).then((replaced) => {
+                reply(replaced);
+            });
+        }).catch( (error) => {
             request.log('error', error);
             reply(boom.badImplementation());
         });
@@ -248,6 +259,8 @@ let self = module.exports = {
     getSlideDataSources: function(request, reply) {
         let slideId = request.params.id;
         slideDB.get(slideId).then((slide) => {
+            if(!slide) return reply(boom.notFound());
+
             let items = slide.revisions[0].dataSources || [];
             let totalCount = items.length;
             if (request.query.countOnly) {
@@ -263,7 +276,7 @@ let self = module.exports = {
     getDeckDataSources: function(request, reply) {
         deckDB.getRevision(request.params.id).then((deckRevision) => {
             // create data sources array
-            if (!deckRevision) throw boom.notFound();
+            if (!deckRevision) return reply(boom.notFound());
 
             if (_.isEmpty(deckRevision.contentItems)) {
                 return reply({ items: [], totalCount: 0, revisionOwner: deckRevision.user });
@@ -483,23 +496,23 @@ let self = module.exports = {
                     //update the content items of the new deck to contain the new slide
                     // top root is the root_deck if missing from payload
                     let top_root_deck = request.payload.top_root_deck || newSlide.root_deck;
-                    let insertPromise = deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, newSlide.user, top_root_deck)
-                    .then(() => {
+
+                    return deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, newSlide.user, top_root_deck)
+                    .then((updatedDeckRevision) => {
+                        //create the thumbnail for the new slide
+                        let content = newSlide.content, slideId = insertedSlide.ops[0].id+'-'+1;
+                        if(content === ''){
+                            content = '<h2>'+newSlide.title+'</h2>';
+                            //for now we use hardcoded template for new slides
+                            content = slidetemplate;
+                        }
+
+                        fileService.createThumbnail(content, slideId, updatedDeckRevision.theme).catch((err) => {
+                            request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+                        });
+
                         reply(co.rewriteID(inserted.ops[0]));
                     });
-                    //create the thumbnail for the new slide
-                    let content = newSlide.content, slideId = insertedSlide.ops[0].id+'-'+1;
-                    if(content === ''){
-                        content = '<h2>'+newSlide.title+'</h2>';
-                        //for now we use hardcoded template for new slides
-                        content = slidetemplate;
-                    }
-
-                    fileService.createThumbnail(content, slideId).catch((err) => {
-                        request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
-                    });
-
-                    return insertPromise;
                 });
             }
         }).catch((error) => {
@@ -687,19 +700,34 @@ let self = module.exports = {
 
     //gets the decktree with the given deck as root
     getDeckTree: function(request, reply) {
-        deckDB.getDeckTreeFromDB(request.params.id)
-        .then((deckTree) => {
-            if (!deckTree) return reply(boom.notFound());
+        if(request.query && request.query.enrich) {
+            deckDB.get(request.params.id).then( (existingDeck) => {
+                if(!existingDeck) return reply(boom.notFound());
 
-            if (co.isEmpty(deckTree))
-                reply(boom.notFound());
-            else{
-                reply(deckTree);
-            }
-        }).catch((err) => {
-            request.log('error', err);
-            reply(boom.badImplementation());
-        });
+                return deckDB.getEnrichedDeckTree(request.params.id).then( (decktree) => {
+                    reply(decktree);
+                });
+            }).catch( (err) => {
+                if(err.isBoom) return reply(err);
+
+                request.log('error', err);
+                reply(boom.badImplementation());                
+            });
+        } else {
+            deckDB.getDeckTreeFromDB(request.params.id)
+            .then((deckTree) => {
+                if (!deckTree) return reply(boom.notFound());
+
+                if (co.isEmpty(deckTree))
+                    reply(boom.notFound());
+                else{
+                    reply(deckTree);
+                }
+            }).catch((err) => {
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });
+        }
     },
 
     // authorize node creation and iterate nodeSpec array to apply each insert
@@ -828,15 +856,21 @@ let self = module.exports = {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;
                             node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction);
-                            slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-'));
 
-                            let slideId = insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id;
-                            fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId).catch((err) => {
-                                request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
+                            return deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction)
+                            .then((updatedDeckRevision) => {
+                                // we can now pick the theme of the parent deck and create the thumbnail!
+                                let slideId = insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id;
+                                fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId, updatedDeckRevision.theme).catch((err) => {
+                                    request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
+                                });
+
+                                return slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-')).then( () => {
+                                    reply(node);
+                                });
+
                             });
 
-                            reply(node);
                         }).catch((err) => {
                             request.log('error', err);
                             reply(boom.badImplementation());
@@ -848,17 +882,25 @@ let self = module.exports = {
 
                         { // these brackets are kept during handleChange removal to keep git blame under control
 
-                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck);
-                            node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
-                            slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-'));
+                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck)
+                            .then((updatedDeckRevision) => {
+                                // since we moved the slide maybe it's under a deck with a different theme, so let's create the thumbnail as well
+                                let slideId = slide.id+'-'+(slideRevision+1);
+                                fileService.createThumbnail(slide.revisions[slideRevision].content, slideId, updatedDeckRevision.theme).catch((err) => {
+                                    request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
+                                });
 
-                            reply(node);
+                                return slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-')).then(() => {
+                                    node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
+                                    reply(node);
+                                });
+                            }).catch( (err) => {
+                                request.log('error', err);
+                                reply(boom.badImplementation());
+                            });
                         }
-
                     }
-
                 });
-
             }else{
                 //need to make a new slide
                 let spath = request.payload.selector.spath;
@@ -895,7 +937,9 @@ let self = module.exports = {
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
                             'root_deck': parentID,
-                            'position' : slidePosition
+                            'position' : slidePosition,
+                            'user': userId,
+                            'theme' : request.payload.theme
                         };
 
                         if(request.payload.hasOwnProperty('content')){
@@ -912,11 +956,40 @@ let self = module.exports = {
                         }
 
                         // create the new slide into the database
-                        self._newSlide(slide, userId, request).then((createdSlide) => {
+                                                
+                        // insert the slide
+                        slideDB.insert(slide).then((inserted) => {
+                            // empty results means something wrong with the payload
+                            if (!inserted) throw boom.badData();
+
+                            let createdSlide = co.rewriteID(inserted.ops[0]);
+
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
-                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck);
+
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                            reply(node);
+                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck).then((updatedDeckRevision) => {
+
+                                // slide is now inserted, so we can create the thumbnail using the (direct) parent deck theme
+
+                                // create thumbnail from the newly created slide revision
+                                let content = createdSlide.revisions[0].content, slideId = createdSlide.id+'-'+1;
+                                if (content === '') {
+                                    // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                                    // TODO for now we use hardcoded template for new slides
+                                    content = slidetemplate;
+                                }
+
+                                // don't wait for it before returning
+                                fileService.createThumbnail(content, slideId, updatedDeckRevision.theme).catch((err) => {
+                                    request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
+                                });
+
+                                reply(node);
+                            }).catch( (err) => {
+                                request.log('error', err);
+                                reply(boom.badImplementation());
+                            });
+
                         }).catch((err) => {
                             if (err.isBoom) return reply(err);
 
@@ -969,17 +1042,24 @@ let self = module.exports = {
                                 parentID = request.payload.selector.id;
                             }
 
-                            deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId, top_root_deck);
-                            deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
-                            //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                            self.getDeckTree({
-                                'params': {'id' : deck.id},
-                                'log': request.log.bind(request),
-                            }, (deckTree) => {
-                                if (deckTree.isBoom) return reply(deckTree);
+                            let insertContentItemPromise = deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId, top_root_deck);
+                            let addToUsagePromise = deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
 
-                                reply(deckTree);
+                            Promise.all([insertContentItemPromise, addToUsagePromise]).then( () => {
+                                //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                                self.getDeckTree({
+                                    'params': {'id' : deck.id},
+                                    'log': request.log.bind(request),
+                                }, (deckTree) => {
+                                    if (deckTree.isBoom) return reply(deckTree);
+
+                                    reply(deckTree);
+                                });
+                            }).catch( (err) => {
+                                request.log('error', err);
+                                reply(boom.badImplementation());
                             });
+
                         }
                     });
                 }
@@ -1008,22 +1088,25 @@ let self = module.exports = {
                                 // omitting the top_root_deck means this change won't be tracked,
                                 // as it will be tracked right after this code, we just need to attach
                                 // first so that the rest of the tracking will work
-                                deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
-                                    // track all created forks AFTER it's attached
-                                    deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, 'attach');
+                                return deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
+                                    return Promise.all([
+                                        // track all created forks AFTER it's attached
+                                        deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, true),
+                                        // add to usage AFTER it's attached
+                                        deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-')),
+                                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                                        self.getDeckTree({
+                                            'params': {'id' : deck.id},
+                                            'log': request.log.bind(request),
+                                        }, (deckTree) => {
+                                            if (deckTree.isBoom) return reply(deckTree);
+
+                                            reply(deckTree);
+                                        }),
+                                    ]);
+
                                 });
 
-                                deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-'));
-
-                                //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                                self.getDeckTree({
-                                    'params': {'id' : deck.id},
-                                    'log': request.log.bind(request),
-                                }, (deckTree) => {
-                                    if (deckTree.isBoom) return reply(deckTree);
-
-                                    reply(deckTree);
-                                });
                             }
                         });
 
@@ -1032,9 +1115,6 @@ let self = module.exports = {
                         reply(boom.badImplementation());
                     });
                 }
-
-
-
             }else{
                 //id is not specified, we need to make a new deck
                 let spath = request.payload.selector.spath;
@@ -1073,6 +1153,7 @@ let self = module.exports = {
                             'user': userId,
                             'root_deck': parentID,
                             'top_root_deck': top_root_deck,
+                            'theme': parentDeck.revisions[0].theme,
                             'position' : deckPosition
                         };
                         //create the new deck
@@ -1317,23 +1398,23 @@ let self = module.exports = {
             };
             //append the node (revised or not) in the new position
             self.createDeckTreeNode(forwardedRequest,
-            (inserted) => {
-                if (inserted.isBoom) return reply(inserted);
+                (inserted) => {
+                    if (inserted.isBoom) return reply(inserted);
 
-                if(inserted.hasOwnProperty('changeset') && removed.hasOwnProperty('changeset')){
-                    inserted_changeset = inserted.changeset;
-                    inserted.inserted_changeset = inserted_changeset;
-                    inserted.removed_changeset = removed_changeset;
-                }
-                else if(removed.hasOwnProperty('changeset')){
-                    inserted.changeset = removed_changeset;
-                }
-                if(inserted.hasOwnProperty('changeset')){
-                    inserted_changeset = inserted.changeset;
-                    inserted.changeset = inserted_changeset;
-                }
-                reply(inserted);
-            });
+                    if(inserted.hasOwnProperty('changeset') && removed.hasOwnProperty('changeset')){
+                        inserted_changeset = inserted.changeset;
+                        inserted.inserted_changeset = inserted_changeset;
+                        inserted.removed_changeset = removed_changeset;
+                    }
+                    else if(removed.hasOwnProperty('changeset')){
+                        inserted.changeset = removed_changeset;
+                    }
+                    if(inserted.hasOwnProperty('changeset')){
+                        inserted_changeset = inserted.changeset;
+                        inserted.changeset = inserted_changeset;
+                    }
+                    reply(inserted);
+                });
         });
 
     },
@@ -1368,7 +1449,12 @@ let self = module.exports = {
                 deckTree.children = deckTree.children.slice(offset, ending);
             }
 
-            reply(deckTree);
+            if(request.query.countOnly){
+                reply({slidesCount: deckTree.children.length});
+            } else {
+                deckTree.slidesCount = deckTree.children.length;
+                reply(deckTree);
+            }
         }).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1438,6 +1524,8 @@ let self = module.exports = {
         let userId = request.auth.credentials.userid;
 
         deckDB.get(deckId).then((deck) => {
+            if(!deck)   return reply(boom.notFound());
+
             // permit deck owner only to use this
             if (userId !== deck.user) return reply(boom.forbidden());
 
@@ -1520,6 +1608,7 @@ let self = module.exports = {
                         timestamp: deck.timestamp,
                         language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
                         forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                        theme: activeRevision.theme,
                         firstSlide: deckDB.getFirstSlide(activeRevision),
                         revisionId: activeRevision.id,
                         latestRevisionId: latestRevision.id
@@ -1591,6 +1680,7 @@ let self = module.exports = {
                         timestamp: deck.timestamp,
                         language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
                         forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                        theme: activeRevision.theme,
                         firstSlide: deckDB.getFirstSlide(activeRevision),
                         revisionId: activeRevision.id,
                         latestRevisionId: latestRevision.id
@@ -1656,6 +1746,7 @@ let self = module.exports = {
                 metadata.translation = revision.translation;
                 metadata.tags = revision.tags;
                 metadata.parent = revision.parent;
+                metadata.theme = revision.theme;
 
                 // get first slide
                 metadata.firstSlide = deckDB.getFirstSlide(revision);
@@ -1701,31 +1792,6 @@ let self = module.exports = {
         });
     },
 
-    //counts the slides in a given deck
-    countSlides: function(request, reply){
-        deckDB.get(request.params.id).then((foundDeck) => {
-            if(!foundDeck){
-                reply(boom.notFound());
-            }
-            else{
-                let activeRevision = 1;
-                if(request.params.id.split('-').length > 1){
-                    activeRevision = parseInt(request.params.id.split('-')[1]);
-                }
-                let slideCount = 0;
-                for(let i = 0; i < foundDeck.revisions[activeRevision-1].contentItems.length; i++){
-                    if(foundDeck.revisions[activeRevision-1].contentItems[i].kind === 'slide'){
-                        slideCount++;
-                    }
-                }
-                reply(slideCount);
-            }
-        }).catch((err) => {
-            request.log('error', err);
-            reply(boom.badImplementation());
-        });
-    },
-
     getDeckUsage: function(request, reply) {
         let deckId = request.params.id;
         let deck = util.parseIdentifier(deckId);
@@ -1734,6 +1800,7 @@ let self = module.exports = {
 
             return deckDB.getUsage(deckId);
 
+            /* eslint-disable no-unreachable */
             // TODO dead code
             return deckDB.getRootDecks(deckId)
             .then((roots) => {
@@ -1749,7 +1816,7 @@ let self = module.exports = {
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
             });
-
+            /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1766,6 +1833,7 @@ let self = module.exports = {
             return deckDB.getRootDecks(deckId)
             .then((roots) => {
                 return roots;
+                /* eslint-disable no-unreachable */
                 // TODO dead code
                 return Promise.all(roots.map((r) => {
                     return deckDB.findPath(util.toIdentifier(r), deckId)
@@ -1776,6 +1844,7 @@ let self = module.exports = {
                         return path;
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
+                /* eslint-enable no-unreachable */
             });
 
         }).then(reply).catch((err) => {
@@ -1792,6 +1861,7 @@ let self = module.exports = {
 
             return deckDB.getUsage(slideId, 'slide');
 
+            /* eslint-disable no-unreachable */
             // TODO dead code
             return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
                 return roots;
@@ -1810,6 +1880,7 @@ let self = module.exports = {
                 })).then((paths) => paths.map(util.toPlatformPath));
 
             });
+            /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1825,6 +1896,7 @@ let self = module.exports = {
 
             return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
                 return roots;
+                /* eslint-disable no-unreachable */
                 // TODO dead code
                 return Promise.all(roots.map((r) => {
                     // path method does not return the slide id, so we take it from the root
@@ -1838,6 +1910,7 @@ let self = module.exports = {
                         return path;
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
+                /* eslint-disable no-unreachable */
 
             });
         }).then(reply).catch((err) => {
@@ -1893,16 +1966,17 @@ let self = module.exports = {
         authorizeUser(userId, deckId, rootDeckId).then((boomError) => {
             if (boomError) return boomError;
 
-            return deckDB.replaceTags(deckId, request.payload.tags, userId, rootDeckId).then((tagsInserted) => {
-                if (!tagsInserted) {
-                    // should never come here, but if it does it is probably correct
-                    return boom.notFound();
-                }
+            return deckDB.get(deckId).then( (deck) => {
+                if(!deck) return boom.notFound();
 
-                return tagsInserted;
+                return deckDB.replaceTags(deckId, request.payload.tags, userId, rootDeckId).then((updatedDeck) => {
+                    return updatedDeck;
+                });
             });
-
-        }).then(reply).catch((err) => {
+        }).then( (response) => {
+            // response is either the deck update or boom
+            reply(response);
+        }).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -1959,15 +2033,21 @@ let self = module.exports = {
             request.log('error', error);
             reply(boom.badImplementation());
         });
-    }, 
+    },
 
     getDeckDeepUsage: function(request, reply){
-        deckDB.getDeepUsage(request.params.id, 'deck', request.query.keepVisibleOnly).then( (usage) => {
-            if(!usage){
-                reply(boom.notFound());
-            } else {
-                reply(usage);
-            }
+        let deckId = request.params.id;
+
+        deckDB.get(deckId).then( (deck) => {
+            if(!deck)   return reply(boom.notFound());
+
+            return deckDB.getDeepUsage(deckId, 'deck', request.query.keepVisibleOnly).then( (usage) => {
+                if(!usage){
+                    reply(boom.notFound());
+                } else {
+                    reply(usage);
+                }
+            });
         }).catch( (err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1975,17 +2055,23 @@ let self = module.exports = {
     },
 
     getSlideDeepUsage: function(request, reply){
-        deckDB.getDeepUsage(request.params.id, 'slide', request.query.keepVisibleOnly).then( (usage) => {
-            if(!usage){
-                reply(boom.notFound());
-            } else {
-                reply(usage);
-            }
+        let slideId = request.params.id;
+
+        slideDB.exists(slideId).then( (exists) => {
+            if(!exists) return reply(boom.notFound());
+
+            return deckDB.getDeepUsage(slideId, 'slide', request.query.keepVisibleOnly).then( (usage) => {
+                if(!usage){
+                    reply(boom.notFound());
+                } else {
+                    reply(usage);
+                }
+            });
         }).catch( (err) => {
             request.log('error', err);
             reply(boom.badImplementation());
         });
-    }, 
+    },
 
     getForkGroup: function(request, reply){
         deckDB.computeForkGroup(request.params.id).then( (forkGroup) => {
@@ -2011,7 +2097,7 @@ let self = module.exports = {
                     slide.content = `<h2>${slide.title}</h2>`;
                 }
 
-                fileService.createThumbnail(slide.content, slide.id).then(() => {
+                fileService.createThumbnail(slide.content, slide.id, slide.theme).then(() => {
                     done(null, { id: slide.id, status: 'OK' });
                 }).catch((err) => {
                     done(null, { id: slide.id, status: err.message });
@@ -2025,6 +2111,9 @@ let self = module.exports = {
                 }
             });
 
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
         });
 
     },

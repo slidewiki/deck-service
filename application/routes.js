@@ -8,7 +8,13 @@ const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
 const groups = require('./controllers/groups');
 
-// joi validation models
+const availableThemes = Joi.string()
+.default('default').empty('')
+.valid('', 'default', 'sky', 'beige', 'black', 'blood', 'league', 'moon', 'night', 'odimadrid', 'oeg', 'openuniversity', 'simple', 'solarized', 'white')
+.description('Available themes to apply to the thumbnail');
+
+
+// TODO better organize joi validation models
 const apiModels = {};
 
 apiModels.tag = require('./models/JoiModels/tag');
@@ -253,28 +259,13 @@ module.exports = function(server) {
     });
 
     server.route({
-        method: 'GET',
-        path: '/deck/{id}/slideCount',
-        handler: handlers.countSlides,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string()
-                },
-            },
-            tags: ['api'],
-            description: 'Get total count of slides for this deck'
-        }
-    });
-
-    server.route({
         method: 'POST',
         path: '/deck/new',
         handler: handlers.newDeck,
         config: {
             validate: {
                 payload: Joi.object().keys({
-                    description: Joi.string(),
+                    description: Joi.string().allow('').default(''),
                     language: Joi.string(),
                     translation: Joi.object().keys({
                         status: Joi.string().valid('original', 'google', 'revised')
@@ -295,7 +286,7 @@ module.exports = function(server) {
                         speakernotes: Joi.string().allow('')
                     }),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
-                    theme: Joi.string().allow(''),
+                    theme : availableThemes,
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number().required(),
@@ -328,7 +319,7 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 payload: Joi.object().keys({
-                    description: Joi.string(),
+                    description: Joi.string().allow('').default(''),
                     language: Joi.string(),
                     translation: Joi.string().alphanum().lowercase(),
                     tags: Joi.array().items(apiModels.tag).default([]),
@@ -344,7 +335,7 @@ module.exports = function(server) {
                     comment: Joi.string().allow(''),
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
-                    theme: Joi.string().allow(''),
+                    theme : availableThemes,
                     new_revision: Joi.boolean(),
                 }),
 
@@ -535,7 +526,8 @@ module.exports = function(server) {
                 },
                 query: {
                     limit: Joi.string().optional(),
-                    offset: Joi.string().optional()
+                    offset: Joi.string().optional(),
+                    countOnly: Joi.boolean().truthy('1').falsy('0', ''),
                 }
             },
             tags: ['api'],
@@ -565,7 +557,7 @@ module.exports = function(server) {
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     comment: Joi.string().allow(''),
-                    description: Joi.string().allow(''),
+                    description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                 }).requiredKeys('content', 'root_deck'),
@@ -603,7 +595,7 @@ module.exports = function(server) {
                         revision: Joi.string().alphanum().lowercase()
                     }),
                     comment: Joi.string().allow(''),
-                    description: Joi.string().allow(''),
+                    description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
@@ -737,7 +729,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional')
                 }
             },
             tags: ['api'],
@@ -754,6 +746,9 @@ module.exports = function(server) {
             validate: {
                 params: {
                     id: Joi.string()
+                }, 
+                query: {
+                    enrich: Joi.boolean().truthy('1').falsy('0', ''),
                 }
             },
             tags: ['api'],
@@ -772,7 +767,7 @@ module.exports = function(server) {
                         id: Joi.string(), //id of the root deck
                         spath: Joi.string().allow(''),
                         stype: Joi.string(),
-                        sid: Joi.string()
+                        sid: Joi.string(),
                     }),
                     nodeSpec: Joi.array().items(
                         Joi.object().keys({
@@ -783,7 +778,7 @@ module.exports = function(server) {
                     content: Joi.string(),
                     title: Joi.string(),
                     license: Joi.string(),
-                    speakernotes: Joi.string()
+                    speakernotes: Joi.string(),
                 }).requiredKeys('selector'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -896,7 +891,7 @@ module.exports = function(server) {
                 },
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login'),
-                }).unknown(),                
+                }).unknown(),
             },
             tags: ['api'],
             auth: 'jwt',
