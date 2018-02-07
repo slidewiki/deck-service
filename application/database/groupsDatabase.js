@@ -6,7 +6,7 @@ const userService = require('../services/user');
 
 function getGroupsCollection(){
     return helper.connectToDatabase()
-        .then((db) => db.collection('groups'));
+    .then((db) => db.collection('groups'));
 }
 
 function getNextId(){
@@ -39,8 +39,8 @@ let self = module.exports = {
 
         if(usergroup){
             let userGroupCondition = (Array.isArray(usergroup)) 
-            ? {userGroup: {$in: usergroup}} 
-            : {userGroup: usergroup};
+                ? {userGroup: {$in: usergroup}} 
+                : {userGroup: usergroup};
 
             conditions.push(userGroupCondition);
         }
@@ -114,11 +114,11 @@ let self = module.exports = {
             return groups.updateOne({
                 _id: groupId
             }, 
-                {
-                    $addToSet: {
-                        decks: deckIdToAdd
-                    }
-                });
+            {
+                $addToSet: {
+                    decks: deckIdToAdd
+                }
+            });
         });
     },
 
@@ -128,11 +128,11 @@ let self = module.exports = {
             return groups.updateOne({
                 _id: groupId
             }, 
-                {
-                    $pull: {
-                        decks: deckIdToRemove
-                    }
-                });
+            {
+                $pull: {
+                    decks: deckIdToRemove
+                }
+            });
         });
     },
 

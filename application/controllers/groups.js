@@ -204,8 +204,8 @@ let self = module.exports = {
 
         if(request.query.usergroup){
             let userGroupCondition = (Array.isArray(request.query.usergroup)) 
-            ? {userGroup: {$in: request.query.usergroup}} 
-            : {userGroup: request.query.usergroup};
+                ? {userGroup: {$in: request.query.usergroup}} 
+                : {userGroup: request.query.usergroup};
 
             conditions.push(userGroupCondition);
         }
