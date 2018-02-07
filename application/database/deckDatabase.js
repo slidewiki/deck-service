@@ -421,30 +421,31 @@ let self = module.exports = {
 
     // returns the new or existing request, with isNew set to true if it was new
     // returns undefined if deck does not exist
-    addEditRightsRequest: async function(deckId, userId) {
-        let existingDeck = await self.get(deckId);
-        if (!existingDeck) return;
+    addEditRightsRequest: function(deckId, userId) {
+        return self.get(deckId).then((existingDeck) => {
+            if (!existingDeck) return;
 
-        let editRightsRequests = existingDeck.editRightsRequests;
-        if (!editRightsRequests) {
-            editRightsRequests = [];
-        }
+            let editRightsRequests = existingDeck.editRightsRequests;
+            if (!editRightsRequests) {
+                editRightsRequests = [];
+            }
 
-        let existingRequest = editRightsRequests.find((r) => r.user === userId);
-        if (existingRequest) {
-            return existingRequest;
-        }
+            let existingRequest = editRightsRequests.find((r) => r.user === userId);
+            if (existingRequest) {
+                return Object.assign({ isNew: false }, existingRequest);
+            }
 
-        let timestamp = new Date().toISOString();
-        let newRequest = { user: userId, requestedAt: timestamp };
-        editRightsRequests.push(newRequest);
+            let timestamp = new Date().toISOString();
+            let newRequest = { user: userId, requestedAt: timestamp };
+            editRightsRequests.push(newRequest);
 
-        existingDeck.editRightsRequests = editRightsRequests;
+            existingDeck.editRightsRequests = editRightsRequests;
 
-        let decks = await helper.getCollection('decks');
-        await decks.findOneAndReplace({ _id: deckId }, existingDeck);
+            return helper.getCollection('decks')
+            .then((decks) => decks.findOneAndReplace({ _id: deckId }, existingDeck))
+            .then(() => Object.assign({ isNew: true }, newRequest));
+        });
 
-        return Object.assign({ isNew: true }, newRequest);
     },
 
     // TODO properly implement a PATCH-like method for partial updates
