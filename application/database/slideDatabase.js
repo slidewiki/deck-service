@@ -463,7 +463,6 @@ let self = module.exports = {
                 id =  slide_id.split('-')[0];
                 rev = slide_id.split('-')[1];
             }
-            console.log(id);
             helper.connectToDatabase().then((db) => {
                 return helper.getNextIncrementationValueForCollection(db, 'slides').then((newSlideId) => {
                     return helper.getCollection('slides').then((slides) => {
@@ -479,7 +478,7 @@ let self = module.exports = {
                             slide._id = newSlideId;
 
                             //slide.translated_from =
-                            return translationService.translateSlide(oldSlideId, language, user).then((translated) => {
+                            return translationService.translateSlide(oldSlideId, language, user, 0).then((translated) => {
                                 //console.log('SLIDE response', original);
                                 if (translated.error) {
                                     //console.log(original);
