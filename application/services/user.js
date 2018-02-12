@@ -70,4 +70,17 @@ const self = module.exports = {
         });
     },
 
+    // promises all user groups for a given user id
+    fetchGroupsForUser: function(userId, authToken){
+        let headers = {};
+        headers[config.JWT.HEADER] = authToken;
+
+        return rp.get({
+            uri: `${Microservices.user.uri}/user/${userId}/profile`,
+            json: true,
+            headers: headers
+        }).then( (userProfile) => {
+            return userProfile.groups.map( (group) => { return group._id; });
+        });
+    },
 };
