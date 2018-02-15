@@ -1612,13 +1612,13 @@ let self = module.exports = {
     },
 
     // we guard the fork deck revision method against abuse, by checking for change logs of one
-    forkDeckRevision(deck_id, user, forAttach, languageToTranslate, newId = false) {
+    forkDeckRevision(deck_id, user, forAttach, languageToTranslate, job) {
         let deck = util.parseIdentifier(deck_id);
         return self.get(deck.id).then((existingDeck) => {
             let [latestRevision] = existingDeck.revisions.slice(-1);
             if (deck.revision && latestRevision.id !== deck.revision) {
                 // we want to fork a read-only revision, all's well
-                return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate, newId);
+                return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate, job);
             } else {
                 // make the deck id canonical just in case
                 deck.revision = latestRevision.id;
@@ -1629,10 +1629,10 @@ let self = module.exports = {
                 if (counts[deck.revision] === 1) {
                     // we want to fork a fresh revision, let's fork the one before it
                     console.log(`forking ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
-                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach, languageToTranslate, newId);
+                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach, languageToTranslate, job);
                 } else {
                     // unknown revision, old deck without changelog, or a revision with changes, just fork it!
-                    return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate, newId);
+                    return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate, job);
                 }
             });
         });
@@ -1641,12 +1641,19 @@ let self = module.exports = {
     // forks a given deck revision by copying all of its sub-decks into new decks
     // forAttach is true when forking is done during deck attach process
     // languageToTranslate, if set, will result in creating a deck translation (subtype of fork)
-    _forkDeckRevision(deck_id, user, forAttach, languageToTranslate, newId_fromJob = false) {
-        return self.getFlatDecksFromDB(deck_id)
-        .then((res) => {
+    _forkDeckRevision(deck_id, user, forAttach, languageToTranslate, job) {
+        return self.getFlatDecksFromDB(deck_id).then((res) => {
+            // if part of a job, we need to read the job data to get the id of the root deck this operation will result to
+            // otherwise, we leave targetRootDeckId undefined; this way a new id will be picked from the database
+            let targetRootDeckId;
+            if (job) {
+                targetRootDeckId = job.attrs.data.newId;
+            }
+
+            let originRootDeckId = res.id;
             //we have a flat sub-deck structure
             let flatDeckArray = [];
-            flatDeckArray.push(res.id); //push root deck into array
+            flatDeckArray.push(originRootDeckId); //push root deck into array
             for(let i = 0; i < res.children.length; i++){
                 flatDeckArray.push(res.children[i].id); //push next sub-deck into array
             }
@@ -1659,9 +1666,9 @@ let self = module.exports = {
             return new Promise((resolve, reject) => {
                 //first we generate all the new ids for the copied decks, and hold them in a map for future reference
                 async.eachSeries(flatDeckArray, (next_deck, callback) => {
-                    if (next_deck.split('-')[0]=== deck_id.split('-')[0] && newId_fromJob){ //if we take the deck for translation from job, where we store the future id
-                        id_map[next_deck] = newId_fromJob+'-'+1;
-                        id_noRev_map[next_deck.split('-')[0]] = newId_fromJob;
+                    if (next_deck.split('-')[0]=== deck_id.split('-')[0] && targetRootDeckId){ //if we take the deck for translation from job, where we store the future id
+                        id_map[next_deck] = targetRootDeckId+'-'+1;
+                        id_noRev_map[next_deck.split('-')[0]] = targetRootDeckId;
                         callback();
                     }else{
                         return helper.connectToDatabase()
@@ -1770,7 +1777,7 @@ let self = module.exports = {
                                                     slide._id = newSlideId;
 
                                                     //slide.translated_from =
-                                                    return translationService.translateSlide(oldSlideId, languageToTranslate, copiedDeck.user, newId_fromJob).then((translated) => {
+                                                    return translationService.translateSlide(oldSlideId, languageToTranslate, copiedDeck.user).then((translated) => {
                                                         //console.log('SLIDE response', original);
                                                         if (translated.error) {
                                                             //console.log(original);
@@ -1808,10 +1815,10 @@ let self = module.exports = {
                                                                 console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
                                                             });
                                                             //filling in the translations array for all decks in the 'family'
-                                                            // return self.updateTranslations('slide', translations).then(() => {
-                                                            //     return self.updateProgress(newId_fromJob);
-                                                            // });
-                                                            return self.updateTranslations('slide', translations);
+                                                            return self.updateTranslations('slide', translations).then(() => {
+                                                                return job.incrementProgress();
+                                                            });
+                                                            // return self.updateTranslations('slide', translations);
                                                         });
 
                                                     }).then(() => {
@@ -1871,7 +1878,7 @@ let self = module.exports = {
 
                                     if (languageToTranslate) {
                                         // translate copiedDeck
-                                        translationService.translateDeck(found._id, languageToTranslate, copiedDeck.user, newId_fromJob)
+                                        translationService.translateDeck(found._id, languageToTranslate, copiedDeck.user)
                                         .then((original) => {
                                             // console.log('response', original);
                                             if (original.error) {
@@ -1923,12 +1930,12 @@ let self = module.exports = {
                         } else {
                             if (!forAttach) {
                                 // if not attaching, we need to track stuff here
-                                let rootDeckId = id_map[res.id];
+                                let rootDeckId = id_map[originRootDeckId];
                                 let forkType = languageToTranslate ? 'translate' : 'fork';
                                 self._trackDecksForked(rootDeckId, id_map, user, forkType);
                             }
 
-                            resolve({'root_deck': id_map[res.id], 'id_map': id_map});
+                            resolve({'root_deck': id_map[originRootDeckId], 'id_map': id_map});
                         }
                     });
                 });
@@ -2004,39 +2011,6 @@ let self = module.exports = {
 
     },
 
-    // updateProgress(newId_fromJob){
-    //     return new Promise((resolve, reject) => {
-    //         return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
-    //         .then((db) => db.collection('jobs'))
-    //         .then((col) => {
-    //             return col.findOne({'data.newId': parseInt(newId_fromJob)})
-    //             .then((found) => {
-    //                 console.log('updateProgress for job: ' + JSON.stringify(found));
-    //                 if (found){
-    //                     if (found.progress){
-    //                         found.progress++;
-    //                         col.save(found);
-    //                         console.log(found.progress);
-    //                         resolve(null, true);
-    //                     }else{
-    //                         found.progress = 1;
-    //                         col.save(found);
-    //                         console.log(found.progress);
-    //                         resolve(null, true);
-    //                     }
-    //                 }else{
-    //                     console.log('Job not found: ' + newId_fromJob);
-    //                     reject('Job not found: ' + newId_fromJob, false);
-    //                 }
-    //             })
-    //             .catch( (err) => {
-    //                 console.log(err);
-    //                 reject(err);
-    //             });
-    //         });
-    //     });
-    // },
-
     updateTranslations(kind, translations_array){
         if (kind === 'deck'){
             return new Promise((resolve, reject) => {
@@ -2094,9 +2068,9 @@ let self = module.exports = {
     },
 
     // forks a given deck revision by copying all of its sub-decks into new decks
-    translateDeckRevision(deck_id, user, language, newId) {
+    translateDeckRevision(deck_id, user, language, job) {
         // forAttach=false as it is never used when attaching existing subdecks
-        return self.forkDeckRevision(deck_id, user, false, language, newId);
+        return self.forkDeckRevision(deck_id, user, false, language, job);
     },
 
     getDeckForks(deckId, userId) {

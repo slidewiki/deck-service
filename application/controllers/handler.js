@@ -8,11 +8,8 @@ Handles the requests by executing stuff and replying to the client. Uses promise
 'use strict';
 
 const _ = require('lodash');
+const {promisify} = require('util');
 const util = require('../lib/util');
-
-//let queue = require('./queue');
-let agenda_file = require('../lib/agenda.js');
-//let agenda = require('../worker.js');
 
 const boom = require('boom'),
     slideDB = require('../database/slideDatabase'),
@@ -20,6 +17,9 @@ const boom = require('boom'),
     co = require('../common'),
     Joi = require('joi'),
     async = require('async');
+
+const agenda = require('../lib/agenda'),
+    jobProgress = require('../lib/agendaJobProgress');
 
 // TODO remove this from here after we've refactored all database-specific code into slide/deck database js files
 const ChangeLog = require('../lib/ChangeLog');
@@ -411,6 +411,20 @@ let self = module.exports = {
         });
     },
 
+    // returns the deck creation progress information, if any looking in the jobs database
+    getDeckProgress: function(request, reply) {
+        let deckId = request.params.id; // always number
+
+        jobProgress.getJobForDeck(deckId, agenda).then((job) => {
+            if (!job) return reply(boom.notFound());
+            let data = job.attrs.data;
+            return reply({ currentSlides: data.progress || 0, totalSlides: data.total });
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
     getDeckTranslations: function(request, reply){
         let deckId = request.params.id; // it should already be a number
 
@@ -661,12 +675,15 @@ let self = module.exports = {
                 }else{
                     if (deckTree.children){
                         return deckDB.getNextId().then((newId) => {
-                            agenda_file.getAgenda().then((agenda) => {
-                                agenda.schedule(new Date(Date.now()), 'translation', { deckId, userId, 'newId':newId, 'language': request.payload.language, 'total': deckTree.children.length});
-                                return reply({cronjob: 1, totalSlides: deckTree.children.length, 'newId': newId});
-                            }).catch((error) => {
-                                request.log('error', error);
-                                reply(boom.badImplementation());
+                            return promisify(agenda.now).bind(agenda)('translation', {
+                                deckId,
+                                userId,
+                                'newId':newId,
+                                'language': request.payload.language,
+                                'total': deckTree.children.length,
+                            }).then((job) => {
+                                // we have the job!
+                                reply({cronjob: 1, totalSlides: deckTree.children.length, 'newId': newId});
                             });
                         });
 

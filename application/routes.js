@@ -462,6 +462,21 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deck/{id}/progress',
+        handler: handlers.getDeckProgress,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+            },
+            tags: ['api'],
+            description: 'Return deck tree creation progress information for the current deck',
+        },
+    });
+
+    server.route({
+        method: 'GET',
         path: '/slide/{id}/translations',
         handler: handlers.getSlideTranslations,
         config: {
