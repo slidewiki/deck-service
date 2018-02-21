@@ -500,6 +500,9 @@ let self = module.exports = {
             if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
                 throw inserted;
             else{
+                if (request.query.noFirstSlide) {
+                    return reply(co.rewriteID(inserted.ops[0]));
+                }
                 //create a new slide inside the new deck
                 let newSlide = {
                     'title': 'New slide',
@@ -1231,6 +1234,7 @@ let self = module.exports = {
                         };
                         //create the new deck
                         self.newDeck({
+                            'query': request.query,
                             'payload' : deck,
                             'auth': request.auth,
                             'log': request.log.bind(request),

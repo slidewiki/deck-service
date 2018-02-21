@@ -383,6 +383,19 @@ let self = module.exports = {
 
     // inserts a deck into the database
     _insert: function(deck) {
+        // check if deck has origin without title
+        if (deck.origin && deck.origin.id && _.isEmpty(deck.origin.title)) {
+            let originId = util.toIdentifier(deck.origin);
+            return self.get(originId).then((originDeck) => {
+                if (!originDeck) throw boom.badData(`unknown deck origin: ${originId}`);
+
+                deck.origin.title = originDeck.revisions[0].title;
+                deck.origin.user = originDeck.user;
+
+                return self._insert(deck);
+            });
+        }
+
         return helper.connectToDatabase()
         .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
         .then((newId) => {
@@ -486,6 +499,19 @@ let self = module.exports = {
 
     //updates a deck's metadata when no new revision is needed
     update: function(id, deck) {
+        // check if deck has origin without title
+        if (deck.origin && deck.origin.id && _.isEmpty(deck.origin.title)) {
+            let originId = util.toIdentifier(deck.origin);
+            return self.get(originId).then((originDeck) => {
+                if (!originDeck) throw boom.badData(`unknown deck origin: ${originId}`);
+
+                deck.origin.title = originDeck.revisions[0].title;
+                deck.origin.user = originDeck.user;
+
+                return self.update(id, deck);
+            });
+        }
+
         // if not included in the call, the deck itself is the top_root_deck
         let top_root_deck = deck.top_root_deck || id;
 
@@ -544,6 +570,9 @@ let self = module.exports = {
                 deckRevision.lastUpdate = existingDeck.lastUpdate;
                 if (!_.isEmpty(deck.editors) ){
                     existingDeck.editors = deck.editors;
+                }
+                if (!_.isEmpty(deck.origin)) {
+                    existingDeck.origin = deck.origin;
                 }
 
                 if(existingDeck.hasOwnProperty('contributors')){
@@ -1729,12 +1758,7 @@ let self = module.exports = {
                                 let timestamp = now.toISOString();
                                 copiedDeck.timestamp = timestamp;
                                 copiedDeck.lastUpdate = timestamp;
-                                if(found.hasOwnProperty('datasource')){
-                                    copiedDeck.datasource = found.datasource;
-                                }
-                                else{
-                                    copiedDeck.datasource = null;
-                                }
+
                                 //copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
                                 copiedDeck.revisions = [found.revisions[ind]];
                                 copiedDeck.revisions[0].id = 1;
@@ -3094,6 +3118,11 @@ function convertToNewDeck(deck){
             theme: deck.theme
         }]
     };
+
+    if (!_.isEmpty(deck.origin)) {
+        result.origin = deck.origin;
+    }
+
     return result;
 }
 

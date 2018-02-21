@@ -265,6 +265,11 @@ module.exports = function(server) {
         config: {
             validate: {
                 payload: Joi.object().keys({
+                    origin: Joi.object().keys({
+                        id: Joi.number().integer().required(),
+                        revision: Joi.number().integer().required(),
+                        kind: Joi.string().allow('fork', 'translation').default('fork'),
+                    }),
                     description: Joi.string().allow('').default(''),
                     language: Joi.string(),
                     translation: Joi.object().keys({
@@ -299,6 +304,10 @@ module.exports = function(server) {
                     })
                 }),
 
+                query: {
+                    noFirstSlide: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Skips automatic creation of first slide'),
+                },
+
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),
@@ -319,6 +328,11 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 payload: Joi.object().keys({
+                    origin: Joi.object().keys({
+                        id: Joi.number().integer().required(),
+                        revision: Joi.number().integer().required(),
+                        kind: Joi.string().allow('fork', 'translation').default('fork'),
+                    }),
                     description: Joi.string().allow('').default(''),
                     language: Joi.string(),
                     translation: Joi.string().alphanum().lowercase(),
@@ -595,7 +609,7 @@ module.exports = function(server) {
             validate: {
                 payload: Joi.object().keys({
                     title: Joi.string(),
-                    content: Joi.string(),
+                    content: Joi.string().allow(''),
                     speakernotes: Joi.string(),
                     root_deck: Joi.string(),
                     parent_deck: Joi.object().keys({
@@ -634,7 +648,7 @@ module.exports = function(server) {
                 },
                 payload: Joi.object().keys({
                     title: Joi.string(),
-                    content: Joi.string(),
+                    content: Joi.string().allow(''),
                     speakernotes: Joi.string(),
                     root_deck: Joi.string(),
                     top_root_deck: Joi.string(),
@@ -827,11 +841,16 @@ module.exports = function(server) {
                             type: Joi.string(),
                         })
                     ).single(),
-                    content: Joi.string(),
+                    content: Joi.string().allow(''),
                     title: Joi.string(),
                     license: Joi.string(),
                     speakernotes: Joi.string(),
                 }).requiredKeys('selector'),
+
+                query: {
+                    noFirstSlide: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Skips automatic creation of first slide when appending new deck'),
+                },
+
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),
