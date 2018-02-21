@@ -2111,26 +2111,58 @@ let self = module.exports = {
     // queries the database to return the set of all decks that are part of a deck fork chain
     // the group can be identified by the deck with minimum id (earliest created one)
     // if it returns an empty array, it means the deck id is NOT in the database
-    computeForkGroup(deckId) {
-        deckId = parseInt(deckId);
+    computeForkGroup(deck, kind='fork') {
+        let deckId = deck._id;
+
+        // restrict based on kind
+        let restrictSearchWithMatch = {
+            'origin.kind': { $in: [null, 'fork'] },
+        };
+        if (kind !== 'fork') {
+            restrictSearchWithMatch = {
+                $or: [
+                    { origin: { $exists: false } },
+                    { 'origin.kind': kind },
+                ],
+            };
+        }
+
         let pipeline = [
             { $match: { _id: deckId } },
             { $project: { origin: 1 } },
-            // add the origins
-            { $graphLookup: {
-                from: 'decks',
-                startWith: '$origin.id',
-                connectFromField: 'origin.id',
-                connectToField: '_id',
-                as: 'origins',
-            } },
-            { $project: {
-                origins: { _id: 1 },
-            } },
-            // add self in origins, it could be the fork group root
-            { $project: {
-                origins: { $setUnion: [ '$origins', [{ _id: '$_id' }] ] },
-            } },
+        ];
+
+        // only add the origins of this deck if it is a fork of matching kind!!!
+        let originsStages = [];
+        if ( (deck.origin && deck.origin.kind === kind) || (kind === 'fork' && (!deck.origin || !deck.origin.kind) ) ) {
+            originsStages = [
+                { $graphLookup: {
+                    from: 'decks',
+                    startWith: '$origin.id',
+                    connectFromField: 'origin.id',
+                    connectToField: '_id',
+                    as: 'origins',
+                    restrictSearchWithMatch,
+                } },
+                { $project: {
+                    origins: { _id: 1 },
+                } },
+                // add self in origins, it could be the fork group root
+                { $project: {
+                    origins: { $setUnion: [ '$origins', [{ _id: '$_id' }] ] },
+                } },
+            ];
+        } else {
+            // always create the origins array, in this case we simply include self
+            originsStages = [
+                { $addFields: {
+                    origins: [{ _id: '$_id' }],
+                } },
+            ];
+        }
+        pipeline.push(...originsStages);
+
+        let forksStages = [
             // add the forks of origins
             { $graphLookup: {
                 from: 'decks',
@@ -2138,6 +2170,7 @@ let self = module.exports = {
                 connectFromField: '_id',
                 connectToField: 'origin.id',
                 as: 'originsforks',
+                restrictSearchWithMatch,
             } },
             { $project: {
                 origins: 1,
@@ -2150,6 +2183,7 @@ let self = module.exports = {
                 connectFromField: '_id',
                 connectToField: 'origin.id',
                 as: 'forks',
+                restrictSearchWithMatch,
             } },
             { $project: {
                 _id: 0,
@@ -2163,6 +2197,7 @@ let self = module.exports = {
             { $unwind: '$forkGroup' },
             { $project: { id: '$forkGroup._id' } },
         ];
+        pipeline.push(...forksStages);
 
         return helper.getCollection('decks')
         .then((decks) => decks.aggregate(pipeline))

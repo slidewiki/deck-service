@@ -2147,12 +2147,11 @@ let self = module.exports = {
     },
 
     getForkGroup: function(request, reply){
-        deckDB.computeForkGroup(request.params.id).then( (forkGroup) => {
-            if(_.isEmpty(forkGroup)){
-                reply(boom.notFound());
-            } else {
-                reply(forkGroup);
-            }
+        let deckId = request.params.id; // it should already be a number
+        deckDB.get(deckId).then((deck) => {
+            if (!deck) return reply(boom.notFound());
+
+            return deckDB.computeForkGroup(deck).then((forkGroup) => reply(forkGroup));
         }).catch( (err) => {
             request.log('error', err);
             reply(boom.badImplementation());
