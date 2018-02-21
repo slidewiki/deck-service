@@ -30,13 +30,21 @@ module.exports = function(server) {
         handler: decks.listDecks,
         config: {
             validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().description('JWT header provided by /login')
+                }).unknown(),
                 query: {
-                    user: Joi.number().integer().description('Return only decks owned by user with set id').required(),
+                    owner: Joi.number().integer().description('Return only decks owned by user with set id'),
+                    editor: Joi.number().integer().description('Return only decks that has edit rights but are not owned by user with set id'),
                     rootsOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only root decks, i.e. decks that are not subdecks'),
                     idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata'),
+                    sortBy: Joi.string().valid('id', 'title', 'lastUpdate', 'timestamp').default('id').required(),
+                    page: Joi.number().integer().positive().default(1).required(),
+                    rows: Joi.number().integer().positive().default(10).required().description('Number of items per page'),
                 },
             },
             tags: ['api'],
+            auth: 'jwt',
             description: 'Retrieve deck metadata with optional filter, sorting, and paging parameters (until paging is implemented, user param is required)',
         }
     });

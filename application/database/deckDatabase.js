@@ -19,49 +19,89 @@ const async = require('async');
 let self = module.exports = {
 
     list: (query, options) => {
-        let projectStage = {};
-        if (options.idOnly) {
-            projectStage._id = 1;
+        let skip = (options.page - 1) * options.rows;
+        let projectStage = {
+            _id: 1,
+            timestamp: 1,
+            description: 1,
+            lastUpdate: 1,
+            translation: 1,
+            active: 1,
+            revisions: 1,
+            title: 1,
+            countRevisions: 1, 
+            tags: 1,
+        };
+
+        // sort stage
+        let sortStage = {};
+        if (options.sortBy === 'title') {
+            sortStage = { 'revisions.title': 1 };
+        } else if(options.sortBy === 'timestamp') {
+            sortStage = { timestamp: -1 };
+        } else if(options.sortBy === 'lastUpdate') {
+            sortStage = { lastUpdate: -1 };
         } else {
-            Object.assign(projectStage, {
-                timestamp: 1,
-                description: 1,
-                lastUpdate: 1,
-                translation: 1,
-                active: 1,
-                revisions: 1,
-            });
+            sortStage = { _id: 1 };
         }
 
         return helper.getCollection('decks').then((decks) => {
+            let pipeline = [
+                { $match: query },
+                {
+                    $project: {
+                        active: 1,
+                        description: 1,
+                        timestamp: 1,
+                        lastUpdate: 1,
+                        revisions: 1,
+                        tags: 1, 
+                        translation: 1,
+                        countRevisions: {
+                            $size: '$revisions' 
+                        }
+                    }
+                },
+                { $unwind: '$revisions' },
+                {
+                    '$redact': {
+                        '$cond': {
+                            if: { $eq: [ '$active', '$revisions.id' ] }, 
+                            then: '$$DESCEND',
+                            else: '$$PRUNE'
+                        }
+                    }
+                },                      
+            ];
+
             if (options.rootsOnly) {
-                let result = decks.aggregate([
-                    { $match: query },
-                    { $project: { revisions: 1 } },
-                    { $unwind: '$revisions' },
-                    { $group: {
-                        _id: '$_id',
+                pipeline.push(
+                    { $addFields: {
                         usageCount: {
-                            $sum: { $size: '$revisions.usage' }
-                        },
-                    } },
-                    { $match: { 'usageCount': 0 } },
-                ]);
-
-                if (options.idOnly) {
-                    return result;
-                }
-
-                return result.map((d) => d._id).toArray().then((deckIds) => {
-                    return decks.find({ _id: { $in: deckIds } });
-                });
-
+                            $size: '$revisions.usage'
+                        }, 
+                        
+                    } }
+                );
+                pipeline.push( 
+                    { $match: { 'usageCount': 0 } }
+                );
             } else {
-                return decks.find(query);
+                pipeline.push(
+                    {
+                        $project: projectStage
+                    }
+                );
             }
 
-        }).then((result) => result.project(projectStage).sort({ _id: 1 }).toArray());
+            // add sorting and pagination params
+            pipeline.push({ $sort: sortStage });
+            pipeline.push({ $skip: skip });
+            pipeline.push({ $limit: options.rows });
 
+            return decks.aggregate(pipeline);
+
+        }).then( (result) => result.toArray());
     },
 
     //gets a specified deck and all of its revision, or only the given revision
