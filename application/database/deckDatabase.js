@@ -2081,7 +2081,11 @@ let self = module.exports = {
         return self.get(deckId).then((deck) => {
             if (!deck) return;
 
-            let query = { 'origin.id': deckId };
+            let query = {
+                'origin.id': deckId,
+                'origin.kind': { $in: [null, 'fork'] },
+            };
+
             if (userId) {
                 query.user = userId;
             }
@@ -2099,7 +2103,11 @@ let self = module.exports = {
         return self.get(deckId).then((deck) => {
             if (!deck) return;
 
-            let query = { 'origin.id': deckId };
+            let query = {
+                'origin.id': deckId,
+                'origin.kind': { $in: [null, 'fork'] },
+            };
+
             if (userId) {
                 query.user = userId;
             }
@@ -2693,9 +2701,8 @@ let self = module.exports = {
         let aggregateQuery = [
             {
                 $match: {
-                    'origin.id': {
-                        $in: deckIds
-                    }
+                    'origin.id': { $in: deckIds },
+                    'origin.kind': { $in: [null, 'fork'] },
                 }
             },
             {
