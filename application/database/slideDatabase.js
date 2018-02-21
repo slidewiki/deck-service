@@ -470,6 +470,19 @@ let self = module.exports = {
                             // TODO
                             let slideRevisionIndex = rev - 1;
                             slide.revisions = [slide.revisions[slideRevisionIndex]];
+                            slide.origin = {
+                                id: slide._id,
+                                revision: slide.revisions[0].id,
+                                title: slide.revisions[0].title,
+                                user: slide.revisions[0].user,
+                                kind: 'translation',
+                            };
+
+                            // change stuff to create new slide
+                            slide.revisions[0].id = 1;
+                            delete slide.revisions[0].parent;
+                            slide.user = parseInt(user);
+                            slide.revisions[0].user = parseInt(user);
 
                             // contentItemsMap[slide._id] = newSlideId;
                             // slide_id_map[slide._id] = newSlideId;
@@ -477,21 +490,21 @@ let self = module.exports = {
                             let oldSlideId = slide._id;
                             slide._id = newSlideId;
 
-                            //slide.translated_from =
-                            return translationService.translateSlide(oldSlideId, language, user, 0).then((translated) => {
-                                //console.log('SLIDE response', original);
-                                if (translated.error) {
-                                    //console.log(original);
+                            let lines = [slide.revisions[0].title, slide.revisions[0].content];
+                            let sourceLang = slide.revisions[0].language || slide.language || 'en';
 
-                                    // TODO WAT
-                                    return {};
-                                }
+                            return translationService.translateContent(lines, sourceLang, language).then(({translations: translatedLines}) => {
+                                // the translations array has translations for each string provided when calling the method
+                                let [newTitle, newContent] = translatedLines;
 
+                                slide.revisions[0].title = newTitle;
+                                slide.revisions[0].content = newContent;
+                                slide.language = language;
+                                slide.revisions[0].language = language;
 
-                                translated._id = newSlideId;
-                                translated.revisions[0].usage = []; //empty the usage as we only translate the slide and do not replace it
+                                slide.revisions[0].usage = []; //empty the usage as we only translate the slide and do not replace it
 
-                                return slides.save(translated).then(() => {
+                                return slides.save(slide).then(() => {
                                     // update translations array
                                     let translations = [];
                                     if (!_.isEmpty(slide.translations)){
@@ -499,18 +512,18 @@ let self = module.exports = {
                                         translations.push({'slide_id':slide._id, 'language': language});
                                     }else{
                                         translations.push({'slide_id':slide._id, 'language': language});
-                                        translations.push({'slide_id':oldSlideId, 'language':slide.language});
+                                        translations.push({'slide_id':oldSlideId, 'language': sourceLang});
                                     }
 
                                     // create the thumbnail
-                                    let traslatedSlideId = `${translated._id}-1`;
-                                    fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId).catch((err) => {
-                                        console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
+                                    let translatedSlideId = `${newSlideId}-1`;
+                                    fileService.createThumbnail(newContent, translatedSlideId).catch((err) => {
+                                        console.warn(`could not create thumbnail for translation ${translatedSlideId}, error was: ${err.message}`);
                                     });
 
                                     //filling in the translations array for all decks in the 'family'
                                     return self.updateTranslations(translations).then(() => {
-                                        return translated;
+                                        return slide;
                                     });
                                 });
                             });

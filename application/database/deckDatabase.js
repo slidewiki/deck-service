@@ -18,7 +18,7 @@ const async = require('async');
 
 let self = module.exports = {
 
-    list: (query, options) => {
+    list: (query, options={}) => {
         let projectStage = {};
         if (options.idOnly) {
             projectStage._id = 1;
@@ -30,6 +30,7 @@ let self = module.exports = {
                 translation: 1,
                 active: 1,
                 revisions: 1,
+                language: 1,
             });
         }
 
@@ -1793,6 +1794,19 @@ let self = module.exports = {
                                                     // TODO
                                                     let slideRevisionIndex = nextSlide.ref.revision - 1;
                                                     slide.revisions = [slide.revisions[slideRevisionIndex]];
+                                                    slide.origin = {
+                                                        id: nextSlide.ref.id,
+                                                        revision: nextSlide.ref.revision,
+                                                        title: slide.revisions[0].title,
+                                                        user: slide.revisions[0].user,
+                                                        kind: 'translation',
+                                                    };
+
+                                                    // change stuff to create new slide
+                                                    slide.revisions[0].id = 1;
+                                                    delete slide.revisions[0].parent;
+                                                    slide.user = parseInt(user);
+                                                    slide.revisions[0].user = parseInt(user);
 
                                                     contentItemsMap[slide._id] = newSlideId;
                                                     slide_id_map[slide._id] = newSlideId;
@@ -1800,15 +1814,17 @@ let self = module.exports = {
                                                     let oldSlideId = slide._id;
                                                     slide._id = newSlideId;
 
-                                                    //slide.translated_from =
-                                                    return translationService.translateSlide(oldSlideId, languageToTranslate, copiedDeck.user).then((translated) => {
-                                                        //console.log('SLIDE response', original);
-                                                        if (translated.error) {
-                                                            //console.log(original);
+                                                    let lines = [slide.revisions[0].title, slide.revisions[0].content];
+                                                    let sourceLang = slide.revisions[0].language || slide.language || 'en';
 
-                                                            // TODO WAT
-                                                            return {};
-                                                        }
+                                                    return translationService.translateContent(lines, sourceLang, languageToTranslate).then(({translations: translatedLines}) => {
+                                                        // the translations array has translations for each string provided when calling the method
+                                                        let [newTitle, newContent] = translatedLines;
+
+                                                        slide.revisions[0].title = newTitle;
+                                                        slide.revisions[0].content = newContent;
+                                                        slide.language = languageToTranslate;
+                                                        slide.revisions[0].language = languageToTranslate;
 
                                                         //Change usage of slide
                                                         for(let i = 0; i < slide.revisions[0].usage.length; i++){
@@ -1819,10 +1835,8 @@ let self = module.exports = {
                                                                 }
                                                             }
                                                         }
-                                                        translated._id = newSlideId;
-                                                        translated.revisions[0].usage = slide.revisions[0].usage;
 
-                                                        return slides.save(translated).then(() => {
+                                                        return slides.save(slide).then(() => {
                                                             // update translations array
                                                             let translations = [];
                                                             if (!_.isEmpty(slide.translations)){
@@ -1834,9 +1848,9 @@ let self = module.exports = {
                                                             }
 
                                                             // create the thumbnail
-                                                            let traslatedSlideId = `${translated._id}-1`;
-                                                            fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
-                                                                console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
+                                                            let translatedSlideId = `${newSlideId}-1`;
+                                                            fileService.createThumbnail(newContent, translatedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
+                                                                console.warn(`could not create thumbnail for translation ${translatedSlideId}, error was: ${err.message}`);
                                                             });
                                                             //filling in the translations array for all decks in the 'family'
                                                             return self.updateTranslations('slide', translations).then(() => {
@@ -1902,18 +1916,16 @@ let self = module.exports = {
 
                                     if (languageToTranslate) {
                                         // translate copiedDeck
-                                        translationService.translateDeck(found._id, languageToTranslate, copiedDeck.user)
-                                        .then((original) => {
-                                            // console.log('response', original);
-                                            if (original.error) {
-                                                // console.log(original);
-                                                // TODO WAT
-                                                return {};
-                                            }
+                                        let lines = [copiedDeck.revisions[0].title, copiedDeck.description];
+                                        let sourceLang = copiedDeck.revisions[0].language || copiedDeck.language || 'en';
 
-                                            copiedDeck.revisions[0].title = original.revisions[0].title;
-                                            copiedDeck.description = original.description;
-                                            let original_language = copiedDeck.language;
+                                        translationService.translateContent(lines, sourceLang, languageToTranslate).then(({translations: translatedLines}) => {
+                                            // the translations array has translations for each string provided when calling the method
+                                            let [newTitle, newDescription] = translatedLines;
+
+                                            copiedDeck.revisions[0].title = newTitle;
+                                            copiedDeck.description = newDescription;
+
                                             copiedDeck.language = languageToTranslate;
                                             copiedDeck.revisions[0].language = languageToTranslate;
                                             new_decks.push(copiedDeck);
@@ -1925,7 +1937,7 @@ let self = module.exports = {
                                                     translations.push({'deck_id':copiedDeck._id, 'language': languageToTranslate});//filling in the translations array for all decks in the 'family'
                                                 }else{
                                                     translations.push({'deck_id':copiedDeck._id, 'language': languageToTranslate});
-                                                    translations.push({'deck_id':original._id, 'language': original_language});
+                                                    translations.push({'deck_id':found._id, 'language': sourceLang});
                                                 }
 
                                                 return self.updateTranslations('deck', translations);
