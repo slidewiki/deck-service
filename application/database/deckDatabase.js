@@ -459,6 +459,14 @@ let self = module.exports = {
             .then((existingDeck) => {
                 if (!_.isEmpty(payload.editors) ) {
                     existingDeck.editors = payload.editors;
+
+                    if (!_.isEmpty(existingDeck.editRightsRequests)) {
+                        // filter out any edit rights requests with users in editors list
+                        let filteredRequests = existingDeck.editRightsRequests
+                        .filter((r) => !existingDeck.editors.users.some((e) => e.id === r.user));
+
+                        existingDeck.editRightsRequests = filteredRequests;
+                    }
                 }
 
                 // TODO validation is BROKEN needs update here as well

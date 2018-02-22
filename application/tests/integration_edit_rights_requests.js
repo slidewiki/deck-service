@@ -17,6 +17,12 @@ describe('REST API for edit rights requests', () => {
             warnOnUnregistered: false,
         });
         mockery.registerMock('../services/user', {
+            fetchUserInfo: () => {
+                return Promise.reject('not mocking optional function');
+            },
+            fetchGroupInfo: () => {
+                return Promise.reject('not mocking optional function');
+            },
             fetchUsersForGroups: (groupIds) => {
                 return Promise.resolve([groupEditorId]);
             }
@@ -140,6 +146,82 @@ describe('REST API for edit rights requests', () => {
                 response.should.have.property('statusCode', 422);
             }))
         );
+    });
+
+    context('when a edit rights request is granted for some user', () => {
+        let someUserId = 666;
+        let someUserToken = JWT.sign( { userid: someUserId }, secret );
+
+        before(() => {
+            return server.inject({
+                method: 'POST',
+                url: `/deck/${deckId}/requestEditRights`,
+                headers: {
+                    '----jwt----': someUserToken,
+                },
+            })
+            .then(() => server.inject({
+                method: 'POST',
+                url: `/deck/${deckId}/requestEditRights`,
+                headers: {
+                    '----jwt----': JWT.sign( { userid: 1111 }, secret ),
+                },
+            }))
+            .then(() => server.inject({
+                method: 'GET',
+                url: `/deck/${deckId}/editors`,
+            }))
+            .then(({payload}) => {
+                let {editors} = JSON.parse(payload);
+                editors.users.push({id: someUserId, joined: new Date().toISOString()});
+                return server.inject({
+                    method: 'PUT',
+                    url: `/deck/${deckId}/editors`,
+                    payload: {editors},
+                    headers: {
+                        '----jwt----': ownerToken,
+                    },
+                });
+            });
+        });
+
+        context('and then that user is removed from editors', () => {
+
+            before(() => {
+                return server.inject({
+                    method: 'GET',
+                    url: `/deck/${deckId}/editors`,
+                }).then(({payload}) => {
+                    let {editors} = JSON.parse(payload);
+                    editors.users = editors.users.filter((u) => u.id !== someUserId);
+                    return server.inject({
+                        method: 'PUT',
+                        url: `/deck/${deckId}/editors`,
+                        payload: {editors},
+                        headers: {
+                            '----jwt----': ownerToken,
+                        },
+                    });
+                });
+            });
+
+            it('should accept an edit rights request from the same user', () => {
+                return server.inject({
+                    method: 'POST',
+                    url: `/deck/${deckId}/requestEditRights`,
+                    headers: {
+                        '----jwt----': someUserToken,
+                    },
+                }).then((response) => {
+                    response.should.have.property('statusCode', 200);
+                    let payload = JSON.parse(response.payload);
+                    payload.should.have.property('user', someUserId);
+                    payload.should.have.property('isNew', true);
+                });
+            });
+
+        });
+
     });
 
 });
