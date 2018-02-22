@@ -19,7 +19,7 @@ const async = require('async');
 let self = module.exports = {
 
     list: (query, options) => {
-        let skip = (options.page - 1) * options.rows;
+        let skip = (options.page - 1) * options.per_page;
         let projectStage = {
             _id: 1,
             timestamp: 1,
@@ -79,8 +79,7 @@ let self = module.exports = {
                     { $addFields: {
                         usageCount: {
                             $size: '$revisions.usage'
-                        }, 
-                        
+                        },
                     } }
                 );
                 pipeline.push( 
@@ -94,13 +93,16 @@ let self = module.exports = {
                 );
             }
 
-            // add sorting and pagination params
-            pipeline.push({ $sort: sortStage });
-            pipeline.push({ $skip: skip });
-            pipeline.push({ $limit: options.rows });
-
+            if (options.countOnly){
+                pipeline.push({ $count: 'total_count' });
+            } else {
+                // add sorting and pagination params
+                pipeline.push({ $sort: sortStage });
+                pipeline.push({ $skip: skip });
+                pipeline.push({ $limit: options.per_page });
+            }
+            
             return decks.aggregate(pipeline);
-
         }).then( (result) => result.toArray());
     },
 

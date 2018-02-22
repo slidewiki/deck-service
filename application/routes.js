@@ -34,17 +34,23 @@ module.exports = function(server) {
                     '----jwt----': Joi.string().description('JWT header provided by /login')
                 }).unknown(),
                 query: {
-                    owner: Joi.number().integer().description('Return only decks owned by user with set id'),
-                    editor: Joi.number().integer().description('Return only decks that has edit rights but are not owned by user with set id'),
+                    user: Joi.number().integer().description('Return only decks owned by user with set id'),
                     rootsOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only root decks, i.e. decks that are not subdecks'),
                     idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata'),
-                    sortBy: Joi.string().valid('id', 'title', 'lastUpdate', 'timestamp').default('id').required(),
-                    page: Joi.number().integer().positive().default(1).required(),
-                    rows: Joi.number().integer().positive().default(10).required().description('Number of items per page'),
+                    roles: [
+                        Joi.string().valid('owner', 'editor'),
+                        Joi.array().items(Joi.string().valid('owner', 'editor'))
+                    ],
+                    sortBy: Joi.string().valid('id', 'title', 'lastUpdate', 'timestamp').default('id'),
+                    page: Joi.number().integer().positive().default(1),
+                    per_page: Joi.number().integer().positive().default(10).description('Number of items per page'),
                 },
             },
             tags: ['api'],
-            auth: 'jwt',
+            auth: {
+                strategy: 'jwt',
+                mode: 'optional'
+            },
             description: 'Retrieve deck metadata with optional filter, sorting, and paging parameters (until paging is implemented, user param is required)',
         }
     });

@@ -9,61 +9,55 @@ let self = module.exports = {
 
     // TODO improve the response object
     listDecks: function(request, reply) {
-        let conditions = [];
-        let query = {};
+        let options = _.pick(request.query, 'user', 'idOnly', 'rootsOnly', 'roles', 'sortBy', 'page', 'per_page');
 
-        if (request.query.owner) {
+        if(request.query.roles){
+
+            let roles = (request.query.roles instanceof Array) 
+                ? request.query.roles : Array(request.query.roles);
+
+            if(request.auth.credentials && roles.includes('editor') && 
+                request.auth.credentials.userid === request.query.user){
+
+                return userService.fetchGroupsForUser(request.query.user, request.auth.token).then( (usergroups) => {
+                    let conditions = [{
+                        'editors.groups.id': { $in: usergroups }
+                    },
+                    {
+                        'editors.users.id': request.query.user
+                    }];
+                    if(request.query.user && roles.includes('owner')){
+                        conditions.push({
+                            user: request.query.user
+                        });
+                    }
+
+                    return countAndList({ $or: conditions }, options).then( (response) => {
+                        reply(response);
+                    });
+                    
+                }).catch( (err) => {
+                    if (err.isBoom) return reply(err);
+                    request.log('error', err);
+                    reply(boom.badImplementation());
+                });
+            }
+        }
+
+        let query = {};
+        if(request.query.user){
             query = {
-                user: request.query.owner
+                user: request.query.user
             };
         }
-        
-        let options = _.pick(request.query, 'idOnly', 'rootsOnly', 'sortBy', 'page', 'rows');
 
-        if(request.query.editor){
-
-            if (!request.auth.credentials || request.auth.credentials.userid !== request.query.editor){
-                return reply(boom.badData('JWT is required'));
-            }
-
-            let userId = request.query.editor;
-            let authToken = request.auth.token;
-
-            return userService.fetchGroupsForUser(userId, authToken).then( (usergroups) => {
-                let conditions = [{
-                    'editors.groups.id': { $in: usergroups }
-                },
-                {
-                    'editors.users.id': userId
-                }];
-                if(request.query.owner){
-                    conditions.push(query);
-                }
-
-                return deckDB.list({ $or: conditions }, options).then( (decks) => {
-                    reply(decks.map((deck) => {
-                        return (options.idOnly) ? { _id: deck._id } : transform(deck);
-                    }));
-                });
-            }).catch( (err) => {
-                if (err.isBoom) return reply(err);
-                request.log('error', err);
-                reply(boom.badImplementation());
-            });
-        }
-
-        
-
-        deckDB.list(query, options).then((decks) => {
-            reply(decks.map((deck) => {
-                return (options.idOnly) ? { _id: deck._id } : transform(deck);
-            }));
+        return countAndList(query, options).then( (response) => {
+            reply(response);
         }).catch((err) => {
             if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
-
     },
 
     getDeckOwners: function(request, reply) {
@@ -82,6 +76,49 @@ let self = module.exports = {
     },
 
 };
+
+function countAndList(query, options){
+    options.countOnly = true;
+    return deckDB.list(query, options).then( (result) => {
+
+        options.countOnly = false;
+        let total_count = (result.length === 0) ? 0 : result[0].total_count;
+
+        return deckDB.list(query, options).then((decks) => {
+            // form base url with the params given
+            let baseLink = '/decks';
+            if (options.user) baseLink += `&user=${options.user}`;
+            if (options.rootsOnly) baseLink += `&rootsOnly=${options.rootsOnly}`;
+            if (options.idOnly) baseLink += `&idOnly=${options.idOnly}`;
+            options.roles = (options.roles instanceof Array) ? options.roles.join('&roles=') : options.roles;
+            if (options.roles) baseLink += `&roles=${options.roles}`;
+            if (options.sortBy) baseLink += `&sortBy=${options.sortBy}`;
+
+            // form links for previous and next results
+            let links = {};
+
+            if(options.page > 1){
+                links.previous = baseLink + `&page=${options.page-1}&per_page=${options.per_page}`;
+            }
+
+            if(options.page * options.per_page < total_count){
+                links.next = baseLink + `&page=${options.page+1}&per_page=${options.per_page}`;
+            }
+
+            let response = {};
+            response.metadata = {
+                page: options.page, 
+                per_page: options.per_page,
+                total_count: total_count,
+                links: links
+            };
+            response.decks = decks.map((deck) => {
+                return (options.idOnly) ? { _id: deck._id } : transform(deck);
+            });
+            return response;
+        });
+    });
+}
 
 function transform(deck){
     let metadata = {};
