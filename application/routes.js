@@ -13,6 +13,10 @@ const availableThemes = Joi.string()
 .valid('', 'default', 'sky', 'beige', 'black', 'blood', 'league', 'moon', 'night', 'odimadrid', 'oeg', 'openuniversity', 'simple', 'solarized', 'white')
 .description('Available themes to apply to the thumbnail');
 
+const slideDimensions = Joi.object().keys({
+    width: Joi.number().integer().positive(),
+    height: Joi.number().integer().positive(),
+});
 
 // TODO better organize joi validation models
 const apiModels = {};
@@ -287,6 +291,7 @@ module.exports = function(server) {
                     }),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                     theme : availableThemes,
+                    slideDimensions: slideDimensions,
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number().required(),
@@ -336,6 +341,7 @@ module.exports = function(server) {
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     theme : availableThemes,
+                    slideDimensions: slideDimensions,
                     new_revision: Joi.boolean(),
                 }),
 
@@ -560,6 +566,7 @@ module.exports = function(server) {
                     description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
+                    dimensions: slideDimensions,
                 }).requiredKeys('content', 'root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -600,6 +607,7 @@ module.exports = function(server) {
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    dimensions: slideDimensions,
                     dataSources: Joi.array().items(Joi.object().keys({
                         type: Joi.string(),
                         title: Joi.string(),

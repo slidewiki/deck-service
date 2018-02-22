@@ -478,6 +478,10 @@ let self = module.exports = {
                     'position' : 1
                 };
 
+                if (request.payload.hasOwnProperty('slideDimensions')) {
+                    newSlide.dimensions = request.payload.slideDimensions;
+                }
+
                 if(request.payload.hasOwnProperty('first_slide')){
                     if(request.payload.first_slide.hasOwnProperty('content')){
                         newSlide.content = request.payload.first_slide.content;
@@ -939,9 +943,12 @@ let self = module.exports = {
                             'root_deck': parentID,
                             'position' : slidePosition,
                             'user': userId,
-                            'theme' : request.payload.theme
+                            'theme' : request.payload.theme,
                         };
 
+                        if (parentDeck.slideDimensions) {
+                            slide.dimensions = parentDeck.slideDimensions;
+                        }
                         if(request.payload.hasOwnProperty('content')){
                             slide.content = request.payload.content;
                         }
@@ -1156,6 +1163,11 @@ let self = module.exports = {
                             'theme': parentDeck.revisions[0].theme,
                             'position' : deckPosition
                         };
+
+                        if (parentDeck.slideDimensions) {
+                            deck.slideDimensions = parentDeck.slideDimensions;
+                        }
+
                         //create the new deck
                         self.newDeck({
                             'payload' : deck,
@@ -1247,6 +1259,9 @@ let self = module.exports = {
                     'tags' : slide.revisions[0].tags,
                     'dataSources' : slide.revisions[0].dataSources
                 };
+                if (slide.revisions[0].dimensions) {
+                    new_slide.dimensions = slide.revisions[0].dimensions;
+                }
                 if(new_slide.speakernotes === null){
                     new_slide.speakernotes = '';
                 }

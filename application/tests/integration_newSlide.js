@@ -67,6 +67,7 @@ describe('REST API', () => {
         }
     };
 
+    // this api method should be deprecated at some point
     context('when creating a slide it', () => {
         it('should reply it', () => {
             return server.inject(options).then((response) => {
@@ -112,6 +113,7 @@ describe('REST API', () => {
                 url: '/deck/new',
                 payload: {
                     title: 'new deck',
+                    slideDimensions: { width: 400, height: 200 },
                 },
                 headers: {
                     'Content-Type': 'application/json',
@@ -125,13 +127,16 @@ describe('REST API', () => {
                 payload.should.be.an('object').and.contain.keys('license', 'timestamp', 'user');
                 payload.license.should.equal('CC BY-SA');
                 payload.user.should.equal(1);
+                payload.should.have.a.nested.property('slideDimensions.width', 400);
+                payload.should.have.a.nested.property('slideDimensions.height', 200);
+
 
                 return server.inject({
                     method: 'POST',
                     url: '/decktree/node/create',
                     payload: {
                         selector: {
-                            id: '1',
+                            id: String(payload.id),
                             spath: '',
                         },
                         nodeSpec: {

@@ -507,6 +507,10 @@ let self = module.exports = {
                 existingDeck.description = deck.description;
                 existingDeck.license = deck.license;
 
+                if (deck.slideDimensions) {
+                    existingDeck.slideDimensions = deck.slideDimensions;
+                }
+
                 // TODO add comment, abstract, footer
 
                 if (!_.isEmpty(deck.tags)) {
@@ -1700,6 +1704,9 @@ let self = module.exports = {
                                     // TODO revisit how we maintain this attribute
                                     translations: found.translations || [],
                                 };
+                                if (found.slideDimensions) {
+                                    copiedDeck.slideDimensions = found.slideDimensions;
+                                }
 
                                 // set the fork origin kind to 'translation' if language is also set
                                 if (languageToTranslate) {
@@ -3031,6 +3038,11 @@ function convertToNewDeck(deck){
             theme: deck.theme
         }]
     };
+
+    if (deck.slideDimensions) {
+        result.slideDimensions = deck.slideDimensions;
+    }
+
     return result;
 }
 
