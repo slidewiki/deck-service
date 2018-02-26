@@ -203,6 +203,25 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'POST',
+        path: '/deck/{id}/requestEditRights',
+        handler: handlers.requestEditRights,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Apply for edit rights on the deck',
+        },
+    });
+
+    server.route({
         method: 'GET',
         path: '/deck/{id}/permissions',
         handler: handlers.userPermissions,

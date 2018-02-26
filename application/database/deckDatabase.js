@@ -419,6 +419,35 @@ let self = module.exports = {
 
     },
 
+    // returns the new or existing request, with isNew set to true if it was new
+    // returns undefined if deck does not exist
+    addEditRightsRequest: function(deckId, userId) {
+        return self.get(deckId).then((existingDeck) => {
+            if (!existingDeck) return;
+
+            let editRightsRequests = existingDeck.editRightsRequests;
+            if (!editRightsRequests) {
+                editRightsRequests = [];
+            }
+
+            let existingRequest = editRightsRequests.find((r) => r.user === userId);
+            if (existingRequest) {
+                return Object.assign({ isNew: false }, existingRequest);
+            }
+
+            let timestamp = new Date().toISOString();
+            let newRequest = { user: userId, requestedAt: timestamp };
+            editRightsRequests.push(newRequest);
+
+            existingDeck.editRightsRequests = editRightsRequests;
+
+            return helper.getCollection('decks')
+            .then((decks) => decks.findOneAndReplace({ _id: deckId }, existingDeck))
+            .then(() => Object.assign({ isNew: true }, newRequest));
+        });
+
+    },
+
     // TODO properly implement a PATCH-like method for partial updates
     replaceEditors: function(id, payload) {
         let deckId = parseInt(id);
@@ -430,6 +459,14 @@ let self = module.exports = {
             .then((existingDeck) => {
                 if (!_.isEmpty(payload.editors) ) {
                     existingDeck.editors = payload.editors;
+
+                    if (!_.isEmpty(existingDeck.editRightsRequests)) {
+                        // filter out any edit rights requests with users in editors list
+                        let filteredRequests = existingDeck.editRightsRequests
+                        .filter((r) => !existingDeck.editors.users.some((e) => e.id === r.user));
+
+                        existingDeck.editRightsRequests = filteredRequests;
+                    }
                 }
 
                 // TODO validation is BROKEN needs update here as well
