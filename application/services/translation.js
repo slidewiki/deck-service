@@ -12,6 +12,7 @@ const self = module.exports = {
             body: {
                 language,
                 content,
+                html: true,
             },
         });
     },
