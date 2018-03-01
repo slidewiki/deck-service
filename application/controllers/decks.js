@@ -84,13 +84,17 @@ function countAndList(query, options){
         let total_count = (result.length === 0) ? 0 : result[0].total_count;
 
         return deckDB.list(query, options).then((decks) => {
+
+            let queryParams = [];
+
             // form base url with the params given
-            let baseLink = '/decks?';
-            if (options.user) baseLink += `user=${options.user}`;
-            if (options.rootsOnly) baseLink += `&rootsOnly=${options.rootsOnly}`;
-            if (options.idOnly) baseLink += `&idOnly=${options.idOnly}`;
-            if (options.roles) baseLink += `&roles=${options.roles}`;
-            if (options.sortBy) baseLink += `&sortBy=${options.sortBy}`;
+            if (options.user) queryParams.push(`user=${options.user}`);
+            if (options.rootsOnly) queryParams.push(`rootsOnly=${options.rootsOnly}`);
+            if (options.idOnly) queryParams.push(`idOnly=${options.idOnly}`);
+            if (options.roles) queryParams.push(`roles=${options.roles}`);
+            if (options.sortBy) queryParams.push(`sortBy=${options.sortBy}`);
+
+            let baseLink = '/decks?' + queryParams.join('&');
 
             // form links for previous and next results
             let links = {};
