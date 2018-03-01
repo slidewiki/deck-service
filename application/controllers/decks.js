@@ -13,8 +13,7 @@ let self = module.exports = {
 
         if(request.query.roles){
 
-            let roles = (request.query.roles instanceof Array) 
-                ? request.query.roles : Array(request.query.roles);
+            let roles = request.query.roles.split(',');
 
             if(request.auth.credentials && roles.includes('editor') && 
                 request.auth.credentials.userid === request.query.user){
@@ -86,11 +85,10 @@ function countAndList(query, options){
 
         return deckDB.list(query, options).then((decks) => {
             // form base url with the params given
-            let baseLink = '/decks';
-            if (options.user) baseLink += `&user=${options.user}`;
+            let baseLink = '/decks?';
+            if (options.user) baseLink += `user=${options.user}`;
             if (options.rootsOnly) baseLink += `&rootsOnly=${options.rootsOnly}`;
             if (options.idOnly) baseLink += `&idOnly=${options.idOnly}`;
-            options.roles = (options.roles instanceof Array) ? options.roles.join('&roles=') : options.roles;
             if (options.roles) baseLink += `&roles=${options.roles}`;
             if (options.sortBy) baseLink += `&sortBy=${options.sortBy}`;
 
@@ -110,6 +108,7 @@ function countAndList(query, options){
                 page: options.page, 
                 per_page: options.per_page,
                 total_count: total_count,
+                sortBy: options.sortBy,
                 links: links
             };
             response.decks = decks.map((deck) => {

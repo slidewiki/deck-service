@@ -101,7 +101,7 @@ let self = module.exports = {
                 pipeline.push({ $skip: skip });
                 pipeline.push({ $limit: options.per_page });
             }
-            
+
             return decks.aggregate(pipeline);
         }).then( (result) => result.toArray());
     },

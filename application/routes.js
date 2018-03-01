@@ -37,10 +37,7 @@ module.exports = function(server) {
                     user: Joi.number().integer().description('Return only decks owned by user with set id'),
                     rootsOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only root decks, i.e. decks that are not subdecks'),
                     idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata'),
-                    roles: [
-                        Joi.string().valid('owner', 'editor'),
-                        Joi.array().items(Joi.string().valid('owner', 'editor'))
-                    ],
+                    roles: Joi.string().regex(/^(owner(,editor)?)$|^(editor(,owner)?)$/).empty('').description('A comma delimited list of roles (values: [owner, editor])'),
                     sortBy: Joi.string().valid('id', 'title', 'lastUpdate', 'timestamp').default('id'),
                     page: Joi.number().integer().positive().default(1),
                     per_page: Joi.number().integer().positive().default(10).description('Number of items per page'),
