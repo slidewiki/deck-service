@@ -19,7 +19,7 @@ const async = require('async');
 let self = module.exports = {
 
     list: (query, options) => {
-        let skip = (options.page - 1) * options.per_page;
+        let skip = (options.page - 1) * options.pageSize;
         let projectStage = {
             _id: 1,
             timestamp: 1,
@@ -35,11 +35,11 @@ let self = module.exports = {
 
         // sort stage
         let sortStage = {};
-        if (options.sortBy === 'title') {
+        if (options.sort === 'title') {
             sortStage = { 'revisions.title': 1 };
-        } else if(options.sortBy === 'timestamp') {
+        } else if(options.sort === 'timestamp') {
             sortStage = { timestamp: -1 };
-        } else if(options.sortBy === 'lastUpdate') {
+        } else if(options.sort === 'lastUpdate') {
             sortStage = { lastUpdate: -1 };
         } else {
             sortStage = { _id: 1 };
@@ -93,13 +93,16 @@ let self = module.exports = {
                 );
             }
 
-            if (options.countOnly){
-                pipeline.push({ $count: 'total_count' });
-            } else {
+            // just count the result set
+            if (options.countOnly) {
+                pipeline.push({ $count: 'totalCount' });
+
+            // if we want only ids, we return *all* deck ids (NOTE: used in user-service)
+            } else if (!options.idOnly) {
                 // add sorting and pagination params
                 pipeline.push({ $sort: sortStage });
                 pipeline.push({ $skip: skip });
-                pipeline.push({ $limit: options.per_page });
+                pipeline.push({ $limit: options.pageSize });
             }
 
             return decks.aggregate(pipeline);

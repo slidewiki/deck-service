@@ -5,11 +5,13 @@ const _ = require('lodash');
 const boom = require('boom');
 const deckDB = require('../database/deckDatabase');
 const userService = require('../services/user');
+const querystring = require('querystring');
+
 let self = module.exports = {
 
     // TODO improve the response object
     listDecks: function(request, reply) {
-        let options = _.pick(request.query, 'user', 'idOnly', 'rootsOnly', 'roles', 'sortBy', 'page', 'per_page');
+        let options = _.pick(request.query, 'user', 'idOnly', 'rootsOnly', 'roles', 'sort', 'page', 'pageSize');
 
         if(request.query.roles){
 
@@ -80,44 +82,41 @@ function countAndList(query, options){
     options.countOnly = true;
     return deckDB.list(query, options).then( (result) => {
 
-        options.countOnly = false;
-        let total_count = (result.length === 0) ? 0 : result[0].total_count;
+        delete options.countOnly;
+        let totalCount = (result.length === 0) ? 0 : result[0].totalCount;
 
         return deckDB.list(query, options).then((decks) => {
-
-            let queryParams = [];
-
-            // form base url with the params given
-            if (options.user) queryParams.push(`user=${options.user}`);
-            if (options.rootsOnly) queryParams.push(`rootsOnly=${options.rootsOnly}`);
-            if (options.idOnly) queryParams.push(`idOnly=${options.idOnly}`);
-            if (options.roles) queryParams.push(`roles=${options.roles}`);
-            if (options.sortBy) queryParams.push(`sortBy=${options.sortBy}`);
-
-            let baseLink = '/decks?' + queryParams.join('&');
 
             // form links for previous and next results
             let links = {};
 
             if(options.page > 1){
-                links.previous = baseLink + `&page=${options.page-1}&per_page=${options.per_page}`;
+                options.page = options.page - 1;
+                links.previous = `/decks?${querystring.stringify(options)}`;
             }
 
-            if(options.page * options.per_page < total_count){
-                links.next = baseLink + `&page=${options.page+1}&per_page=${options.per_page}`;
+            if(options.page * options.pageSize < totalCount){
+                options.page = options.page + 1;
+                links.next = `/decks?${querystring.stringify(options)}`;
+            }
+
+            let items = decks.map((deck) => {
+                return (options.idOnly) ? { _id: deck._id } : transform(deck);
+            });
+
+            if(options.idOnly){
+                return items;
             }
 
             let response = {};
-            response.metadata = {
+            response._meta = {
                 page: options.page, 
-                per_page: options.per_page,
-                total_count: total_count,
-                sortBy: options.sortBy,
+                pageSize: options.pageSize,
+                totalCount: totalCount,
+                sort: options.sort,
                 links: links
             };
-            response.decks = decks.map((deck) => {
-                return (options.idOnly) ? { _id: deck._id } : transform(deck);
-            });
+            response.items = items;
             return response;
         });
     });
