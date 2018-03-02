@@ -97,12 +97,16 @@ let self = module.exports = {
             if (options.countOnly) {
                 pipeline.push({ $count: 'totalCount' });
 
-            // if we want only ids, we return *all* deck ids (NOTE: used in user-service)
-            } else if (!options.idOnly) {
-                // add sorting and pagination params
+            
+            } else {
+                // add sorting
                 pipeline.push({ $sort: sortStage });
-                pipeline.push({ $skip: skip });
-                pipeline.push({ $limit: options.pageSize });
+
+                // if we want only ids, we return *all* deck ids (NOTE: used in user-service)
+                if(!options.idOnly){
+                    pipeline.push({ $skip: skip });
+                    pipeline.push({ $limit: options.pageSize });
+                }
             }
 
             return decks.aggregate(pipeline);
