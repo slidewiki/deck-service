@@ -89,14 +89,15 @@ function countAndList(query, options){
 
             // form links for previous and next results
             let links = {};
+            let page = options.page;
 
             if(options.page > 1){
-                options.page = options.page - 1;
+                options.page = page - 1;
                 links.previous = `/decks?${querystring.stringify(options)}`;
             }
 
             if(options.page * options.pageSize < totalCount){
-                options.page = options.page + 1;
+                options.page = page + 1;
                 links.next = `/decks?${querystring.stringify(options)}`;
             }
 
@@ -110,7 +111,7 @@ function countAndList(query, options){
 
             let response = {};
             response._meta = {
-                page: options.page, 
+                page: page, 
                 pageSize: options.pageSize,
                 totalCount: totalCount,
                 sort: options.sort,
