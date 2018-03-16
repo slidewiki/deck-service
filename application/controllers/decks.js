@@ -27,13 +27,29 @@ let self = module.exports = {
                     {
                         'editors.users.id': request.query.user
                     }];
+                    let query = '';
+
                     if(request.query.user && roles.includes('owner')){
                         conditions.push({
                             user: request.query.user
                         });
+                        query = { $or: conditions };
+                    }else{
+                        query = {
+                            $and: [
+                                {
+                                    user: { 
+                                        $not : { $eq: request.query.user } 
+                                    } 
+                                }, 
+                                {
+                                    $or: conditions
+                                }
+                            ]
+                        };
                     }
 
-                    return countAndList({ $or: conditions }, options).then( (response) => {
+                    return countAndList(query, options).then( (response) => {
                         reply(response);
                     });
                     
