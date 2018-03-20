@@ -3097,6 +3097,8 @@ function convertToNewDeck(deck){
     const result = {
         _id: deck._id,
         user: deck.user,
+        // all new decks (or subdecks) are initially hidden (unlisted)
+        hidden: true,
         accessLevel: deck.accessLevel,
         editors: deck.editors,
         timestamp: now.toISOString(),

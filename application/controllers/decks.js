@@ -11,70 +11,123 @@ let self = module.exports = {
 
     // TODO improve the response object
     listDecks: function(request, reply) {
-        let options = _.pick(request.query, 'user', 'idOnly', 'rootsOnly', 'roles', 'sort', 'page', 'pageSize');
+        let options = _.pick(request.query, 'idOnly', 'rootsOnly', 'sort', 'page', 'pageSize');
+        let query = _.pick(request.query, 'user');
 
-        if(request.query.roles){
+        // HACK: when idOnly is set, user service needs to find all decks of a user, including hidden ones
+        if (options.idOnly) {
+            // so we ignore ALL other input
+            return countAndList(query, options).then((response) => {
+                reply(response);
+            }).catch((err) => {
+                if (err.isBoom) return reply(err);
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });
+        }
 
-            let roles = request.query.roles.split(',');
+        // the roles, status parameters have priviliged semantics:
+        let roles = request.query.roles && request.query.roles.split(',') || [];
+        let currentUser = request.auth.credentials && request.auth.credentials.userid;
 
-            if(request.auth.credentials && roles.includes('editor') && 
-                request.auth.credentials.userid === request.query.user){
-
-                return userService.fetchGroupsForUser(request.query.user, request.auth.token).then( (usergroups) => {
-                    let conditions = [{
-                        'editors.groups.id': { $in: usergroups }
-                    },
-                    {
-                        'editors.users.id': request.query.user
-                    }];
-                    let query = '';
-
-                    if(request.query.user && roles.includes('owner')){
-                        conditions.push({
-                            user: request.query.user
-                        });
-                        query = { $or: conditions };
-                    }else{
-                        query = {
-                            $and: [
-                                {
-                                    user: { 
-                                        $not : { $eq: request.query.user } 
-                                    } 
-                                }, 
-                                {
-                                    $or: conditions
-                                }
-                            ]
-                        };
-                    }
-
-                    return countAndList(query, options).then( (response) => {
-                        reply(response);
-                    });
-                    
-                }).catch( (err) => {
-                    if (err.isBoom) return reply(err);
-                    request.log('error', err);
-                    reply(boom.badImplementation());
-                });
+        // we need to figure out the edit rights of the current user if:
+        //   we ask for editable decks owned by others, or:
+        //   we ask for non-public decks owned by others
+        let isPrivileged = (currentUser && currentUser !== query.user) && (roles.includes('editor') || request.query.status !== 'public');
+        if (!isPrivileged) {
+            // we are either asking for own decks, or are not authenticated,
+            // or we are asking for public decks in general and no editor is in roles
+            if (currentUser && currentUser === query.user) {
+                if (request.query.status === 'public') {
+                    query.hidden = { $in: [false, null] };
+                } else if (request.query.status === 'hidden') {
+                    query.hidden = true;
+                } // else indifferent ('all')
+            } else {
+                // if not asking for our own decks, we can only view public ones:
+                query.hidden = { $in: [false, null] };
             }
+
+            return countAndList(query, options).then((response) => {
+                reply(response);
+            }).catch((err) => {
+                if (err.isBoom) return reply(err);
+                request.log('error', err);
+                reply(boom.badImplementation());
+            });
+
         }
 
-        let query = {};
-        if(request.query.user){
-            query = {
-                user: request.query.user
+        // at this point we assert that we have authentication and query.user is NOT the same as currentUser
+        // we also assert that we are either requesting for editable OR non-public decks
+        // either way, we need to first get the list of groups current user belongs to 
+        return userService.fetchGroupsForUser(currentUser, request.auth.token).then((usergroups) => {
+            // this will hold whatever we can access
+            let rolesConditions = [];
+            if (roles.includes('editor')) {
+                rolesConditions.push({ 'editors.groups.id': { $in: usergroups } });
+                rolesConditions.push({ 'editors.users.id': currentUser });
+            }
+
+            if (roles.includes('owner')) {
+                rolesConditions.push({ user: currentUser });
+            } else if (roles.includes('editor') && !query.user) {
+                // exclude currentUser from owners unless a (different) user is set
+                query.user = { $ne: currentUser };
+            }
+
+            // hidden decks query part: can show any editable ones (by any user), or owned ones
+            let hiddenQuery = {  hidden: true, };
+            if (_.isEmpty(rolesConditions)) {
+                hiddenQuery.$or = [
+                    { 'editors.groups.id': { $in: usergroups } },
+                    { 'editors.users.id': currentUser },
+                    { user: currentUser },
+                ];
+            } else {
+                // roles conditions always allow for accessing hidden decks
+                hiddenQuery.$or = rolesConditions;
+            }
+
+            // public decks are always accessible
+            let publicQuery = {
+                hidden: { $in: [false, null] },
             };
-        }
 
-        return countAndList(query, options).then( (response) => {
-            reply(response);
-        }).catch((err) => {
+            if (request.query.status === 'public') {
+                Object.assign(query, publicQuery);
+                // should be non-empty anyway, but better safe than sorry
+                if (!_.isEmpty(rolesConditions)) {
+                    query.$or = rolesConditions;
+                }
+            } else if (request.query.status === 'hidden') {
+                // non-empty rolesConditions are already in hiddenQuery
+                Object.assign(query, hiddenQuery);
+            } else {
+                // any
+                if (_.isEmpty(rolesConditions)) {
+                    query.$or = [
+                        publicQuery,
+                        hiddenQuery,
+                    ];
+                } else {
+                    // non-empty rolesConditions are already in hiddenQuery
+                    // roles conditions always allow for accessing hidden decks,
+                    // so no need to add any special 'hidden' queries
+                    query.$or = rolesConditions;
+                }
+            }
+
+            return countAndList(query, options).then( (response) => {
+                reply(response);
+            });
+
+        }).catch( (err) => {
             if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
+
     },
 
     getDeckOwners: function(request, reply) {
