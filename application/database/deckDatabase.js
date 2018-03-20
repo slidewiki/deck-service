@@ -1789,6 +1789,9 @@ let self = module.exports = {
                                     active: 1,
                                     // TODO revisit how we maintain this attribute
                                     translations: found.translations || [],
+                                    // forked decks are created as non-hidden
+                                    // so that users may find them more easily
+                                    hidden: false,
                                 };
                                 if (found.slideDimensions) {
                                     copiedDeck.slideDimensions = found.slideDimensions;
@@ -2752,12 +2755,17 @@ let self = module.exports = {
 
     // get  recent decks
     getAllRecent: function(limit, offset){
-        return self.findWithLimitAndSort('decks', {}, limit, offset, {'timestamp': -1});
+        return self.findWithLimitAndSort('decks', {
+            hidden: { $in: [false, null] },
+        }, limit, offset, {'timestamp': -1});
     },
 
     // get featured decks
     getAllFeatured: function(limit, offset){
-        return self.findWithLimit('decks', {'revisions.isFeatured': 1}, limit, offset);
+        return self.findWithLimit('decks', {
+            'revisions.isFeatured': 1,
+            hidden: { $in: [false, null] },
+        }, limit, offset);
     },
 
     // get first slide
