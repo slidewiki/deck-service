@@ -375,6 +375,7 @@ module.exports = function(server) {
                     theme : availableThemes,
                     slideDimensions: slideDimensions,
                     new_revision: Joi.boolean(),
+                    hidden: Joi.boolean(),
                 }),
 
                 headers: Joi.object({

@@ -621,6 +621,10 @@ let self = module.exports = {
                 // changes ended here
                 deckTracker.applyChangeLog();
 
+                if (deck.hasOwnProperty('hidden')) {
+                    existingDeck.hidden = deck.hidden;
+                }
+
                 // lastUpdated update
                 existingDeck.lastUpdate = (new Date()).toISOString();
                 deckRevision.lastUpdate = existingDeck.lastUpdate;
