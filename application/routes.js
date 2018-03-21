@@ -332,7 +332,8 @@ module.exports = function(server) {
                             id: Joi.number().required(),
                             joined: Joi.string().isoDate().required(),
                         })).default([])
-                    })
+                    }),
+                    hidden: Joi.boolean().default(true),
                 }),
 
                 headers: Joi.object({

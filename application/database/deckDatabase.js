@@ -1789,9 +1789,8 @@ let self = module.exports = {
                                     active: 1,
                                     // TODO revisit how we maintain this attribute
                                     translations: found.translations || [],
-                                    // forked decks are created as non-hidden
-                                    // so that users may find them more easily
-                                    hidden: false,
+                                    // forked decks are created as hidden like they were new ones
+                                    hidden: true,
                                 };
                                 if (found.slideDimensions) {
                                     copiedDeck.slideDimensions = found.slideDimensions;
@@ -2442,30 +2441,29 @@ let self = module.exports = {
                 return { fork: true, edit: true, admin: true, readOnly };
             }
 
-            // default level is public
-            let accessLevel = deck.accessLevel || 'public';
+            let canFork = !deck.hidden;
             return self.getDeckUsersGroups(deck, deckId)
             .then((editors) => {
                 if (editors.users.includes(userId)) {
                     // user is an editor
-                    return { fork: true, edit: true, admin: false, readOnly };
+                    return { fork: canFork, edit: true, admin: false, readOnly };
                 } else {
                     // we also need to check if the groups allowed to edit the deck include the user
                     return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
 
                         if (groupsUsers.includes(userId)) {
                             // user is an editor
-                            return { fork: true, edit: true, admin: false, readOnly };
+                            return { fork: canFork, edit: true, admin: false, readOnly };
                         } else {
                             // user is not an editor or owner
                             // also return if user can fork the deck (e.g. if it's public)
-                            return { fork: (accessLevel !== 'private'), edit: false, admin: false, readOnly };
+                            return { fork: canFork, edit: false, admin: false, readOnly };
                         }
 
                     }).catch((err) => {
                         console.warn(`could not fetch usergroup info from service: ${err.message}`);
                         // we're not sure, let's just not allow this user
-                        return { fork: (accessLevel !== 'private'), edit: false, admin: false, readOnly };
+                        return { fork: canFork, edit: false, admin: false, readOnly };
                     });
                 }
             });
@@ -2479,15 +2477,12 @@ let self = module.exports = {
         return self.get(deckId).then((deck) => {
             if (!deck) return;
 
-            // next, we need to check the accessLevel, defaults to 'public'
-            let accessLevel = deck.accessLevel || 'public';
-
-            if (accessLevel === 'private') {
+            if (deck.hidden) {
                 // no-one but the deck owner can fork it!!
                 return deck.user === userId;
             }
 
-            // any other access level means you can fork it always
+            // if not hidden you can fork it always
             return true;
         });
     },
@@ -3101,12 +3096,16 @@ function convertToNewDeck(deck){
     else if(!deck.hasOwnProperty('editors')){
         deck.editors = {users: [], groups: []};
     }
+
+    if (!deck.hasOwnProperty('hidden')) {
+        // all new decks (or subdecks) are hidden by default unless overriden
+        deck.hidden = true;
+    }
     //should we have a default accessLevel?
     const result = {
         _id: deck._id,
         user: deck.user,
-        // all new decks (or subdecks) are initially hidden (unlisted)
-        hidden: true,
+        hidden: deck.hidden,
         accessLevel: deck.accessLevel,
         editors: deck.editors,
         timestamp: now.toISOString(),
