@@ -11,7 +11,7 @@ let self = module.exports = {
 
     // TODO improve the response object
     listDecks: function(request, reply) {
-        let options = _.pick(request.query, 'idOnly', 'rootsOnly', 'sort', 'page', 'pageSize');
+        let options = _.pick(request.query, 'idOnly', 'rootsOnly', 'sort', 'page', 'pageSize', 'user', 'roles', 'status');
         let query = _.pick(request.query, 'user');
 
         // HACK: when idOnly is set, user service needs to find all decks of a user, including hidden ones
@@ -184,6 +184,7 @@ function countAndList(query, options){
                 pageSize: options.pageSize,
                 totalCount: totalCount,
                 sort: options.sort,
+                status: options.status,
                 links: links
             };
             response.items = items;
