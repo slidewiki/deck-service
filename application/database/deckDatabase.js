@@ -31,6 +31,7 @@ let self = module.exports = {
             title: 1,
             countRevisions: 1, 
             tags: 1,
+            hidden: 1,
         };
 
         // sort stage
@@ -51,6 +52,7 @@ let self = module.exports = {
                 {
                     $project: {
                         active: 1,
+                        hidden: 1,
                         description: 1,
                         timestamp: 1,
                         lastUpdate: 1,

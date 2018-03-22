@@ -203,6 +203,7 @@ function transform(deck){
     metadata.translation = deck.translation;
     metadata.countRevisions = deck.countRevisions;
     metadata.active = deck.active;
+    metadata.hidden = deck.hidden;
 
     // only active revision is returned
     let revision = deck.revisions;
