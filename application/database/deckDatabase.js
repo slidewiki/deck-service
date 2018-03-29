@@ -18,20 +18,19 @@ const async = require('async');
 
 let self = module.exports = {
 
-    list: (query, options) => {
-        let skip = (options.page - 1) * options.pageSize;
+    list: function(query, options={}) {
         let projectStage = {
-            _id: 1,
-            timestamp: 1,
-            description: 1,
-            lastUpdate: 1,
-            translation: 1,
+            user: 1,
             active: 1,
-            revisions: 1,
-            title: 1,
-            countRevisions: 1, 
-            tags: 1,
             hidden: 1,
+            description: 1,
+            timestamp: 1,
+            lastUpdate: 1,
+            revisions: 1,
+            tags: 1, 
+            translation: 1,
+            countRevisions: 1, 
+            title: 1,
         };
 
         // sort stage
@@ -51,6 +50,7 @@ let self = module.exports = {
                 { $match: query },
                 {
                     $project: {
+                        user: 1,
                         active: 1,
                         hidden: 1,
                         description: 1,
@@ -99,14 +99,13 @@ let self = module.exports = {
             if (options.countOnly) {
                 pipeline.push({ $count: 'totalCount' });
 
-            
             } else {
                 // add sorting
                 pipeline.push({ $sort: sortStage });
 
-                // if we want only ids, we return *all* deck ids (NOTE: used in user-service)
-                if(!options.idOnly){
-                    pipeline.push({ $skip: skip });
+                // some routes don't support pagination
+                if (options.pageSize) {
+                    pipeline.push({ $skip: (options.page - 1) * options.pageSize });
                     pipeline.push({ $limit: options.pageSize });
                 }
             }

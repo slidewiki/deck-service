@@ -1339,6 +1339,28 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/group/{id}/decks',
+        handler: decks.listGroupDecks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer()
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            description: 'Get the list of decks in group', 
+            auth: {
+                strategy: 'jwt',
+                mode: 'optional'
+            },
+        }
+    });
+
+    server.route({
         method: 'PUT',
         path: '/group/{id}/decks',
         handler: groups.replaceDecks,

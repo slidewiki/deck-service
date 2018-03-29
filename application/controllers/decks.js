@@ -4,6 +4,7 @@ const _ = require('lodash');
 
 const boom = require('boom');
 const deckDB = require('../database/deckDatabase');
+const groupDB = require('../database/groupsDatabase');
 const userService = require('../services/user');
 const querystring = require('querystring');
 
@@ -16,6 +17,9 @@ let self = module.exports = {
 
         // HACK: when idOnly is set, user service needs to find all decks of a user, including hidden ones
         if (options.idOnly) {
+            // if we want only ids, we return *all* deck ids
+            delete options.pageSize;
+
             // so we ignore ALL other input
             return countAndList(query, options).then((response) => {
                 reply(response);
@@ -145,6 +149,44 @@ let self = module.exports = {
 
     },
 
+    listGroupDecks: function(request, reply) {
+        let groupId = request.params.id;
+
+        // we need to also check visibility of decks listed
+        let currentUser = request.auth.credentials && request.auth.credentials.userid;
+        groupDB.get(groupId).then((group) => {
+            if (!group) throw boom.notFound();
+
+            let query = { _id: { $in: group.decks } };
+            // check user permissions (currentUser can be empty here)
+            return groupDB.userPermissions(groupId, currentUser, request.auth.token).then((perms) => {
+                if (!perms.edit) {
+                    // only return public decks
+                    query.hidden = { $in: [false, null] };
+                }
+
+                // list the decks and forward the deck order for reordering
+                return deckDB.list(query).then((decks) => {
+                    // let's sort the decks (happens in-place)
+                    decks.sort((a, b) => {
+                        // order is the same as in the group.decks array
+                        return group.decks.indexOf(a._id) - group.decks.indexOf(b._id);
+                    });
+
+                    // let's also transform them
+                    reply(decks.map((d) => transform(d)));
+                });
+
+            });
+
+        }).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+
+    },
+
 };
 
 function countAndList(query, options){
@@ -155,6 +197,13 @@ function countAndList(query, options){
         let totalCount = (result.length === 0) ? 0 : result[0].totalCount;
 
         return deckDB.list(query, options).then((decks) => {
+            let items = decks.map((deck) => {
+                return (options.idOnly) ? { _id: deck._id } : transform(deck);
+            });
+
+            if (!options.pageSize) {
+                return items;
+            }
 
             // form links for previous and next results
             let links = {};
@@ -168,14 +217,6 @@ function countAndList(query, options){
             if(options.page * options.pageSize < totalCount){
                 options.page = page + 1;
                 links.next = `/decks?${querystring.stringify(options)}`;
-            }
-
-            let items = decks.map((deck) => {
-                return (options.idOnly) ? { _id: deck._id } : transform(deck);
-            });
-
-            if(options.idOnly){
-                return items;
             }
 
             let response = {};
@@ -196,6 +237,8 @@ function countAndList(query, options){
 function transform(deck){
     let metadata = {};
     metadata._id = deck._id;
+
+    metadata.owner = deck.user;
     metadata.timestamp = deck.timestamp;
     metadata.description = deck.description;
     metadata.lastUpdate = deck.lastUpdate;
