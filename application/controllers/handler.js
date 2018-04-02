@@ -1098,7 +1098,7 @@ let self = module.exports = {
                                 return deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
                                     return Promise.all([
                                         // track all created forks AFTER it's attached
-                                        deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, true),
+                                        deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, 'attach'),
                                         // add to usage AFTER it's attached
                                         deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-')),
                                         //we have to return from the callback, else empty node is returned because it is updated asynchronously
