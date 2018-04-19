@@ -2910,7 +2910,7 @@ let self = module.exports = {
 
             return self.getRevision(deckId).then( (revision) => {
 
-                path.push({id: deck._id, revision: deck.revisionId});
+                path.push({id: deck._id, revision: deck.revisionId, hidden: deck.hidden});
 
                 let decktree = {
                     id: deck._id, 
@@ -2926,6 +2926,7 @@ let self = module.exports = {
                     tags: revision.tags.map ( (tag) => { return tag.tagName; }),
                     contributors: deck.contributors.map( (contr) => {return contr.user;}),
                     path: path,
+                    hidden: deck.hidden,
                     contents: []
                 };
 
