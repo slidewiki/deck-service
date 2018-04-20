@@ -201,6 +201,9 @@ const deckRevision = {
         visibility: {
             type: 'boolean'
         },
+        allowMarkdown: {
+            type: 'boolean'
+        },
         translation: {
             type: 'object',
             properties: {

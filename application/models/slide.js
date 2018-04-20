@@ -66,6 +66,9 @@ const slideRevision = {
         content: {
             type: 'string'
         },
+        markdown: {
+            type: 'string'
+        },
         speakernotes: {
             type: 'string'
         },

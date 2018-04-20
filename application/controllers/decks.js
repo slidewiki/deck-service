@@ -17,7 +17,7 @@ let self = module.exports = {
 
             let roles = request.query.roles.split(',');
 
-            if(request.auth.credentials && roles.includes('editor') && 
+            if(request.auth.credentials && roles.includes('editor') &&
                 request.auth.credentials.userid === request.query.user){
 
                 return userService.fetchGroupsForUser(request.query.user, request.auth.token).then( (usergroups) => {
@@ -38,10 +38,10 @@ let self = module.exports = {
                         query = {
                             $and: [
                                 {
-                                    user: { 
-                                        $not : { $eq: request.query.user } 
-                                    } 
-                                }, 
+                                    user: {
+                                        $not : { $eq: request.query.user }
+                                    }
+                                },
                                 {
                                     $or: conditions
                                 }
@@ -52,7 +52,7 @@ let self = module.exports = {
                     return countAndList(query, options).then( (response) => {
                         reply(response);
                     });
-                    
+
                 }).catch( (err) => {
                     if (err.isBoom) return reply(err);
                     request.log('error', err);
@@ -127,7 +127,7 @@ function countAndList(query, options){
 
             let response = {};
             response._meta = {
-                page: page, 
+                page: page,
                 pageSize: options.pageSize,
                 totalCount: totalCount,
                 sort: options.sort,
@@ -168,6 +168,7 @@ function transform(deck){
     metadata.tags = revision.tags;
     metadata.parent = revision.parent;
     metadata.theme = revision.theme;
+    metadata.allowMarkdown = revision.allowMarkdown;
 
     // get first slide
     metadata.firstSlide = deckDB.getFirstSlide(revision);
