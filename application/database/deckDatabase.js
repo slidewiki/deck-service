@@ -2291,7 +2291,6 @@ let self = module.exports = {
                         ref: 1,
                     },
                     theme: 1,
-                    allowMarkdown: false,
                 },
             } },
             { $unwind: '$revisions' },
@@ -2310,7 +2309,6 @@ let self = module.exports = {
                     id: 1,
                     revision: 1,
                     theme: 1,
-                    allowMarkdown: false,
                     using: '$using.ref.revision',
                 },
             });
