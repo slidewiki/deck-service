@@ -1178,68 +1178,49 @@ let self = module.exports = {
 
     // updates an existing content item's revision
     // can be used for reverting or updating
-    updateContentItem: function(citem, revertedRevId, root_deck, ckind, user, top_root_deck, parentOperations) {
-        let rootArray = root_deck.split('-');
-        return helper.getCollection('decks')
-        .then((col) => {
-            return col.findOne({_id: parseInt(rootArray[0])})
-            .then((existingDeck) => {
-                let newRevId = getNewRevisionID(citem);
-                if(revertedRevId !== ''){
-                    newRevId = revertedRevId;
+    updateContentItem: function(citem, revertedRevId, parentDeckId, ckind, userId, rootDeckId, parentOperations) {
+        userId = parseInt(userId);
+        return helper.getCollection('decks').then((decks) => {
+            let parentDeck = util.parseIdentifier(parentDeckId);
+
+            return decks.findOne({ _id: parentDeck.id }).then((existingDeck) => {
+                let newRevision;
+                if (revertedRevId) {
+                    newRevision = revertedRevId;
+                } else {
+                    newRevision = getNewRevisionID(citem);
                 }
-                let rootRev = existingDeck.active;
-                if(rootArray.length > 1){
-                    rootRev = rootArray[1];
-                }
-                let old_rev_id = rootArray[1];
 
                 // pre-compute what the for loop does
-                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, user, parentOperations, revertedRevId ? 'revert' : undefined);
+                let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId, parentOperations, revertedRevId ? 'revert' : undefined);
 
                 existingDeck.lastUpdate = new Date().toISOString();
 
-                let updatedDeckRevision;
-                for(let i = 0; i < existingDeck.revisions.length; i++) {
-                    if(existingDeck.revisions[i].id === parseInt(rootRev)) {
-                        // TODO clean up this mess!
-                        updatedDeckRevision = existingDeck.revisions[i];
+                // only the latest revision is updateable!
+                let [updatedDeckRevision] = existingDeck.revisions.slice(-1);
+                updatedDeckRevision.lastUpdate = existingDeck.lastUpdate;
 
-                        for(let j = 0; j < existingDeck.revisions[i].contentItems.length; j++) {
-                            if(existingDeck.revisions[i].contentItems[j].ref.id === citem._id && existingDeck.revisions[i].contentItems[j].kind === ckind) {
-                                old_rev_id = existingDeck.revisions[i].contentItems[j].ref.revision;
-                                existingDeck.revisions[i].contentItems[j].ref.revision = newRevId;
+                let existingItem = updatedDeckRevision.contentItems.find((i) => i.ref.id === citem._id && i.kind === ckind);
+                let oldRevision = existingItem.ref.revision;
+                existingItem.ref.revision = newRevision;
 
-                                existingDeck.revisions[i].lastUpdate = existingDeck.lastUpdate;
-                            }
-                            else continue;
-                        }
-                    }
-                    else continue;
+                if (!existingDeck.hasOwnProperty('contributors')) {
+                    existingDeck.contributors = [];
+                }
+                let existingContributor = existingDeck.contributors.find((c) => c.user === userId);
+                if (existingContributor) {
+                    existingContributor.count++;
+                } else {
+                    existingDeck.contributors.push({ user: userId, count: 1 });
                 }
 
-                if(existingDeck.hasOwnProperty('contributors')){
-                    let revIndex = 0;
-                    if(citem.revisions.length > 1){
-                        revIndex = parseInt(newRevId)-1;
-                    }
-                    let contributors = existingDeck.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(citem.revisions[revIndex].user));
-                    if(existingUserContributorIndex > -1)
-                        contributors[existingUserContributorIndex].count++;
-                    else{
-                        contributors.push({'user': parseInt(citem.revisions[revIndex].user), 'count': 1});
-                    }
-                    existingDeck.contributors = contributors;
-                }
-
-                return col.save(existingDeck)
+                return decks.save(existingDeck)
                 .then(() => deckTracker.applyChangeLog())
                 .then((deckChanges) => {
                     return {
-                        oldRevision: old_rev_id,
-                        newRrevision: newRevId,
-                        deckChanges: deckChanges,
+                        oldRevision,
+                        newRevision,
+                        deckChanges,
                         updatedDeckRevision,
                     };
                 });
