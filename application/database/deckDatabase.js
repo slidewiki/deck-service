@@ -620,6 +620,9 @@ let self = module.exports = {
                 if(!deck.hasOwnProperty('allowMarkdown') || deck.allowMarkdown === null){
                     deckRevision.allowMarkdown = false;
                 }
+                else{
+                    deckRevision.allowMarkdown = deck.allowMarkdown;
+                }
                 // changes ended here
                 deckTracker.applyChangeLog();
 

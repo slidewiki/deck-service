@@ -532,7 +532,6 @@ let self = module.exports = {
     // new simpler implementation of deck update with permission checking and NO new_revision: true option
     updateDeck: function(request, reply) {
         let userId = request.auth.credentials.userid;
-
         let deckId = request.params.id;
         // TODO we should keep this required, no fall-back values!
         let rootDeckId = request.payload.top_root_deck;
