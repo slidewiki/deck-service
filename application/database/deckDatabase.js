@@ -2382,32 +2382,36 @@ let self = module.exports = {
     },
 
     _getRootDecks(itemId, itemKind='deck', keepVisibleOnly=true) {
-        return self.getUsage(itemId, itemKind).then((parents) => {
-            // return self if is deck and is root
-            if (parents.length === 0) {
-                if (itemKind === 'deck') {
-                    return [util.parseIdentifier(itemId)];
-                } else {
-                    // orphan slide
-                    return [];
+        return self.get(itemId).then( (deck) => {
+            return self.getUsage(itemId, itemKind).then((parents) => {
+                // return self if is deck and is root
+                if (parents.length === 0) {
+                    if (itemKind === 'deck') {
+                        let item = util.parseIdentifier(itemId);
+                        item.hidden = deck.hidden;
+                        return [item];
+                    } else {
+                        // orphan slide
+                        return [];
+                    }
                 }
-            }
 
-            return parents.reduce((promise, parent) => {
-                return promise.then((roots) => {
-                    let parentId = util.toIdentifier(parent);
-                    // a deck/slide parent is always a deck
-                    return self.getRootDecks(parentId, 'deck', keepVisibleOnly).then((deepRoots) => {
-                        // when method is called by client code the itemId may have revision
-                        // in such a case `parent` includes a `using` attribute
-                        // let's propagate that that in deep results
-                        if (parent.using) {
-                            deepRoots.forEach((u) => u.using = parent.using);
-                        }
-                        return roots.concat(deepRoots);
+                return parents.reduce((promise, parent) => {
+                    return promise.then((roots) => {
+                        let parentId = util.toIdentifier(parent);
+                        // a deck/slide parent is always a deck
+                        return self.getRootDecks(parentId, 'deck', keepVisibleOnly).then((deepRoots) => {
+                            // when method is called by client code the itemId may have revision
+                            // in such a case `parent` includes a `using` attribute
+                            // let's propagate that that in deep results
+                            if (parent.using) {
+                                deepRoots.forEach((u) => u.using = parent.using);
+                            }
+                            return roots.concat(deepRoots);
+                        });
                     });
-                });
-            }, Promise.resolve([]));
+                }, Promise.resolve([]));
+            });
         });
     },
 
