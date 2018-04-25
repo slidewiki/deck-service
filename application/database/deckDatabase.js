@@ -1,9 +1,9 @@
 'use strict';
 
 const _ = require('lodash');
-const util = require('../lib/util');
 const boom = require('boom');
 
+const util = require('../lib/util');
 const ChangeLog = require('../lib/ChangeLog');
 
 const userService = require('../services/user');
@@ -153,31 +153,33 @@ let self = module.exports = {
     // TODO
     // this could likely replace #get as it returns a more uniform data structure,
     // only with the requested revision data merged into a single object
-    getDeck: function(identifier) {
-        let [deckId, revisionId] = identifier.split('-').map(parseInt);
+    getDeck: async function(identifier) {
+        let {id, revision} = util.parseIdentifier(identifier);
 
-        return self.get(deckId).then((deck) => {
-            if (!deck) return;
+        let deck = await self.get(id);
+        if (!deck) return;
 
-            if (!revisionId) {
-                // if not set, we are looking at the active one
-                revisionId = deck.active;
-            }
+        let deckRevision;
+        if (!revision) {
+            // if not set, we are looking at the latest one
+            [deckRevision] = deck.revisions.slice(-1);
+            revision = deckRevision.id;
+        } else {
+            deckRevision = deck.revisions.find((r) => r.id === revision);
+            if (!deckRevision) return; // not found
+        }
 
-            let deckRevision = deck.revisions.find((r) => (r.id === revisionId));
-            if (!deckRevision) return; // revision not found
+        // merge revision data into deck data
+        _.merge(deck, deckRevision);
 
-            // add some extra revision metadata
-            deck.revisionId = revisionId;
+        // add proper ids, revision id
+        deck.id = id;
+        deck.revision = revision;
+        // remove other revisions
+        delete deck.revisions;
 
-            let [latestRevision] = deck.revisions.slice(-1);
-            deck.latestRevisionId = latestRevision.id;
-
-            return _.merge(deck, deckRevision);
-        });
-
+        return deck;
     },
-
 
     // returns the deck revision subdocument, either the one specified in identifier, or the active one
     getRevision: function(identifier) {
@@ -763,6 +765,7 @@ let self = module.exports = {
             existingDeck.lastUpdate = now;
 
             // update usage of each slide or subdeck
+            // TODO compute usage in a delayed job
             async.eachSeries(originRevision.contentItems, (item, done) => {
                 let promise;
                 if (item.kind === 'slide') {
@@ -1277,6 +1280,41 @@ let self = module.exports = {
                 return existingDeck;
             });
         });
+    },
+
+    // adds a variant (language dependent only) id and revision in position index under given deck
+    insertContentVariant: function(parentDeckId, index, newVariant, userId) {
+        return self.get(parentDeckId).then((existingDeck) => {
+            if (!existingDeck) return;
+
+            if (!existingDeck.hasOwnProperty('contributors')) {
+                existingDeck.contributors = [];
+            }
+            let existingContributor = _.find(existingDeck.contributors, { user: userId });
+            if (existingContributor) {
+                existingContributor.count++;
+            } else{
+                existingDeck.contributors.push({ user: userId, count: 1 });
+            }
+
+            let [updatedRevision] = existingDeck.revisions.slice(-1);
+            existingDeck.lastUpdate = new Date().toISOString();
+            updatedRevision.lastUpdate = existingDeck.lastUpdate;
+
+            let contentItem = updatedRevision.contentItems[index];
+            if (!contentItem.hasOwnProperty('variants')) {
+                contentItem.variants = [];
+            }
+            let existingVariant = contentItem.variants.find((v) => v.language === newVariant.language);
+            if (existingVariant) {
+                throw boom.badData(`variant for language ${newVariant.language} already exists`);
+            } else {
+                contentItem.variants.push(newVariant);
+            }
+
+            return helper.getCollection('decks').then((decks) => decks.save(existingDeck)).then(() => updatedRevision);
+        });
+
     },
 
     //recursive function that gets the decktree of a given deck and all of its sub-decks, can be used with onlyDecks to ignore slides
@@ -2143,6 +2181,42 @@ let self = module.exports = {
     translateDeckRevision(deck_id, user, language) {
         // forAttach=false as it is never used when attaching existing subdecks
         return self.forkDeckRevision(deck_id, user, false, language);
+    },
+
+    getDeckVariants: async function(deckId) {
+        let deck = await self.getDeck(deckId);
+        if (!deck) return;
+
+        return deck.variants || [];
+    },
+
+    addDeckVariant: async function(deckId, variantData, userId) {
+        let deck = await self.get(deckId);
+        if (!deck) return;
+
+        // always work with latest revision
+        let [latestRevision] = deck.revisions.slice(-1);
+        // ensure variants
+        if (!latestRevision.hasOwnProperty('variants')) {
+            latestRevision.variants = [];
+        }
+
+        // check against the deck language and the variants array
+        // for now we only support language as variant definition
+        let existingVariant = _.find(latestRevision.variants, { language: variantData.language });
+        if (existingVariant || latestRevision.language === variantData.language) {
+            throw boom.badData(`translation to language ${variantData.language} already exists for deck ${deckId}`);
+        }
+        latestRevision.variants.push(variantData);
+
+        // TODO change log
+        // TODO make it recursive in the deck tree ????
+
+        let decks = await helper.getCollection('decks');
+        // changed the latestRevision object which is still referenced by the deck object, so saving the deck object will work
+        await decks.save(deck);
+        // respond with provided variant data on success
+        return variantData;
     },
 
     getDeckForks(deckId, userId) {

@@ -407,21 +407,6 @@ let self = module.exports = {
         });
     },
 
-    getDeckTranslations: function(request, reply){
-        let deckId = request.params.id; // it should already be a number
-
-        deckDB.get(deckId).then((deck) => {
-            if (!deck) return reply(boom.notFound());
-
-            let currentLang = {'deck_id':deckId, 'language': deck.revisions[0].language};
-            reply({'translations': deck.translations, 'currentLang':currentLang});
-
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
-        });
-    },
-
     getDeckRevisions: function(request, reply) {
         let deckId = request.params.id; // it should already be a number
 
@@ -562,6 +547,37 @@ let self = module.exports = {
             // response is either the deck update response or boom
             reply(response);
         }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+
+    },
+
+    getDeckVariants: function(request, reply){
+        deckDB.getDeckVariants(request.params.id).then((variants) => {
+            if (!variants) return reply(boom.notFound());
+            reply(variants);
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+
+    addDeckVariant: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+        let deckId = request.params.id;
+
+        authorizeUser(userId, deckId, deckId).then((boom) => {
+            // authorizeUser returns nothing if all's ok
+            if (boom) throw boom;
+
+            // reply new variant data on success
+            return deckDB.addDeckVariant(deckId, request.payload, userId);
+        }).then((result) => {
+            reply(result);
+        }).catch((err) => {
+            if (err.isBoom) return reply(err);
+
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -1433,6 +1449,74 @@ let self = module.exports = {
         });
 
     },
+
+    getDeckTreeNodeVariants: function(request, reply) {
+        let rootDeckId = request.query.id;
+
+        // only doing this to return proper http error
+        return deckDB.getDeck(rootDeckId).then((rootDeck) => {
+            if (!rootDeck) throw boom.notFound();
+
+            // let's only worry about slides for now
+            if (request.query.stype !== 'slide') {
+                throw boom.badRequest('getting translations for a subdeck is not supported');
+            }
+
+            let slideId = request.query.sid;
+            return slideDB.findSlideNode(rootDeckId, slideId).then((slideNode) => {
+                if (!slideNode) {
+                    throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootDeckId}`);
+                }
+
+                reply(slideNode.variants);
+            });
+
+        }).catch((err) => {
+            if (err.isBoom) return reply(err);
+
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
+    addDeckTreeNodeVariant: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+        let {id: rootDeckId} = util.parseIdentifier(request.payload.selector.id);
+        // will ignore any revision included here
+
+        // TODO proper authorization checking the actual parent id
+        return authorizeUser(userId, rootDeckId, rootDeckId).then((boomError) => {
+            if (boomError) throw boomError;
+
+            // let's only worry about slides for now
+            if (request.payload.selector.stype !== 'slide') {
+                throw boom.badData('adding translations to a subdeck is not supported');
+            }
+
+            // latest revision only!
+            return deckDB.getDeckVariants(rootDeckId).then((variants) => {
+                // check if the language is in deck variants
+                let existingVariant = _.find(variants, { language: request.payload.language });
+                if (!existingVariant) {
+                    throw boom.badData(`missing deck translation for language ${request.payload.language} in deck ${rootDeckId}`);
+                }
+
+                let slideId = request.payload.selector.sid;
+                return slideDB.addSlideNodeVariant(rootDeckId, slideId, request.payload, userId);
+            });
+
+        }).then((result) => {
+            // after all is said and done, reply!
+            reply(result);
+        }).catch((err) => {
+            if (err.isBoom) return reply(err);
+
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+
+    },
+
     //gets a flat listing of the slides from deck and all of its sub-decks with optional offset and limit
     getFlatSlides: function(request, reply){
         deckDB.getFlatSlides(request.params.id, undefined)

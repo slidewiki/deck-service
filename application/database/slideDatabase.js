@@ -4,8 +4,10 @@ Controller for handling mongodb and the data model slide while providing CRUD'is
 
 'use strict';
 
-const util = require('../lib/util');
+const _ = require('lodash');
+const boom = require('boom');
 
+const util = require('../lib/util');
 const helper = require('./helper'),
     slideModel = require('../models/slide.js'),
     oid = require('mongodb').ObjectID;
@@ -61,6 +63,31 @@ let self = module.exports = {
             return found;
         });
 
+    },
+
+    // TODO
+    // this could likely replace #get as it returns a more uniform data structure,
+    // only with the requested revision data merged into a single object
+    getSlideRevision: async function(identifier) {
+        let {id, revision} = util.parseIdentifier(identifier);
+        if (!revision) return; // not found (like)
+
+        let slide = await self.get(id);
+        if (!slide) return; // not found
+
+        let slideRevision = slide.revisions.find((r) => (r.id === revision));
+        if (!slideRevision) return; // not found
+
+        // merge revision data into slide data
+        _.merge(slide, slideRevision);
+
+        // add proper ids, revision id
+        slide.id = id;
+        slide.revision = revision;
+        // remove other revisions
+        delete slide.revisions;
+
+        return slide;
     },
 
     getAll: function(identifier) {
@@ -445,6 +472,72 @@ let self = module.exports = {
             }).then((result) => result.toArray());
         });
 
+    },
+
+    // returns a useful representation of a slide in a deck tree, with all variants
+    findSlideNode: async function(rootId, slideId) {
+        let path = await deckDB.findPath(rootId, slideId, 'slide');
+        if (!path || !path.length) return; // not found
+
+        // the parent of the slide is the second to last item of the path
+        // path has at least length 2, guaranteed
+        let [parentRef] = path.slice(-2, -1);
+        let parent = await deckDB.getDeck(util.toIdentifier(parentRef));
+
+        // the last item of the path is the index in the parent deck
+        let [{index}] = path.slice(-1);
+        let contentItem = parent.contentItems[index];
+
+        // we want to query the slide database to get content for all slide variants
+        let slide = await self.getSlideRevision(util.toIdentifier(contentItem.ref));
+
+        // we return as much useful stuff as possible :)
+        return {
+            path,
+            parent,
+            index,
+            slide,
+            variants: contentItem.variants || [],
+        };
+    },
+
+    addSlideNodeVariant: async function(rootId, slideId, variantData, userId) {
+        let slideNode = await self.findSlideNode(rootId, slideId);
+        if (!slideNode) {
+            throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootId}`);
+        }
+
+        //  check if it exists already
+        if (_.find(slideNode.variants, { language: variantData.language }) ) {
+            throw boom.badData(`translation to language ${variantData.language} already exists for slide: ${slideId} in deck tree: ${rootId}`);
+        }
+
+        let originalSlide = slideNode.slide;
+        // create a copy based on original slide data
+        let newSlide = _.pick(slideNode.slide, [
+            'title',
+            'content',
+            'license',
+            'speakernotes',
+        ]);
+        // assign other data
+        Object.assign(newSlide, {
+            user: userId,
+            language: variantData.language,
+            // this is the parent deck
+            root_deck: util.toIdentifier(slideNode.parent),
+        });
+
+        let inserted = await self.insert(newSlide);
+        let newVariant = {
+            id: inserted.ops[0]._id,
+            revision: 1, // brand new!
+            language: variantData.language,
+        };
+
+        await deckDB.insertContentVariant(slideNode.parent.id, slideNode.index, newVariant, userId);
+        // respond with new variant data on success
+        return newVariant;
     },
 
 };

@@ -462,15 +462,39 @@ module.exports = function(server) {
     server.route({
         method: 'GET',
         path: '/deck/{id}/translations',
-        handler: handlers.getDeckTranslations,
+        handler: handlers.getDeckVariants,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'List all deck translations for current deck',
+        },
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/deck/{id}/translations',
+        handler: handlers.addDeckVariant,
         config: {
             validate: {
                 params: {
                     id: Joi.number().integer().description('The deck id (without revision)'),
                 },
+                payload: Joi.object().keys({
+                    language: Joi.string(),
+                    title: Joi.string(),
+                    description: Joi.string().allow(''),
+                }).requiredKeys('language'),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
-            description: 'List all deck translations for current deck',
+            auth: 'jwt',
+            description: 'Set a language as part of the list of available translations of a deck',
         },
     });
 
@@ -906,6 +930,50 @@ module.exports = function(server) {
             auth: 'jwt',
             description: 'Move a node (slide/deck) in a different position in the deck tree'
         }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/decktree/node/translations',
+        handler: handlers.getDeckTreeNodeVariants,
+        config: {
+            validate: {
+                query: {
+                    id: Joi.string().required(),
+                    spath: Joi.string(),
+                    stype: Joi.string().default('slide'),
+                    sid: Joi.string().required(),
+                },
+            },
+            tags: ['api'],
+            description: 'List the translations available for a deck tree node (slide or subdeck)',
+        },
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/decktree/node/translations',
+        handler: handlers.addDeckTreeNodeVariant,
+        config: {
+            validate: {
+                payload: Joi.object().keys({
+                    language: Joi.string(),
+                    selector: Joi.object().keys({
+                        id: Joi.string(),
+                        spath: Joi.string(),
+                        stype: Joi.string().default('slide'),
+                        sid: Joi.string(),
+                    }).requiredKeys('id', 'sid'),
+                }).requiredKeys('language'),
+
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Add a translation for a deck tree node (slide only)',
+        },
     });
 
     //----------------------------- Archives Routes -----------------------------//
