@@ -153,20 +153,36 @@ let self = module.exports = {
     // TODO
     // this could likely replace #get as it returns a more uniform data structure,
     // only with the requested revision data merged into a single object
-    getDeck: async function(identifier) {
+    getDeck: async function(identifier, variantFilter) {
         let {id, revision} = util.parseIdentifier(identifier);
 
         let deck = await self.get(id);
         if (!deck) return;
 
+        let [latestRevision] = deck.revisions.slice(-1);
+
         let deckRevision;
         if (!revision) {
             // if not set, we are looking at the latest one
-            [deckRevision] = deck.revisions.slice(-1);
-            revision = deckRevision.id;
+            deckRevision = latestRevision;
+            revision = latestRevision.id;
         } else {
-            deckRevision = deck.revisions.find((r) => r.id === revision);
+            deckRevision = _.find(deck.revisions, { id: revision });
             if (!deckRevision) return; // not found
+        }
+
+        if (!_.isEmpty(variantFilter)) {
+            // check if variant language exists
+            let variantData = _.find(deckRevision.variants, variantFilter);
+            if (variantData) {
+                // replace variant data in result object (but only if assigned already in variantData
+                _.merge(deckRevision, variantData);
+                // and hide other variants
+                delete deckRevision.variants;
+            } else {
+                // TODO if not found, we have to return error ????
+                throw boom.badData(`unknown variant for deck ${identifier}: ${JSON.stringify(variantFilter)}`);
+            }
         }
 
         // merge revision data into deck data
@@ -175,6 +191,8 @@ let self = module.exports = {
         // add proper ids, revision id
         deck.id = id;
         deck.revision = revision;
+        // and latestRevisionId
+        deck.latestRevision = latestRevision.id;
         // remove other revisions
         delete deck.revisions;
 
@@ -1299,6 +1317,7 @@ let self = module.exports = {
     },
 
     //recursive function that gets the decktree of a given deck and all of its sub-decks, can be used with onlyDecks to ignore slides
+    // DEPRECATED
     getDeckTreeFromDB: function(deck_id, onlyDecks){
         let deckTree;
         let revision_id = -1;
@@ -2191,11 +2210,16 @@ let self = module.exports = {
         latestRevision.variants.push(variantData);
 
         // TODO change log
-        // TODO make it recursive in the deck tree ????
 
         let decks = await helper.getCollection('decks');
         // changed the latestRevision object which is still referenced by the deck object, so saving the deck object will work
         await decks.save(deck);
+
+        // need to apply this recursively as well !!!
+        for (let subdeck of _.filter(latestRevision.contentItems, { kind: 'deck' }) ) {
+            await self.addDeckVariant(subdeck.ref.id, variantData, userId);
+        }
+
         // respond with provided variant data on success
         return variantData;
     },

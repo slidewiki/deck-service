@@ -483,11 +483,9 @@ module.exports = function(server) {
                 params: {
                     id: Joi.number().integer().description('The deck id (without revision)'),
                 },
-                payload: Joi.object().keys({
-                    language: Joi.string(),
-                    title: Joi.string(),
-                    description: Joi.string().allow(''),
-                }).requiredKeys('language'),
+                payload: {
+                    language: Joi.string().required(),
+                },
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),
@@ -810,6 +808,7 @@ module.exports = function(server) {
                     id: Joi.string()
                 }, 
                 query: {
+                    language: Joi.string().empty(''),
                     enrich: Joi.boolean().truthy('1').falsy('0', ''),
                 }
             },

@@ -13,6 +13,7 @@ const util = require('../lib/util');
 const boom = require('boom'),
     slideDB = require('../database/slideDatabase'),
     deckDB = require('../database/deckDatabase'),
+    treeDB = require('../database/deckTreeDatabase'),
     co = require('../common'),
     Joi = require('joi'),
     async = require('async');
@@ -734,7 +735,7 @@ let self = module.exports = {
                 reply(boom.badImplementation());                
             });
         } else {
-            deckDB.getDeckTreeFromDB(request.params.id)
+            treeDB.getDeckTree(request.params.id, _.pick(request.query, 'language'))
             .then((deckTree) => {
                 if (!deckTree) return reply(boom.notFound());
 
@@ -744,6 +745,8 @@ let self = module.exports = {
                     reply(deckTree);
                 }
             }).catch((err) => {
+                if(err.isBoom) return reply(err);
+
                 request.log('error', err);
                 reply(boom.badImplementation());
             });
