@@ -1466,6 +1466,7 @@ let self = module.exports = {
                                 deckTree.children.push({
                                     title:slideRevision.title,
                                     content: slideRevision.content,
+                                    markdown: slideRevision.markdown,
                                     speakernotes: slideRevision.speakernotes,
                                     user: String(slideRevision.user),
                                     id: slide._id+'-'+slideRevision.id,
