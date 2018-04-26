@@ -113,41 +113,35 @@ let self = module.exports = {
         }).then( (result) => result.toArray());
     },
 
-    //gets a specified deck and all of its revision, or only the given revision
+    // gets a specified deck and all of its revision, or only the given revision
     get: function(identifier) {
-        identifier = String(identifier);
-        let idArray = identifier.split('-');
-        
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => col.findOne({ _id: parseInt(idArray[0]) }))
+        // TODO check why we allow invalid identifier as input here!!!
+        let {id: deckId, revision: revisionId} = util.parseIdentifier(identifier) || {};
+
+        return helper.getCollection('decks')
+        .then((col) => col.findOne({ _id: deckId }))
         .then((found) => {
             if (!found) return;            
             // add some extra revision metadata
             let [latestRevision] = found.revisions.slice(-1);
             found.latestRevisionId = latestRevision.id;
 
-            let parsed = identifier.split('-');
-            if(parsed.length === 1 || idArray[1] === ''){
+            if (!revisionId) {
                 // this is the requested revision, if not set it is the 'active' revision
                 found.revisionId = found.active;
                 return found;
-            }
-            else{
+            } else {
                 // this is the requested revision
-                found.revisionId = parseInt(idArray[1]);
+                found.revisionId = revisionId;
 
-                let revision = found.revisions[parseInt(idArray[1])-1];
-                if(typeof revision === 'undefined'){
-                    return;
-                }
-                else{
-                    found.revisions = [revision];
-                    return found;
-                }
+                let revision = _.find(found.revisions, { id: revisionId });
+                if (!revision) return;
+
+                // include only requested
+                found.revisions = [revision];
+                return found;
             }
         });
-
     },
 
     // TODO
