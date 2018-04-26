@@ -1233,7 +1233,7 @@ let self = module.exports = {
             { // these brackets are kept during handleChange removal to keep git blame under control
 
                 let top_root_deck = request.payload.selector.id;
-                deckDB.rename(root_deck, request.payload.name, top_root_deck, userId).then((renamed) => {
+                deckDB.rename(root_deck, request.payload.name, {}, top_root_deck, userId).then((renamed) => {
                     if (co.isEmpty(renamed.value))
                         throw renamed;
                     else{

@@ -369,7 +369,13 @@ let self = module.exports = {
 
             if (targetKind === 'slide') {
                 // first check all children for slide target
-                let foundSlideIndex = sourceRevision.contentItems.findIndex((citem) => citem.kind === 'slide' && citem.ref.id === target.id);
+                let foundSlideIndex = sourceRevision.contentItems.findIndex((citem) => {
+                    if (citem.kind !== 'slide') return false;
+                    if (citem.ref.id === target.id) return true;
+
+                    // also check the variants!!!
+                    return !!_.find(citem.variants, { id: target.id });
+                });
                 let foundSlide = sourceRevision.contentItems[foundSlideIndex];
 
                 // the path points to the slide, append just the index and return
@@ -668,7 +674,7 @@ let self = module.exports = {
     },
 
     //renames a deck
-    rename: function(deck_id, newName, top_root_deck, user){
+    rename: function(deck_id, newName, variantFilter, top_root_deck, user){
         // if not included in the call, the deck itself is the top_root_deck
         top_root_deck = top_root_deck || deck_id;
 
@@ -687,6 +693,16 @@ let self = module.exports = {
             let deckTracker = ChangeLog.deckTracker(deck, top_root_deck, user);
 
             deckRevision.title = newName;
+
+            if (!_.isEmpty(variantFilter)) {
+                let existingVariant = _.find(deckRevision.variants, variantFilter);
+                if (!existingVariant) {
+                    throw boom.badData(`missing deck translation for language ${variantFilter.language} in deck ${deck_id}`);
+                }
+                existingVariant.title = newName;
+            } else {
+                deckRevision.title = newName;
+            }
 
             // changes ended here
             deckTracker.applyChangeLog();
@@ -1281,8 +1297,8 @@ let self = module.exports = {
         });
     },
 
-    // adds a variant (language dependent only) id and revision in position index under given deck
-    insertContentVariant: function(parentDeckId, index, newVariant, userId) {
+    // inserts or updates a variant (language dependent only) id and revision in position index under given deck
+    setContentVariant: function(parentDeckId, index, newVariant, userId) {
         return self.get(parentDeckId).then((existingDeck) => {
             if (!existingDeck) return;
 
@@ -1304,9 +1320,10 @@ let self = module.exports = {
             if (!contentItem.hasOwnProperty('variants')) {
                 contentItem.variants = [];
             }
-            let existingVariant = contentItem.variants.find((v) => v.language === newVariant.language);
+            let existingVariant = _.find(contentItem.variants, { language: newVariant.language });
             if (existingVariant) {
-                throw boom.badData(`variant for language ${newVariant.language} already exists`);
+                // effectively replaces values in existing variant
+                _.merge(existingVariant, newVariant);
             } else {
                 contentItem.variants.push(newVariant);
             }
