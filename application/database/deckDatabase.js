@@ -678,15 +678,15 @@ let self = module.exports = {
         // if not included in the call, the deck itself is the top_root_deck
         top_root_deck = top_root_deck || deck_id;
 
-        let deckId = deck_id.split('-')[0];
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => col.findOne({_id: parseInt(deckId)})
+        let {id: deckId} = util.parseIdentifier(deck_id);
+
+        return helper.getCollection('decks')
+        .then((col) => col.findOne({ _id: deckId })
         .then((deck) => {
             if (!deck) return;
 
-            let revisionIndex = deck_id.split('-')[1] - 1;
-            let deckRevision = deck.revisions[revisionIndex];
+            // always the latest
+            let [deckRevision] = deck.revisions.slice(-1);
             if (!deckRevision) return;
 
             // start tracking changes
