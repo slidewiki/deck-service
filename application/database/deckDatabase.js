@@ -488,10 +488,8 @@ let self = module.exports = {
             let newRequest = { user: userId, requestedAt: timestamp };
             editRightsRequests.push(newRequest);
 
-            existingDeck.editRightsRequests = editRightsRequests;
-
             return helper.getCollection('decks')
-            .then((decks) => decks.findOneAndReplace({ _id: deckId }, existingDeck))
+            .then((decks) => decks.findOneAndUpdate({ _id: deckId }, { $set: { editRightsRequests }}))
             .then(() => Object.assign({ isNew: true }, newRequest));
         });
 
