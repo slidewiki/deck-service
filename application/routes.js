@@ -40,8 +40,9 @@ module.exports = function(server) {
                 query: {
                     user: Joi.number().integer().description('Return only decks owned by user with set id'),
                     rootsOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only root decks, i.e. decks that are not subdecks'),
-                    idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata'),
+                    idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata. Ignores paging, roles, status or authentication'),
                     roles: Joi.string().regex(/^(owner(,editor)?)$|^(editor(,owner)?)$/).empty('').description('A comma delimited list of roles (values: [owner, editor])'),
+                    status: Joi.string().valid('public', 'hidden', 'any').empty('').default('public').description('Specify whether to include hidden decks, only public, or all. Ignored if no authentication provided.'),
                     sort: Joi.string().valid('id', 'title', 'lastUpdate', 'timestamp').default('id'),
                     page: Joi.number().integer().positive().default(1).description('Page number'),
                     pageSize: Joi.number().integer().positive().default(10).description('Number of items per page'),
@@ -331,7 +332,8 @@ module.exports = function(server) {
                             id: Joi.number().required(),
                             joined: Joi.string().isoDate().required(),
                         })).default([])
-                    })
+                    }),
+                    hidden: Joi.boolean().default(true),
                 }),
 
                 headers: Joi.object({
@@ -374,6 +376,7 @@ module.exports = function(server) {
                     theme : availableThemes,
                     slideDimensions: slideDimensions,
                     new_revision: Joi.boolean(),
+                    hidden: Joi.boolean(),
                 }),
 
                 headers: Joi.object({
@@ -1334,6 +1337,28 @@ module.exports = function(server) {
             response: {
                 schema: apiModels.group.getModel
             }
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/group/{id}/decks',
+        handler: decks.listGroupDecks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer()
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            description: 'Get the list of decks in group', 
+            auth: {
+                strategy: 'jwt',
+                mode: 'optional'
+            },
         }
     });
 

@@ -181,7 +181,7 @@ describe('REST API', () => {
                     response.payload.should.be.a('string');
                     let payload = JSON.parse(response.payload);
                     payload.should.be.an('object').and.contain.keys('fork', 'edit', 'admin', 'readOnly');
-                    payload.fork.should.equal(true);
+                    payload.fork.should.equal(false); // new decks are hidden by default, so no forking
                     payload.edit.should.equal(true);
                     payload.admin.should.equal(false);
                     payload.readOnly.should.equal(false);
@@ -197,7 +197,7 @@ describe('REST API', () => {
                     response.payload.should.be.a('string');
                     let payload = JSON.parse(response.payload);
                     payload.should.be.an('object').and.contain.keys('fork', 'edit', 'admin', 'readOnly');
-                    payload.fork.should.equal(true);
+                    payload.fork.should.equal(false);  // new decks are hidden by default, so no forking
                     payload.edit.should.equal(false);
                     payload.admin.should.equal(false);
                     payload.readOnly.should.equal(false);

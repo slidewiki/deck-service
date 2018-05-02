@@ -587,6 +587,7 @@ let self = module.exports = {
 
                 return _.pick(fork, [
                     'id', 'title', 'user',
+                    'hidden',
                     'timestamp', 'lastUpdate', 'current', 'origin',
                 ]);
 
@@ -1758,7 +1759,8 @@ let self = module.exports = {
         }
 
         let decksPromise = deckDB.find('decks', {
-            user: userid
+            user: userid,
+            hidden: { $in: [false, null] },
         });
 
         decksPromise.then((decks) => {
