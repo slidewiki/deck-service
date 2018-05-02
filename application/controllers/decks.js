@@ -266,6 +266,7 @@ function transform(deck){
     metadata.tags = revision.tags;
     metadata.parent = revision.parent;
     metadata.theme = revision.theme;
+    metadata.allowMarkdown = revision.allowMarkdown;
 
     // get first slide
     metadata.firstSlide = deckDB.getFirstSlide(revision);

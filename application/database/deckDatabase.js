@@ -57,10 +57,10 @@ let self = module.exports = {
                         timestamp: 1,
                         lastUpdate: 1,
                         revisions: 1,
-                        tags: 1, 
+                        tags: 1,
                         translation: 1,
                         countRevisions: {
-                            $size: '$revisions' 
+                            $size: '$revisions'
                         }
                     }
                 },
@@ -68,12 +68,12 @@ let self = module.exports = {
                 {
                     '$redact': {
                         '$cond': {
-                            if: { $eq: [ '$active', '$revisions.id' ] }, 
+                            if: { $eq: [ '$active', '$revisions.id' ] },
                             then: '$$DESCEND',
                             else: '$$PRUNE'
                         }
                     }
-                },                      
+                },
             ];
 
             if (options.rootsOnly) {
@@ -84,7 +84,7 @@ let self = module.exports = {
                         },
                     } }
                 );
-                pipeline.push( 
+                pipeline.push(
                     { $match: { 'usageCount': 0 } }
                 );
             } else {
@@ -118,12 +118,12 @@ let self = module.exports = {
     get: function(identifier) {
         identifier = String(identifier);
         let idArray = identifier.split('-');
-        
+
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => col.findOne({ _id: parseInt(idArray[0]) }))
         .then((found) => {
-            if (!found) return;            
+            if (!found) return;
             // add some extra revision metadata
             let [latestRevision] = found.revisions.slice(-1);
             found.latestRevisionId = latestRevision.id;
@@ -489,10 +489,8 @@ let self = module.exports = {
             let newRequest = { user: userId, requestedAt: timestamp };
             editRightsRequests.push(newRequest);
 
-            existingDeck.editRightsRequests = editRightsRequests;
-
             return helper.getCollection('decks')
-            .then((decks) => decks.findOneAndReplace({ _id: deckId }, existingDeck))
+            .then((decks) => decks.findOneAndUpdate({ _id: deckId }, { $set: { editRightsRequests }}))
             .then(() => Object.assign({ isNew: true }, newRequest));
         });
 
@@ -618,7 +616,12 @@ let self = module.exports = {
                         console.warn(`could not update slide thumbnails for deck ${id}, error was: ${err.message}`);
                     });
                 }
-
+                if(!deck.hasOwnProperty('allowMarkdown') || deck.allowMarkdown === null){
+                    deckRevision.allowMarkdown = false;
+                }
+                else{
+                    deckRevision.allowMarkdown = deck.allowMarkdown;
+                }
                 // changes ended here
                 deckTracker.applyChangeLog();
 
@@ -1314,6 +1317,7 @@ let self = module.exports = {
                     latestRevisionId: latestRevision.id,
                     title: striptags(deck.revisions[revision_id].title),
                     theme: deck.revisions[revision_id].theme,
+                    allowMarkdown: deck.revisions[revision_id].allowMarkdown,
                     type: 'deck',
                     children: [],
                 };
@@ -1333,6 +1337,7 @@ let self = module.exports = {
                                             id: slide._id+'-'+slide.revisions[slide_revision].id,
                                             type: 'slide',
                                             theme: deck.revisions[revision_id].theme,
+                                            allowMarkdown: deck.revisions[revision_id].allowMarkdown,
                                         });
                                         callback();
                                     });
@@ -1436,6 +1441,7 @@ let self = module.exports = {
                     type: 'deck',
                     user: String(deckRevision.user),
                     theme: deckRevision.theme,
+                    allowMarkdown: deckRevision.allowMarkdown,
                     children: []
                 };
             }
@@ -1463,10 +1469,12 @@ let self = module.exports = {
                                 deckTree.children.push({
                                     title:slideRevision.title,
                                     content: slideRevision.content,
+                                    markdown: slideRevision.markdown,
                                     speakernotes: slideRevision.speakernotes,
                                     user: String(slideRevision.user),
                                     id: slide._id+'-'+slideRevision.id,
                                     theme: deckRevision.theme,
+                                    allowMarkdown: deckRevision.allowMarkdown,
                                     type: 'slide'
                                 });
                                 callback();
@@ -2815,7 +2823,7 @@ let self = module.exports = {
                 // remove from 'deck' collection
                 let removeDeckPromise = helper.getCollection('decks')
                 .then((col) => {
-                    col.remove({'_id': existingDeck._id});                
+                    col.remove({'_id': existingDeck._id});
                 });
 
                 // update usage of its content slides
@@ -2859,7 +2867,7 @@ let self = module.exports = {
 
                 return Promise.all([removeDeckPromise, updateSlidesUsagePromise]);
             });
-        });     
+        });
     },
 
     // moves the entire deck tree including all subdecks to the archive
@@ -2873,7 +2881,7 @@ let self = module.exports = {
                 throw boom.methodNotAllowed(`cannot archive a non-root deck ${deckId}`);
             }
 
-            // archive subdecks 
+            // archive subdecks
             let archiveSubdecks = new Promise( (resolve, reject) => {
                 self.getFlatDecksFromDB(String(deckId)).then((res) => {
                     if (!res) return reject(boom.notFound());
@@ -2886,7 +2894,7 @@ let self = module.exports = {
                         }).catch( (err) => {
                             callback(err);
                         });
-                        
+
                     }, (err) => {
                         if(err){
                             reject(err);
@@ -2961,16 +2969,16 @@ let self = module.exports = {
                                     if(!revision) callback();
 
                                     let slideDetails = {
-                                        id: slide._id, 
-                                        revisionId: revision.id, 
-                                        type: 'slide', 
-                                        title: revision.title, 
-                                        content: revision.content, 
-                                        speakernotes: revision.speakernotes, 
-                                        timestamp: slide.timestamp, 
-                                        lastUpdate: slide.lastUpdate, 
-                                        language: revision.language, 
-                                        owner: slide.user, 
+                                        id: slide._id,
+                                        revisionId: revision.id,
+                                        type: 'slide',
+                                        title: revision.title,
+                                        content: revision.content,
+                                        speakernotes: revision.speakernotes,
+                                        timestamp: slide.timestamp,
+                                        lastUpdate: slide.lastUpdate,
+                                        language: revision.language,
+                                        owner: slide.user,
                                         contributors: slide.contributors.map( (contr) => {return contr.user; }),
                                         path: path,
                                     };
@@ -2980,7 +2988,7 @@ let self = module.exports = {
                                 });
                             }).catch(callback);
                         }
-                    }, (err) => {               
+                    }, (err) => {
                         if (err) {
                             reject(err);
                         } else {
@@ -2993,7 +3001,7 @@ let self = module.exports = {
     },
 };
 
-// regenerates direct slide thumbnails according to the deck revision theme 
+// regenerates direct slide thumbnails according to the deck revision theme
 function updateDeckThumbnails(deckRevision, newTheme) {
     return deckRevision.contentItems.filter((citem) => citem.kind === 'slide').reduce((p, citem) => {
         return p.then(() => {
@@ -3100,6 +3108,9 @@ function convertToNewDeck(deck){
     if(!deck.hasOwnProperty('theme') || deck.theme === null){
         deck.theme = 'default';
     }
+    if(!deck.hasOwnProperty('allowMarkdown') || deck.allowMarkdown === null){
+        deck.allowMarkdown = false;
+    }
     if(deck.hasOwnProperty('editors') && deck.editors === null){
         deck.editors = {users: [], groups: []};
     }
@@ -3140,7 +3151,8 @@ function convertToNewDeck(deck){
             abstract: deck.abstract,
             footer: deck.footer,
             contentItems: [],
-            theme: deck.theme
+            theme: deck.theme,
+            allowMarkdown: deck.allowMarkdown
         }]
     };
 
