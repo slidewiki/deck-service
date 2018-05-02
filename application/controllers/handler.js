@@ -587,6 +587,7 @@ let self = module.exports = {
 
                 return _.pick(fork, [
                     'id', 'title', 'user',
+                    'hidden',
                     'timestamp', 'lastUpdate', 'current', 'origin',
                 ]);
 
