@@ -694,8 +694,6 @@ let self = module.exports = {
             // start tracking changes
             let deckTracker = ChangeLog.deckTracker(deck, top_root_deck, user);
 
-            deckRevision.title = newName;
-
             if (!_.isEmpty(variantFilter)) {
                 let existingVariant = _.find(deckRevision.variants, variantFilter);
                 if (!existingVariant) {

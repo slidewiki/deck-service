@@ -4,6 +4,7 @@ const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
 const decks = require('./controllers/decks');
+const deckTrees = require('./controllers/deckTrees');
 const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
 const groups = require('./controllers/groups');
@@ -859,10 +860,11 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/decktree/node/rename',
-        handler: handlers.renameDeckTreeNode,
+        handler: deckTrees.renameDeckTreeNode,
         config: {
             validate: {
                 payload: Joi.object().keys({
+                    language: Joi.string(),
                     selector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
                         spath: Joi.string(),
