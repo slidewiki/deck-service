@@ -279,34 +279,14 @@ let self = module.exports = {
             // create data sources array
             if (!deckRevision) return reply(boom.notFound());
 
-            if (_.isEmpty(deckRevision.contentItems)) {
-                return reply({ items: [], totalCount: 0, revisionOwner: deckRevision.user });
-            }
+            // variant (translations) filter
+            let variantFilter = _.pick(request.query, 'language');
 
             let dataSources = [];
-
-            // get first level of slides - from contentItems
             let arrayOfSlideIds = [];
             let slideRevisionsMap = {};
-            let thereAreSubdecks = false;// does this deck have some subdecks
-            deckRevision.contentItems.forEach((contentItem) => {
-                if (contentItem.kind === 'slide') {
-                    const slideId = contentItem.ref.id;
-                    const revisionId = contentItem.ref.revision;
-                    arrayOfSlideIds.push(slideId);
-                    slideRevisionsMap[slideId] = revisionId;
-                } else {
-                    thereAreSubdecks = true;
-                }
-            });
 
-            let promise = Promise.resolve({children: []});
-            if (thereAreSubdecks) {
-                //if there are subdecks, get the rest of slides, from deeper levels ( > 1 )
-                promise = deckDB.getFlatSlides(request.params.id, undefined);
-            }
-
-            return promise.then((deckTree) => {
+            return treeDB.getFlatSlides(request.params.id, variantFilter).then((deckTree) => {
                 deckTree.children.forEach((child) => {
                     let idArray = child.id.split('-');
                     const newSlideId = parseInt(idArray[0]);
