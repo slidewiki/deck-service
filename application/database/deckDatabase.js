@@ -1022,7 +1022,7 @@ let self = module.exports = {
                 //TODO must check if the root_deck comes with a revision id or not, and get the element accordingly
                 let activeRevisionId = existingDeck.active;
                 if(root_deck_path.length > 1){
-                    activeRevisionId = root_deck_path[1];
+                    activeRevisionId = parseInt(root_deck_path[1]);
                 }
 
                 let deckTracker;
@@ -1056,7 +1056,7 @@ let self = module.exports = {
                     existingDeck.contributors = contributors;
                 }
 
-                let updatedRevision = existingDeck.revisions[activeRevisionId-1];
+                let updatedRevision = _.find(existingDeck.revisions, {id: activeRevisionId});
 
                 existingDeck.lastUpdate = new Date().toISOString();
                 updatedRevision.lastUpdate = existingDeck.lastUpdate;
@@ -1118,22 +1118,23 @@ let self = module.exports = {
                 //TODO must check if the root_deck comes with a revision id or not, and get the element accordingly
                 let activeRevisionId = existingDeck.active;
                 if(root_deck_path.length > 1){
-                    activeRevisionId = root_deck_path[1];
+                    activeRevisionId = parseInt(root_deck_path[1]);
                 }
 
                 let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, userId);
 
-                let citems = existingDeck.revisions[activeRevisionId-1].contentItems;
+                let deckRevision = _.find(existingDeck.revisions, {id: activeRevisionId});
+                let citems = deckRevision.contentItems;
                 for(let i = position-1; i < citems.length; i++){
                     citems[i].order = citems[i].order-1;
                 }
                 self.removeFromUsage(citems[position-1], root_deck_path);
 
                 citems.splice(position-1, 1);
-                existingDeck.revisions[activeRevisionId-1].contentItems = citems;
+                deckRevision.contentItems = citems;
 
                 existingDeck.lastUpdate = new Date().toISOString();
-                existingDeck.revisions[activeRevisionId-1].lastUpdate = existingDeck.lastUpdate;
+                deckRevision.lastUpdate = existingDeck.lastUpdate;
 
                 deckTracker.applyChangeLog();
 
