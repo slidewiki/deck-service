@@ -40,8 +40,9 @@ module.exports = function(server) {
                 query: {
                     user: Joi.number().integer().description('Return only decks owned by user with set id'),
                     rootsOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only root decks, i.e. decks that are not subdecks'),
-                    idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata'),
+                    idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata. Ignores paging, roles, status or authentication'),
                     roles: Joi.string().regex(/^(owner(,editor)?)$|^(editor(,owner)?)$/).empty('').description('A comma delimited list of roles (values: [owner, editor])'),
+                    status: Joi.string().valid('public', 'hidden', 'any').empty('').default('public').description('Specify whether to include hidden decks, only public, or all. Ignored if no authentication provided.'),
                     sort: Joi.string().valid('id', 'title', 'lastUpdate', 'timestamp').default('id'),
                     page: Joi.number().integer().positive().default(1).description('Page number'),
                     pageSize: Joi.number().integer().positive().default(10).description('Number of items per page'),
@@ -331,7 +332,8 @@ module.exports = function(server) {
                             id: Joi.number().required(),
                             joined: Joi.string().isoDate().required(),
                         })).default([])
-                    })
+                    }),
+                    hidden: Joi.boolean().default(true),
                 }),
 
                 headers: Joi.object({
@@ -359,6 +361,7 @@ module.exports = function(server) {
                     translation: Joi.string().alphanum().lowercase(),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
+                    allowMarkdown: Joi.boolean(),
                     root_deck: Joi.string(),
                     top_root_deck: Joi.string(),
                     parent_deck: Joi.object().keys({
@@ -373,6 +376,7 @@ module.exports = function(server) {
                     theme : availableThemes,
                     slideDimensions: slideDimensions,
                     new_revision: Joi.boolean(),
+                    hidden: Joi.boolean(),
                 }),
 
                 headers: Joi.object({
@@ -642,6 +646,7 @@ module.exports = function(server) {
                 payload: Joi.object().keys({
                     title: Joi.string(),
                     content: Joi.string(),
+                    markdown: Joi.string(),
                     speakernotes: Joi.string(),
                     root_deck: Joi.string(),
                     top_root_deck: Joi.string(),
@@ -806,7 +811,7 @@ module.exports = function(server) {
             validate: {
                 params: {
                     id: Joi.string()
-                }, 
+                },
                 query: {
                     language: Joi.string().empty(''),
                     enrich: Joi.boolean().truthy('1').falsy('0', ''),
@@ -1352,7 +1357,7 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Retrieve a deck group', 
+            description: 'Retrieve a deck group',
             response: {
                 schema: apiModels.group.getModel
             }
@@ -1399,6 +1404,28 @@ module.exports = function(server) {
             response: {
                 schema: apiModels.group.getModel
             }
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/group/{id}/decks',
+        handler: decks.listGroupDecks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer()
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            description: 'Get the list of decks in group', 
+            auth: {
+                strategy: 'jwt',
+                mode: 'optional'
+            },
         }
     });
 
@@ -1480,7 +1507,7 @@ module.exports = function(server) {
                     id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
                 },
                 query: {
-                    user: Joi.number().integer().description('Optionally filter with deck group owner id'), 
+                    user: Joi.number().integer().description('Optionally filter with deck group owner id'),
                     usergroup: [
                         Joi.number().integer().description('a user group id'),
                         Joi.array().items(Joi.number().integer()).description('array of user group ids')
@@ -1499,17 +1526,17 @@ module.exports = function(server) {
         config: {
             validate: {
                 query: {
-                    user: Joi.number().integer().description('a user id'), 
+                    user: Joi.number().integer().description('a user id'),
                     usergroup: [
                         Joi.number().integer().description('a user group id'),
                         Joi.array().items(Joi.number().integer()).description('array of user group ids')
                     ],
-                    page: Joi.number().integer().min(0).default(0).required().description('page to be retrieved'), 
+                    page: Joi.number().integer().min(0).default(0).required().description('page to be retrieved'),
                     per_page: Joi.number().integer().positive().default(20).required().description('number of results within a page')
                 },
             },
             tags: ['api'],
-            description: 'Get a list of deck groups', 
+            description: 'Get a list of deck groups',
             response: {
                 schema: Joi.object().keys({
                     metadata: Joi.object().keys({

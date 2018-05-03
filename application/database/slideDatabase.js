@@ -673,6 +673,9 @@ function convertToNewSlide(slide) {
     if(slide.language === null){
         slide.language = 'en_EN';
     }
+    if(slide.markdown === null){
+        slide.markdown = '';
+    }
     let contributorsArray = [{'user': slide.user, 'count': 1}];
     const result = {
         _id: slide._id,
@@ -690,6 +693,7 @@ function convertToNewSlide(slide) {
             user: slide.user,
             title: slide.title,
             content: slide.content,
+            markdown: slide.markdown,
             speakernotes: slide.speakernotes,
             parent: slide.parent_slide,
             tags: slide.tags,
@@ -708,6 +712,9 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
     if(slide.language === null){
         slide.language = 'en_EN';
     }
+    if(slide.markdown === null){
+        slide.markdown = '';
+    }
     const result = {
         lastUpdate: now.toISOString(),
         language: slide.language,
@@ -719,6 +726,7 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
             user: slide.user,
             title: slide.title,
             content: slide.content,
+            markdown: slide.markdown,
             speakernotes: slide.speakernotes,
             tags: slide.tags,
             dataSources: slide.dataSources,

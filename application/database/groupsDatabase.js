@@ -165,6 +165,11 @@ let self = module.exports = {
         return self.get(groupId).then( (group) => {
             if(!group) return null;
 
+            if (!userId) {
+                // logged out
+                return { admin: false, edit: false };
+            }
+
             // give all rights to group owner
             if(group.user === userId){
                 return {

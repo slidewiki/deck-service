@@ -155,7 +155,7 @@ let self = module.exports = {
                             return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
                             .then(({updatedDeckRevision}) => {
                                 // the updateContentItem returns, amongs other things, the updated revision of the parent (root_deck)
-                                // we need this to have access to the theme for the new updated slide 
+                                // we need this to have access to the theme for the new updated slide
 
                                 //create thumbnail for the new slide revision
                                 let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
@@ -457,6 +457,7 @@ let self = module.exports = {
                 let newSlide = {
                     'title': 'New slide',
                     'content': slidetemplate,
+                    'markdown': '',
                     'language': request.payload.language,
                     'license': request.payload.license,
                     'user': inserted.ops[0].user,
@@ -471,6 +472,9 @@ let self = module.exports = {
                 if(request.payload.hasOwnProperty('first_slide')){
                     if(request.payload.first_slide.hasOwnProperty('content')){
                         newSlide.content = request.payload.first_slide.content;
+                    }
+                    if(request.payload.first_slide.hasOwnProperty('markdown')){
+                        newSlide.markdown = request.payload.first_slide.markdown;
                     }
                     if(request.payload.first_slide.hasOwnProperty('title')){
                         newSlide.title = request.payload.first_slide.title;
@@ -514,7 +518,6 @@ let self = module.exports = {
     // new simpler implementation of deck update with permission checking and NO new_revision: true option
     updateDeck: function(request, reply) {
         let userId = request.auth.credentials.userid;
-
         let deckId = request.params.id;
         // TODO we should keep this required, no fall-back values!
         let rootDeckId = request.payload.top_root_deck;
@@ -601,6 +604,7 @@ let self = module.exports = {
 
                 return _.pick(fork, [
                     'id', 'title', 'user',
+                    'hidden',
                     'timestamp', 'lastUpdate', 'current', 'origin',
                 ]);
 
@@ -732,7 +736,7 @@ let self = module.exports = {
                 if(err.isBoom) return reply(err);
 
                 request.log('error', err);
-                reply(boom.badImplementation());                
+                reply(boom.badImplementation());
             });
         } else {
             treeDB.getDeckTree(request.params.id, _.pick(request.query, 'language'))
@@ -957,6 +961,8 @@ let self = module.exports = {
                         let slide = {
                             'title': 'New slide',
                             'content': slidetemplate,
+                            'allowMarkdown': false,
+                            'markdown': '',
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
                             'root_deck': parentID,
@@ -971,6 +977,12 @@ let self = module.exports = {
                         if(request.payload.hasOwnProperty('content')){
                             slide.content = request.payload.content;
                         }
+                        if(request.payload.hasOwnProperty('markdown')){
+                            slide.markdown = request.payload.markdown;
+                        }
+                        if(request.payload.hasOwnProperty('allowMarkdown')){
+                            slide.allowMarkdown = request.payload.allowMarkdown;
+                        }
                         if(request.payload.hasOwnProperty('title')){
                             slide.title = request.payload.title;
                         }
@@ -982,7 +994,7 @@ let self = module.exports = {
                         }
 
                         // create the new slide into the database
-                                                
+
                         // insert the slide
                         slideDB.insert(slide).then((inserted) => {
                             // empty results means something wrong with the payload
@@ -1180,6 +1192,7 @@ let self = module.exports = {
                             'root_deck': parentID,
                             'top_root_deck': top_root_deck,
                             'theme': parentDeck.revisions[0].theme,
+                            'allowMarkdown': parentDeck.revisions[0].allowMarkdown,
                             'position' : deckPosition
                         };
 
@@ -1269,6 +1282,7 @@ let self = module.exports = {
                 let new_slide = {
                     'title' : request.payload.name,
                     'content' : slide.revisions[0].content,
+                    'markdown' : slide.revisions[0].markdown,
                     'speakernotes' : slide.revisions[0].speakernotes,
                     'user' : String(userId),
                     'root_deck' : root_deck,
@@ -1832,7 +1846,8 @@ let self = module.exports = {
         }
 
         let decksPromise = deckDB.find('decks', {
-            user: userid
+            user: userid,
+            hidden: { $in: [false, null] },
         });
 
         decksPromise.then((decks) => {
