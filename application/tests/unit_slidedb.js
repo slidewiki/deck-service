@@ -161,7 +161,6 @@ describe('Database', () => {
             };
             let deck2 = {
                 'description': 'New Deck Replaced',
-                'language': 'en_EN',
                 'translation': {
                     'status': 'original'
                 },

@@ -612,10 +612,30 @@ let self = module.exports = {
 
                 //TODO check if all attributes are used from payload
                 const deckRevision = existingDeck.revisions[activeRevisionIndex];
-                deckRevision.title = deck.title;
-                deckRevision.language = deck.language;
-                existingDeck.description = deck.description;
-                existingDeck.license = deck.license;
+
+                // language is treated differently now
+                let variantFilter = _.pick(deck, 'language');
+                if (!_.isEmpty(variantFilter)) {
+                    let variant = _.find(deckRevision.variants, variantFilter);
+                    if (variant) {
+                        let variantData = _.pick(deck, [
+                            'title',
+                            'description',
+                        ]);
+                        // update the data if present in payload
+                        Object.assign(variant, variantData);
+                    } else {
+                        throw boom.badData(`missing deck translation for language ${variantFilter.language} in deck ${id}`);
+                    }
+                } else {
+                    // language must never be provided in API when changing the deck with default language
+                    deckRevision.title = deck.title;
+                    // TODO move the description to the deck revision level already!
+                    deckRevision.description = deck.description;
+
+                    existingDeck.description = deck.description;
+                    existingDeck.license = deck.license;
+                }
 
                 if (deck.slideDimensions) {
                     existingDeck.slideDimensions = deck.slideDimensions;
