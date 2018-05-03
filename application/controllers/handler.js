@@ -1536,7 +1536,7 @@ let self = module.exports = {
 
     //gets a flat listing of the slides from deck and all of its sub-decks with optional offset and limit
     getFlatSlides: function(request, reply){
-        deckDB.getFlatSlides(request.params.id, undefined)
+        treeDB.getFlatSlides(request.params.id, _.pick(request.query, 'language'))
         .then((deckTree) => {
             if (co.isEmpty(deckTree)){
                 return reply(boom.notFound());

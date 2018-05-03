@@ -1472,6 +1472,7 @@ let self = module.exports = {
     },
 
     //returns a flattened structure of a deck's slides, and optionally its sub-decks
+    // DEPRECATED
     getFlatSlides: function(deckId, deckTree, returnDecks){
 
         return self.getRevision(deckId)

@@ -588,6 +588,7 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 query: {
+                    language: Joi.string().empty(''),
                     limit: Joi.string().optional(),
                     offset: Joi.string().optional(),
                     countOnly: Joi.boolean().truthy('1').falsy('0', ''),
