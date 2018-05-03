@@ -115,34 +115,53 @@ let self = module.exports = {
     },
 
     // gets a specified deck and all of its revision, or only the given revision
-    get: function(identifier) {
+    get: async function(identifier, variantFilter) {
         // TODO check why we allow invalid identifier as input here!!!
         let {id: deckId, revision: revisionId} = util.parseIdentifier(identifier) || {};
 
-        return helper.getCollection('decks')
-        .then((col) => col.findOne({ _id: deckId }))
-        .then((found) => {
-            if (!found) return;
-            // add some extra revision metadata
-            let [latestRevision] = found.revisions.slice(-1);
-            found.latestRevisionId = latestRevision.id;
+        let col = await helper.getCollection('decks');
+        let found = await col.findOne({ _id: deckId });
+        if (!found) return;
 
-            if (!revisionId) {
-                // this is the requested revision, if not set it is the 'active' revision
-                found.revisionId = found.active;
-                return found;
-            } else {
-                // this is the requested revision
-                found.revisionId = revisionId;
+        // add some extra revision metadata
+        let [latestRevision] = found.revisions.slice(-1);
+        found.latestRevisionId = latestRevision.id;
 
-                let revision = _.find(found.revisions, { id: revisionId });
-                if (!revision) return;
+        if (!revisionId) {
+            // this is the requested revision, if not set it is the 'active' revision
+            found.revisionId = found.active;
+        } else {
+            // this is the requested revision
+            found.revisionId = revisionId;
 
-                // include only requested
-                found.revisions = [revision];
-                return found;
+            let revision = _.find(found.revisions, { id: revisionId });
+            if (!revision) return;
+
+            // include only requested
+            found.revisions = [revision];
+        }
+
+        // translate all revisions
+        if (!_.isEmpty(variantFilter)) {
+            for (let deckRevision of found.revisions) {
+                // check if variant language exists
+                let variantData = _.find(deckRevision.variants, variantFilter);
+                if (variantData) {
+                    // replace variant data in result object (but only if assigned already in variantData)
+                    _.merge(deckRevision, variantData);
+                } else {
+                    // TODO if not found, and specific revision WAS requested, we return error (do we have to ????)
+                    if (revisionId) {
+                        throw boom.badData(`unknown variant for deck ${identifier}: ${JSON.stringify(variantFilter)}`);
+                    } // else no worries
+                }
+
+                // always hide (other) variants
+                delete deckRevision.variants;
             }
-        });
+        }
+
+        return found;
     },
 
     // TODO
@@ -151,7 +170,7 @@ let self = module.exports = {
     getDeck: async function(identifier, variantFilter) {
         let {id, revision} = util.parseIdentifier(identifier);
 
-        let deck = await self.get(id);
+        let deck = await self.get(id, variantFilter);
         if (!deck) return;
 
         let [latestRevision] = deck.revisions.slice(-1);
@@ -164,20 +183,6 @@ let self = module.exports = {
         } else {
             deckRevision = _.find(deck.revisions, { id: revision });
             if (!deckRevision) return; // not found
-        }
-
-        if (!_.isEmpty(variantFilter)) {
-            // check if variant language exists
-            let variantData = _.find(deckRevision.variants, variantFilter);
-            if (variantData) {
-                // replace variant data in result object (but only if assigned already in variantData
-                _.merge(deckRevision, variantData);
-                // and hide other variants
-                delete deckRevision.variants;
-            } else {
-                // TODO if not found, we have to return error ????
-                throw boom.badData(`unknown variant for deck ${identifier}: ${JSON.stringify(variantFilter)}`);
-            }
         }
 
         // merge revision data into deck data

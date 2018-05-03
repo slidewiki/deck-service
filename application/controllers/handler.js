@@ -350,9 +350,11 @@ let self = module.exports = {
 
     },
 
-    //gets a single deck from the database, containing all revisions, unless a specific revision is specified in the id
+    // gets a single deck from the database, containing all revisions, unless a specific revision is specified in the id
     getDeck: function(request, reply) {
-        deckDB.get(encodeURIComponent(request.params.id)).then((deck) => {
+        let deckId = request.params.id;
+        let variantFilter = _.pick(request.query, 'language');
+        deckDB.get(deckId, variantFilter).then((deck) => {
             if (co.isEmpty(deck))
                 reply(boom.notFound());
             else {

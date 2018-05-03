@@ -115,6 +115,9 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string()
                 },
+                query: {
+                    language: Joi.string().empty(''),
+                },
             },
             tags: ['api'],
             description: 'Get metadata of a deck'
