@@ -384,7 +384,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.getFlatDecksFromDB(ins.ops[0]._id+'-1'));
+            let res = ins.then((ins) => deckdb.getFlatDecks(ins.ops[0]._id+'-1'));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('title').that.is.not.empty,

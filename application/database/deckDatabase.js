@@ -1580,7 +1580,42 @@ let self = module.exports = {
         });
     },
 
+    // returns a flattened structure of a deck's sub-decks
+    getFlatDecks: async function(deckId, variantFilter, deckTree) {
+        let deck = await self.getDeck(deckId, variantFilter);
+        if (!deck) return; // not found
+
+        // make it canonical
+        deckId = util.toIdentifier(deck);
+
+        let deckNode = {
+            type: 'deck',
+            id: deckId,
+            title: deck.title,
+            user: String(deck.user),
+        };
+
+        if (!deckTree) {
+            // is root
+            deckTree = Object.assign(deckNode, {
+                children: [],
+            });
+        } else {
+            // is subdeck, add flat to children
+            deckTree.children.push(deckNode);
+        }
+
+        // recurse!
+        for (let item of _.filter(deck.contentItems, { kind: 'deck' })) {
+            let itemId = util.toIdentifier(item.ref);
+            await self.getFlatDecks(itemId, variantFilter, deckTree);
+        }
+
+        return deckTree;
+    },
+
     //returns a flattened structure of a deck's sub-decks
+    // DEPRECATED
     getFlatDecksFromDB: function(deck_id, deckTree){
 
         let revision_id = -1;
@@ -1812,7 +1847,7 @@ let self = module.exports = {
     // languageToTranslate, if set, will result in creating a deck translation (subtype of fork)
     _forkDeckRevision(deck_id, user, forAttach, languageToTranslate) {
 
-        return self.getFlatDecksFromDB(deck_id)
+        return self.getFlatDecks(deck_id)
         .then((res) => {
             //we have a flat sub-deck structure
             let flatDeckArray = [];
@@ -1844,12 +1879,14 @@ let self = module.exports = {
 
                     //iterate the flat decktree and copy each deck, referring to the new ids in its content items and usage
                     async.eachSeries(flatDeckArray, (next_deck, callback) => {
+                        let {id: nextId, revision: nextRevision} = util.parseIdentifier(next_deck);
+
                         helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
                         .then((db2) => db2.collection('decks'))
                         .then((col) => {
-                            return col.findOne({_id: parseInt(next_deck.split('-')[0])})
+                            return col.findOne({_id: nextId})
                             .then((found) => {
-                                let ind = parseInt(next_deck.split('-')[1])-1;
+                                let ind = _.findIndex(found.revisions, { id: nextRevision });
                                 let contributorsArray = found.contributors;
                                 //contributorsArray.push({'user': parseInt(user), 'count': 1});
                                 let existingUserContributorIndex = findWithAttr(contributorsArray, 'user', parseInt(user));
@@ -2998,7 +3035,7 @@ let self = module.exports = {
 
             // archive subdecks
             let archiveSubdecks = new Promise( (resolve, reject) => {
-                self.getFlatDecksFromDB(String(deckId)).then((res) => {
+                self.getFlatDecks(String(deckId)).then((res) => {
                     if (!res) return reject(boom.notFound());
 
                     async.eachSeries(res.children, (subdeckChild, callback) => {
