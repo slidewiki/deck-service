@@ -68,11 +68,10 @@ describe('REST API fork deck', () => {
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'revisions', 'id', 'license');
+                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'id', 'license');
                 payload.user.should.equal(1);
                 deckID = String(payload.id);
                 payload.license.should.equal('CC BY-SA');
-                payload.revisions.should.be.an('array').and.have.length(1);
             }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
                 opt.payload = {};

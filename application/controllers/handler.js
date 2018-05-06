@@ -48,13 +48,26 @@ let self = module.exports = {
         });
     },
 
-    //gets a single slide with all of its revisions, unless revision is defined
+    // gets a single slide revision, or all revisions in an array if no revision id provided
     getSlide: function(request, reply) {
-        slideDB.get(encodeURIComponent(request.params.id)).then((slide) => {
-            if (co.isEmpty(slide))
+        let slideId = request.params.id;
+        // check to see if no revision was provided
+        let {id, revision} = util.parseIdentifier(request.params.id) || {};
+
+        let promise;
+        if (!revision) {
+            promise = slideDB.get(id);
+        } else {
+            promise = slideDB.getSlideRevision(slideId);
+        }
+
+        // handle promise
+        promise.then((slide) => {
+            if (!slide) {
                 reply(boom.notFound());
-            else
+            } else {
                 reply(slide);
+            }
         }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
@@ -326,7 +339,7 @@ let self = module.exports = {
 
     },
 
-    // gets a single deck from the database, containing all revisions, unless a specific revision is specified in the id
+    // gets a single deck from the database, with data according to provided revision or latest if missing
     getDeck: async function(request, reply) {
         let deckId = request.params.id;
         let variantFilter = _.pick(request.query, 'language');
@@ -342,37 +355,12 @@ let self = module.exports = {
             }
         }
 
-        let deck = await deckDB.get(deckId, variantFilter, fallbackFilter);
+        let deck = await deckDB.getDeck(deckId, variantFilter, fallbackFilter);
         if (!deck) throw boom.notFound();
 
         try {
-            // TODO this is only until we remove the damned revisions array from response payload
-            // the last is the selected one, or the latest one
-            let [defaultRevision] = deck.revisions.slice(-1);
-            deck.language = defaultRevision.language;
-
-            // add some deprecated names for revision, latestRevision
-            let deckRef = util.parseIdentifier(deckId);
-            if (deckRef.revision) {
-                deck.revisionId = defaultRevision.id;
-                // TODO remove this, not really latest
-                deck.latestRevisionId = defaultRevision.id;
-            } else {
-                // default to active (?)
-                deck.revisionId = deck.active;
-                deck.latestRevisionId = defaultRevision.id;
-            }
-
-            // add first slide id-revision for all revisions
-            for (let rev of deck.revisions) {
-                let deckRev = {
-                    id: deck._id,
-                    revision: rev.id,
-                    language: rev.language,
-                    contentItems: rev.contentItems,
-                };
-                rev.firstSlide = await treeDB.getFirstSlide(deckRev);
-            }
+            // add first slide id-revision
+            deck.firstSlide = await treeDB.getFirstSlide(deck);
 
             reply(deck);
 
@@ -423,11 +411,12 @@ let self = module.exports = {
         deckDB.insert(request.payload, userId).then((inserted) => {
             // empty results means something wrong with the payload
             if (!inserted) throw boom.badData();
-            let newDeckId = String(inserted._id) + '-1';
+            let newDeckId = util.toIdentifier({id: inserted._id, revision: 1});
 
             if (request.payload.empty) {
                 // skip creating a new slide
-                return co.rewriteID(inserted);
+                // return a uniform response format
+                return deckDB.getDeck(newDeckId);
             }
 
             // create a new slide inside the new deck
@@ -451,13 +440,14 @@ let self = module.exports = {
                 newSlide.dimensions = request.payload.slideDimensions;
             }
 
+            // return a uniform response format
             return treeDB.createSlide(newSlide, newDeckId, 0, newDeckId, userId)
-            .then(() => co.rewriteID(inserted));
+            .then(() => deckDB.getDeck(newDeckId));
 
         }).then(reply).catch((err) => {
             if (err.isBoom) return reply(err);
             request.log('error', err);
-            reply(boom.badImplementation(err));
+            reply(boom.badImplementation());
         });
     },
 
@@ -489,7 +479,8 @@ let self = module.exports = {
                     });
                 }
 
-                if (!changed.theme) return replaced;
+                // uniform response object
+                if (!changed.theme) return deckDB.getDeck(replaced._id);
 
                 // theme was changed, update thumbs for all direct slides
                 return slideDB.getDeckSlides(deckId).then((slides) => {
@@ -500,7 +491,8 @@ let self = module.exports = {
                         });
                     }
 
-                    return replaced;
+                    // uniform response object
+                    return deckDB.getDeck(replaced._id);
                 }).catch((err) => {
                     console.warn(`could not update slide thumbnails for deck ${deckId}, error was: ${err.message}`);
                 });
@@ -616,7 +608,13 @@ let self = module.exports = {
             // authorizeUser returns nothing if all's ok
             if (boom) throw boom;
 
-            return deckDB.createDeckRevision(deckId, userId, rootDeckId);
+            // response uniform to new deck
+            return deckDB.createDeckRevision(deckId, userId, rootDeckId)
+            .then((updatedDeck) => {
+                // make deckId canonical
+                let newDeckId = util.toIdentifier({ id: updatedDeck._id, revision: updatedDeck.revisions[0].id });
+                return deckDB.getDeck(newDeckId);
+            });
         }).then(reply).catch((err) => {
             if (err.isBoom) return reply(err);
             request.log('error', err);
@@ -646,7 +644,9 @@ let self = module.exports = {
                     throw boom.badData(`could not find ${revisionId} for deck ${deckId}`);
                 }
 
-                return updatedDeck;
+                // make deckId canonical
+                let newDeckId = util.toIdentifier({ id: updatedDeck._id, revision: updatedDeck.revisions[0].id });
+                return deckDB.getDeck(newDeckId);
             });
 
         }).then(reply).catch((err) => {

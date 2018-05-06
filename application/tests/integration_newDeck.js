@@ -107,20 +107,18 @@ describe('REST API new deck', () => {
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'revisions', 'id', 'editors', 'license');
+                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'id', 'editors', 'license');
                 payload.user.should.equal(1);
                 payload.license.should.equal('CC BY-SA');
                 payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                 payload.editors.users.should.be.an('array').and.have.length(0);
                 payload.editors.groups.should.be.an('array').and.have.length(0);
 
-                payload.revisions.should.be.an('array').and.have.length(1);
-                let revision = payload.revisions[0];
-                revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'user', 'tags');
-                revision.user.should.equal(1);
-                revision.id.should.equal(1);
-                revision.usage.should.be.an('array').and.have.length(0);
-                revision.tags.should.be.an('array').and.have.length(0);
+                payload.should.contain.keys('revision', 'usage', 'revisionTimestamp', 'revisionUser', 'tags');
+                payload.revisionUser.should.equal(1);
+                payload.revision.should.equal(1);
+                payload.usage.should.be.an('array').and.have.length(0);
+                payload.tags.should.be.an('array').and.have.length(0);
             });
         });
         it('it should reply it for full data', () => {
@@ -133,7 +131,7 @@ describe('REST API new deck', () => {
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'revisions', 'id', 'editors', 'license');
+                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'id', 'editors', 'license');
                 payload.user.should.equal(2);
                 deckID = String(payload.id);
                 payload.license.should.equal('CC BY-SA');
@@ -143,13 +141,11 @@ describe('REST API new deck', () => {
                 payload.should.have.a.nested.property('slideDimensions.width', 800);
                 payload.should.have.a.nested.property('slideDimensions.height', 400);
 
-                payload.revisions.should.be.an('array').and.have.length(1);
-                let revision = payload.revisions[0];
-                revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'user', 'tags');
-                revision.user.should.equal(2);
-                revision.id.should.equal(1);
-                revision.usage.should.be.an('array').and.have.length(0);
-                revision.tags.should.be.an('array').and.have.length(2);
+                payload.should.contain.keys('revision', 'usage', 'revisionTimestamp', 'revisionUser', 'tags');
+                payload.revisionUser.should.equal(2);
+                payload.revision.should.equal(1);
+                payload.usage.should.be.an('array').and.have.length(0);
+                payload.tags.should.be.an('array').and.have.length(2);
             });
         });
         it('it should return 401 if JWT-login is wrong', () => {
@@ -177,7 +173,7 @@ describe('REST API new deck', () => {
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
                 payload.should.be.an('object').and.contain.keys(
-                    '_id', 'user', 'timestamp', 'license', 'revisions', 'editors', 'revisionId', 'language'
+                    'id', 'user', 'timestamp', 'license', 'editors', 'language'
                 );
                 payload._id.should.equal(parseInt(deckID));
                 payload.user.should.equal(2);
@@ -189,13 +185,11 @@ describe('REST API new deck', () => {
                 payload.editors.groups.should.be.an('array').and.have.length(1);
                 payload.should.have.a.property('slideDimensions').that.is.an('object').and.contains.keys('width', 'height');
 
-                payload.revisions.should.be.an('array').and.have.length(1);
-                let revision = payload.revisions[0];
-                revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'lastUpdate', 'user', 'tags');
-                revision.user.should.equal(2);
-                revision.id.should.equal(1);
-                revision.usage.should.be.an('array').and.have.length(0);
-                revision.tags.should.be.an('array').and.have.length(2);
+                payload.should.contain.keys('revision', 'usage', 'revisionTimestamp', 'revisionLastUpdate', 'revisionUser', 'tags');
+                payload.revisionUser.should.equal(2);
+                payload.revision.should.equal(1);
+                payload.usage.should.be.an('array').and.have.length(0);
+                payload.tags.should.be.an('array').and.have.length(2);
             });
         });
         it('it should return 404 if no deck exists for given id', () => {

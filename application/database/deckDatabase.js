@@ -951,9 +951,8 @@ let self = module.exports = {
             citem_revision_id = parseInt(citem_revision_id);
         }
         let root_deck_path = root_deck.split('-');
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
+
+        return helper.getCollection('decks').then((col) => {
             return col.findOne({_id: parseInt(root_deck_path[0])})
             .then((existingDeck) => {
                 //TODO must check if the root_deck comes with a revision id or not, and get the element accordingly

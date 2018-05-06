@@ -478,8 +478,10 @@ const self = module.exports = {
         // check if it is a deck or a slide
         let renamePromise;
         if (itemKind === 'deck') {
-            renamePromise = deckDB.rename(itemId, newName, variantFilter, rootId, userId).then(() => {
-                reply({ title: newName });
+            renamePromise = deckDB.rename(itemId, newName, variantFilter, rootId, userId)
+            .then(() => deckDB.getDeck(itemId, variantFilter))
+            .then((updatedDeck) => {
+                reply(updatedDeck);
             });
         } else {
             // it's a slide
@@ -491,21 +493,14 @@ const self = module.exports = {
                 // prepare the payload and include the variant spec data as well
                 let payload = Object.assign({ title: newName }, variantFilter);
                 return slideDB.updateSlideNode(slideNode, payload, userId).then((newSlideRef) => {
-                    // TODO revise this weird API response
-                    // this is to keep the API intact as much as possible
-                    return slideDB.get(newSlideRef.id).then((updatedSlide) => {
-                        // prepare the updatedSlide response object
-                        // updatedSlide.revisions = updatedSlide.revisions.slice(-1);
-                        updatedSlide.revisions = [_.find(updatedSlide.revisions, { id: newSlideRef.revision })];
-
+                    return slideDB.getSlideRevision(util.toIdentifier(newSlideRef)).then((updatedSlide) => {
                         // create thumbnail for the new slide revision
-                        let content = updatedSlide.revisions[0].content;
+                        let content = updatedSlide.content;
                         let newSlideId = util.toIdentifier(newSlideRef);
                         fileService.createThumbnail(content, newSlideId, newSlideRef.theme).catch((err) => {
                             console.warn(`could not create thumbnail for renamed slide ${newSlideId}, error was: ${err.message}`);
                         });
 
-                        // TODO might also need to create a thumbnail
                         reply(updatedSlide);
                     });
                 });
