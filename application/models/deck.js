@@ -55,6 +55,11 @@ const trackedDeckRevisionProperties = {
             },
         },
     },
+
+    allowMarkdown: {
+        type: 'boolean'
+    },
+
 };
 
 const contributor = {
@@ -199,9 +204,6 @@ const deckRevision = {
             type: 'number'
         },
         visibility: {
-            type: 'boolean'
-        },
-        allowMarkdown: {
             type: 'boolean'
         },
         translation: {
