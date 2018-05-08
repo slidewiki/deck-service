@@ -431,28 +431,6 @@ module.exports = function(server) {
     });
 
     server.route({
-        method: 'PUT',
-        path: '/deck/{id}/translate',
-        handler: handlers.translateDeckRevision,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string()
-                },
-                payload: Joi.object().keys({
-                    language: Joi.string(),
-                }).requiredKeys('language'),
-                headers: Joi.object({
-                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
-                }).unknown(),
-            },
-            tags: ['api'],
-            auth: 'jwt',
-            description:'Translate a deck and store as a new fork'
-        }
-    });
-
-    server.route({
         method: 'GET',
         path: '/deck/{id}/revisions',
         handler: handlers.getDeckRevisions,

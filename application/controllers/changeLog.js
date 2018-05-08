@@ -155,7 +155,7 @@ function prepareChangeLog(changeLog, simplifyOutput) {
             cur.path = formatPath(cur.path);
             if (cur.from) cur.from = formatPath(cur.from);
 
-            if (['fork', 'attach', 'translate'].includes(cur.action)) cur.forkOf = util.toIdentifier(cur.value.origin);
+            if (['fork', 'attach'].includes(cur.action)) cur.forkOf = util.toIdentifier(cur.value.origin);
 
             // format node updates
             if (cur.value) cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;

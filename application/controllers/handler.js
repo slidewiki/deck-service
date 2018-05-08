@@ -632,28 +632,6 @@ let self = module.exports = {
 
     },
 
-    translateDeckRevision: function(request, reply) {
-        let deckId = request.params.id;
-        let userId = request.auth.credentials.userid;
-
-        return deckDB.forkAllowed(deckId, userId)
-        .then((forkAllowed) => {
-            if (!forkAllowed) {
-                return reply(boom.forbidden());
-            }
-
-            return deckDB.translateDeckRevision(deckId, userId, request.payload.language).then((id_map) => {
-                //We must iterate through all objects in the decktree of the fork and translate each one
-                reply(id_map);
-            });
-
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
-        });
-
-    },
-
     // simply creates a new deck revision without updating anything
     createDeckRevision: function(request, reply) {
         let userId = request.auth.credentials.userid;

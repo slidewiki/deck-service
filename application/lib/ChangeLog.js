@@ -456,12 +456,9 @@ function fillDeckInfo(deckChanges) {
                     rec.value.ref.title = after.title;
 
                     // check for fork information in add ops
-                    let origin = ['fork', 'attach', 'translate'].includes(rec.action) && deck.origin;
+                    let origin = ['fork', 'attach'].includes(rec.action) && deck.origin;
                     if (origin) {
                         rec.value.origin = origin;
-                        if (rec.action === 'translate') {
-                            rec.translatedTo = deck.language;
-                        }
                     }
 
                     if (rec.oldValue) {

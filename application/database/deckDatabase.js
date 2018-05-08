@@ -1816,13 +1816,13 @@ let self = module.exports = {
     },
 
     // we guard the fork deck revision method against abuse, by checking for change logs of one
-    forkDeckRevision(deck_id, user, forAttach, languageToTranslate) {
+    forkDeckRevision(deck_id, user, forAttach) {
         let deck = util.parseIdentifier(deck_id);
         return self.get(deck.id).then((existingDeck) => {
             let [latestRevision] = existingDeck.revisions.slice(-1);
             if (deck.revision && latestRevision.id !== deck.revision) {
                 // we want to fork a read-only revision, all's well
-                return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate);
+                return self._forkDeckRevision(deck_id, user, forAttach);
             } else {
                 // make the deck id canonical just in case
                 deck.revision = latestRevision.id;
@@ -1833,10 +1833,10 @@ let self = module.exports = {
                 if (counts[deck.revision] === 1) {
                     // we want to fork a fresh revision, let's fork the one before it
                     console.log(`forking ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
-                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach, languageToTranslate);
+                    return self._forkDeckRevision(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach);
                 } else {
                     // unknown revision, old deck without changelog, or a revision with changes, just fork it!
-                    return self._forkDeckRevision(deck_id, user, forAttach, languageToTranslate);
+                    return self._forkDeckRevision(deck_id, user, forAttach);
                 }
             });
         });
@@ -1844,8 +1844,7 @@ let self = module.exports = {
 
     // forks a given deck revision by copying all of its sub-decks into new decks
     // forAttach is true when forking is done during deck attach process
-    // languageToTranslate, if set, will result in creating a deck translation (subtype of fork)
-    _forkDeckRevision(deck_id, user, forAttach, languageToTranslate) {
+    _forkDeckRevision(deck_id, user, forAttach) {
 
         return self.getFlatDecks(deck_id)
         .then((res) => {
@@ -1920,11 +1919,6 @@ let self = module.exports = {
                                     copiedDeck.slideDimensions = found.slideDimensions;
                                 }
 
-                                // set the fork origin kind to 'translation' if language is also set
-                                if (languageToTranslate) {
-                                    copiedDeck.origin.kind = 'translation';
-                                }
-
                                 let now = new Date();
                                 let timestamp = now.toISOString();
                                 copiedDeck.timestamp = timestamp;
@@ -1952,15 +1946,12 @@ let self = module.exports = {
                                 delete copiedDeck.revisions[0].isFeatured;
 
                                 let contentItemsMap = {};
-                                // HACK to combine both translating and non-translating code
-                                let contentItemsToTranslate = languageToTranslate ? copiedDeck.revisions[0].contentItems : [];
+                                let contentItemsToCopy = []; // copiedDeck.revisions[0].contentItems;
 
-                                // console.log('before loop for content items');
-                                async.eachSeries(contentItemsToTranslate, (nextSlide, doneTranslation) => {
-                                    if (nextSlide.kind !== 'slide') return doneTranslation();
+                                async.eachSeries(contentItemsToCopy, (nextSlide, doneSlideCopy) => {
+                                    if (nextSlide.kind !== 'slide') return doneSlideCopy();
 
-                                    //console.log('NEXT SLIDE', nextSlide);
-                                    //we have to copy the slide, not like when forking
+                                    // let's copy the slide
                                     let root_deck_path = [copiedDeck._id, '1'];
                                     helper.connectToDatabase().then((db) => {
                                         return helper.getNextIncrementationValueForCollection(db, 'slides').then((newSlideId) => {
@@ -1968,75 +1959,58 @@ let self = module.exports = {
                                                 return slides.findOne({_id: nextSlide.ref.id}).then((slide) => {
                                                     // TODO
                                                     let slideRevisionIndex = nextSlide.ref.revision - 1;
-                                                    slide.revisions = [slide.revisions[slideRevisionIndex]];
+                                                    let sourceRevision = slide.revisions[slideRevisionIndex];
+                                                    slide.revisions = [sourceRevision];
 
                                                     contentItemsMap[slide._id] = newSlideId;
                                                     slide_id_map[slide._id] = newSlideId;
-
+                                                    
                                                     let oldSlideId = slide._id;
                                                     slide._id = newSlideId;
+                                                    sourceRevision.parent = {
+                                                        id: oldSlideId,
+                                                        revision: sourceRevision.id,
+                                                        // TODO check these out
+                                                        title: sourceRevision.title,
+                                                        user: sourceRevision.user,
+                                                    };
+                                                    sourceRevision.id = 1;
 
-                                                    //slide.translated_from =
-                                                    return translationService.translateSlide(oldSlideId, languageToTranslate, copiedDeck.user).then((translated) => {
-                                                        //console.log('SLIDE response', original);
-                                                        if (translated.error) {
-                                                            //console.log(original);
+                                                    slide.user = parseInt(user);
+                                                    sourceRevision.user = parseInt(user);
 
-                                                            // TODO WAT
-                                                            return {};
-                                                        }
-
-                                                        //Change usage of slide
-                                                        for(let i = 0; i < slide.revisions[0].usage.length; i++){
-                                                            for(let j in id_map){
-                                                                if(id_map.hasOwnProperty(j) && slide.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                                                    slide.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
-                                                                    slide.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
-                                                                }
+                                                    // Change usage of slide
+                                                    for(let i = 0; i < slide.revisions[0].usage.length; i++){
+                                                        for(let j in id_map){
+                                                            if(id_map.hasOwnProperty(j) && slide.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
+                                                                slide.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
+                                                                slide.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
                                                             }
                                                         }
-                                                        translated._id = newSlideId;
-                                                        translated.revisions[0].usage = slide.revisions[0].usage;
+                                                    }
 
-                                                        return slides.save(translated).then(() => {
-                                                            // update translations array
-                                                            let translations = [];
-                                                            if (!_.isEmpty(slide.translations)){
-                                                                translations = slide.translations;
-                                                                translations.push({'slide_id':slide._id, 'language': languageToTranslate});
-                                                            }else{
-                                                                translations.push({'slide_id':slide._id, 'language': languageToTranslate});
-                                                                translations.push({'slide_id':oldSlideId, 'language':slide.language});
-                                                            }
-
-                                                            // create the thumbnail
-                                                            let traslatedSlideId = `${translated._id}-1`;
-                                                            fileService.createThumbnail(translated.revisions[0].content, traslatedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
-                                                                console.warn(`could not create thumbnail for translation ${traslatedSlideId}, error was: ${err.message}`);
-                                                            });
-
-                                                            //filling in the translations array for all decks in the 'family'
-                                                            return self.updateTranslations('slide', translations);
+                                                    return slides.save(slide).then(() => {
+                                                        // create the thumbnail
+                                                        let copiedSlideId = `${newSlideId}-1`;
+                                                        fileService.createThumbnail(slide.revisions[0].content, copiedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
+                                                            console.warn(`could not create thumbnail for translation ${copiedSlideId}, error was: ${err.message}`);
                                                         });
-
-                                                    }).then(() => {
-                                                        // everything was a success!
 
                                                         //console.log('contentItemsMap', contentItemsMap);
                                                         //console.log('copiedDeck', copiedDeck);
-                                                        for(let i = 0; i < contentItemsToTranslate.length; i++){
-                                                            if(contentItemsToTranslate[i].ref.id === oldSlideId){
-                                                                contentItemsToTranslate[i].ref.id = newSlideId;
-                                                                contentItemsToTranslate[i].ref.revision = 1;
+                                                        for(let i = 0; i < contentItemsToCopy.length; i++){
+                                                            if(contentItemsToCopy[i].ref.id === oldSlideId){
+                                                                contentItemsToCopy[i].ref.id = newSlideId;
+                                                                contentItemsToCopy[i].ref.revision = 1;
                                                             }
                                                         }
 
-                                                        doneTranslation();
+                                                        doneSlideCopy();
                                                     });
                                                 });
                                             });
                                         });
-                                    }).catch(doneTranslation); // catch ANY error
+                                    }).catch(doneSlideCopy); // catch ANY error
 
                                 }, (err) => {
                                     if (err) {
@@ -2074,47 +2048,10 @@ let self = module.exports = {
                                         }
                                     }
 
-                                    if (languageToTranslate) {
-                                        // translate copiedDeck
-                                        translationService.translateDeck(found._id, languageToTranslate, copiedDeck.user)
-                                        .then((original) => {
-                                            // console.log('response', original);
-                                            if (original.error) {
-                                                // console.log(original);
-                                                // TODO WAT
-                                                return {};
-                                            }
-
-                                            copiedDeck.revisions[0].title = original.revisions[0].title;
-                                            copiedDeck.description = original.description;
-                                            let original_language = copiedDeck.language;
-                                            copiedDeck.language = languageToTranslate;
-                                            copiedDeck.revisions[0].language = languageToTranslate;
-                                            new_decks.push(copiedDeck);
-
-                                            return col.insertOne(copiedDeck).then(() => {
-                                                let translations = [];
-                                                if (!_.isEmpty(copiedDeck.translations)) {
-                                                    translations = copiedDeck.translations;
-                                                    translations.push({'deck_id':copiedDeck._id, 'language': languageToTranslate});//filling in the translations array for all decks in the 'family'
-                                                }else{
-                                                    translations.push({'deck_id':copiedDeck._id, 'language': languageToTranslate});
-                                                    translations.push({'deck_id':original._id, 'language': original_language});
-                                                }
-
-                                                return self.updateTranslations('deck', translations);
-                                            });
-
-                                        }).then(() => {
-                                            callback();
-                                        }).catch(callback);
-
-                                    } else {
-                                        new_decks.push(copiedDeck);
-                                        return col.insertOne(copiedDeck).then(() => {
-                                            callback();
-                                        }).catch(callback);
-                                    }
+                                    new_decks.push(copiedDeck);
+                                    return col.insertOne(copiedDeck).then(() => {
+                                        callback();
+                                    }).catch(callback);
 
                                 });
 
@@ -2129,8 +2066,7 @@ let self = module.exports = {
                             if (!forAttach) {
                                 // if not attaching, we need to track stuff here
                                 let rootDeckId = id_map[res.id];
-                                let forkType = languageToTranslate ? 'translate' : 'fork';
-                                self._trackDecksForked(rootDeckId, id_map, user, forkType);
+                                self._trackDecksForked(rootDeckId, id_map, user, 'fork');
                             }
 
                             resolve({'root_deck': id_map[res.id], 'id_map': id_map});
@@ -2263,12 +2199,6 @@ let self = module.exports = {
             });
         }
 
-    },
-
-    // forks a given deck revision by copying all of its sub-decks into new decks
-    translateDeckRevision(deck_id, user, language) {
-        // forAttach=false as it is never used when attaching existing subdecks
-        return self.forkDeckRevision(deck_id, user, false, language);
     },
 
     getDeckVariants: async function(deckId) {
