@@ -432,36 +432,8 @@ const self = module.exports = {
     },
 
     // recursively copies the deck revision tree
-    _copyDeckTree: async function(deckId, userId) {
+    _copyDeckTree: async function(deckId, userId, parentDeckId) {
         let originDeck = await deckDB.getDeck(deckId);
-
-        // we need to recursively copy its subdecks first!
-        // in this we are going to collect the subdeck id replacements taking place
-        let copiedIdsMap = {};
-        for (let item of originDeck.contentItems) {
-            let itemId = util.toIdentifier(item.ref);
-            let newItemRef;
-            if (item.kind === 'slide') {
-                // TODO copy this as well ??
-                continue;
-
-                // // let's copy the slide
-                // let slide = await slideDB.getSlideRevision(itemId);
-                // let inserted = await slideDB.copy(slide, copiedDeckId, userId);
-                // newItemRef = { id: inserted.ops[0]._id, revision: 1 };
-
-                // // TODO create the thumbnail
-            } else {
-                // subdecks
-                let copyResult = await self._copyDeckTree(itemId, userId);
-                newItemRef = copyResult.newDeckRef;
-                // also collect the id replacements from inner copy tree process
-                Object.assign(copiedIdsMap, copyResult.copiedIdsMap);
-            }
-
-            // replace item ref with copy
-            Object.assign(item.ref, newItemRef);
-        }
 
         // create a copy based on original deck data
         let newDeck = _.pick(originDeck, [
@@ -472,7 +444,6 @@ const self = module.exports = {
             'tags',
 
             'variants',
-            'contentItems',
 
             'theme',
             'slideDimensions',
@@ -488,24 +459,77 @@ const self = module.exports = {
                 'title',
                 'user',
             ]),
-            // root_deck: parentDeckId,
+            root_deck: parentDeckId, // could be nothing
         });
 
-        return deckDB.insert(newDeck).then((inserted) => {
-            // the new deck reference
-            let newDeckRef = {
-                id: inserted.ops[0]._id,
-                revision: 1,
-            };
-            // include the replacement that just took place
-            copiedIdsMap[deckId] = util.toIdentifier(newDeckRef);
+        let inserted = await deckDB.insert(newDeck);
+        // create the new deck reference
+        let newDeckRef = {
+            id: inserted.ops[0]._id,
+            revision: 1,
+        };
 
-            // return the new deck reference and the replacements
-            return {
-                newDeckRef,
-                copiedIdsMap,
-            };
-        });
+        // now that we have the new deck id, we can properly handle attach the content items
+        // we will also recursively copy its subdecks and collect the replacements taking place
+        let copiedIdsMap = {};
+        for (let item of originDeck.contentItems) {
+            let itemId = util.toIdentifier(item.ref);
+            let newItemRef;
+            if (item.kind === 'slide') {
+                // TODO copy slides as well ??
+                let keepSlides = true;
+                if (keepSlides) {
+                    // we are keeping the same slide, but need to update its usage to include the new parent deck
+                    let slides = await helper.getCollection('slides');
+                    await slides.findOneAndUpdate(
+                        { _id: item.ref.id, 'revisions.id': item.ref.revision },
+                        { $push: { 'revisions.$.usage': newDeckRef } }
+                    );
+                    continue;
+                } else {
+                    // let's copy the slide as well
+                    let slide = await slideDB.getSlideRevision(itemId);
+                    let inserted = await slideDB.copy(slide, util.toIdentifier(newDeckRef), userId);
+                    inserted = inserted.ops[0];
+
+                    newItemRef = { id: inserted._id, revision: 1 };
+
+                    // TODO create the thumbnail
+                    let copiedSlideId = util.toIdentifier(newItemRef);
+                    fileService.createThumbnail(inserted.revisions[0].content, copiedSlideId, newDeck.theme).catch((err) => {
+                        console.warn(`could not create thumbnail for slide ${copiedSlideId}, error was: ${err.message}`);
+                    });
+                }
+
+            } else {
+                // subdecks
+                let copyResult = await self._copyDeckTree(itemId, userId, util.toIdentifier(newDeckRef));
+                newItemRef = copyResult.newDeckRef;
+                // also collect the id replacements from inner copy tree process
+                Object.assign(copiedIdsMap, copyResult.copiedIdsMap);
+            }
+
+            // replace item ref with copy
+            Object.assign(item.ref, newItemRef);
+        }
+
+        // finished, now we directly attach the contentItems
+        let decks = await helper.getCollection('decks');
+        // we need to wait before response
+        await decks.findOneAndUpdate(
+            { _id: newDeckRef.id },
+            { $set: { 'revisions.0.contentItems': originDeck.contentItems } }
+        );
+
+        // also add the new reference in the replacements map
+        copiedIdsMap[deckId] = util.toIdentifier(newDeckRef);
+
+        // return both the new deck and the replacements
+        return {
+            newDeckRef,
+            copiedIdsMap,
+        };
+
     },
 
 };
