@@ -473,9 +473,15 @@ let self = module.exports = {
                     throw new Error(JSON.stringify(validateDeck.errors));
                 }
 
+                let trackNewDeck = true;
+                if (deck.origin || deck.root_deck) {
+                    // it's a copy or a new subdeck, don't track it!
+                    trackNewDeck = false;
+                }
+
                 return col.insertOne(convertedDeck).then((result) => {
                     // the deck.root_deck means we are adding a subdeck to that deck
-                    if (!deck.root_deck) {
+                    if (trackNewDeck) {
                         // also track in change log, but only if it's not a subdeck
                         ChangeLog.trackDeckCreated(convertedDeck._id, convertedDeck.user);
                     }
@@ -3221,7 +3227,8 @@ function convertToNewDeck(deck){
             comment: deck.comment,
             abstract: deck.abstract,
             footer: deck.footer,
-            contentItems: [],
+            contentItems: deck.contentItems || [],
+            variants: deck.variants || [],
             theme: deck.theme,
             allowMarkdown: deck.allowMarkdown
         }]
@@ -3229,6 +3236,10 @@ function convertToNewDeck(deck){
 
     if (deck.slideDimensions) {
         result.slideDimensions = deck.slideDimensions;
+    }
+
+    if (deck.origin) {
+        result.origin = deck.origin;
     }
 
     return result;

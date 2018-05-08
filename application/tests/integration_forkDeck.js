@@ -81,6 +81,7 @@ describe('REST API', () => {
                 payload: {
                     title: 'new deck',
                     hidden: false,
+                    language: 'en_GB',
                 },
                 headers: {
                     'Content-Type': 'application/json',

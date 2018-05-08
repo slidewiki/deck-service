@@ -128,14 +128,14 @@ const self = module.exports = {
     },
 
     // we guard the copy deck revision tree method against abuse, by checking for change logs of one
-    copyDeckTree: async function(deckId, user, forAttach) {
+    copyDeckTreeOld: async function(deckId, user, forAttach) {
         let deck = util.parseIdentifier(deckId);
         let existingDeck = await deckDB.get(deck.id);
 
         let [latestRevision] = existingDeck.revisions.slice(-1);
         if (deck.revision && latestRevision.id !== deck.revision) {
             // we want to fork a read-only revision, all's well
-            return self._copyDeckTree(deckId, user, forAttach);
+            return self._copyDeckTreeOld(deckId, user, forAttach);
         } else {
             // make the deck id canonical just in case
             deck.revision = latestRevision.id;
@@ -146,17 +146,17 @@ const self = module.exports = {
         if (counts[deck.revision] === 1) {
             // we want to fork a fresh revision, let's fork the one before it
             console.log(`forking ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
-            return self._copyDeckTree(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach);
+            return self._copyDeckTreeOld(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach);
         } else {
             // unknown revision, old deck without changelog, or a revision with changes, just fork it!
-            return self._copyDeckTree(deckId, user, forAttach);
+            return self._copyDeckTreeOld(deckId, user, forAttach);
         }
 
     },
 
     // copies a given deck revision tree by copying all of its sub-decks into new decks
     // forAttach is true when forking is done during deck attach process
-    _copyDeckTree: async function(deckId, user, forAttach) {
+    _copyDeckTreeOld: async function(deckId, user, forAttach) {
         let res = await deckDB.getFlatDecks(deckId);
 
         // we have a flat sub-deck structure
@@ -363,6 +363,149 @@ const self = module.exports = {
 
         // return the same result
         return forkResult;
+    },
+
+    // we guard the copy deck revision tree method against abuse, by checking for change logs of one
+    copyDeckTree: async function(deckId, userId, forAttach) {
+        let deck = util.parseIdentifier(deckId);
+        let latestRevision = await deckDB.getLatestRevision(deck.id);
+
+        // this flag will determine if we need to revise the deck tree after copying is complete
+        // we only need to do this if we are copying the latest revision of a deck
+        let reviseAfterCopy = false;
+
+        // make the deck id canonical 
+        if (!deck.revision) {
+            deck.revision = latestRevision;
+        }
+        // figure out which revision we indeed need to copy
+        if (deck.revision === latestRevision) {
+            // before we copy it, let's check if it's a fresh revision
+            let counts = await deckDB.getChangesCounts(deck.id);
+            if (counts[deck.revision] === 1) {
+                // we want to copy a fresh revision, let's copy the one before it
+                console.log(`copying ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
+                deck.revision = deck.revision - 1;
+            } else {
+                // unknown revision, old deck without changelog, or a revision with changes
+                // we will copy it as is, but we also need to revise it afterwards
+                reviseAfterCopy = true;
+            } 
+        }
+
+        // rebuild the final deckId
+        deckId = util.toIdentifier(deck);
+
+        let {newDeckRef, copiedIdsMap} = await self._copyDeckTree(deckId, userId);
+        let rootDeckId = util.toIdentifier(newDeckRef);
+
+        if (!forAttach) {
+            // if not attaching, we need to track stuff here
+            // TODO wait for it ?
+            deckDB._trackDecksForked(rootDeckId, copiedIdsMap, userId, 'fork');
+        } // TODO ELSE ????
+
+        if (reviseAfterCopy) {
+            // after forking the deck and if the revision we forked is the latest,
+            // we create a new revision for the original deck;
+            // this way the fork points to a read-only revision
+
+            // this is an automatic revision, the user should be 'system'
+            // deck autorevision is created with same deck as root
+            let updatedDeck = await deckDB.createDeckRevision(deck.id, -1, deck.id);
+
+            // we need to update all parents of the deck to keep them updated
+            // with the latest revision we have just created now
+            let usage = await deckDB.getUsage(deckId);
+            // if a deck has no roots, itself is the root
+            console.log(`updating deck revision used for ${deck.id} in ${usage.length} parent decks`);
+
+            for (let parentDeck of usage) {
+                // citem, revertedRevId, root_deck, ckind, user, top_root_deck, parentOperations
+                let parentDeckId = util.toIdentifier(parentDeck);
+                await deckDB.updateContentItem(updatedDeck, '', parentDeckId, 'deck', -1, parentDeckId);
+            }
+        }
+
+        // keep the API intact for now
+        return { root_deck: rootDeckId, id_map: copiedIdsMap };
+    },
+
+    // recursively copies the deck revision tree
+    _copyDeckTree: async function(deckId, userId) {
+        let originDeck = await deckDB.getDeck(deckId);
+
+        // we need to recursively copy its subdecks first!
+        // in this we are going to collect the subdeck id replacements taking place
+        let copiedIdsMap = {};
+        for (let item of originDeck.contentItems) {
+            let itemId = util.toIdentifier(item.ref);
+            let newItemRef;
+            if (item.kind === 'slide') {
+                // TODO copy this as well ??
+                continue;
+
+                // // let's copy the slide
+                // let slide = await slideDB.getSlideRevision(itemId);
+                // let inserted = await slideDB.copy(slide, copiedDeckId, userId);
+                // newItemRef = { id: inserted.ops[0]._id, revision: 1 };
+
+                // // TODO create the thumbnail
+            } else {
+                // subdecks
+                let copyResult = await self._copyDeckTree(itemId, userId);
+                newItemRef = copyResult.newDeckRef;
+                // also collect the id replacements from inner copy tree process
+                Object.assign(copiedIdsMap, copyResult.copiedIdsMap);
+            }
+
+            // replace item ref with copy
+            Object.assign(item.ref, newItemRef);
+        }
+
+        // create a copy based on original deck data
+        let newDeck = _.pick(originDeck, [
+            'title',
+            'description',
+            'language',
+            'license',
+            'tags',
+
+            'variants',
+            'contentItems',
+
+            'theme',
+            'slideDimensions',
+            'allowMarkdown',
+        ]);
+
+        // assign metadata
+        Object.assign(newDeck, {
+            user: userId,
+            origin: _.pick(originDeck, [
+                'id',
+                'revision',
+                'title',
+                'user',
+            ]),
+            // root_deck: parentDeckId,
+        });
+
+        return deckDB.insert(newDeck).then((inserted) => {
+            // the new deck reference
+            let newDeckRef = {
+                id: inserted.ops[0]._id,
+                revision: 1,
+            };
+            // include the replacement that just took place
+            copiedIdsMap[deckId] = util.toIdentifier(newDeckRef);
+
+            // return the new deck reference and the replacements
+            return {
+                newDeckRef,
+                copiedIdsMap,
+            };
+        });
     },
 
 };
