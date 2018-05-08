@@ -211,7 +211,33 @@ let self = module.exports = {
         };
     },
 
-    copy: function(slide, slideRevision){
+    // creates a duplicate of the slide
+    copy: async function(originalSlide, parentDeckId, userId) {
+        // create a copy based on original slide data
+        let newSlide = _.pick(originalSlide, [
+            'title',
+            'content',
+            'markdown',
+            'license',
+            'speakernotes',
+            'dimensions',
+            'language',
+        ]);
+
+        // assign metadata
+        Object.assign(newSlide, {
+            user: userId,
+            root_deck: parentDeckId,
+            comment: `Duplicate slide of ${util.toIdentifier(originalSlide)}`,
+            // used internally
+            parent_slide: _.pick(originalSlide, 'id', 'revision'),
+        });
+
+        return self.insert(newSlide);
+    },
+
+    // DEPRECATED
+    _copy: function(slide, slideRevision){
         return helper.connectToDatabase()
         .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
         .then((newId) => {

@@ -838,7 +838,7 @@ let self = module.exports = {
                         duplicateSlide.parent = request.payload.nodeSpec.id;
                         duplicateSlide.comment = 'Duplicate slide of ' + request.payload.nodeSpec.id;
                         //copy the slide to a new duplicate
-                        slideDB.copy(duplicateSlide, slideRevision)
+                        slideDB._copy(duplicateSlide, slideRevision)
                         .then((insertedDuplicate) => {
                             insertedDuplicate = insertedDuplicate.ops[0];
                             insertedDuplicate.id = insertedDuplicate._id;

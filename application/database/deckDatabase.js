@@ -1946,69 +1946,45 @@ let self = module.exports = {
                                 delete copiedDeck.revisions[0].isFeatured;
 
                                 let contentItemsMap = {};
-                                let contentItemsToCopy = []; // copiedDeck.revisions[0].contentItems;
+                                let contentItemsToCopy = []; // TODO for now disable copying slides as well // copiedDeck.revisions[0].contentItems;
+                                let copiedDeckId = util.toIdentifier({id: copiedDeck._id, revision: 1});
 
+                                // TODO remove this circular reference
+                                let slideDB = require('./slideDatabase');
                                 async.eachSeries(contentItemsToCopy, (nextSlide, doneSlideCopy) => {
                                     if (nextSlide.kind !== 'slide') return doneSlideCopy();
 
                                     // let's copy the slide
-                                    let root_deck_path = [copiedDeck._id, '1'];
-                                    helper.connectToDatabase().then((db) => {
-                                        return helper.getNextIncrementationValueForCollection(db, 'slides').then((newSlideId) => {
-                                            return helper.getCollection('slides').then((slides) => {
-                                                return slides.findOne({_id: nextSlide.ref.id}).then((slide) => {
-                                                    // TODO
-                                                    let slideRevisionIndex = nextSlide.ref.revision - 1;
-                                                    let sourceRevision = slide.revisions[slideRevisionIndex];
-                                                    slide.revisions = [sourceRevision];
+                                    return helper.getCollection('slides').then((slides) => {
+                                        return slides.findOne({_id: nextSlide.ref.id}).then((slide) => {
+                                            let oldSlideId = slide._id;
+                                            let sourceRevision = _.find(slide.revisions, { id: nextSlide.ref.revision });
+                                            let newSlide = Object.assign({}, slide, sourceRevision, { id: slide._id, revision: sourceRevision.id });
+                                            return slideDB.copy(newSlide, copiedDeckId, parseInt(user)).then((inserted) => {
+                                                inserted = inserted.ops[0];
 
-                                                    contentItemsMap[slide._id] = newSlideId;
-                                                    slide_id_map[slide._id] = newSlideId;
-                                                    
-                                                    let oldSlideId = slide._id;
-                                                    slide._id = newSlideId;
-                                                    sourceRevision.parent = {
-                                                        id: oldSlideId,
-                                                        revision: sourceRevision.id,
-                                                        // TODO check these out
-                                                        title: sourceRevision.title,
-                                                        user: sourceRevision.user,
-                                                    };
-                                                    sourceRevision.id = 1;
+                                                let newSlideId = inserted._id;
+                                                contentItemsMap[oldSlideId] = newSlideId;
+                                                slide_id_map[oldSlideId] = newSlideId;
 
-                                                    slide.user = parseInt(user);
-                                                    sourceRevision.user = parseInt(user);
-
-                                                    // Change usage of slide
-                                                    for(let i = 0; i < slide.revisions[0].usage.length; i++){
-                                                        for(let j in id_map){
-                                                            if(id_map.hasOwnProperty(j) && slide.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                                                                slide.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
-                                                                slide.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
-                                                            }
-                                                        }
-                                                    }
-
-                                                    return slides.save(slide).then(() => {
-                                                        // create the thumbnail
-                                                        let copiedSlideId = `${newSlideId}-1`;
-                                                        fileService.createThumbnail(slide.revisions[0].content, copiedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
-                                                            console.warn(`could not create thumbnail for translation ${copiedSlideId}, error was: ${err.message}`);
-                                                        });
-
-                                                        //console.log('contentItemsMap', contentItemsMap);
-                                                        //console.log('copiedDeck', copiedDeck);
-                                                        for(let i = 0; i < contentItemsToCopy.length; i++){
-                                                            if(contentItemsToCopy[i].ref.id === oldSlideId){
-                                                                contentItemsToCopy[i].ref.id = newSlideId;
-                                                                contentItemsToCopy[i].ref.revision = 1;
-                                                            }
-                                                        }
-
-                                                        doneSlideCopy();
-                                                    });
+                                                // create the thumbnail
+                                                let copiedSlideId = `${newSlideId}-1`;
+                                                fileService.createThumbnail(inserted.revisions[0].content, copiedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
+                                                    console.warn(`could not create thumbnail for translation ${copiedSlideId}, error was: ${err.message}`);
                                                 });
+
+                                                //console.log('contentItemsMap', contentItemsMap);
+                                                //console.log('copiedDeck', copiedDeck);
+                                                for(let i = 0; i < contentItemsToCopy.length; i++){
+                                                    if(contentItemsToCopy[i].ref.id === oldSlideId){
+                                                        contentItemsToCopy[i].ref.id = newSlideId;
+                                                        contentItemsToCopy[i].ref.revision = 1;
+                                                    }
+                                                }
+
+                                                doneSlideCopy();
                                             });
+
                                         });
                                     }).catch(doneSlideCopy); // catch ANY error
 

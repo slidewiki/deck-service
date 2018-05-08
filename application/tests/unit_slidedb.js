@@ -192,7 +192,7 @@ describe('Database', () => {
                 root_deck: '25-1'
             };
             let ins = db.insert(slide);
-            let res = ins.then((ins) => {ins.ops[0].parent = ins.ops[0]._id+'-1'; return db.copy(ins.ops[0], 0);});
+            let res = ins.then((ins) => {ins.ops[0].parent = ins.ops[0]._id+'-1'; return db._copy(ins.ops[0], 0);});
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
