@@ -144,7 +144,7 @@ let self = module.exports = {
                     throw new Error(JSON.stringify(slideModel.errors));
                 }
 
-                return slides.insertOne(convertedSlide);
+                return slides.insertOne(convertedSlide).then((result) => result.ops[0]);
             });
         });
     },
@@ -666,7 +666,7 @@ let self = module.exports = {
 
         let inserted = await self.insert(newSlide);
         let newVariant = {
-            id: inserted.ops[0]._id,
+            id: inserted._id,
             revision: 1, // brand new!
             language: variantData.language,
         };

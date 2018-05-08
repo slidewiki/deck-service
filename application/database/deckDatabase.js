@@ -485,7 +485,8 @@ let self = module.exports = {
                         // also track in change log, but only if it's not a subdeck
                         ChangeLog.trackDeckCreated(convertedDeck._id, convertedDeck.user);
                     }
-                    return result;
+                    // just added this one deck
+                    return result.ops[0];
                 });
             });
         });
@@ -1980,8 +1981,6 @@ let self = module.exports = {
                                             let sourceRevision = _.find(slide.revisions, { id: nextSlide.ref.revision });
                                             let newSlide = Object.assign({}, slide, sourceRevision, { id: slide._id, revision: sourceRevision.id });
                                             return slideDB.copy(newSlide, copiedDeckId, parseInt(user)).then((inserted) => {
-                                                inserted = inserted.ops[0];
-
                                                 let newSlideId = inserted._id;
                                                 contentItemsMap[oldSlideId] = newSlideId;
                                                 slide_id_map[oldSlideId] = newSlideId;

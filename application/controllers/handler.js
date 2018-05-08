@@ -91,12 +91,12 @@ let self = module.exports = {
             // empty results means something wrong with the payload
             if (!inserted) return reply(boom.badData());
 
-            let createdSlide = co.rewriteID(inserted.ops[0]);
+            let createdSlide = co.rewriteID(inserted);
 
             // create thumbnail from the newly created slide revision
             let content = createdSlide.revisions[0].content, slideId = createdSlide.id+'-'+1;
             if (content === '') {
-                // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                // content = '<h2>'+inserted.revisions[0].title+'</h2>';
                 // TODO for now we use hardcoded template for new slides
                 content = slidetemplate;
             }
@@ -432,7 +432,7 @@ let self = module.exports = {
             // empty results means something wrong with the payload
             if (!inserted) return reply(boom.badData());
 
-            if (co.isEmpty(inserted.ops) || co.isEmpty(inserted.ops[0]))
+            if (co.isEmpty(inserted))
                 throw inserted;
             else{
                 //create a new slide inside the new deck
@@ -442,8 +442,8 @@ let self = module.exports = {
                     'markdown': '',
                     'language': request.payload.language,
                     'license': request.payload.license,
-                    'user': inserted.ops[0].user,
-                    'root_deck': String(inserted.ops[0]._id)+'-1',
+                    'user': inserted.user,
+                    'root_deck': String(inserted._id)+'-1',
                     'position' : 1
                 };
 
@@ -468,15 +468,15 @@ let self = module.exports = {
                 //insert the slide into the database
                 return slideDB.insert(newSlide)
                 .then((insertedSlide) => {
-                    insertedSlide.ops[0].id = insertedSlide.ops[0]._id;
+                    insertedSlide.id = insertedSlide._id;
                     //update the content items of the new deck to contain the new slide
                     // top root is the root_deck if missing from payload
                     let top_root_deck = request.payload.top_root_deck || newSlide.root_deck;
 
-                    return deckDB.insertNewContentItem(insertedSlide.ops[0], 0, newSlide.root_deck, 'slide', 1, newSlide.user, top_root_deck)
+                    return deckDB.insertNewContentItem(insertedSlide, 0, newSlide.root_deck, 'slide', 1, newSlide.user, top_root_deck)
                     .then((updatedDeckRevision) => {
                         //create the thumbnail for the new slide
-                        let content = newSlide.content, slideId = insertedSlide.ops[0].id+'-'+1;
+                        let content = newSlide.content, slideId = insertedSlide.id+'-'+1;
                         if(content === ''){
                             content = '<h2>'+newSlide.title+'</h2>';
                             //for now we use hardcoded template for new slides
@@ -487,7 +487,7 @@ let self = module.exports = {
                             request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
                         });
 
-                        reply(co.rewriteID(inserted.ops[0]));
+                        reply(co.rewriteID(inserted));
                     });
                 });
             }
@@ -960,7 +960,7 @@ let self = module.exports = {
                             // empty results means something wrong with the payload
                             if (!inserted) throw boom.badData();
 
-                            let createdSlide = co.rewriteID(inserted.ops[0]);
+                            let createdSlide = co.rewriteID(inserted);
 
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
 
@@ -972,7 +972,7 @@ let self = module.exports = {
                                 // create thumbnail from the newly created slide revision
                                 let content = createdSlide.revisions[0].content, slideId = createdSlide.id+'-'+1;
                                 if (content === '') {
-                                    // content = '<h2>'+inserted.ops[0].revisions[0].title+'</h2>';
+                                    // content = '<h2>'+inserted.revisions[0].title+'</h2>';
                                     // TODO for now we use hardcoded template for new slides
                                     content = slidetemplate;
                                 }

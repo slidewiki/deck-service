@@ -44,9 +44,9 @@ describe('Database', () => {
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.have.property('ops').that.is.not.empty,
-                //res.should.eventually.have.deep.property('ops[0]').that.has.all.keys('_id', 'language'),
-                //res.should.eventually.have.deep.property('ops[0].language', slide.language)
+                res.should.eventually.be.not.empty,
+                res.should.eventually.include.all.keys('_id', 'language'),
+                res.should.eventually.have.property('language', slide.language)
             ]);
         });
 
@@ -69,9 +69,8 @@ describe('Database', () => {
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.have.property('ops').that.is.not.empty,
-                //res.should.eventually.have.deep.property('ops[0]').that.has.all.keys('_id', 'user'),
-                //res.should.eventually.have.deep.property('ops[0]', _id)
+                res.should.eventually.be.not.empty,
+                res.should.eventually.include.all.keys('_id', 'user')
             ]);
         });
 
@@ -92,10 +91,10 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.get(ins.ops[0]._id));
+            let res = ins.then((ins) => deckdb.get(ins._id));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                //res.should.eventually.have.all.keys('_id', 'language'),
+                // res.should.eventually.include.all.keys('_id', 'language'),
                 res.should.eventually.have.property('user', deck.user)
             ]);
         });
@@ -110,15 +109,15 @@ describe('Database', () => {
                 root_deck: '1-1'
             };
             let ins = db.insert(slide);
-            let res = ins.then((ins) => db.get(ins.ops[0]._id));
+            let res = ins.then((ins) => db.get(ins._id));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                //res.should.eventually.have.all.keys('_id', 'language'),
+                res.should.eventually.include.all.keys('_id', 'language'),
                 res.should.eventually.have.property('language', slide.language)
             ]);
         });
 
-        it('should be able to replace an previously inserted slide', () => {
+        it('should be able to replace a previously inserted slide', () => {
             let slide = {
                 title: 'Dummy',
                 content: 'dummy',
@@ -136,12 +135,11 @@ describe('Database', () => {
                 root_deck: '1-1'
             };
             let ins = db.insert(slide);
-            let res = ins.then((ins) => db.replace(ins.ops[0]._id+'-1', slide2));
+            let res = ins.then((ins) => db.replace(ins._id+'-1', slide2));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('value').that.contains.all.keys('_id', 'language'),
                 //res.should.eventually.have.property('value').that.has.property('language', slide.language) // FIXME returns old object
-                //ins.then((slide) => res.should.eventually.have.deep.property('value._id', slide.ops[0]._id))//FIXME works, but fails because of .... santa
             ]);
         });
 
@@ -174,12 +172,11 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.update(ins.ops[0]._id+'-1', deck2));
+            let res = ins.then((ins) => deckdb.update(ins._id+'-1', deck2));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                //res.should.eventually.have.property('value').that.contains.all.keys('_id', 'language'),
+                //res.should.eventually.have.property('value').that.includes.all.keys('_id', 'language'),
                 //res.should.eventually.have.property('value').that.has.property('language', slide.language) // FIXME returns old object
-                //ins.then((slide) => res.should.eventually.have.deep.property('value._id', slide.ops[0]._id))//FIXME works, but fails because of .... santa
             ]);
         });
 
@@ -193,13 +190,12 @@ describe('Database', () => {
                 root_deck: '25-1'
             };
             let ins = db.insert(slide);
-            let res = ins.then((ins) => {ins.ops[0].parent = ins.ops[0]._id+'-1'; return db._copy(ins.ops[0], 0);});
+            let res = ins.then((ins) => {ins.parent = ins._id+'-1'; return db._copy(ins, 0);});
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.have.property('ops').that.is.not.empty,
-                //res.should.eventually.have.deep.property('ops[0]').that.has.all.keys('_id', 'language'),
-                //res.should.eventually.have.deep.property('ops[0].language', slide.language)
+                res.should.eventually.have.nested.property('ops[0]').that.includes.all.keys('_id', 'language'),
+                res.should.eventually.have.nested.property('ops[0].language', slide.language)
             ]);
         });
 
@@ -213,7 +209,7 @@ describe('Database', () => {
                 root_deck: '25-1'
             };
             let ins = db.insert(slide);
-            let res = ins.then((ins) => db.rename(ins.ops[0]._id+'-1', 'new name' ));
+            let res = ins.then((ins) => db.rename(ins._id+'-1', 'new name' ));
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
@@ -240,7 +236,7 @@ describe('Database', () => {
                 root_deck: '25-1'
             };
             let ins = db.insert(slide);
-            let ins2 = ins.then((ins) => db.replace(ins.ops[0]._id+'-1', slide2));
+            let ins2 = ins.then((ins) => db.replace(ins._id+'-1', slide2));
             let res = ins2.then((ins2) => db.updateUsage(ins2.value._id+'-1','2', '25-1' ));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
@@ -261,7 +257,7 @@ describe('Database', () => {
             let res = ins.then((ins) => {
                 let itemToAdd = {
                     ref: {
-                        id:ins.ops[0]._id,
+                        id:ins._id,
                         revision: 1
                     },
                     kind: 'slide'
@@ -289,13 +285,12 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.getDeckTreeFromDB(ins.ops[0]._id+'-1'));
+            let res = ins.then((ins) => deckdb.getDeckTreeFromDB(ins._id+'-1'));
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('title').that.is.not.empty,
-                //res.should.eventually.have.deep.property('ops[0]').that.has.all.keys('_id', 'user'),
-                //res.should.eventually.have.deep.property('ops[0]', _id)
+                //res.should.eventually.have.all.keys('_id', 'user')
             ]);
         });
 
@@ -315,12 +310,11 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.getActiveRevisionFromDB(ins.ops[0]._id+'-1'));
+            let res = ins.then((ins) => deckdb.getActiveRevisionFromDB(ins._id+'-1'));
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                //res.should.eventually.have.deep.property('ops[0]').that.has.all.keys('_id', 'user'),
-                //res.should.eventually.have.deep.property('ops[0]', _id)
+                //res.should.eventually.have.all.keys('_id', 'user'),
             ]);
         });
 
@@ -340,7 +334,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.rename(ins.ops[0]._id+'-1', 'new name'));
+            let res = ins.then((ins) => deckdb.rename(ins._id+'-1', 'new name'));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('value').that.is.not.empty
@@ -363,7 +357,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.insertNewContentItem({id: '1', revisions: [{},{},{user:2}]}, '2', ins.ops[0]._id+'-1', 'slide', '3'));
+            let res = ins.then((ins) => deckdb.insertNewContentItem({id: '1', revisions: [{},{},{user:2}]}, '2', ins._id+'-1', 'slide', '3'));
             return Promise.all([
                 res.should.be.fulfilled
             ]);
@@ -385,7 +379,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.getFlatDecks(ins.ops[0]._id+'-1'));
+            let res = ins.then((ins) => deckdb.getFlatDecks(ins._id+'-1'));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('title').that.is.not.empty,
@@ -408,7 +402,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.getFlatSlides(ins.ops[0]._id+'-1', undefined));
+            let res = ins.then((ins) => deckdb.getFlatSlides(ins._id+'-1', undefined));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('title').that.is.not.empty,
@@ -431,7 +425,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.getDeckEditors(ins.ops[0]._id+'-1'));
+            let res = ins.then((ins) => deckdb.getDeckEditors(ins._id+'-1'));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
             ]);
@@ -453,7 +447,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => treedb.copyDeckTree(ins.ops[0]._id+'-1', 1));
+            let res = ins.then((ins) => treedb.copyDeckTree(ins._id+'-1', 1));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('root_deck').that.is.not.empty,

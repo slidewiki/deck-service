@@ -262,7 +262,6 @@ const self = module.exports = {
                 let sourceRevision = _.find(slide.revisions, { id: nextSlide.ref.revision });
                 let newSlide = Object.assign({}, slide, sourceRevision, { id: slide._id, revision: sourceRevision.id });
                 let inserted = await slideDB.copy(newSlide, copiedDeckId, parseInt(user));
-                inserted = inserted.ops[0];
 
                 let newSlideId = inserted._id;
                 contentItemsMap[oldSlideId] = newSlideId;
@@ -465,7 +464,7 @@ const self = module.exports = {
         let inserted = await deckDB.insert(newDeck);
         // create the new deck reference
         let newDeckRef = {
-            id: inserted.ops[0]._id,
+            id: inserted._id,
             revision: 1,
         };
 
@@ -490,7 +489,6 @@ const self = module.exports = {
                     // let's copy the slide as well
                     let slide = await slideDB.getSlideRevision(itemId);
                     let inserted = await slideDB.copy(slide, util.toIdentifier(newDeckRef), userId);
-                    inserted = inserted.ops[0];
 
                     newItemRef = { id: inserted._id, revision: 1 };
 
