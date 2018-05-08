@@ -165,6 +165,7 @@ let self = module.exports = {
         let slideUpdate = _.pick(payload, [
             'title',
             'content',
+            'markdown',
             'license',
             'speakernotes',
             'dimensions',
@@ -274,14 +275,15 @@ let self = module.exports = {
     },
 
     replace: function(id, slide) {
-        let idArray = String(id).split('-');
-        if(idArray.length > 1){
-            id = idArray[0];
-        }
-        return helper.connectToDatabase()
-        .then((db) => db.collection('slides'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(id)})
+        return helper.getCollection('slides').then((col) => {
+            let idArray = String(id).split('-');
+            if(idArray.length > 1){
+                id = idArray[0];
+            }
+
+            // prepare the result id and revisions
+            let newSlideRef = { id: parseInt(id) };
+            return col.findOne({_id: newSlideRef.id })
             .then((existingSlide) => {
                 const maxRevisionId = existingSlide.revisions.reduce((prev, curr) => {
                     if (curr.id > prev)
@@ -289,6 +291,9 @@ let self = module.exports = {
 
                     return prev;
                 }, 1);
+
+                newSlideRef.revision = maxRevisionId + 1;
+
                 let usageArray = existingSlide.revisions[idArray[1]-1].usage;
                 //we should remove the usage of the previous revision in the root deck
                 let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
@@ -302,10 +307,9 @@ let self = module.exports = {
                     }
                 }
 
-                let valid = false;
                 //should empty usage array and keep only the new root deck revision
                 usageArray = [{'id':parseInt(slide.root_deck.split('-')[0]), 'revision': parseInt(slide.root_deck.split('-')[1])}];
-                let slideWithNewRevision = convertSlideWithNewRevision(slide, parseInt(maxRevisionId)+1, usageArray);
+                let slideWithNewRevision = convertSlideWithNewRevision(slide, newSlideRef.revision, usageArray);
                 slideWithNewRevision.timestamp = existingSlide.timestamp;
                 slideWithNewRevision.license = existingSlide.license;
                 slideWithNewRevision.user = existingSlide.user;
@@ -320,22 +324,20 @@ let self = module.exports = {
                     slideWithNewRevision.contributors = contributors;
                 }
 
-                try {
-                    valid = slideModel(slideWithNewRevision);
-                    if (!valid) {
-                        return slideModel.errors;
-                    }
-                    let new_revisions = existingSlide.revisions;
-                    new_revisions[idArray[1]-1].usage = previousUsageArray;
-                    new_revisions.push(slideWithNewRevision.revisions[0]);
-                    slideWithNewRevision.revisions = new_revisions;
-                    return col.findOneAndUpdate({
-                        _id: parseInt(id)
-                    }, { $set: slideWithNewRevision }, {new: true});
-                } catch (e) {
-                    console.log('validation failed', e);
+                if (!slideModel(slideWithNewRevision)) {
+                    throw new Error(JSON.stringify(slideModel.errors));
                 }
-                return;
+
+                let new_revisions = existingSlide.revisions;
+                new_revisions[idArray[1]-1].usage = previousUsageArray;
+                new_revisions.push(slideWithNewRevision.revisions[0]);
+                slideWithNewRevision.revisions = new_revisions;
+
+                // update and return new ids if successful
+                return col.findOneAndUpdate({
+                    _id: newSlideRef.id
+                }, { $set: slideWithNewRevision }, { returnOriginal: false })
+                .then(() => newSlideRef);
             });
         });
     },
@@ -405,7 +407,8 @@ let self = module.exports = {
             else{
                 slide.revisions[0].title = newName;
             }
-            return col.findOneAndUpdate({_id: parseInt(slideId)}, slide);
+            return col.findOneAndUpdate({_id: parseInt(slideId)}, slide, { returnOriginal: false })
+            .then((result) => result.value);
         }));
     },
 
@@ -646,6 +649,7 @@ let self = module.exports = {
         let newSlide = _.pick(slideNode.slide, [
             'title',
             'content',
+            'markdown',
             'license',
             'speakernotes',
             'dimensions',
@@ -655,6 +659,7 @@ let self = module.exports = {
             'language',
             'title',
             'content',
+            'markdown',
             'speakernotes',
         ]));
         // assign other data
@@ -702,6 +707,10 @@ function convertToNewSlide(slide) {
     if(slide.markdown === null){
         slide.markdown = '';
     }
+
+    // remove nils (undefined or nulls)
+    slide = _.omitBy(slide, _.isNil);
+
     let contributorsArray = [{'user': slide.user, 'count': 1}];
     const result = {
         _id: slide._id,

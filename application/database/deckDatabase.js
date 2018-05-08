@@ -713,7 +713,8 @@ let self = module.exports = {
                     throw validateDeck.errors;
                 }
 
-                return col.findOneAndReplace({ _id: parseInt(id) }, existingDeck, { returnOriginal: false });
+                return col.findOneAndReplace({ _id: parseInt(id) }, existingDeck, { returnOriginal: false })
+                .then((result) => result.value);
             });
         });
     },
@@ -754,7 +755,8 @@ let self = module.exports = {
             deck.lastUpdate = (new Date()).toISOString();
             deckRevision.lastUpdate = deck.lastUpdate;
 
-            return col.findOneAndReplace({_id: parseInt(deckId)}, deck);
+            return col.findOneAndReplace({_id: parseInt(deckId)}, deck, { returnOriginal: false })
+            .then((result) => result.value);
         }));
     },
 

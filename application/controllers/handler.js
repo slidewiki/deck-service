@@ -133,46 +133,41 @@ let self = module.exports = {
                     request.payload.root_deck = parentDeckId;
 
                 //create the slide revision in the database
-                return slideDB.replace(slideId, request.payload).then((replaced) => {
-                    if (co.isEmpty(replaced.value))
-                        throw replaced;
-                    else{
-
-                        // send tags to tag-service
-                        if(request.payload.tags && request.payload.tags.length > 0){
-                            tagService.upload(request.payload.tags, userId).catch( (e) => {
-                                request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
-                            });
-                        }
-
-                        //we must update all decks in the 'usage' attribute
-                        return slideDB.get(replaced.value._id).then((newSlide) => {
-
-                            // prepare the newSlide response object
-                            newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
-
-                            // update the content item of the parent deck with the new revision id
-                            return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
-                            .then(({updatedDeckRevision}) => {
-                                // the updateContentItem returns, amongs other things, the updated revision of the parent (root_deck)
-                                // we need this to have access to the theme for the new updated slide
-
-                                //create thumbnail for the new slide revision
-                                let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
-                                if(content === ''){
-                                    content = '<h2>'+newSlide.revisions[0].title+'</h2>';
-                                    //for now we use hardcoded template for new slides
-                                    content = slidetemplate;
-                                }
-                                fileService.createThumbnail(content, newSlideId, updatedDeckRevision.theme).catch((err) => {
-                                    request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
-                                });
-
-                                reply(newSlide);
-                            });
-
+                return slideDB.replace(slideId, request.payload).then((slideRef) => {
+                    // send tags to tag-service
+                    if(request.payload.tags && request.payload.tags.length > 0){
+                        tagService.upload(request.payload.tags, userId).catch( (e) => {
+                            request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
                         });
                     }
+
+                    //we must update all decks in the 'usage' attribute
+                    return slideDB.get(slideRef.id).then((newSlide) => {
+
+                        // prepare the newSlide response object
+                        newSlide.revisions = [newSlide.revisions[newSlide.revisions.length-1]];
+
+                        // update the content item of the parent deck with the new revision id
+                        return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
+                        .then(({updatedDeckRevision}) => {
+                            // the updateContentItem returns, amongs other things, the updated revision of the parent (root_deck)
+                            // we need this to have access to the theme for the new updated slide
+
+                            //create thumbnail for the new slide revision
+                            let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
+                            if(content === ''){
+                                content = '<h2>'+newSlide.revisions[0].title+'</h2>';
+                                //for now we use hardcoded template for new slides
+                                content = slidetemplate;
+                            }
+                            fileService.createThumbnail(content, newSlideId, updatedDeckRevision.theme).catch((err) => {
+                                request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                            });
+
+                            reply(newSlide);
+                        });
+
+                    });
                 });
 
             }).catch((error) => {
@@ -517,8 +512,6 @@ let self = module.exports = {
             return deckDB.update(deckId, request.payload).then((replaced) => {
                 if (!replaced) return boom.notFound();
 
-                if (replaced.ok !== 1) throw replaced;
-
                 // send tags to tag-service
                 if (!_.isEmpty(request.payload.tags)) {
                     tagService.upload(request.payload.tags, userId).catch((e) => {
@@ -526,7 +519,7 @@ let self = module.exports = {
                     });
                 }
 
-                return replaced.value;
+                return replaced;
             });
 
         }).then((response) => {
@@ -668,12 +661,17 @@ let self = module.exports = {
             // continue as normal
             let revisionId = request.payload.revision_id;
 
-            return deckDB.revertDeckRevision(deckId, revisionId, userId, rootDeckId);
-        }).then((response) => {
-            // by now it's not a 404, which means the revision_id in the payload was invalid
-            if (!response)
-                response = boom.badData();
+            return deckDB.revertDeckRevision(deckId, revisionId, userId, rootDeckId)
+            .then((updatedDeck) => {
+                // means the revision_id in the payload was invalid
+                if (!updatedDeck) {
+                    return boom.badData(`could not find ${revisionId} for deck ${deckId}`);
+                }
 
+                return updatedDeck;
+            });
+
+        }).then((response) => {
             // response is either the new deck revision or boom
             reply(response);
         }).catch((err) => {
@@ -1196,6 +1194,7 @@ let self = module.exports = {
     },
 
     //renames a decktree node (slide or deck)
+    // DEPRECATED
     renameDeckTreeNode: function(request, reply) {
         let userId = request.auth.credentials.userid;
 
@@ -1207,12 +1206,8 @@ let self = module.exports = {
 
                 let top_root_deck = request.payload.selector.id;
                 deckDB.rename(root_deck, request.payload.name, {}, top_root_deck, userId).then((renamed) => {
-                    if (co.isEmpty(renamed.value))
-                        throw renamed;
-                    else{
-                        let response = {'title' : renamed.value};
-                        reply(response);
-                    }
+                    let response = {'title' : renamed};
+                    reply(response);
                 }).catch((error) => {
                     request.log('error', error);
                     reply(boom.badImplementation());
@@ -2231,7 +2226,7 @@ function authorizeUser(userId, deckId, rootDeckId) {
         if (!perms[0]) return boom.notFound();
 
         // if others are not found return 422 instead of 404 (not part of path)
-        if (perms.some((p) => p === undefined)) return boom.badData();
+        if (perms.some((p) => p === undefined)) return boom.badData(`could not authorize user:${userId} for deck:${deckId} under tree:${rootDeckId}`);
 
         // check edit permission
         if (perms.some((p) => !p.edit)) return boom.forbidden();

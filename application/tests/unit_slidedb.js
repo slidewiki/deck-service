@@ -138,8 +138,7 @@ describe('Database', () => {
             let res = ins.then((ins) => db.replace(ins._id+'-1', slide2));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.have.property('value').that.contains.all.keys('_id', 'language'),
-                //res.should.eventually.have.property('value').that.has.property('language', slide.language) // FIXME returns old object
+                res.should.eventually.include.all.keys('id', 'revision'),
             ]);
         });
 
@@ -175,8 +174,8 @@ describe('Database', () => {
             let res = ins.then((ins) => deckdb.update(ins._id+'-1', deck2));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                //res.should.eventually.have.property('value').that.includes.all.keys('_id', 'language'),
-                //res.should.eventually.have.property('value').that.has.property('language', slide.language) // FIXME returns old object
+                res.should.eventually.include.all.keys('_id'),
+                res.should.eventually.have.nested.property('revisions.0.language', deck.language),
             ]);
         });
 
@@ -213,7 +212,6 @@ describe('Database', () => {
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.have.property('value').that.is.not.empty,
             ]);
         });
 
@@ -237,7 +235,7 @@ describe('Database', () => {
             };
             let ins = db.insert(slide);
             let ins2 = ins.then((ins) => db.replace(ins._id+'-1', slide2));
-            let res = ins2.then((ins2) => db.updateUsage(ins2.value._id+'-1','2', '25-1' ));
+            let res = ins2.then((ins2) => db.updateUsage(ins2.id+'-1','2', '25-1' ));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('_id').that.is.a('number'),
@@ -337,7 +335,6 @@ describe('Database', () => {
             let res = ins.then((ins) => deckdb.rename(ins._id+'-1', 'new name'));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.have.property('value').that.is.not.empty
             ]);
         });
 
