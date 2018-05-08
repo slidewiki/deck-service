@@ -621,7 +621,7 @@ let self = module.exports = {
                 return reply(boom.forbidden());
             }
 
-            return deckDB.forkDeckRevision(deckId, userId).then((id_map) => {
+            return treeDB.copyDeckTree(deckId, userId).then((id_map) => {
                 reply(id_map);
             });
 
@@ -1062,7 +1062,7 @@ let self = module.exports = {
                     });
                 }
                 else{
-                    deckDB.forkDeckRevision(request.payload.nodeSpec.id, userId, true).then((forkResult) => {
+                    treeDB.copyDeckTree(request.payload.nodeSpec.id, userId, true).then((forkResult) => {
                         // get the new deck we are going to attach
                         request.payload.nodeSpec.id = forkResult.root_deck;
 

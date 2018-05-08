@@ -6,7 +6,7 @@
 
 describe('Database', () => {
 
-    let db, deckdb, helper; //expect
+    let db, deckdb, treedb, helper; //expect
 
     beforeEach((done) => {
         //Clean everything up before doing new tests
@@ -18,6 +18,7 @@ describe('Database', () => {
         //expect = require('chai').expect;
         db = require('../database/slideDatabase.js');
         deckdb = require('../database/deckDatabase.js');
+        treedb = require('../database/deckTreeDatabase');
         helper = require('../database/helper.js');
         helper.cleanDatabase()
         .then(() => done())
@@ -452,7 +453,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.forkDeckRevision(ins.ops[0]._id+'-1', 1));
+            let res = ins.then((ins) => treedb.copyDeckTree(ins.ops[0]._id+'-1', 1));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('root_deck').that.is.not.empty,

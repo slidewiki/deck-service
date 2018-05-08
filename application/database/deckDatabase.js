@@ -1816,6 +1816,7 @@ let self = module.exports = {
     },
 
     // we guard the fork deck revision method against abuse, by checking for change logs of one
+    // DEPRECATED
     forkDeckRevision(deck_id, user, forAttach) {
         let deck = util.parseIdentifier(deck_id);
         return self.get(deck.id).then((existingDeck) => {
@@ -1844,6 +1845,7 @@ let self = module.exports = {
 
     // forks a given deck revision by copying all of its sub-decks into new decks
     // forAttach is true when forking is done during deck attach process
+    // DEPRECATED
     _forkDeckRevision(deck_id, user, forAttach) {
 
         return self.getFlatDecks(deck_id)
