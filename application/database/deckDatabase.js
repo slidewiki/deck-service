@@ -632,7 +632,7 @@ let self = module.exports = {
 
                 // language is treated differently now
                 let variantFilter = _.pick(deck, 'language');
-                if (!_.isEmpty(variantFilter)) {
+                if (!_.isEmpty(variantFilter) && variantFilter.language !== deckRevision.language) {
                     let variant = _.find(deckRevision.variants, variantFilter);
                     if (variant) {
                         let variantData = _.pick(deck, [
