@@ -168,7 +168,7 @@ let self = module.exports = {
     // this could likely replace #get as it returns a more uniform data structure,
     // only with the requested revision data merged into a single object
     getDeck: async function(identifier, variantFilter) {
-        let {id, revision} = util.parseIdentifier(identifier);
+        let {id, revision} = util.parseIdentifier(identifier) || {};
 
         let deck = await self.get(id, variantFilter);
         if (!deck) return;
@@ -186,13 +186,24 @@ let self = module.exports = {
         }
 
         // merge revision data into deck data
+        // don't mix revision owner with deck owner
+        deckRevision.revisionUser = deckRevision.user;
+        delete deckRevision.user;
+
+        // also the revision timestamp and lastUpdate
+        deckRevision.revisionTimestamp = deckRevision.timestamp;
+        delete deckRevision.timestamp;
+        deckRevision.revisionLastUpdate = deckRevision.lastUpdate;
+        delete deckRevision.lastUpdate;
+
         _.merge(deck, deckRevision);
 
         // add proper ids, revision id
         deck.id = id;
         deck.revision = revision;
-        // and latestRevisionId
+        // and latest revision id and revision count
         deck.latestRevision = latestRevision.id;
+        deck.revisionCount = deck.revisions.length;
         // remove other revisions
         delete deck.revisions;
 
