@@ -30,6 +30,7 @@ const self = module.exports = {
             language: deck.language,
             theme: deck.theme,
             allowMarkdown: deck.allowMarkdown,
+            variants: deck.variants,
             children: [],
         };
 

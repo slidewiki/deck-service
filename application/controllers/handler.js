@@ -380,6 +380,7 @@ let self = module.exports = {
                 }
             }
         }).catch((error) => {
+            if (error.isBoom) return reply(error);
             request.log('error', error);
             reply(boom.badImplementation());
         });
