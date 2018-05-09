@@ -1350,39 +1350,43 @@ let self = module.exports = {
     },
 
     // inserts or updates a variant (language dependent only) id and revision in position index under given deck
-    setContentVariant: function(parentDeckId, index, newVariant, userId) {
-        return self.get(parentDeckId).then((existingDeck) => {
-            if (!existingDeck) return;
+    setContentVariant: async function(parentDeckId, index, newVariant, userId) {
+        // latest revision always
+        let existingDeck = await self.getDeck(parentDeckId);
+        if (!existingDeck) return;
 
-            if (!existingDeck.hasOwnProperty('contributors')) {
-                existingDeck.contributors = [];
-            }
-            let existingContributor = _.find(existingDeck.contributors, { user: userId });
-            if (existingContributor) {
-                existingContributor.count++;
-            } else{
-                existingDeck.contributors.push({ user: userId, count: 1 });
-            }
+        let contributors = existingDeck.contributors || [];
+        let existingContributor = _.find(contributors, { user: userId });
+        if (existingContributor) {
+            existingContributor.count++;
+        } else{
+            contributors.push({ user: userId, count: 1 });
+        }
 
-            let [updatedRevision] = existingDeck.revisions.slice(-1);
-            existingDeck.lastUpdate = new Date().toISOString();
-            updatedRevision.lastUpdate = existingDeck.lastUpdate;
+        let contentItem = existingDeck.contentItems[index];
+        let variants = contentItem.variants || [];
+        let existingVariant = _.find(variants, { language: newVariant.language });
+        if (existingVariant) {
+            // effectively replaces values in existing variant
+            _.merge(existingVariant, newVariant);
+        } else {
+            variants.push(newVariant);
+        }
 
-            let contentItem = updatedRevision.contentItems[index];
-            if (!contentItem.hasOwnProperty('variants')) {
-                contentItem.variants = [];
-            }
-            let existingVariant = _.find(contentItem.variants, { language: newVariant.language });
-            if (existingVariant) {
-                // effectively replaces values in existing variant
-                _.merge(existingVariant, newVariant);
-            } else {
-                contentItem.variants.push(newVariant);
-            }
+        let now = new Date().toISOString();
+        let decks = await helper.getCollection('decks');
+        let result = await decks.findOneAndUpdate(
+            { _id: existingDeck.id, 'revisions.id': existingDeck.revision },
+            { $set: {
+                contributors,
+                lastUpdate: now,
+                'revisions.$.lastUpdate': now,
+                [`revisions.$.contentItems.${index}.variants`]: variants,
+            } },
+            { returnOriginal: false }
+        );
 
-            return helper.getCollection('decks').then((decks) => decks.save(existingDeck)).then(() => updatedRevision);
-        });
-
+        return result.value;
     },
 
     //recursive function that gets the decktree of a given deck and all of its sub-decks, can be used with onlyDecks to ignore slides
