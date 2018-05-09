@@ -596,6 +596,8 @@ let self = module.exports = {
         let slideNode = await self.findSlideNode(rootId, slideId);
         // slideNode includes data for the original slide, and references for variants
 
+        let parentRef = _.pick(slideNode.parent, 'id', 'revision');
+        let newSlideRef, oldSlideRef, result;
         if (!_.isEmpty(variantFilter)) {
             // assign language and other variant metadata from filter if provided
             Object.assign(payload, variantFilter);
@@ -606,31 +608,43 @@ let self = module.exports = {
                 return self.addSlideNodeVariant(rootId, slideId, payload, userId);
             }
             // slideVariant exists, so we need to revise that instead
-            let newSlideRef = await self.revise(util.toIdentifier(slideVariant), payload, userId);
+            oldSlideRef = _.pick(slideVariant, 'id', 'revision');
+            newSlideRef = await self.revise(util.toIdentifier(oldSlideRef), payload, userId);
 
             let newVariant = Object.assign({
                 language: payload.language,
             }, newSlideRef);
 
-            await deckDB.setContentVariant(slideNode.parent.id, slideNode.index, newVariant, userId);
-            // respond with new variant data on success
-            return newVariant;
+            await deckDB.setContentVariant(parentRef.id, slideNode.index, newVariant, userId);
 
+            result = newVariant;
         } else {
             // if no variantFilter is provided, we revise the original slide
-            let newSlideRef = await self.revise(util.toIdentifier(slideNode.slide), payload, userId);
+            oldSlideRef = _.pick(slideNode.slide, 'id', 'revision');
+            newSlideRef = await self.revise(util.toIdentifier(oldSlideRef), payload, userId);
 
             // TODO change this
             let dummyItem = {
                 _id: newSlideRef.id,
                 revisions: [{ id: newSlideRef.revision}],
             };
-            let parentDeckId = util.toIdentifier(slideNode.parent);
+            let parentDeckId = util.toIdentifier(parentRef);
             await deckDB.updateContentItem(dummyItem, null, parentDeckId, 'slide', userId, rootId);
 
-            return newSlideRef;
+            result = newSlideRef;
         }
 
+        // new slide created, replacing the older one, let's fix the usage
+        let slides = await helper.getCollection('slides');
+        let slide = await slides.findOne({ _id: oldSlideRef.id });
+        let oldSlide = _.find(slide.revisions, { id: oldSlideRef.revision });
+        let newSlide = _.find(slide.revisions, { id: newSlideRef.revision });
+        _.remove(oldSlide.usage, parentRef);
+        newSlide.usage.push(parentRef);
+        await slides.save(slide);
+
+        // respond with new variant data or new slide ref on success
+        return result;
     },
 
     addSlideNodeVariant: async function(rootId, slideId, variantData, userId) {
