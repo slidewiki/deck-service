@@ -2343,9 +2343,13 @@ let self = module.exports = {
     // computes the usage of the item, i.e. the decks that point to it
     getUsage(itemId, itemKind='deck', keepVisibleOnly=false) {
         let item = util.parseIdentifier(itemId);
+
+        // prepare some objects to be used later for building the pipeline
         let elemMatchQuery = {
-            kind: itemKind,
             'ref.id': item.id,
+        };
+        let variantMatchQuery = {
+            'variants.id': item.id,
         };
 
         let projectStage = {
@@ -2357,6 +2361,7 @@ let self = module.exports = {
 
         if (item.revision) {
             elemMatchQuery['ref.revision'] = item.revision;
+            variantMatchQuery['variants.revision'] = item.revision;
         } else {
             projectStage.using = {
                 $arrayElemAt: [
@@ -2376,20 +2381,51 @@ let self = module.exports = {
         }
 
         let pipeline = [
+            // always match as first stage to be fast because of indexes
+            { $match: {
+                'revisions.contentItems': {
+                    $elemMatch: {
+                        kind: itemKind,
+                        $or: [
+                            elemMatchQuery,
+                            variantMatchQuery,
+                        ],
+                    }
+                }
+            } },
+            { $unwind: '$revisions' },
             { $project: {
                 revisions: {
                     id: 1,
+                    // we need to reform this array to include the variants as contentItems to filter later
                     contentItems: {
-                        kind: 1,
-                        ref: 1,
+                        $reduce: {
+                            input: '$revisions.contentItems',
+                            initialValue: [],
+                            in: {
+                                $concatArrays: [
+                                    '$$value',
+                                    [ { kind: '$$this.kind', ref: '$$this.ref', } ],
+                                    { $ifNull: [
+                                        { $map: {
+                                            input: '$$this.variants',
+                                            as: 'variant',
+                                            in: { kind: '$$this.kind', ref: '$$variant' },
+                                        } },
+                                        [],
+                                    ] },
+                                ],
+                            },
+                        }
                     },
                     theme: 1,
                 },
             } },
-            { $unwind: '$revisions' },
             { $match: {
                 'revisions.contentItems': {
-                    $elemMatch: elemMatchQuery,
+                    $elemMatch: _.merge({
+                        kind: itemKind,
+                    }, elemMatchQuery),
                 }
             } },
             { $project: projectStage },
