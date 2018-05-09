@@ -620,7 +620,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/slide/{id}',
-        handler: handlers.updateSlide,
+        handler: handlers.updateSlideNode,
         config: {
             validate: {
                 params: {
@@ -656,7 +656,7 @@ module.exports = function(server) {
                         authors: Joi.string().allow(''),
                         year: Joi.string().allow('')
                     })).default([])
-                }).requiredKeys('content', 'root_deck'),
+                }).requiredKeys('top_root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),

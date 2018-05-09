@@ -9,6 +9,8 @@ const deckDB = require('../database/deckDatabase');
 const slideDB = require('../database/slideDatabase');
 const treeDB = require('../database/deckTreeDatabase');
 
+const fileService = require('../services/file');
+
 const self = module.exports = {
 
     // renames a decktree node (slide or deck)
@@ -34,7 +36,19 @@ const self = module.exports = {
                 // this is to keep the API intact as much as possible
                 return slideDB.get(newSlideRef.id).then((updatedSlide) => {
                     // prepare the updatedSlide response object
-                    updatedSlide.revisions = updatedSlide.revisions.slice(-1);
+                    // updatedSlide.revisions = updatedSlide.revisions.slice(-1);
+                    updatedSlide.revisions = [_.find(updatedSlide.revisions, { id: newSlideRef.revision })];
+
+                    // create thumbnail for the new slide revision
+                    let content = updatedSlide.revisions[0].content;
+                    let newSlideId = util.toIdentifier(newSlideRef);
+
+                    if (!content) {
+                        content = '<h2>' + updatedSlide.revisions[0].title + '</h2>';
+                    }
+                    fileService.createThumbnail(content, newSlideId, newSlideRef.theme).catch((err) => {
+                        request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                    });
 
                     // TODO might also need to create a thumbnail
                     reply(updatedSlide);

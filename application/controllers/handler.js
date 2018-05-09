@@ -117,6 +117,7 @@ let self = module.exports = {
     },
 
     //updates slide by creating a new revision
+    // DEPRECATED
     updateSlide: function(request, reply) {
         let userId = request.auth.credentials.userid;
         let slideId = request.params.id;
@@ -176,6 +177,51 @@ let self = module.exports = {
             });
 
         }
+
+    },
+
+    // updates slide by creating a new revision
+    updateSlideNode: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+        let slideId = request.params.id;
+        let rootId = request.payload.top_root_deck;
+
+        // TODO authenticate
+
+        let variantFilter = _.pick(request.payload, 'language');
+        slideDB.updateSlideNode(rootId, slideId, request.payload, variantFilter, userId).then((slideRef) => {
+            // send tags to tag-service
+            if (request.payload.tags && request.payload.tags.length > 0) {
+                tagService.upload(request.payload.tags, userId).catch( (e) => {
+                    request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
+                });
+            }
+
+            // we must update all decks in the 'usage' attribute
+            return slideDB.get(slideRef.id).then((newSlide) => {
+                // prepare the newSlide response object
+                newSlide.revisions = [_.find(newSlide.revisions, { id: slideRef.revision })];
+
+                // create thumbnail for the new slide revision
+                let content = newSlide.revisions[0].content;
+                let newSlideId = util.toIdentifier(slideRef);
+
+                if (!content) {
+                    content = '<h2>' + newSlide.revisions[0].title + '</h2>';
+                }
+                request.log('info', `creating thumbnail for new slide revision ${newSlideId} with theme ${slideRef.theme}`);
+                fileService.createThumbnail(content, newSlideId, slideRef.theme).catch((err) => {
+                    request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                });
+
+                reply(newSlide);
+            });
+
+        }).catch((error) => {
+            if (error.isBoom) return reply(error);
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
 
     },
 

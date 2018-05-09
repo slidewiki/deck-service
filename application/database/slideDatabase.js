@@ -643,6 +643,10 @@ let self = module.exports = {
         newSlide.usage.push(parentRef);
         await slides.save(slide);
 
+        // include the theme of the parent in the result
+        // TODO maybe we could skip this in the future
+        Object.assign(result, { theme: slideNode.parent.theme } );
+
         // respond with new variant data or new slide ref on success
         return result;
     },
