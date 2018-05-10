@@ -2292,6 +2292,11 @@ let self = module.exports = {
         }
 
         let pipeline = [
+            { $match: {
+                'revisions.contentItems': {
+                    $elemMatch: elemMatchQuery,
+                }
+            } },
             { $project: {
                 revisions: {
                     id: 1,
