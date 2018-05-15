@@ -117,14 +117,14 @@ let self = module.exports = {
                 if (db.s.databaseName !== dbname)
                     throw new 'Wrong Database!';
 
-                // log connection status and bring down the service once db is done for
+                // log connection status and reset connection once reconnect fails
                 db.on('close', (err) => {
                     if (err) {
                         console.warn(err.message);
                     }
                 });
-                db.on('reconnect', (err) => {
-                    console.warn(err ? `reconnected to ${err.s.host}:${err.s.port}`: 'reconnected to mongodb');
+                db.on('reconnect', (payload) => {
+                    console.warn(payload ? `reconnected to ${payload.s.host}:${payload.s.port}`: 'reconnected to mongodb');
                 });
                 // HACK This is an undocumented event name, but it's there and it works
                 // best solution so far, and even if it's removed in the future, it will not break anything else
