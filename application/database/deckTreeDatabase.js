@@ -549,43 +549,67 @@ const self = module.exports = {
         // we will also recursively copy its subdecks and collect the replacements taking place
         let copiedIdsMap = {};
         for (let item of originDeck.contentItems) {
-            let itemId = util.toIdentifier(item.ref);
-            let newItemRef;
             if (item.kind === 'slide') {
                 // TODO copy slides as well ??
                 let keepSlides = true;
                 if (keepSlides) {
                     // we are keeping the same slide, but need to update its usage to include the new parent deck
                     let slides = await helper.getCollection('slides');
-                    await slides.findOneAndUpdate(
-                        { _id: item.ref.id, 'revisions.id': item.ref.revision },
-                        { $push: { 'revisions.$.usage': newDeckRef } }
-                    );
-                    continue;
+                    // process the item ref and all its variants 
+                    for (let ref of [item.ref, ...(item.variants || [])]) {
+                        await slides.findOneAndUpdate(
+                            { _id: ref.id, 'revisions.id': ref.revision },
+                            { $push: { 'revisions.$.usage': newDeckRef } }
+                        );
+                    }
+
                 } else {
                     // let's copy the slide as well
-                    let slide = await slideDB.getSlideRevision(itemId);
-                    let inserted = await slideDB.copy(slide, util.toIdentifier(newDeckRef), userId);
+                    let newDeckId = util.toIdentifier(newDeckRef);
 
-                    newItemRef = { id: inserted._id, revision: 1 };
+                    let slide = await slideDB.getSlideRevision(util.toIdentifier(item.ref));
+                    let inserted = await slideDB.copy(slide, newDeckId, userId);
 
-                    // TODO create the thumbnail
-                    let copiedSlideId = util.toIdentifier(newItemRef);
+                    let copiedSlideRef = { id: inserted._id, revision: 1 };
+
+                    // create the thumbnail
+                    let copiedSlideId = util.toIdentifier(copiedSlideRef);
                     fileService.createThumbnail(inserted.revisions[0].content, copiedSlideId, newDeck.theme).catch((err) => {
                         console.warn(`could not create thumbnail for slide ${copiedSlideId}, error was: ${err.message}`);
                     });
+
+                    // replace item ref with new slide
+                    Object.assign(item.ref, copiedSlideRef);
+
+                    // if we have variants, need to copy them as well
+                    for (let variant of (item.variants || [])) {
+                        let original = await slideDB.getSlideRevision(util.toIdentifier(variant));
+                        let duplicate = await slideDB.copy(original, newDeckId, userId);
+
+                        let copiedVariantRef = { id: duplicate._id, revision: 1 };
+
+                        // create the thumbnail
+                        let copiedVariantId = util.toIdentifier(copiedVariantRef);
+                        fileService.createThumbnail(duplicate.revisions[0].content, copiedVariantId, newDeck.theme).catch((err) => {
+                            console.warn(`could not create thumbnail for slide ${copiedVariantId}, error was: ${err.message}`);
+                        });
+
+                        // replace ref values in variant object directly
+                        Object.assign(variant, copiedVariantRef);
+                    }
                 }
 
             } else {
                 // subdecks
-                let copyResult = await self._copyDeckTree(itemId, userId, util.toIdentifier(newDeckRef));
-                newItemRef = copyResult.newDeckRef;
+                let subdeckId = util.toIdentifier(item.ref);
+                let copyResult = await self._copyDeckTree(subdeckId, userId, util.toIdentifier(newDeckRef));
                 // also collect the id replacements from inner copy tree process
                 Object.assign(copiedIdsMap, copyResult.copiedIdsMap);
+
+                // replace item ref with copied deck tree
+                Object.assign(item.ref, copyResult.newDeckRef);
             }
 
-            // replace item ref with copy
-            Object.assign(item.ref, newItemRef);
         }
 
         // finished, now we directly attach the contentItems
