@@ -699,6 +699,36 @@ let self = module.exports = {
         return newVariant;
     },
 
+    copySlideNode: async function(rootId, slideId, newParentId, userId) {
+        let slideNode = await self.findSlideNode(rootId, slideId);
+        // slideNode includes data for the original slide, and references for variants
+
+        // let's copy the primary slide of the node
+        let duplicate = await self.copy(slideNode.slide, newParentId, userId);
+        let copiedSlideRef = { id: duplicate._id, revision: 1 };
+
+        // construct the new result content item object
+        let newContentItem = {
+            kind: 'slide',
+            ref: copiedSlideRef,
+            variants: [],
+        };
+
+        // if we have variants, need to copy them as well
+        for (let variant of (slideNode.variants || [])) {
+            let original = await self.getSlideRevision(util.toIdentifier(variant));
+            let duplicate = await self.copy(original, newParentId, userId);
+
+            let copiedVariantRef = { id: duplicate._id, revision: 1 };
+
+            // update the original variant with the ref data only (keep the rest of properites in the copy)
+            let newVariant = Object.assign({}, variant, copiedVariantRef);
+            newContentItem.variants.push(newVariant);
+        }
+
+        return newContentItem;
+    },
+
 };
 
 // split slide id given as parameter to slide id and revision id

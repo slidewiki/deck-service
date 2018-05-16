@@ -862,77 +862,70 @@ let self = module.exports = {
                 let slideArrayPath = spathArray[spathArray.length-1].split(':');
                 slidePosition = parseInt(slideArrayPath[1])+1;
 
-                let slideRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
-                self.getSlide({
-                    'params' : {'id' : request.payload.nodeSpec.id.split('-')[0]},
-                    'log': request.log.bind(request),
-                }, (slide) => {
-                    if (slide.isBoom) return reply(slide);
+                // TODO remove this deprecated part of the code
+                if (request.payload.isMove) {
+                    let slideRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
+                    self.getSlide({
+                        'params' : {'id' : request.payload.nodeSpec.id.split('-')[0]},
+                        'log': request.log.bind(request),
+                    }, (slide) => {
+                        if (slide.isBoom) return reply(slide);
 
-                    if (!request.payload.isMove) {
-                        // if it's not a move op we are attaching a copy of a slide that may or may not be in the current tree
-
-                        // let's keep the exact action tracked
-                        let addAction = 'attach';
-                        if (request.payload.nodeSpec.id === request.payload.selector.sid) {
-                            addAction = 'copy';
-                        }
-
-                        //we must duplicate the slide
-                        let duplicateSlide = slide;
-                        duplicateSlide.parent = request.payload.nodeSpec.id;
-                        duplicateSlide.comment = 'Duplicate slide of ' + request.payload.nodeSpec.id;
-                        //copy the slide to a new duplicate
-                        slideDB._copy(duplicateSlide, slideRevision)
-                        .then((insertedDuplicate) => {
-                            insertedDuplicate = insertedDuplicate.ops[0];
-                            insertedDuplicate.id = insertedDuplicate._id;
-                            node = {title: insertedDuplicate.revisions[0].title, id: insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id, type: 'slide'};
-
-                            return deckDB.insertNewContentItem(insertedDuplicate, slidePosition, parentID, 'slide', 1, userId, top_root_deck, addAction)
-                            .then((updatedDeckRevision) => {
-                                // we can now pick the theme of the parent deck and create the thumbnail!
-                                let slideId = insertedDuplicate.id+'-'+insertedDuplicate.revisions[0].id;
-                                fileService.createThumbnail(insertedDuplicate.revisions[0].content, slideId, updatedDeckRevision.theme).catch((err) => {
-                                    request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
-                                });
-
-                                return slideDB.addToUsage({ref:{id:insertedDuplicate._id, revision: 1}, kind: 'slide'}, parentID.split('-')).then( () => {
-                                    reply(node);
-                                });
-
-                            });
-
-                        }).catch((err) => {
-                            request.log('error', err);
-                            reply(boom.badImplementation());
-                        });
-                    }
-                    else{
                         //change position of the existing slide
                         slide.id = slide._id;
 
-                        { // these brackets are kept during handleChange removal to keep git blame under control
-
-                            deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck)
-                            .then((updatedDeckRevision) => {
-                                // since we moved the slide maybe it's under a deck with a different theme, so let's create the thumbnail as well
-                                let slideId = slide.id+'-'+(slideRevision+1);
-                                fileService.createThumbnail(slide.revisions[slideRevision].content, slideId, updatedDeckRevision.theme).catch((err) => {
-                                    request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
-                                });
-
-                                return slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-')).then(() => {
-                                    node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
-                                    reply(node);
-                                });
-                            }).catch( (err) => {
-                                request.log('error', err);
-                                reply(boom.badImplementation());
+                        deckDB.insertNewContentItem(slide, slidePosition, parentID, 'slide', slideRevision+1, userId, top_root_deck)
+                        .then((updatedDeckRevision) => {
+                            // since we moved the slide maybe it's under a deck with a different theme, so let's create the thumbnail as well
+                            let slideId = slide.id+'-'+(slideRevision+1);
+                            fileService.createThumbnail(slide.revisions[slideRevision].content, slideId, updatedDeckRevision.theme).catch((err) => {
+                                request.log('warn', `could not create thumbnail for slide duplicate ${slideId}: ${err.message || err}`);
                             });
-                        }
+
+                            return slideDB.addToUsage({ref:{id:slide._id, revision: slideRevision+1}, kind: 'slide'}, parentID.split('-')).then(() => {
+                                node = {title: slide.revisions[slideRevision].title, id: slide.id+'-'+slide.revisions[slideRevision].id, type: 'slide'};
+                                reply(node);
+                            });
+                        }).catch( (err) => {
+                            request.log('error', err);
+                            reply(boom.badImplementation());
+                        });
+
+                    });
+
+                    // finished
+                    return;
+                }
+
+                // we are attaching a copy of a slide that may or may not be in the current tree
+                let slideId = request.payload.nodeSpec.id;
+                slideDB.findSlideNode(top_root_deck, slideId).then((slideNode) => {
+                    if (!slideNode) {
+                        return reply(boom.badData(`could not find slide: ${slideId} in deck tree: ${top_root_deck}`));
                     }
+
+                    // let's keep the exact action tracked
+                    let addAction = 'attach';
+                    if (request.payload.nodeSpec.id === request.payload.selector.sid) {
+                        addAction = 'copy';
+                    }
+
+                    // we must duplicate the slide node
+                    return slideDB.copySlideNode(top_root_deck, slideId, parentID, userId).then((newContentItem) => {
+                        return deckDB.insertContentItem(newContentItem, slidePosition, parentID, userId, top_root_deck, addAction).then((updatedDeckRevision) => {
+                            // TODO generate thumbnails (????)
+
+                            // the node data are the same as the original
+                            reply({ title: slideNode.slide.title, id: util.toIdentifier(newContentItem.ref), type: 'slide' });
+                        });
+
+                    });
+
+                }).catch((err) => {
+                    request.log('error', err);
+                    reply(boom.badImplementation());
                 });
+
             }else{
                 //need to make a new slide
                 let spath = request.payload.selector.spath;
@@ -1010,7 +1003,7 @@ let self = module.exports = {
                             node = {title: createdSlide.revisions[0].title, id: createdSlide.id+'-'+createdSlide.revisions[0].id, type: 'slide'};
 
                             //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                            deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck).then((updatedDeckRevision) => {
+                            return deckDB.insertNewContentItem(createdSlide, slidePosition, parentID, 'slide', 1, userId, top_root_deck).then((updatedDeckRevision) => {
 
                                 // slide is now inserted, so we can create the thumbnail using the (direct) parent deck theme
 
@@ -1028,9 +1021,6 @@ let self = module.exports = {
                                 });
 
                                 reply(node);
-                            }).catch( (err) => {
-                                request.log('error', err);
-                                reply(boom.badImplementation());
                             });
 
                         }).catch((err) => {
@@ -1068,6 +1058,7 @@ let self = module.exports = {
 
                 //NOTE must check if it is a move action, if not, we are appending an external subdeck and we need to fork it
                 if(request.payload.isMove){
+                    // TODO remove this deprecated part of the code
                     self.getDeck({
                         'params': {'id' : request.payload.nodeSpec.id},
                         'log': request.log.bind(request),
