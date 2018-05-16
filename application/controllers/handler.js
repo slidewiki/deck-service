@@ -556,8 +556,24 @@ let self = module.exports = {
             request.payload.user = userId;
 
             // update the deck without creating a new revision
-            return deckDB.update(deckId, request.payload).then((replaced) => {
-                if (!replaced) return boom.notFound();
+            return deckDB.update(deckId, request.payload).then((result) => {
+                if (!result) return boom.notFound();
+                let {replaced, changed} = result;
+
+                if (changed.theme) {
+                    // theme was changed, update thumbs for all direct slides
+
+                    slideDB.getDeckSlides(deckId).then((slides) => {
+                        for (let slide of slides) {
+                            let slideId = util.toIdentifier(slide);
+                            fileService.createThumbnail(slide.content, slideId, changed.theme).catch((err) => {
+                                console.warn(`could not update thumbnail for slide ${slideId}, error was: ${err.message}`);
+                            });
+                        }
+                    }).catch((err) => {
+                        console.warn(`could not update slide thumbnails for deck ${deckId}, error was: ${err.message}`);
+                    });
+                }
 
                 // send tags to tag-service
                 if (!_.isEmpty(request.payload.tags)) {
@@ -913,10 +929,20 @@ let self = module.exports = {
                     // we must duplicate the slide node
                     return slideDB.copySlideNode(top_root_deck, slideId, parentID, userId).then((newContentItem) => {
                         return deckDB.insertContentItem(newContentItem, slidePosition, parentID, userId, top_root_deck, addAction).then((updatedDeckRevision) => {
-                            // TODO generate thumbnails (????)
+                            let theme = updatedDeckRevision.theme;
+                            return slideDB.getContentItemSlides(newContentItem).then((slides) => {
+                                // generate thumbnails but don't wait for it
+                                for (let slide of slides) {
+                                    let newSlideId = util.toIdentifier(slide);
+                                    fileService.createThumbnail(slide.content, newSlideId, theme).catch((err) => {
+                                        console.warn(`could not create thumbnail for slide ${newSlideId}, error was: ${err.message}`);
+                                    });
+                                }
 
-                            // the node data are the same as the original
-                            reply({ title: slideNode.slide.title, id: util.toIdentifier(newContentItem.ref), type: 'slide' });
+                                // the node data are the same as the original
+                                reply({ title: slideNode.slide.title, id: util.toIdentifier(newContentItem.ref), type: 'slide' });
+                            });
+
                         });
 
                     });

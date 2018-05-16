@@ -679,12 +679,6 @@ let self = module.exports = {
                     deckRevision.theme = deck.theme;
                 }
 
-                if (deckRevision.theme !== oldTheme) {
-                    // theme was changed, update thumbs for all direct slides
-                    updateDeckThumbnails(deckRevision, deckRevision.theme).catch((err) => {
-                        console.warn(`could not update slide thumbnails for deck ${id}, error was: ${err.message}`);
-                    });
-                }
                 if(!deck.hasOwnProperty('allowMarkdown') || deck.allowMarkdown === null){
                     deckRevision.allowMarkdown = false;
                 }
@@ -720,7 +714,16 @@ let self = module.exports = {
                 }
 
                 return col.findOneAndReplace({ _id: parseInt(id) }, existingDeck, { returnOriginal: false })
-                .then((result) => result.value);
+                .then((result) => {
+                    // return the new deck in database and a hash of changes of interest to caller
+                    return {
+                        replaced: result.value,
+                        changed: {
+                            // return the new theme, or false if unchanged
+                            theme: (deckRevision.theme !== oldTheme) && deckRevision.theme,
+                        },
+                    };
+                });
             });
         });
     },
@@ -3148,26 +3151,6 @@ let self = module.exports = {
         });
     },
 };
-
-// regenerates direct slide thumbnails according to the deck revision theme
-function updateDeckThumbnails(deckRevision, newTheme) {
-    return deckRevision.contentItems.filter((citem) => citem.kind === 'slide').reduce((p, citem) => {
-        return p.then(() => {
-            let slideId = `${citem.ref.id}-${citem.ref.revision}`;
-
-            // fetch the slide content
-            return helper.getCollection('slides').then((slides) => {
-                return slides.findOne({ _id: citem.ref.id }).then((slide) => {
-                    let slideRevision =  slide.revisions.find((rev) => (rev.id === citem.ref.revision));
-
-                    return fileService.createThumbnail(slideRevision.content, slideId, newTheme).catch((err) => {
-                        console.warn(`could not create thumbnail for slide ${slideId}, error was: ${err.message}`);
-                    });
-                });
-            });
-        });
-    }, Promise.resolve());
-}
 
 // split deck id given as parameter to deck id and revision id
 function splitDeckIdParam(deckId){

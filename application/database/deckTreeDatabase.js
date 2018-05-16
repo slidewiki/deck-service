@@ -425,8 +425,17 @@ const self = module.exports = {
         // add it after the target index
         let updatedDeckRevision = await deckDB.insertContentItem(newContentItem, targetPosition + 1, targetDeckId, userId, rootId);
 
-        // TODO generate thumbnails
-        // since we moved the slide maybe it's under a deck with a different theme, so let's create the thumbnail as well
+        // since we moved the slide maybe it's under a deck with a different theme
+        if (slideNode.parent.theme !== updatedDeckRevision.theme) {
+            // yep, it is, so let's create the thumbnails as well
+            for (let slide of await slideDB.getContentItemSlides(newContentItem)) {
+                // generate thumbnails but don't wait for it
+                let newSlideId = util.toIdentifier(slide);
+                fileService.createThumbnail(slide.content, newSlideId, updatedDeckRevision.theme).catch((err) => {
+                    console.warn(`could not create thumbnail for slide ${newSlideId}, error was: ${err.message}`);
+                });
+            }
+        }
 
         // TODO fix usage 
 

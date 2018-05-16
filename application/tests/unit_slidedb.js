@@ -174,8 +174,8 @@ describe('Database', () => {
             let res = ins.then((ins) => deckdb.update(ins._id+'-1', deck2));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.include.all.keys('_id'),
-                res.should.eventually.have.nested.property('revisions.0.language', deck.language),
+                res.should.eventually.include.all.keys('replaced', 'changed'),
+                res.should.eventually.have.nested.property('replaced.revisions.0.language', deck.language),
             ]);
         });
 

@@ -565,6 +565,38 @@ let self = module.exports = {
 
     },
 
+    // returns all the slides, including the variants, directly under the deckId
+    getDeckSlides: async function(deckId) {
+        let deck = await deckDB.getDeck(deckId);
+        if (!deck) return; // not found
+
+        return self.getContentItemSlides(deck.contentItems);
+    },
+
+    // queries the database for the content of all slides in contentItems, including variants
+    getContentItemSlides: async function(contentItems) {
+        if (!_.isArray(contentItems)) {
+            // support just one object or an array all the same
+            contentItems = [contentItems];
+        }
+
+        let slides = [];
+        for (let item of contentItems) {
+            if (item.kind !== 'slide') {
+                continue;
+            }
+            // query the slide database to get content
+            slides.push(await self.getSlideRevision(util.toIdentifier(item.ref)));
+            if (!item.variants) continue;
+
+            for (let variant of item.variants) {
+                slides.push(await self.getSlideRevision(util.toIdentifier(variant)));
+            }
+        }
+
+        return slides;
+    },
+
     // returns a useful representation of a slide in a deck tree, with all variants
     findSlideNode: async function(rootId, slideId) {
         let path = await deckDB.findPath(rootId, slideId, 'slide');
