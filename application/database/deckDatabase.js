@@ -1153,6 +1153,66 @@ let self = module.exports = {
 
     },
 
+    // new method for inserting, simply receives the content item and adds it 
+    // into a deck at the specified position, or appends it at the end if no position is given
+    insertContentItem: async function(citem, position, deckId, userId, rootDeckId, action) {
+        // TODO fix usage 
+        position = parseInt(position);
+        let deckRef = util.parseIdentifier(deckId);
+
+        let decks = await helper.getCollection('decks');
+        let existingDeck = await decks.findOne({ _id: deckRef.id });
+
+        // always mess with the latest revision!
+        let [updatedRevision] = existingDeck.revisions.slice(-1);
+        let deckTracker;
+        if (rootDeckId) {
+            // only track this when rootDeckId is provided
+            deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId, [], action);
+        }
+        // copy edit rights from existingDeck to new
+        if (citem.kind === 'deck') {
+            let attachedDeckId = util.toIdentifier(citem.ref);
+            // TODO check why i do a get here before doing the replacing... 
+            self.get(attachedDeckId).then(() => {
+                return self.deepReplaceEditors(attachedDeckId, { editors: existingDeck.editors });
+            }).catch((err) => {
+                console.warn(`could not properly set edit rights for ${attachedDeckId} when adding it to ${deckId}; error was: ${err}`);
+            });
+        }
+
+        // TODO add contributor data after attaching if needed
+        existingDeck.lastUpdate = new Date().toISOString();
+        updatedRevision.lastUpdate = existingDeck.lastUpdate;
+
+        let citems = updatedRevision.contentItems;
+        if (position && position > 0) {
+            for (let i = position - 1; i < citems.length; i++) {
+                citems[i].order++;
+            }
+
+            let newCitem = Object.assign({
+                order: position,
+            }, citem);
+
+            citems.splice(position - 1, 0, newCitem);
+        } else {
+            // add it to the end
+            // we need to track stuff, this doesn't help
+            let newCitem = Object.assign({
+                order: parseInt(getOrder(updatedRevision)) + 1,
+            }, citem);
+            citems.push(newCitem);
+        }
+
+        // update content items array
+        updatedRevision.contentItems = citems;
+
+        if (deckTracker) deckTracker.applyChangeLog();
+
+        return decks.save(existingDeck).then(() => updatedRevision);
+    },
+
     //removes (unlinks) a content item from a given deck
     removeContentItem: function(position, root_deck, top_root_deck, userId){
         let root_deck_path = root_deck.split('-');

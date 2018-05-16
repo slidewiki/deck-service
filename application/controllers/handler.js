@@ -1358,6 +1358,7 @@ let self = module.exports = {
 
     },
     //changes position of a deck tree node inside the decktree
+    // DEPRECATED
     moveDeckTreeNode: function(request, reply) {
         let userId = request.auth.credentials.userid;
 

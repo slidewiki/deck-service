@@ -365,6 +365,82 @@ const self = module.exports = {
         return forkResult;
     },
 
+    // rootId is the id of the deck tree: its root deck id
+    // source is an object {id, kind, parentId, position}
+    // target is an object {deckId, position}
+    moveDeckTreeNode: async function(rootId, source, target, userId) {
+        let { id: itemId, kind: itemKind, parentId: sourceId, position: sourcePosition } = source;
+        let { deckId: targetDeckId, position: targetPosition } = target;
+
+        if (itemKind === 'deck') {
+            // find the path to it
+            let path = await deckDB.findPath(rootId, itemId);
+            if (!path || !path.length) {
+                throw boom.badData(`could not find deck: ${itemId} in deck tree: ${rootId}`);
+            }
+
+            // last part of the path is the source deck
+            let [pathLeaf] = path.slice(-1);
+            // source can never be the rootId, so path has at least length 2
+            let [pathParent] = path.slice(-2, -1);
+            console.info(`assert ${pathLeaf.index + 1} should equal ${sourcePosition}`);
+            console.info(`assert ${util.toIdentifier(pathParent)} should equal ${sourceId}`);
+
+            // prepare a content item node to attach it to target
+            let newContentItem = {
+                kind: 'deck',
+                ref: _.pick(pathLeaf, 'id', 'revision'),
+            };
+
+            await deckDB.insertContentItem(newContentItem, targetPosition + 1, targetDeckId, userId, rootId);
+
+            // TODO fix usage 
+
+            // if moving in same deck update the source index since it will have changed now
+            // TODO make this better (?)
+            if (sourceId === targetDeckId && sourcePosition > targetPosition ) {
+                sourcePosition++;
+            }
+            // then delete it from old deck
+            await deckDB.removeContentItem(sourcePosition, sourceId, rootId, userId);
+
+            return newContentItem;
+        }
+
+        // first find the slide node
+        let slideNode = await slideDB.findSlideNode(rootId, itemId);
+        if (!slideNode) {
+            throw boom.badData(`could not find slide: ${itemId} in deck tree: ${rootId}`);
+        }
+        console.info(`assert ${slideNode.index + 1} should equal ${sourcePosition}`);
+        console.info(`assert ${util.toIdentifier(slideNode.parent)} should equal ${sourceId}`);
+
+        // prepare a content item node to attach it to target
+        let newContentItem = {
+            kind: 'slide',
+            ref: _.pick(slideNode.slide, 'id', 'revision'),
+            variants: slideNode.variants,
+        };
+
+        // add it after the target index
+        let updatedDeckRevision = await deckDB.insertContentItem(newContentItem, targetPosition + 1, targetDeckId, userId, rootId);
+
+        // TODO generate thumbnails
+        // since we moved the slide maybe it's under a deck with a different theme, so let's create the thumbnail as well
+
+        // TODO fix usage 
+
+        // if moving in same deck update the source index since it will have changed now
+        // TODO make this better (?)
+        if (sourceId === targetDeckId && sourcePosition > targetPosition ) {
+            sourcePosition++;
+        }
+        // then delete it from old deck
+        await deckDB.removeContentItem(sourcePosition, sourceId, rootId, userId);
+
+        return newContentItem;
+    },
+
     // we guard the copy deck revision tree method against abuse, by checking for change logs of one
     copyDeckTree: async function(deckId, userId, forAttach) {
         let deck = util.parseIdentifier(deckId);

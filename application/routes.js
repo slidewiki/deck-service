@@ -893,7 +893,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/decktree/node/move',
-        handler: handlers.moveDeckTreeNode,
+        handler: deckTrees.moveDeckTreeNode,
         config: {
             validate: {
                 payload: Joi.object().keys({
