@@ -915,42 +915,77 @@ let self = module.exports = {
 
                 // we are attaching a copy of a slide that may or may not be in the current tree
                 let slideId = request.payload.nodeSpec.id;
-                slideDB.findSlideNode(top_root_deck, slideId).then((slideNode) => {
-                    if (!slideNode) {
-                        return reply(boom.badData(`could not find slide: ${slideId} in deck tree: ${top_root_deck}`));
-                    }
+                // let's keep the exact action tracked
+                let addAction = 'attach';
+                if (request.payload.nodeSpec.id === request.payload.selector.sid) {
+                    // this means we create a slide duplicate and insert after the slide in selector
+                    addAction = 'copy';
+                }
 
-                    // let's keep the exact action tracked
-                    let addAction = 'attach';
-                    if (request.payload.nodeSpec.id === request.payload.selector.sid) {
-                        addAction = 'copy';
-                    }
+                // if nodeSpec.root is defined, means it's an external attach of a slide in a deck
+                let slideRootId = request.payload.nodeSpec.root;
+                if (slideRootId) {
+                    // we attach the slide with its variants (translations)
+                    slideDB.findSlideNode(slideRootId, slideId).then((slideNode) => {
+                        if (!slideNode) {
+                            return reply(boom.badData(`could not find slide: ${slideId} in deck tree: ${slideRootId}`));
+                        }
 
-                    // we must duplicate the slide node
-                    return slideDB.copySlideNode(top_root_deck, slideId, parentID, userId).then((newContentItem) => {
-                        return deckDB.insertContentItem(newContentItem, slidePosition, parentID, userId, top_root_deck, addAction).then((updatedDeckRevision) => {
-                            let theme = updatedDeckRevision.theme;
-                            return slideDB.getContentItemSlides(newContentItem).then((slides) => {
-                                // generate thumbnails but don't wait for it
-                                for (let slide of slides) {
-                                    let newSlideId = util.toIdentifier(slide);
-                                    fileService.createThumbnail(slide.content, newSlideId, theme).catch((err) => {
-                                        console.warn(`could not create thumbnail for slide ${newSlideId}, error was: ${err.message}`);
-                                    });
-                                }
+                        // we must duplicate the slide node
+                        return slideDB.copySlideNode(slideRootId, slideId, parentID, userId).then((newContentItem) => {
+                            return deckDB.insertContentItem(newContentItem, slidePosition, parentID, userId, top_root_deck, addAction).then((updatedDeckRevision) => {
+                                let theme = updatedDeckRevision.theme;
+                                return slideDB.getContentItemSlides(newContentItem).then((slides) => {
+                                    // generate thumbnails but don't wait for it
+                                    for (let slide of slides) {
+                                        let newSlideId = util.toIdentifier(slide);
+                                        fileService.createThumbnail(slide.content, newSlideId, theme).catch((err) => {
+                                            console.warn(`could not create thumbnail for slide ${newSlideId}, error was: ${err.message}`);
+                                        });
+                                    }
 
-                                // the node data are the same as the original
-                                reply({ title: slideNode.slide.title, id: util.toIdentifier(newContentItem.ref), type: 'slide' });
+                                    // the node data are the same as the original
+                                    reply({ title: slideNode.slide.title, id: util.toIdentifier(newContentItem.ref), type: 'slide' });
+                                });
+
                             });
 
                         });
 
+                    }).catch((err) => {
+                        request.log('error', err);
+                        reply(boom.badImplementation());
                     });
 
-                }).catch((err) => {
-                    request.log('error', err);
-                    reply(boom.badImplementation());
-                });
+                } else {
+                    // otherwise, we keep things backwards-compatible and insert a simple slide copy.
+                    // in this case the slide copy will have the same language as the deck tree we are attaching to
+                    slideDB.getSlideRevision(slideId).then((slide) => {
+                        if (!slide) {
+                            return reply(boom.badData(`could not locate slide to attach: ${slideId}`));
+                        }
+
+                        return slideDB.copy(slide, parentID, userId).then((inserted) => {
+                            // it's slide copy, so revision is 1
+                            let newContentItem = { ref: { id: inserted._id, revision: 1 }, kind: 'slide' };
+                            return deckDB.insertContentItem(newContentItem, slidePosition, parentID, userId, top_root_deck, addAction).then((updatedDeckRevision) => {
+                                // we can now pick the theme of the parent deck and create the thumbnail!
+                                let newSlideId = util.toIdentifier(newContentItem.ref);
+                                fileService.createThumbnail(inserted.revisions[0].content, newSlideId, updatedDeckRevision.theme).catch((err) => {
+                                    console.warn(`could not create thumbnail for slide ${newSlideId}, error was: ${err.message}`);
+                                });
+
+                                // the node data are the same as the original
+                                reply({ title: slide.title, id: newSlideId, type: 'slide' });
+                            });
+                        });
+
+                    }).catch((err) => {
+                        request.log('error', err);
+                        reply(boom.badImplementation());
+                    });
+
+                }
 
             }else{
                 //need to make a new slide
