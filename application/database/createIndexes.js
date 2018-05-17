@@ -8,6 +8,7 @@ module.exports = function() {
             { key: {'revisions.contentItems.ref.id': 1} },
             { key: {'revisions.contentItems.ref.revision': 1} },
             { key: {'revisions.contentItems.kind': 1} },
+            { key: {'origin.id': 1} },
         ]);
     });
 };
