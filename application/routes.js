@@ -823,6 +823,7 @@ module.exports = function(server) {
                         Joi.object().keys({
                             id: Joi.string(),
                             type: Joi.string(),
+                            root: Joi.string(),
                         })
                     ).single(),
                     content: Joi.string(),
