@@ -454,6 +454,7 @@ const self = module.exports = {
     copyDeckTree: async function(deckId, userId, forAttach) {
         let deck = util.parseIdentifier(deckId);
         let latestRevision = await deckDB.getLatestRevision(deck.id);
+        if (!latestRevision) return; // deck not found
 
         // this flag will determine if we need to revise the deck tree after copying is complete
         // we only need to do this if we are copying the latest revision of a deck
@@ -640,4 +641,114 @@ const self = module.exports = {
 
     },
 
+    // copies (forks) deck sourceId and attaches it to deck targetId children at targetPosition
+    attachDeckTree: async function(sourceId, targetId, targetPosition, targetRootId, userId) {
+        let forkResult = await self.copyDeckTree(sourceId, userId, true);
+        if (!forkResult) return; // sourceId not found
+
+        // get the new deck we are going to attach
+        let newContentItem = { ref: util.parseIdentifier(forkResult.root_deck), kind: 'deck' };
+
+        // before attaching, we need to add the merge parent deck variants into the child deck variants
+        // we also need to update the child language to match the parents' (????)
+        // because the child deck may have subdecks, this needs to be done recursively
+        let targetDeck = await deckDB.getDeck(targetId);
+        // normalize the id
+        targetId = util.toIdentifier(targetDeck);
+
+        // we need to keep only what we support as variant filter, which is language only
+        let targetVariants = (targetDeck.variants || []).map((v) => _.pick(v, 'language'));
+        await mergeDeckVariants(newContentItem.ref.id, targetVariants, _.pick(targetDeck, 'language'));
+
+        // omitting the rootDeckId in the call to insertContentItem means this change won't be tracked,
+        // as it will be tracked right after this code, we just need to attach now
+        // first so that the rest of the tracking will work
+        await deckDB.insertContentItem(newContentItem, targetPosition, targetId, userId);
+
+        // do some stuff in parallel, AFTER it's attached
+        await Promise.all([
+            // track all created forks
+            deckDB._trackDecksForked(targetRootId, forkResult.id_map, userId, 'attach').catch((err) => {
+                console.warn(`error tracking attach deck copy ${forkResult.root_node} to ${targetId}`);
+            }),
+            // add to usage
+            deckDB.addToUsage(newContentItem, targetId.split('-')).catch((err) => {
+                console.warn(`error processing usage while attaching deck copy ${forkResult.root_node} to ${targetId}`);
+            }),
+        ]);
+
+        // return the deck copy information
+        return forkResult;
+    },
+
 };
+
+// adds all the variants to the deck deckId and its subdecks, if missing
+// also sets the relevant deck properties to the values specified in defaults
+// defaults should never be included in new variants to merge
+async function mergeDeckVariants(deckId, variants, defaults) {
+    let deck = await deckDB.get(deckId);
+
+    // always work with latest revision
+    let [latestRevision] = deck.revisions.slice(-1);
+    // ensure variants
+    if (!latestRevision.hasOwnProperty('variants')) {
+        latestRevision.variants = [];
+    }
+
+    // merge variants provided into deck variants
+    for (let variant of variants) {
+        let existingVariant = _.find(latestRevision.variants, variant);
+        if (!existingVariant) {
+            latestRevision.variants.push(variant);
+        }
+    }
+
+    // remove the defaults from the deck variants if there
+    // check if defaults is in variants and remove it
+    let existingDefaults = _.find(latestRevision.variants, defaults);
+    _.remove(latestRevision.variants, defaults);
+
+    // assign the defaults: language is the only one supported for now
+    if (defaults.language !== latestRevision.language) {
+        // add the current language of the deck to the variants array
+        let oldVariantData = _.pick(latestRevision, 'language', 'title', 'description');
+        let existingVariant = _.find(latestRevision.variants, _.pick(oldVariantData, 'language'));
+        if (existingVariant) {
+            // update with values from latestRevision as we are changing the language
+            Object.assign(existingVariant, oldVariantData);
+        } else {
+            // push all variant data into variants array
+            latestRevision.variants.push(oldVariantData);
+        }
+
+        // if defaults was in variants, update the variant data (title, description)
+        if (existingDefaults) {
+            Object.assign(latestRevision, existingDefaults);
+        }
+
+        // finally, change the language!
+        latestRevision.language = defaults.language;
+    }
+
+    let decks = await helper.getCollection('decks');
+    // put the changed revision object
+    await decks.findOneAndUpdate(
+        { _id: deck._id, 'revisions.id': latestRevision.id },
+        { $set: {
+            'revisions.$': latestRevision,
+        } }
+    );
+
+    // need to apply this recursively as well !!!
+    // current deck is synced. let's sync its children as well
+
+    // we need to keep only what we support as variant filter, which is language only
+    let newVariants = latestRevision.variants.map((v) => _.pick(v, 'language'));
+    for (let subdeck of _.filter(latestRevision.contentItems, { kind: 'deck' }) ) {
+        await mergeDeckVariants(subdeck.ref.id, newVariants, defaults);
+    }
+
+    // respond with merged variants on success
+    return latestRevision.variants;
+}

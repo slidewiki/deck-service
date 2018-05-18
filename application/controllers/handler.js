@@ -1159,52 +1159,24 @@ let self = module.exports = {
                     });
                 }
                 else{
-                    treeDB.copyDeckTree(request.payload.nodeSpec.id, userId, true).then((forkResult) => {
-                        // get the new deck we are going to attach
-                        request.payload.nodeSpec.id = forkResult.root_deck;
+                    // find the parent, again
+                    if(request.payload.selector.stype === 'deck'){
+                        parentID = request.payload.selector.sid;
+                    }
+                    else{
+                        parentID = request.payload.selector.id;
+                    }
 
-                        deckRevision = parseInt(request.payload.nodeSpec.id.split('-')[1])-1;
-                        self.getDeck({
-                            'params': {'id' : request.payload.nodeSpec.id},
-                            'log': request.log.bind(request),
-                        }, (deck) => {
-                            if (deck.isBoom) return reply(deck);
-
-                            deck.id = deck._id;
-                            { // these brackets are kept during handleChange removal to keep git blame under control
-
-                                if(request.payload.selector.stype === 'deck'){
-                                    parentID = request.payload.selector.sid;
-                                }
-                                else{
-                                    parentID = request.payload.selector.id;
-                                }
-
-                                // omitting the top_root_deck means this change won't be tracked,
-                                // as it will be tracked right after this code, we just need to attach
-                                // first so that the rest of the tracking will work
-                                return deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
-                                    return Promise.all([
-                                        // track all created forks AFTER it's attached
-                                        deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, 'attach'),
-                                        // add to usage AFTER it's attached
-                                        deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-')),
-                                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
-                                        self.getDeckTree({
-                                            'params': {'id' : deck.id},
-                                            'log': request.log.bind(request),
-                                        }, (deckTree) => {
-                                            if (deckTree.isBoom) return reply(deckTree);
-
-                                            reply(deckTree);
-                                        }),
-                                    ]);
-
-                                });
-
-                            }
+                    let sourceId = request.payload.nodeSpec.id;
+                    treeDB.attachDeckTree(sourceId, parentID, deckPosition, top_root_deck, userId).then((forkResult) => {
+                        if (!forkResult) {
+                            // source id not found
+                            return reply(boom.badData(`could not locate specified deck: ${sourceId}`));
+                        }
+                        //we have to return from the callback, else empty node is returned because it is updated asynchronously
+                        return treeDB.getDeckTree(forkResult.root_deck).then((deckTree) => {
+                            reply(deckTree);
                         });
-
                     }).catch((err) => {
                         request.log('error', err);
                         reply(boom.badImplementation());
