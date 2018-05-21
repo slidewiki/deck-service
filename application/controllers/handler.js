@@ -1203,63 +1203,37 @@ let self = module.exports = {
                 let deckArrayPath = spathArray[spathArray.length-1].split(':');
                 deckPosition = parseInt(deckArrayPath[1])+1;
 
-                { // these brackets are kept during handleChange removal to keep git blame under control
+                let payload = {
+                    title: 'New deck',
+                    description: '',
+                };
+                treeDB.createSubdeck(payload, parentID, deckPosition, top_root_deck, userId).then((newDeck) => {
+                    // this creates an empty subdeck, let's also add a sample slide
+                    // init the payload from the optional first_slide object data
+                    let payload = Object.assign({
+                        title: 'New slide',
+                        content: slidetemplate,
+                        markdown: '',
+                        speakernotes: '',
+                    }, request.payload.first_slide);
 
-                    self.getDeck({
-                        'params': {'id':parentID},
-                        'log': request.log.bind(request),
-                    }, (parentDeck) => {
-                        if (parentDeck.isBoom) return reply(parentDeck);
-
-                        let deck = {
-                            'description': '',
-                            'title': 'New deck',
-                            'content': slidetemplate,
-                            'language': parentDeck.revisions[0].language,
-                            'license': parentDeck.license,
-                            'user': userId,
-                            'root_deck': parentID,
-                            'top_root_deck': top_root_deck,
-                            'theme': parentDeck.revisions[0].theme,
-                            'allowMarkdown': parentDeck.revisions[0].allowMarkdown,
-                            'position' : deckPosition
-                        };
-
-                        if (parentDeck.slideDimensions) {
-                            deck.slideDimensions = parentDeck.slideDimensions;
-                        }
-
-                        //create the new deck
-                        self.newDeck({
-                            'payload' : deck,
-                            'auth': request.auth,
-                            'log': request.log.bind(request),
-                        }, (createdDeck) => {
-                            if (createdDeck.isBoom) return reply(createdDeck);
-
-                            let insertPromise = Promise.resolve();
-                            if (parentID) {
-                                insertPromise = deckDB.insertNewContentItem(createdDeck, deckPosition, parentID, 'deck', 1, userId, top_root_deck);
-                            }
-
-                            insertPromise.then(() => {
-                                // we have to return from the callback, else empty node is returned because it is updated asynchronously
-                                self.getDeckTree({
-                                    'params': {'id' : createdDeck.id},
-                                    'log': request.log.bind(request),
-                                }, (deckTree) => {
-                                    if (deckTree.isBoom) return reply(deckTree);
-
-                                    reply(deckTree);
-                                });
-                            }).catch((err) => {
-                                request.log('error', err);
-                                reply(boom.badImplementation());
+                    return treeDB.createSlide(payload, util.toIdentifier(newDeck.ref), 0, top_root_deck, userId).then((newSlide) => {
+                        // we have to return from the callback, else empty node is returned because it is updated asynchronously
+                        return treeDB.getDeckTree(newDeck.ref.id).then((newTree) => {
+                            // let's create a thumbnail but dont wait for it
+                            let slideId = util.toIdentifier(newSlide.ref);
+                            fileService.createThumbnail(payload.content, slideId, newTree.theme).catch((err) => {
+                                request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
                             });
 
+                            reply(newTree);
                         });
                     });
-                }
+
+                }).catch((err) => {
+                    request.log('error', err);
+                    reply(boom.badImplementation());
+                });
             }
         }
     },

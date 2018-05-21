@@ -649,7 +649,7 @@ const self = module.exports = {
         // get the new deck we are going to attach
         let newContentItem = { ref: util.parseIdentifier(forkResult.root_deck), kind: 'deck' };
 
-        // before attaching, we need to add the merge parent deck variants into the child deck variants
+        // before attaching, we need to merge the parent deck variants into the child deck variants
         // we also need to update the child language to match the parents' (????)
         // because the child deck may have subdecks, this needs to be done recursively
         let targetDeck = await deckDB.getDeck(targetId);
@@ -679,6 +679,90 @@ const self = module.exports = {
 
         // return the deck copy information
         return forkResult;
+    },
+
+    createSubdeck: async function(payload, targetId, targetPosition, rootId, userId) {
+        let parentDeck = await deckDB.getDeck(targetId);
+        if (!parentDeck) return; // sourceId not found
+        // normalize the id
+        targetId = util.toIdentifier(parentDeck);
+
+        // assign data from parent deck
+        Object.assign(payload, _.pick(parentDeck, [
+            'language',
+            'license',
+            'theme',
+            'allowMarkdown',
+            'slideDimensions',
+        ]));
+
+        // assign metadata
+        Object.assign(payload, {
+            'user': userId,
+            'root_deck': targetId,
+        });
+
+        // add it to database
+        let newDeck = await deckDB.insert(payload);
+        // get the content item to insert
+        let newContentItem = { ref: { id: newDeck._id, revision: 1 }, kind: 'deck' };
+
+        // we also add to the subdeck the same variants as the parent deck
+        // for now, only language is variant specifier
+        let targetVariants = (parentDeck.variants || []).map((v) => _.pick(v, 'language'));
+        if (!_.isEmpty(targetVariants)) {
+            newDeck.variants = targetVariants;
+
+            // also save the variants
+            let decks = await helper.getCollection('decks');
+            await decks.findOneAndUpdate(
+                { _id: newContentItem.ref.id, 'revisions.id': newContentItem.ref.revision },
+                { $set: {
+                    'revisions.$.variants': targetVariants,
+                } }
+            );
+        }
+
+        // omitting the rootDeckId in the call to insertContentItem means this change won't be tracked,
+        // as it will be tracked right after this code, we just need to attach now
+        // first so that the rest of the tracking will work
+        await deckDB.insertContentItem(newContentItem, targetPosition, targetId, userId);
+
+        // return the new content item
+        return newContentItem;
+    },
+
+    createSlide: async function(payload, targetId, targetPosition, rootId, userId) {
+        let parentDeck = await deckDB.getDeck(targetId);
+        if (!parentDeck) return; // sourceId not found
+        // normalize the id
+        targetId = util.toIdentifier(parentDeck);
+
+        // assign data from parent deck
+        Object.assign(payload, _.pick(parentDeck, [
+            'language',
+            'license',
+        ]));
+        if (parentDeck.slideDimensions) {
+            payload.dimensions= parentDeck.slideDimensions;
+        }
+
+        // assign metadata
+        Object.assign(payload, {
+            'user': userId,
+            'root_deck': targetId,
+        });
+
+        // add it to database
+        let newSlide = await slideDB.insert(payload);
+        // get the content item to insert
+        let newContentItem = { ref: { id: newSlide._id, revision: 1 }, kind: 'slide' };
+
+        // this method also tracks the slide insertion
+        await deckDB.insertContentItem(newContentItem, targetPosition, targetId, userId, rootId);
+
+        // return the new content item
+        return newContentItem;
     },
 
 };
