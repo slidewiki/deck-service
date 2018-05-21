@@ -726,7 +726,7 @@ const self = module.exports = {
         // omitting the rootDeckId in the call to insertContentItem means this change won't be tracked,
         // as it will be tracked right after this code, we just need to attach now
         // first so that the rest of the tracking will work
-        await deckDB.insertContentItem(newContentItem, targetPosition, targetId, userId);
+        await deckDB.insertContentItem(newContentItem, targetPosition, targetId, userId, rootId);
 
         // return the new content item
         return newContentItem;
