@@ -779,6 +779,7 @@ let self = module.exports = {
     },
 
     // authorize node creation and iterate nodeSpec array to apply each insert
+    // DEPRECATED
     createDeckTreeNodeWithCheck: function(request, reply) {
         let userId = request.auth.credentials.userid;
         let rootDeckId = request.payload.selector.id;
@@ -851,6 +852,7 @@ let self = module.exports = {
     },
 
     //creates a node (deck or slide) into the given deck tree
+    // DEPRECATED
     createDeckTreeNode: function(request, reply) {
         let node = {};
         let top_root_deck = request.payload.selector.id;

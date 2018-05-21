@@ -809,7 +809,7 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/decktree/node/create',
-        handler: handlers.createDeckTreeNodeWithCheck,
+        handler: deckTrees.createDeckTreeNode,
         config: {
             validate: {
                 payload: Joi.object().keys({

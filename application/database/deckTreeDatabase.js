@@ -683,7 +683,7 @@ const self = module.exports = {
 
     createSubdeck: async function(payload, targetId, targetPosition, rootId, userId) {
         let parentDeck = await deckDB.getDeck(targetId);
-        if (!parentDeck) return; // sourceId not found
+        if (!parentDeck) return; // targetId not found
         // normalize the id
         targetId = util.toIdentifier(parentDeck);
 
