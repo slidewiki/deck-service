@@ -386,17 +386,19 @@ let self = module.exports = {
 
             if (targetKind === 'slide') {
                 // first check all children for slide target
+                let variant;
                 let foundSlideIndex = sourceRevision.contentItems.findIndex((citem) => {
                     if (citem.kind !== 'slide') return false;
                     if (citem.ref.id === target.id) return true;
 
-                    // also check the variants!!!
-                    return !!_.find(citem.variants, { id: target.id });
+                    // also check the variants
+                    // set variant when such is found
+                    return !!(variant = _.find(citem.variants, { id: target.id }));
                 });
                 let foundSlide = sourceRevision.contentItems[foundSlideIndex];
 
                 // the path points to the slide, append just the index and return
-                if (foundSlide) return path.concat({ index: foundSlideIndex });
+                if (foundSlide) return path.concat({ index: foundSlideIndex, variant });
             }
 
             // expand all subdecks

@@ -628,21 +628,32 @@ let self = module.exports = {
         let slideNode = await self.findSlideNode(rootId, slideId);
         // slideNode includes data for the original slide, and references for variants
 
+        // check if slideId request was for variant slide
+        let [{variant: slideVariant}] = slideNode.path.slice(-1);
+
         let parentRef = _.pick(slideNode.parent, 'id', 'revision');
         let newSlideRef, oldSlideRef, result;
-        if (!_.isEmpty(variantFilter)) {
-            // assign language and other variant metadata from filter if provided
-            Object.assign(payload, variantFilter);
-
-            let slideVariant = _.find(slideNode.variants, variantFilter);
+        if (slideVariant || !_.isEmpty(variantFilter)) {
+            // if slideVariant exists, variantFilter is effectively ignored (contains immutable data)
             if (!slideVariant) {
-                // creates and adds a brand new slide variant
-                return self.addSlideNodeVariant(rootId, slideId, payload, userId);
+                // the slideId was the primary slide in the node
+                // try and locate the variant based on filter provided instead
+                slideVariant = _.find(slideNode.variants, variantFilter);
+
+                // if still not there, add it
+                if (!slideVariant) {
+                    // but first assign language and other variant metadata from filter
+                    Object.assign(payload, variantFilter);
+                    // creates and adds a brand new slide variant
+                    return self.addSlideNodeVariant(rootId, slideId, payload, userId);
+                }
             }
-            // slideVariant exists, so we need to revise that instead
+
+            // slideVariant already exists, so we need to revise that instead of adding one
             oldSlideRef = _.pick(slideVariant, 'id', 'revision');
             newSlideRef = await self.revise(util.toIdentifier(oldSlideRef), payload, userId);
 
+            // language is the only currently supported variant spec
             let newVariant = Object.assign({
                 language: payload.language,
             }, newSlideRef);
@@ -651,7 +662,7 @@ let self = module.exports = {
 
             result = newVariant;
         } else {
-            // if no variantFilter is provided, we revise the original slide
+            // no variantFilter is provided, and the slideId targets the primary slide, so we revise that instead
             oldSlideRef = _.pick(slideNode.slide, 'id', 'revision');
             newSlideRef = await self.revise(util.toIdentifier(oldSlideRef), payload, userId);
 

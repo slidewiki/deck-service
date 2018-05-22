@@ -188,8 +188,7 @@ let self = module.exports = {
 
         // TODO authenticate
 
-        let variantFilter = _.pick(request.payload, 'language');
-        slideDB.updateSlideNode(rootId, slideId, request.payload, variantFilter, userId).then((slideRef) => {
+        slideDB.updateSlideNode(rootId, slideId, request.payload, {}, userId).then((slideRef) => {
             // send tags to tag-service
             if (request.payload.tags && request.payload.tags.length > 0) {
                 tagService.upload(request.payload.tags, userId).catch( (e) => {
