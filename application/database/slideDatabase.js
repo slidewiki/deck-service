@@ -598,6 +598,7 @@ let self = module.exports = {
     },
 
     // returns a useful representation of a slide in a deck tree, with all variants
+    // includes data for the original slide, and references for variants
     findSlideNode: async function(rootId, slideId) {
         let path = await deckDB.findPath(rootId, slideId, 'slide');
         if (!path || !path.length) return; // not found
@@ -624,45 +625,42 @@ let self = module.exports = {
         };
     },
 
-    updateSlideNode: async function(rootId, slideId, payload, variantFilter, userId) {
-        let slideNode = await self.findSlideNode(rootId, slideId);
-        // slideNode includes data for the original slide, and references for variants
+    updateSlideNode: async function(slideNode, payload, userId) {
+        // pick the if of the root of the path
+        let [{id: rootId}] = slideNode.path;
 
-        // check if slideId request was for variant slide
+        // check if slideNode was matched against a variant slide
         let [{variant: slideVariant}] = slideNode.path.slice(-1);
+        // check if payload includes variant specifications (language)
+        let variantFilter = _.pick(payload, 'language');
+
+        if (!slideVariant && !_.isEmpty(variantFilter)) {
+            // the slideNode was located using the primary slide id
+            // try and locate the variant based on filter provided instead
+            slideVariant = _.find(slideNode.variants, variantFilter);
+
+            // if still not there, add it
+            if (!slideVariant) {
+                // creates and adds a brand new slide variant
+                return self.addSlideNodeVariant(slideNode, payload, userId);
+            }
+        }
 
         let parentRef = _.pick(slideNode.parent, 'id', 'revision');
         let newSlideRef, oldSlideRef, result;
-        if (slideVariant || !_.isEmpty(variantFilter)) {
-            // if slideVariant exists, variantFilter is effectively ignored (contains immutable data)
-            if (!slideVariant) {
-                // the slideId was the primary slide in the node
-                // try and locate the variant based on filter provided instead
-                slideVariant = _.find(slideNode.variants, variantFilter);
-
-                // if still not there, add it
-                if (!slideVariant) {
-                    // but first assign language and other variant metadata from filter
-                    Object.assign(payload, variantFilter);
-                    // creates and adds a brand new slide variant
-                    return self.addSlideNodeVariant(rootId, slideId, payload, userId);
-                }
-            }
-
-            // slideVariant already exists, so we need to revise that instead of adding one
+        if (slideVariant) {
+            // slideVariant already exists
+            // we need to revise that instead of adding one
             oldSlideRef = _.pick(slideVariant, 'id', 'revision');
             newSlideRef = await self.revise(util.toIdentifier(oldSlideRef), payload, userId);
 
-            // language is the only currently supported variant spec
-            let newVariant = Object.assign({
-                language: payload.language,
-            }, newSlideRef);
-
+            // update the existing variant with new ref data
+            let newVariant = Object.assign(slideVariant, newSlideRef);
             await deckDB.setContentVariant(parentRef.id, slideNode.index, newVariant, userId);
 
             result = newVariant;
         } else {
-            // no variantFilter is provided, and the slideId targets the primary slide, so we revise that instead
+            // no variantFilter is provided, and the slide  targets the primary slide, so we revise that instead
             oldSlideRef = _.pick(slideNode.slide, 'id', 'revision');
             newSlideRef = await self.revise(util.toIdentifier(oldSlideRef), payload, userId);
 
@@ -694,17 +692,7 @@ let self = module.exports = {
         return result;
     },
 
-    addSlideNodeVariant: async function(rootId, slideId, variantData, userId) {
-        let slideNode = await self.findSlideNode(rootId, slideId);
-        if (!slideNode) {
-            throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootId}`);
-        }
-
-        //  check if it exists already
-        if (_.find(slideNode.variants, { language: variantData.language }) ) {
-            throw boom.badData(`variant for language ${variantData.language} already exists for slide: ${slideId} in deck tree: ${rootId}`);
-        }
-
+    addSlideNodeVariant: async function(slideNode, variantData, userId) {
         let originalSlide = slideNode.slide;
         // create a copy based on original slide data
         let newSlide = _.pick(slideNode.slide, [

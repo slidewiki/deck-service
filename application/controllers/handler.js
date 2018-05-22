@@ -186,34 +186,43 @@ let self = module.exports = {
         let slideId = request.params.id;
         let rootId = request.payload.top_root_deck;
 
+        // ignore the language (TODO remove from API as well)
+        delete request.payload.language;
+
         // TODO authenticate
 
-        slideDB.updateSlideNode(rootId, slideId, request.payload, {}, userId).then((slideRef) => {
-            // send tags to tag-service
-            if (request.payload.tags && request.payload.tags.length > 0) {
-                tagService.upload(request.payload.tags, userId).catch( (e) => {
-                    request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
-                });
+        slideDB.findSlideNode(rootId, slideId).then((slideNode) => {
+            if (!slideNode) {
+                throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootId}`);
             }
 
-            // we must update all decks in the 'usage' attribute
-            return slideDB.get(slideRef.id).then((newSlide) => {
-                // prepare the newSlide response object
-                newSlide.revisions = [_.find(newSlide.revisions, { id: slideRef.revision })];
-
-                // create thumbnail for the new slide revision
-                let content = newSlide.revisions[0].content;
-                let newSlideId = util.toIdentifier(slideRef);
-
-                if (!content) {
-                    content = '<h2>' + newSlide.revisions[0].title + '</h2>';
+            return slideDB.updateSlideNode(slideNode, request.payload, userId).then((slideRef) => {
+                // send tags to tag-service
+                if (request.payload.tags && request.payload.tags.length > 0) {
+                    tagService.upload(request.payload.tags, userId).catch( (e) => {
+                        request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
+                    });
                 }
-                request.log('info', `creating thumbnail for new slide revision ${newSlideId} with theme ${slideRef.theme}`);
-                fileService.createThumbnail(content, newSlideId, slideRef.theme).catch((err) => {
-                    request.log('warn', `could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
-                });
 
-                reply(newSlide);
+                // we must update all decks in the 'usage' attribute
+                return slideDB.get(slideRef.id).then((newSlide) => {
+                    // prepare the newSlide response object
+                    newSlide.revisions = [_.find(newSlide.revisions, { id: slideRef.revision })];
+
+                    // create thumbnail for the new slide revision
+                    let content = newSlide.revisions[0].content;
+                    let newSlideId = util.toIdentifier(slideRef);
+
+                    if (!content) {
+                        content = '<h2>' + newSlide.revisions[0].title + '</h2>';
+                    }
+                    request.log('info', `creating thumbnail for new slide revision ${newSlideId} with theme ${slideRef.theme}`);
+                    fileService.createThumbnail(content, newSlideId, slideRef.theme).catch((err) => {
+                        console.warn(`could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                    });
+
+                    reply(newSlide);
+                });
             });
 
         }).catch((error) => {
@@ -1515,13 +1524,26 @@ let self = module.exports = {
             // latest revision only!
             return deckDB.getDeckVariants(rootDeckId).then((variants) => {
                 // check if the language is in deck variants
-                let existingVariant = _.find(variants, { language: request.payload.language });
+                let variantFilter = _.pick(request.payload, 'language');
+                let existingVariant = _.find(variants, variantFilter);
                 if (!existingVariant) {
-                    throw boom.badData(`missing deck translation for language ${request.payload.language} in deck ${rootDeckId}`);
+                    throw boom.badData(`missing deck variant for ${Object.entries(variantFilter)} in deck ${rootDeckId}`);
                 }
 
+                // locate the node
                 let slideId = request.payload.selector.sid;
-                return slideDB.addSlideNodeVariant(rootDeckId, slideId, request.payload, userId);
+                return slideDB.findSlideNode(rootDeckId, slideId).then((slideNode) => {
+                    if (!slideNode) {
+                        throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootDeckId}`);
+                    }
+
+                    // check if node variant exists already
+                    if (_.find(slideNode.variants, variantFilter) ) {
+                        throw boom.badData(`variant for ${Object.entries(variantFilter)} already exists for slide: ${slideId} in deck tree: ${rootDeckId}`);
+                    }
+
+                    return slideDB.addSlideNodeVariant(slideNode, request.payload, userId);
+                });
             });
 
         }).then((result) => {

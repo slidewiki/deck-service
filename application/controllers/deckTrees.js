@@ -389,27 +389,35 @@ const self = module.exports = {
             });
         } else {
             // it's a slide
-            renamePromise = slideDB.updateSlideNode(rootId, itemId, { title: newName }, variantFilter, userId).then((newSlideRef) => {
-                // TODO revise this weird API response
-                // this is to keep the API intact as much as possible
-                return slideDB.get(newSlideRef.id).then((updatedSlide) => {
-                    // prepare the updatedSlide response object
-                    // updatedSlide.revisions = updatedSlide.revisions.slice(-1);
-                    updatedSlide.revisions = [_.find(updatedSlide.revisions, { id: newSlideRef.revision })];
+            renamePromise = slideDB.findSlideNode(rootId, itemId).then((slideNode) => {
+                if (!slideNode) {
+                    throw boom.badData(`could not find slide: ${itemId} in deck tree: ${rootId}`);
+                }
 
-                    // create thumbnail for the new slide revision
-                    let content = updatedSlide.revisions[0].content;
-                    let newSlideId = util.toIdentifier(newSlideRef);
+                // prepare the payload and include the variant spec data as well
+                let payload = Object.assign({ title: newName }, variantFilter);
+                return slideDB.updateSlideNode(slideNode, payload, userId).then((newSlideRef) => {
+                    // TODO revise this weird API response
+                    // this is to keep the API intact as much as possible
+                    return slideDB.get(newSlideRef.id).then((updatedSlide) => {
+                        // prepare the updatedSlide response object
+                        // updatedSlide.revisions = updatedSlide.revisions.slice(-1);
+                        updatedSlide.revisions = [_.find(updatedSlide.revisions, { id: newSlideRef.revision })];
 
-                    if (!content) {
-                        content = '<h2>' + updatedSlide.revisions[0].title + '</h2>';
-                    }
-                    fileService.createThumbnail(content, newSlideId, newSlideRef.theme).catch((err) => {
-                        console.warn(`could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                        // create thumbnail for the new slide revision
+                        let content = updatedSlide.revisions[0].content;
+                        let newSlideId = util.toIdentifier(newSlideRef);
+
+                        if (!content) {
+                            content = '<h2>' + updatedSlide.revisions[0].title + '</h2>';
+                        }
+                        fileService.createThumbnail(content, newSlideId, newSlideRef.theme).catch((err) => {
+                            console.warn(`could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                        });
+
+                        // TODO might also need to create a thumbnail
+                        reply(updatedSlide);
                     });
-
-                    // TODO might also need to create a thumbnail
-                    reply(updatedSlide);
                 });
             });
         }
