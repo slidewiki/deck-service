@@ -144,6 +144,11 @@ let self = module.exports = {
         // translate all revisions
         if (!_.isEmpty(variantFilter)) {
             for (let deckRevision of found.revisions) {
+                if (variantFilter.language === deckRevision.language) {
+                    // skip it if the same language as requested
+                    continue;
+                }
+
                 // check if variant language exists
                 let variantData = _.find(deckRevision.variants, variantFilter);
                 if (variantData) {
@@ -161,7 +166,7 @@ let self = module.exports = {
                 } else {
                     // TODO if not found, and specific revision WAS requested, we return error (do we have to ????)
                     if (revisionId) {
-                        throw boom.badData(`unknown variant for deck ${identifier}: ${JSON.stringify(variantFilter)}`);
+                        throw boom.badData(`missing deck variant for ${Object.entries(variantFilter)} in deck ${identifier}`);
                     } // else no worries
                 }
             }
@@ -2292,9 +2297,10 @@ let self = module.exports = {
 
         // check against the deck language and the variants array
         // for now we only support language as variant definition
-        let existingVariant = _.find(latestRevision.variants, { language: variantData.language });
-        if (existingVariant || latestRevision.language === variantData.language) {
-            throw boom.badData(`translation to language ${variantData.language} already exists for deck ${deckId}`);
+        let variantFilter = _.pick(variantData, 'language');
+        let existingVariant = _.find(latestRevision.variants, variantFilter);
+        if (existingVariant || latestRevision.language === variantFilter.language) {
+            throw boom.badData(`deck variant for ${Object.entries(variantFilter)} already exists for deck ${deckId}`);
         }
         latestRevision.variants.push(variantData);
 
