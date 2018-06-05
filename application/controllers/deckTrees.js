@@ -431,4 +431,15 @@ const self = module.exports = {
 
     },
 
+    exportDeckTree: function(request, reply) {
+        treeDB.exportDeckTree(request.params.id).then((deckTree) => {
+            if (!deckTree) throw boom.notFound();
+            reply(deckTree);
+        }).catch((err) => {
+            if(err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
 };

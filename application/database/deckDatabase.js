@@ -3070,6 +3070,7 @@ let self = module.exports = {
         return self.archiveDeck(deckId, userId, reason, comment);
     },
 
+    // DEPRECATED
     getEnrichedDeckTree: function(deckId, onlyDecks=false, path=[]){
         return self.get(deckId).then( (deck) => {
             if(!deck) return;

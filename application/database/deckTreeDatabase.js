@@ -128,6 +128,63 @@ const self = module.exports = {
         return deckTree;
     },
 
+    // new implementation for decktree API with enrich flag
+    exportDeckTree: async function(deckId, path=[]) {
+        let deck = await deckDB.getDeck(deckId);
+        if (!deck) return; // not found
+
+        // make it canonical
+        deckId = util.toIdentifier(deck);
+
+        // build the path
+        path.push(_.pick(deck, 'id', 'revision', 'hidden'));
+
+        let deckTree = {
+            type: 'deck',
+            id: deck.id,
+            revision: deck.revision,
+            latestRevision: deck.latestRevision,
+            hidden: deck.hidden,
+            title: deck.title,
+            description: deck.description, 
+            variants: deck.variants,
+            timestamp: deck.timestamp, 
+            lastUpdate: deck.lastUpdate, 
+            language: deck.language,
+            owner: deck.user, 
+            tags: _.map(deck.tags, 'tagName'),
+            contributors: _.map(deck.contributors, 'user'),
+            path: path,
+            contents: [],
+        };
+
+        for (let item of deck.contentItems) {
+            let itemId = util.toIdentifier(item.ref);
+            if (item.kind === 'slide') {
+                let slide = await exportSlide(itemId);
+                slide.path = path;
+
+                // also add the variants
+                slide.variants = [];
+                for (let slideVariant of (item.variants || [])) {
+                    let variantInfo = await exportSlide(util.toIdentifier(slideVariant));
+                    // also add any other variant data (language currently)
+                    Object.assign(variantInfo, slideVariant);
+                    slide.variants.push(variantInfo);
+                }
+
+                deckTree.contents.push(slide);
+
+            } else {
+                // it's a deck
+                let innerTree = await self.exportDeckTree(itemId, _.cloneDeep(path));
+                deckTree.contents.push(innerTree);
+            }
+        }
+
+        return deckTree;
+    },
+
     // we guard the copy deck revision tree method against abuse, by checking for change logs of one
     copyDeckTreeOld: async function(deckId, user, forAttach) {
         let deck = util.parseIdentifier(deckId);
@@ -835,4 +892,18 @@ async function mergeDeckVariants(deckId, variants, defaults) {
 
     // respond with merged variants on success
     return latestRevision.variants;
+}
+
+async function exportSlide(slideId) {
+    let slide = await slideDB.getSlideRevision(slideId);
+    let result = _.pick(slide, 'id', 'revision',
+        'title', 'content', 'speakernotes',
+        'timestamp', 'lastUpdate',
+        'language');
+
+    return Object.assign(result, {
+        type: 'slide',
+        owner: slide.user,
+        contributors: _.map(slide.contributors, 'user'),
+    });
 }

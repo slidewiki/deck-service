@@ -966,6 +966,21 @@ module.exports = function(server) {
         },
     });
 
+    server.route({
+        method: 'GET',
+        path: '/decktree/{id}/export',
+        handler: deckTrees.exportDeckTree,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string(),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve full data for the entire deck tree and slides',
+        },
+    });
+
     //----------------------------- Archives Routes -----------------------------//
 
     // TODO add other valid values
