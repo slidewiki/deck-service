@@ -72,6 +72,53 @@ function parseMoveTarget(selector) {
     return deckId;
 }
 
+async function findCreateNodeTarget(selector) {
+    let target = {
+        id: selector.sid || selector.id,
+        kind: selector.stype,
+    };
+
+    // first parse the spath for create node target details
+    if (selector.spath) {
+        let parentId, position;
+
+        let pathParts = selector.spath.split(';');
+        if (pathParts.length > 1) {
+            // the path ends with the node, so pick its parent
+            // pick the id (first element) of the second to last path part
+            [parentId] = pathParts[pathParts.length - 2].split(':');
+        } else {
+            // the path only has the node, so the parent is the root
+            parentId = selector.id;
+        }
+
+        // always pick the position (second element) of the last path part
+        [,position] = pathParts[pathParts.length - 1].split(':');
+
+        Object.assign(target, {
+            parentId,
+            position: position && parseInt(position),
+        });
+
+    } else {
+        // no path given; we must find its parent and its position from the db
+        target = await treeDB.findDeckTreeNode(selector.id, target.id, target.kind);
+    }
+
+    // with current API if target.kind is deck,
+    // we only support adding to its end (any position determined is ignored)
+    // this is a UI limitation that has creeped into the API as well
+
+    if (target.kind === 'deck') {
+        // the node will be created under the target.id instead of target.parentId
+        // position is ignored
+        target.parentId = target.id;
+        delete target.position;
+    }
+
+    return target;
+}
+
 const self = module.exports = {
 
     // authorize node creation and iterate nodeSpec array to apply each insert
@@ -157,35 +204,7 @@ const self = module.exports = {
         }
 
         // parse the create node target
-        let target;
-        let selector = request.payload.selector;
-        {
-            let parentId;
-            let pathParts = selector.spath.split(';');
-            if (pathParts.length > 1) {
-                // the path ends with the item, so pick its parent
-                // pick the id (first element) of the second to last path part
-                [parentId] = pathParts[pathParts.length - 2].split(':');
-            } else if (selector.stype === 'deck') {
-                // the path only has the item, so the parent is the root deck
-                parentId = selector.sid;
-            } else {
-                // selector is a slide, parent is the root deck since empty path provided
-                parentId = selector.id;
-            }
-
-            // always pick the position (second element) of the last path part
-            let [,position] = pathParts[pathParts.length - 1].split(':');
-
-            target = {
-                id: selector.sid || selector.id,
-                kind: selector.stype,
-                deckId: parentId,
-                position: parseInt(position),
-            };
-        }
-
-        Promise.resolve().then(() => {
+        findCreateNodeTarget(request.payload.selector).then((target) => {
             // check if it is a slide or a deck
             if (source.kind === 'slide') {
                 // check if it's new or existing
@@ -208,8 +227,8 @@ const self = module.exports = {
                             }
 
                             // we must duplicate the slide node
-                            return slideDB.copySlideNode(source.rootId, source.id, target.deckId, userId).then((newContentItem) => {
-                                return deckDB.insertContentItem(newContentItem, target.position + 1, target.deckId, userId, rootId, addAction).then((updatedDeckRevision) => {
+                            return slideDB.copySlideNode(source.rootId, source.id, target.parentId, userId).then((newContentItem) => {
+                                return deckDB.insertContentItem(newContentItem, target.position + 1, target.parentId, userId, rootId, addAction).then((updatedDeckRevision) => {
                                     let theme = updatedDeckRevision.theme;
                                     return slideDB.getContentItemSlides(newContentItem).then((slides) => {
                                         // generate thumbnails but don't wait for it
@@ -239,10 +258,10 @@ const self = module.exports = {
                             throw boom.badData(`could not locate slide to attach: ${source.id}`);
                         }
 
-                        return slideDB.copy(slide, target.deckId, userId).then((inserted) => {
+                        return slideDB.copy(slide, target.parentId, userId).then((inserted) => {
                             // it's slide copy, so revision is 1
                             let newContentItem = { ref: { id: inserted._id, revision: 1 }, kind: 'slide' };
-                            return deckDB.insertContentItem(newContentItem, target.position + 1, target.deckId, userId, rootId, addAction).then((updatedDeckRevision) => {
+                            return deckDB.insertContentItem(newContentItem, target.position + 1, target.parentId, userId, rootId, addAction).then((updatedDeckRevision) => {
                                 // we can now pick the theme of the parent deck and create the thumbnail!
                                 let newSlideId = util.toIdentifier(newContentItem.ref);
                                 fileService.createThumbnail(inserted.revisions[0].content, newSlideId, updatedDeckRevision.theme).catch((err) => {
@@ -263,7 +282,12 @@ const self = module.exports = {
                     markdown: '',
                     speakernotes: '',
                 };
-                return treeDB.createSlide(newSlidePayload, target.deckId, target.position + 1, rootId, userId).then((newContentItem) => {
+                return treeDB.createSlide(newSlidePayload, target.parentId, target.position + 1, rootId, userId).then((newContentItem) => {
+                    if (!newContentItem) {
+                        // could not find the target.parentId
+                        throw boom.badData(`could not locate specified deck: ${target.parentId}`);
+                    }
+
                     // slide is now inserted, so we can create the thumbnail using the (direct) parent deck theme
                     let newSlideId = util.toIdentifier(newContentItem.ref);
                     // TODO set this to proper value 
@@ -282,7 +306,7 @@ const self = module.exports = {
             // new node is a deck
             if (source.id) {
                 // need to attach!
-                return treeDB.attachDeckTree(source.id, target.deckId, target.position + 1, rootId, userId).then((forkResult) => {
+                return treeDB.attachDeckTree(source.id, target.parentId, target.position + 1, rootId, userId).then((forkResult) => {
                     if (!forkResult) {
                         // source id not found
                         throw boom.badData(`could not locate specified deck: ${source.id}`);
@@ -299,10 +323,10 @@ const self = module.exports = {
                 title: 'New deck',
                 description: '',
             };
-            return treeDB.createSubdeck(newDeckPayload, target.deckId, target.position + 1, rootId, userId).then((newContentItem) => {
+            return treeDB.createSubdeck(newDeckPayload, target.parentId, target.position + 1, rootId, userId).then((newContentItem) => {
                 if (!newContentItem) {
-                    // could not find the target.deckId
-                    throw boom.badData(`could not locate specified deck: ${target.deckId}`);
+                    // could not find the target.parentId
+                    throw boom.badData(`could not locate specified deck: ${target.parentId}`);
                 }
                 // this creates an empty subdeck, let's also add a sample slide
                 // init the payload from the optional first_slide object data

@@ -185,6 +185,41 @@ const self = module.exports = {
         return deckTree;
     },
 
+    // finds parent deck and position of itemId of itemKind under the rootId deck tree 
+    // rootId should NEVER be the same as itemId
+    findDeckTreeNode: async function(rootId, itemId, itemKind) {
+        if (itemKind === 'deck') {
+            // find the path to it
+            let path = await deckDB.findPath(rootId, itemId);
+            if (!path || !path.length) return; // not found
+
+            // last part of the path is the deck node
+            let [pathLeaf] = path.slice(-1);
+            // node can never be the rootId, so path has at least length 2
+            let [pathParent] = path.slice(-2, -1);
+
+            // uniform object schema
+            return {
+                id: itemId,
+                kind: itemKind,
+                parentId: util.toIdentifier(pathParent),
+                position: pathLeaf.index + 1,
+            };
+        }
+
+        // else it's a slide, find the slide node
+        let slideNode = await slideDB.findSlideNode(rootId, itemId);
+        if (!slideNode) return; // not found
+
+        // uniform object schema
+        return {
+            id: itemId,
+            kind: itemKind,
+            parentId: util.toIdentifier(slideNode.parent),
+            position: slideNode.index + 1,
+        };
+    },
+
     // we guard the copy deck revision tree method against abuse, by checking for change logs of one
     copyDeckTreeOld: async function(deckId, user, forAttach) {
         let deck = util.parseIdentifier(deckId);
@@ -811,7 +846,7 @@ const self = module.exports = {
 
     createSlide: async function(payload, targetId, targetPosition, rootId, userId) {
         let parentDeck = await deckDB.getDeck(targetId);
-        if (!parentDeck) return; // sourceId not found
+        if (!parentDeck) return; // targetId not found
         // normalize the id
         targetId = util.toIdentifier(parentDeck);
 
