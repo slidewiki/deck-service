@@ -77,7 +77,7 @@ function parseMoveTarget(selector) {
 async function findCreateNodeTarget(selector) {
     let target = {
         id: selector.sid || selector.id,
-        kind: selector.stype,
+        kind: selector.stype || 'deck',
     };
 
     // first parse the spath for create node target details
