@@ -185,7 +185,8 @@ const self = module.exports = {
         return deckTree;
     },
 
-    // finds parent deck and position of itemId of itemKind under the rootId deck tree 
+    // finds canonical node data for itemId of itemKind under the rootId deck tree 
+    // result is object {kind, ref, variants, parentId, position}
     // rootId should NEVER be the same as itemId
     findDeckTreeNode: async function(rootId, itemId, itemKind) {
         if (itemKind === 'deck') {
@@ -200,8 +201,8 @@ const self = module.exports = {
 
             // uniform object schema
             return {
-                id: itemId,
                 kind: itemKind,
+                ref: _.pick(pathLeaf, 'id', 'revision'),
                 parentId: util.toIdentifier(pathParent),
                 position: pathLeaf.index + 1,
             };
@@ -213,10 +214,13 @@ const self = module.exports = {
 
         // uniform object schema
         return {
-            id: itemId,
             kind: itemKind,
+            ref: _.pick(slideNode.slide, 'id', 'revision'),
+            variants: slideNode.variants,
             parentId: util.toIdentifier(slideNode.parent),
             position: slideNode.index + 1,
+            // TODO maybe remove this
+            theme: slideNode.parent.theme,
         };
     },
 
@@ -492,81 +496,32 @@ const self = module.exports = {
         let { id: itemId, kind: itemKind, parentId: sourceId, position: sourcePosition } = source;
         let { deckId: targetDeckId, position: targetPosition } = target;
 
-        if (itemKind === 'deck') {
-            // find the path to it
-            let path = await deckDB.findPath(rootId, itemId);
-            if (!path || !path.length) {
-                throw boom.badData(`could not find deck: ${itemId} in deck tree: ${rootId}`);
-            }
-
-            // last part of the path is the source deck
-            let [pathLeaf] = path.slice(-1);
-            // source can never be the rootId, so path has at least length 2
-            let [pathParent] = path.slice(-2, -1);
-
-            // TODO remove source position, source id from the API?
-            if (!sourcePosition) {
-                sourcePosition = pathLeaf.index + 1;
-            } else {
-                console.info(`assert ${pathLeaf.index + 1} should equal ${sourcePosition}`);
-            }
-            if (!sourceId) {
-                sourceId = util.toIdentifier(pathParent);
-            } else {
-                console.info(`assert ${util.toIdentifier(pathParent)} should equal ${sourceId}`);
-            }
-
-            // prepare a content item node to attach it to target
-            let newContentItem = {
-                kind: 'deck',
-                ref: _.pick(pathLeaf, 'id', 'revision'),
-            };
-
-            await deckDB.insertContentItem(newContentItem, targetPosition + 1, targetDeckId, userId, rootId);
-
-            // TODO fix usage 
-
-            // if moving in same deck update the source index since it will have changed now
-            // TODO make this better (?)
-            if (sourceId === targetDeckId && sourcePosition > targetPosition ) {
-                sourcePosition++;
-            }
-            // then delete it from old deck
-            await deckDB.removeContentItem(sourcePosition, sourceId, rootId, userId);
-
-            return newContentItem;
+        // check if node exists!
+        let found = await self.findDeckTreeNode(rootId, itemId, itemKind);
+        if (!found) {
+            throw boom.badData(`could not find ${itemKind}: ${itemId} in deck tree: ${rootId}`);
         }
 
-        // first find the slide node
-        let slideNode = await slideDB.findSlideNode(rootId, itemId);
-        if (!slideNode) {
-            throw boom.badData(`could not find slide: ${itemId} in deck tree: ${rootId}`);
-        }
-
-        // TODO remove source position, source id from the API?
+        // TODO remove node position, node id from the API?
         if (!sourcePosition) {
-            sourcePosition = slideNode.index + 1;
+            sourcePosition = found.position;
         } else {
-            console.info(`assert ${slideNode.index + 1} should equal ${sourcePosition}`);
+            console.info(`assert ${found.position} should equal ${sourcePosition}`);
         }
+
         if (!sourceId) {
-            sourceId = util.toIdentifier(slideNode.parent);
+            sourceId = found.parentId;
         } else {
-            console.info(`assert ${util.toIdentifier(slideNode.parent)} should equal ${sourceId}`);
+            console.info(`assert ${found.parentId} should equal ${sourceId}`);
         }
 
         // prepare a content item node to attach it to target
-        let newContentItem = {
-            kind: 'slide',
-            ref: _.pick(slideNode.slide, 'id', 'revision'),
-            variants: slideNode.variants,
-        };
-
+        let newContentItem = _.pick(found, 'kind', 'ref', 'variants');
         // add it after the target index
         let updatedDeckRevision = await deckDB.insertContentItem(newContentItem, targetPosition + 1, targetDeckId, userId, rootId);
 
         // since we moved the slide maybe it's under a deck with a different theme
-        if (slideNode.parent.theme !== updatedDeckRevision.theme) {
+        if (itemKind === 'slide' && found.theme && found.theme !== updatedDeckRevision.theme) {
             // yep, it is, so let's create the thumbnails as well
             for (let slide of await slideDB.getContentItemSlides(newContentItem)) {
                 // generate thumbnails but don't wait for it
@@ -577,14 +532,12 @@ const self = module.exports = {
             }
         }
 
-        // TODO fix usage 
-
         // if moving in same deck update the source index since it will have changed now
         // TODO make this better (?)
         if (sourceId === targetDeckId && sourcePosition > targetPosition ) {
             sourcePosition++;
         }
-        // then delete it from old deck
+        // then delete it from previous parent deck
         await deckDB.removeContentItem(sourcePosition, sourceId, rootId, userId);
 
         return newContentItem;

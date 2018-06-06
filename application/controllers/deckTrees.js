@@ -104,7 +104,13 @@ async function findCreateNodeTarget(selector) {
 
     } else {
         // no path given; we must find its parent and its position from the db
-        target = await treeDB.findDeckTreeNode(selector.id, target.id, target.kind);
+        let found = await treeDB.findDeckTreeNode(selector.id, target.id, target.kind);
+        if (!found) {
+            throw boom.badData(`could not find ${target.kind}: ${target.id} in deck tree: ${selector.id}`);
+        }
+
+        target.parentId = found.parentId;
+        target.position = found.position;
     }
 
     // with current API if target.kind is deck,
