@@ -440,8 +440,18 @@ const self = module.exports = {
             let [pathLeaf] = path.slice(-1);
             // source can never be the rootId, so path has at least length 2
             let [pathParent] = path.slice(-2, -1);
-            console.info(`assert ${pathLeaf.index + 1} should equal ${sourcePosition}`);
-            console.info(`assert ${util.toIdentifier(pathParent)} should equal ${sourceId}`);
+
+            // TODO remove source position, source id from the API?
+            if (!sourcePosition) {
+                sourcePosition = pathLeaf.index + 1;
+            } else {
+                console.info(`assert ${pathLeaf.index + 1} should equal ${sourcePosition}`);
+            }
+            if (!sourceId) {
+                sourceId = util.toIdentifier(pathParent);
+            } else {
+                console.info(`assert ${util.toIdentifier(pathParent)} should equal ${sourceId}`);
+            }
 
             // prepare a content item node to attach it to target
             let newContentItem = {
@@ -469,8 +479,18 @@ const self = module.exports = {
         if (!slideNode) {
             throw boom.badData(`could not find slide: ${itemId} in deck tree: ${rootId}`);
         }
-        console.info(`assert ${slideNode.index + 1} should equal ${sourcePosition}`);
-        console.info(`assert ${util.toIdentifier(slideNode.parent)} should equal ${sourceId}`);
+
+        // TODO remove source position, source id from the API?
+        if (!sourcePosition) {
+            sourcePosition = slideNode.index + 1;
+        } else {
+            console.info(`assert ${slideNode.index + 1} should equal ${sourcePosition}`);
+        }
+        if (!sourceId) {
+            sourceId = util.toIdentifier(slideNode.parent);
+        } else {
+            console.info(`assert ${util.toIdentifier(slideNode.parent)} should equal ${sourceId}`);
+        }
 
         // prepare a content item node to attach it to target
         let newContentItem = {

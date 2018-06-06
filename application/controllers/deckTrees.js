@@ -33,7 +33,7 @@ function parseMoveSource(selector) {
         // the path ends with the item, so pick its parent
         // pick the id (first element) of the second to last path part
         [parentId] = pathParts[pathParts.length - 2].split(':');
-    } else {
+    } else if (selector.spath) {
         // the path only has the item, so the parent is the root deck
         parentId = selector.id;
     }
@@ -44,8 +44,8 @@ function parseMoveSource(selector) {
     return {
         id: selector.sid,
         kind: selector.stype,
-        parentId,
-        position: parseInt(position),
+        parentId, // could be undefined
+        position: position && parseInt(position), // could be undefined
     };
 }
 

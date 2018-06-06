@@ -900,13 +900,13 @@ module.exports = function(server) {
                 payload: Joi.object().keys({
                     sourceSelector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string().allow(''),
+                        spath: Joi.string().default(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
                     targetSelector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string().allow(''),
+                        spath: Joi.string().default(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
