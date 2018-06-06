@@ -1244,7 +1244,8 @@ let self = module.exports = {
                 for(let i = position-1; i < citems.length; i++){
                     citems[i].order = citems[i].order-1;
                 }
-                self.removeFromUsage(citems[position-1], root_deck_path);
+                let citemToRemove = citems[position-1];
+                self.removeFromUsage(citemToRemove, root_deck_path);
 
                 citems.splice(position-1, 1);
                 deckRevision.contentItems = citems;
@@ -1254,8 +1255,7 @@ let self = module.exports = {
 
                 deckTracker.applyChangeLog();
 
-                col.save(existingDeck);
-
+                return col.save(existingDeck).then(() => citemToRemove);
             });
         });
     },

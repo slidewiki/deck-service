@@ -26,20 +26,22 @@ const slidetemplate = '<div class="pptx2html" style="position: relative; width: 
     '<div class="h-left">&nbsp;</div>'+
     '</div></div>';
 
-function parseMoveSource(selector) {
-    let parentId;
-    let pathParts = selector.spath.split(';');
-    if (pathParts.length > 1) {
-        // the path ends with the item, so pick its parent
-        // pick the id (first element) of the second to last path part
-        [parentId] = pathParts[pathParts.length - 2].split(':');
-    } else if (selector.spath) {
-        // the path only has the item, so the parent is the root deck
-        parentId = selector.id;
-    }
+function parseNodeToRemove(selector) {
+    let parentId, position;
+    if (selector.spath) {
+        let pathParts = selector.spath.split(';');
+        if (pathParts.length > 1) {
+            // the path ends with the item, so pick its parent
+            // pick the id (first element) of the second to last path part
+            [parentId] = pathParts[pathParts.length - 2].split(':');
+        } else {
+            // the path only has the item, so the parent is the root deck
+            parentId = selector.id;
+        }
 
-    // always pick the position (second element) of the last path part
-    let [,position] = pathParts[pathParts.length - 1].split(':');
+        // always pick the position (second element) of the last path part
+        [,position] = pathParts[pathParts.length - 1].split(':');
+    }
 
     return {
         id: selector.sid,
@@ -367,7 +369,7 @@ const self = module.exports = {
         let rootId = request.payload.sourceSelector.id;
 
         // determine the source node info
-        let source = parseMoveSource(request.payload.sourceSelector);
+        let source = parseNodeToRemove(request.payload.sourceSelector);
 
         // determine the target deck id and node position
         let target = {
@@ -453,6 +455,21 @@ const self = module.exports = {
             reply(boom.badImplementation());
         });
 
+    },
+
+    removeDeckTreeNode: function(request, reply) {
+        let userId = request.auth.credentials.userid;
+        let rootId = request.payload.selector.id;
+
+        // determine the info for the node to remove
+        let node = parseNodeToRemove(request.payload.selector);
+
+        // just remove it!
+        return treeDB.removeDeckTreeNode(rootId, node, userId).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
     },
 
     exportDeckTree: function(request, reply) {

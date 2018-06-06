@@ -458,6 +458,34 @@ const self = module.exports = {
     },
 
     // rootId is the id of the deck tree: its root deck id
+    // node is an object {id, kind, parentId, position}
+    removeDeckTreeNode: async function(rootId, node, userId) {
+        let { id: itemId, kind: itemKind, parentId, position } = node;
+
+        // check if node exists!
+        let found = await self.findDeckTreeNode(rootId, itemId, itemKind);
+        if (!found) {
+            throw boom.badData(`could not find ${itemKind}: ${itemId} in deck tree: ${rootId}`);
+        }
+
+        // TODO remove node position, node id from the API?
+        if (!position) {
+            position = found.position;
+        } else {
+            console.info(`assert ${found.position} should equal ${position}`);
+        }
+
+        if (!parentId) {
+            parentId = found.parentId;
+        } else {
+            console.info(`assert ${found.parentId} should equal ${parentId}`);
+        }
+
+        // delete it from parent deck!
+        return deckDB.removeContentItem(position, parentId, rootId, userId);
+    },
+
+    // rootId is the id of the deck tree: its root deck id
     // source is an object {id, kind, parentId, position}
     // target is an object {deckId, position}
     moveDeckTreeNode: async function(rootId, source, target, userId) {

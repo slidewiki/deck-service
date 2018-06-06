@@ -1327,6 +1327,7 @@ let self = module.exports = {
         }
     },
     //deletes a decktree node by removing its reference from its parent deck (does not actually delete it from the database)
+    // DEPRECATED
     deleteDeckTreeNode: function(request, reply) {
         let userId = request.auth.credentials.userid;
 

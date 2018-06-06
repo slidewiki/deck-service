@@ -815,7 +815,7 @@ module.exports = function(server) {
                 payload: Joi.object().keys({
                     selector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string().allow(''),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string(),
                     }),
@@ -851,7 +851,7 @@ module.exports = function(server) {
                     language: Joi.string(),
                     selector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string(),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
@@ -870,13 +870,13 @@ module.exports = function(server) {
     server.route({
         method: 'DELETE',
         path: '/decktree/node/delete',
-        handler: handlers.deleteDeckTreeNode,
+        handler: deckTrees.removeDeckTreeNode,
         config: {
             validate: {
                 payload: Joi.object().keys({
                     selector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string(),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
@@ -900,13 +900,13 @@ module.exports = function(server) {
                 payload: Joi.object().keys({
                     sourceSelector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string().default(''),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
                     targetSelector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string().default(''),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
@@ -930,7 +930,7 @@ module.exports = function(server) {
             validate: {
                 query: {
                     id: Joi.string().required(),
-                    spath: Joi.string(),
+                    spath: Joi.string().empty(''),
                     stype: Joi.string().default('slide'),
                     sid: Joi.string().required(),
                 },
@@ -950,7 +950,7 @@ module.exports = function(server) {
                     language: Joi.string(),
                     selector: Joi.object().keys({
                         id: Joi.string(),
-                        spath: Joi.string(),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string().default('slide'),
                         sid: Joi.string(),
                     }).requiredKeys('id', 'sid'),
