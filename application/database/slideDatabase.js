@@ -8,6 +8,8 @@ const _ = require('lodash');
 const boom = require('boom');
 
 const util = require('../lib/util');
+const ChangeLog = require('../lib/ChangeLog');
+
 const helper = require('./helper'),
     slideModel = require('../models/slide.js'),
     oid = require('mongodb').ObjectID;
@@ -647,6 +649,12 @@ let self = module.exports = {
         }
 
         let parentRef = _.pick(slideNode.parent, 'id', 'revision');
+
+        // start tracking changes
+        let decks = await helper.getCollection('decks');
+        let parentQuery = { _id: parentRef.id };
+        let deckTracker = ChangeLog.deckTracker(await decks.findOne(parentQuery), rootId, userId);
+
         let newSlideRef, oldSlideRef, result;
         if (slideVariant) {
             // slideVariant already exists
@@ -670,10 +678,14 @@ let self = module.exports = {
                 revisions: [{ id: newSlideRef.revision}],
             };
             let parentDeckId = util.toIdentifier(parentRef);
-            await deckDB.updateContentItem(dummyItem, null, parentDeckId, 'slide', userId, rootId);
+            await deckDB.updateContentItem(dummyItem, null, parentDeckId, 'slide', userId);
+            // omit rootId in call above to not track the update twice
 
             result = newSlideRef;
         }
+
+        // finished updating deck
+        deckTracker.applyChangeLog(await decks.findOne(parentQuery));
 
         // new slide created, replacing the older one, let's fix the usage
         let slides = await helper.getCollection('slides');
@@ -725,7 +737,21 @@ let self = module.exports = {
             language: variantData.language,
         };
 
-        await deckDB.setContentVariant(slideNode.parent.id, slideNode.index, newVariant, userId);
+        // pick the id of the root of the path
+        let [{id: rootId}] = slideNode.path;
+
+        // start tracking changes
+        let decks = await helper.getCollection('decks');
+        let parentQuery = { _id: slideNode.parent.id };
+        let deckTracker = ChangeLog.deckTracker(await decks.findOne(parentQuery), rootId, userId);
+
+        // update the deck
+        let updatedDeck = await deckDB.setContentVariant(slideNode.parent.id, slideNode.index, newVariant, userId);
+        // console.log(updatedDeck);
+
+        // finished updating deck
+        deckTracker.applyChangeLog(await decks.findOne(parentQuery));
+
         // respond with new variant data on success
         return newVariant;
     },

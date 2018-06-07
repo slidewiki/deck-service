@@ -1352,7 +1352,10 @@ let self = module.exports = {
                 }
 
                 // pre-compute what the for loop does
-                let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId, parentOperations, revertedRevId ? 'revert' : undefined);
+                let deckTracker;
+                if (rootDeckId) { // tracking is optional
+                    ChangeLog.deckTracker(existingDeck, rootDeckId, userId, parentOperations, revertedRevId ? 'revert' : undefined);
+                }
 
                 existingDeck.lastUpdate = new Date().toISOString();
 
@@ -1374,9 +1377,11 @@ let self = module.exports = {
                     existingDeck.contributors.push({ user: userId, count: 1 });
                 }
 
-                return decks.save(existingDeck)
-                .then(() => deckTracker.applyChangeLog())
-                .then((deckChanges) => {
+                return decks.save(existingDeck).then(() => {
+                    if (deckTracker) {
+                        return deckTracker.applyChangeLog();
+                    }
+                }).then((deckChanges) => {
                     return {
                         oldRevision,
                         newRevision,

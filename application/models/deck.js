@@ -56,8 +56,22 @@ const trackedDeckRevisionProperties = {
         },
     },
 
-    allowMarkdown: {
-        type: 'boolean'
+    variants: {
+        type: 'array',
+        items: {
+            type: 'object',
+            properties: {
+                title: {
+                    type: 'string',
+                },
+                description: {
+                    type: 'string',
+                },
+                language: {
+                    type: 'string',
+                },
+            },
+        },
     },
 
 };
@@ -204,6 +218,9 @@ const deckRevision = {
             type: 'number'
         },
         visibility: {
+            type: 'boolean'
+        },
+        allowMarkdown: {
             type: 'boolean'
         },
         translation: {
