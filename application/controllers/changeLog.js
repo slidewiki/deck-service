@@ -41,7 +41,7 @@ let self = module.exports = {
 
 };
 
-const mergeMoves = false;
+const mergeMoves = true;
 const mergeParents = true;
 
 function prepareChangeLog(changeLog, variantFilter, simplifyOutput) {
