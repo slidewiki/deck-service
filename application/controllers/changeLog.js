@@ -85,26 +85,41 @@ function prepareChangeLog(changeLog, simplifyOutput) {
         changeLog = changeLog.reduce((acc, cur) => {
             if (hold) {
                 // TODO check timestamps as well
-                if (cur.op === 'add' && _.isEqual(hold.value, cur.value) && hold.user === cur.user) {
-                    // we have a move, so merge and push
-                    acc.push({
-                        op: 'move',
-                        from: hold.path,
-                        path: cur.path,
-                        value: cur.value,
+                if (['add', 'remove'].includes(cur.op)) {
+                    // in order to qualify for a move:
+                    if (cur.op !== hold.op // cur.op is distict from hold.op (add/remove or remove/add sequence)
+                        && _.isEqual(hold.value, cur.value) // both ops were for the same value (deck tree node)
+                        && hold.user === cur.user // both ops were by the same user
+                        && cur._id.getTimestamp() - hold._id.getTimestamp() === 0 // timestamps (second-based accuracy) should be the same 
+                    ) {
+                        // we have a move, so merge and push
+                        acc.push({
+                            op: 'move',
+                            from: hold.path,
+                            path: cur.path,
+                            value: cur.value,
 
-                        timestamp: cur.timestamp,
-                        user: cur.user,
-                    });
+                            timestamp: cur.timestamp,
+                            user: cur.user,
+                        });
+
+                        // and unset 'hold'
+                        hold = undefined;                        
+                    } else {
+                        // push hold, set cur to hold
+                        acc.push(hold);
+                        hold = cur;
+                    }
 
                 } else {
                     // just push both
                     acc.push(hold, cur);
+
+                    // and unset 'hold'
+                    hold = undefined;                        
                 }
 
-                // in any case, unset 'hold'
-                hold = undefined;
-            } else if (cur.op === 'remove') {
+            } else if (['add', 'remove'].includes(cur.op)) {
                 // just hold it, don't push it yet
                 hold = cur;
             } else {
