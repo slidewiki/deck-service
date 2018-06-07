@@ -1237,7 +1237,11 @@ let self = module.exports = {
                     activeRevisionId = parseInt(root_deck_path[1]);
                 }
 
-                let deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, userId);
+                // skip tracking if no top_root_deck or userId provided
+                let deckTracker;
+                if (top_root_deck && userId) {
+                    deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, userId);
+                }
 
                 let deckRevision = _.find(existingDeck.revisions, {id: activeRevisionId});
                 let citems = deckRevision.contentItems;
@@ -1253,7 +1257,7 @@ let self = module.exports = {
                 existingDeck.lastUpdate = new Date().toISOString();
                 deckRevision.lastUpdate = existingDeck.lastUpdate;
 
-                deckTracker.applyChangeLog();
+                if (deckTracker) deckTracker.applyChangeLog();
 
                 return col.save(existingDeck).then(() => citemToRemove);
             });

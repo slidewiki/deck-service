@@ -188,9 +188,20 @@ let self = module.exports = {
                 return records;
             },
 
-            contentItemsRecords: function(path) {
-                const contentItemsAfter = Immutable.fromJS(revision.contentItems.map(omitOrder));
+            contentItemsRecords: function(path, updatedDeck) {
+                if (!updatedDeck) {
+                    updatedDeck = deck;
+                }
+
+                // we can only ever update the latest revision, let's compare to that ???
+                let [updatedRevision] = updatedDeck.revisions.slice(-1);
+
+                const contentItemsAfter = Immutable.fromJS(updatedRevision.contentItems.map(omitOrder));
                 const contentItemOps = diff(contentItemsBefore, contentItemsAfter);
+
+                if (!contentItemOps.isEmpty() && updatedRevision.id !== revision.id) {
+                    console.warn(`trying to apply content item change log across different revisions: ${revision.id} -> ${updatedRevision.id}`);
+                }
 
                 // we have a list of JSON patch-style operations, which we would like to save in the log
                 // in a reversible way as to provide full log capabilities without need for current state
@@ -201,7 +212,7 @@ let self = module.exports = {
                         let indexMatch = rec.path.match(/^\/(\d+)$/);
 
                         if (!indexMatch) {
-                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.strigify(rec)}`);
+                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.stringify(rec)}`);
                         }
 
                         // indexMatch[1] includes just the index added
@@ -214,7 +225,7 @@ let self = module.exports = {
                         let indexMatch = rec.path.match(/^\/(\d+)$/);
 
                         if (!indexMatch) {
-                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.strigify(rec)}`);
+                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.stringify(rec)}`);
                         }
 
                         // indexMatch[1] includes just the index added
@@ -227,7 +238,7 @@ let self = module.exports = {
                         let indexMatch = rec.path.match(/^\/(\d+)\/ref\/revision/);
 
                         if (!indexMatch) {
-                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.strigify(rec)}`);
+                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.stringify(rec)}`);
                         }
 
                         // indexMatch[1] includes just the index added
@@ -250,7 +261,7 @@ let self = module.exports = {
                     // first the deck changes
                     ...this.deckUpdateRecords(path, updatedDeck),
                     // then the children changes
-                    ...this.contentItemsRecords(path)])
+                    ...this.contentItemsRecords(path, updatedDeck)])
                 );
             },
 
