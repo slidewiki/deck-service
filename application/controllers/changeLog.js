@@ -10,11 +10,12 @@ let self = module.exports = {
 
     getDeckChangeLog: function(request, reply) {
         let deckId = request.params.id;
+        let variantFilter = _.pick(request.query, 'language');
 
         deckDB.getChangeLog(deckId).then((changeLog) => {
             if (!changeLog) return boom.notFound();
 
-            return prepareChangeLog(changeLog, request.query.simplify);
+            return prepareChangeLog(changeLog, variantFilter, request.query.simplify);
 
         }).then(reply).catch((error) => {
             request.log('error', error);
@@ -25,11 +26,12 @@ let self = module.exports = {
     getSlideChangeLog: function(request, reply) {
         let slideId = request.params.id;
         let rootId = request.query.root;
+        let variantFilter = _.pick(request.query, 'language');
 
         slideDB.getChangeLog(slideId, rootId).then((changeLog) => {
             if (!changeLog) return boom.notFound();
 
-            return prepareChangeLog(changeLog, request.query.simplify);
+            return prepareChangeLog(changeLog, variantFilter, request.query.simplify);
 
         }).then(reply).catch((error) => {
             request.log('error', error);
@@ -39,13 +41,58 @@ let self = module.exports = {
 
 };
 
-const mergeMoves = true;
+const mergeMoves = false;
 const mergeParents = true;
 
-function prepareChangeLog(changeLog, simplifyOutput) {
+function prepareChangeLog(changeLog, variantFilter, simplifyOutput) {
     if (mergeParents) {
         changeLog = mergeChangeParents(changeLog);
     }
+
+    // make sure node references match the current variantFilter,
+    // if variantFilter does not match, keep the primary node references, without variants
+    let checkVariants = !_.isEmpty(variantFilter);
+    if (checkVariants) {
+        changeLog.forEach((cur) => {
+            // check variant nodes (slides)
+            for (let value of [cur.value, cur.oldValue]) {
+                if (!value) continue;
+
+                let variant = checkVariants && _.find(value.variants, variantFilter);
+                if (variant) {
+                    // found! replace ref 
+                    Object.assign(value.ref, variant);
+                }
+                // always delete variants (???)
+                delete value.variants;
+            }
+        });
+    }
+
+    // remove primary or other variants
+    // if variantFilter does not match, essentially variant-specific changes including to the primary are all purged
+    _.remove(changeLog, (cur) => {
+        // keep all add/remove records
+        if (['add', 'remove'].includes(cur.op)) {
+            return false;
+        }
+
+        if (cur.op === 'replace') {
+            // remove/keep records for primary
+            if (!cur.value.variant) return checkVariants;
+            // remove/keep records for other variants
+            if (checkVariants && !_.isEqual(cur.value.variant, variantFilter) ) return true;
+        } 
+
+        if (cur.op === 'update') {
+            // remove/keep records for primary
+            if (!cur.variant) return checkVariants;
+            // remove/keep records for other variants
+            if (checkVariants && !_.isEqual(cur.variant, variantFilter) ) return true;
+        }
+
+        return !checkVariants;
+    });
 
     // we add the revise/revert subops
     changeLog.forEach((cur) => {
@@ -200,7 +247,7 @@ function formatPathPart(pathPart) {
 }
 
 function formatRef(ref) {
-    if (!ref.id || !ref.revision) return undefined;
+    if (!ref || !ref.id || !ref.revision) return undefined;
     return `${ref.id}-${ref.revision}`;
 }
 

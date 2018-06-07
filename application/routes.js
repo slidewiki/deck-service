@@ -1247,6 +1247,7 @@ module.exports = function(server) {
                     id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
                 },
                 query: {
+                    language: Joi.string().empty(''),
                     simplify: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
