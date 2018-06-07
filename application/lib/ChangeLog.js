@@ -1,7 +1,6 @@
 'use strict';
 
 const _ = require('lodash');
-const async = require('async');
 
 const Immutable = require('immutable');
 const diff = require('immutablediff');
@@ -397,104 +396,80 @@ function saveDeckChanges(deckChanges, userId) {
     });
 }
 
-function fillSlideInfo(deckChanges) {
+async function fillSlideInfo(deckChanges) {
     // TODO avoid this circular reference
     const slideDB = require('../database/slideDatabase');
 
     // we check to see if we need to also read some data for slide updates
     let slideUpdates = deckChanges.filter((c) => (c.value && c.value.kind === 'slide'));
-    return new Promise((resolve, reject) => {
-        async.eachSeries(slideUpdates, (rec, done) => {
-            // we want to add title and old title of slide
-            slideDB.get(rec.value.ref.id).then((slide) => {
-                if (!slide) return; // ignore errors ?
+    for (let rec of slideUpdates) {
+        // we want to add title and old title of slide
+        let slide = await slideDB.get(rec.value.ref.id);
+        if (!slide) continue; // ignore errors ?
 
-                let after = slide.revisions.find((r) => r.id === rec.value.ref.revision);
-                rec.value.ref.title = after.title;
+        let after = slide.revisions.find((r) => r.id === rec.value.ref.revision);
+        rec.value.ref.title = after.title;
 
-                // check for copy information in add ops
-                let origin = ['copy', 'attach'].includes(rec.action) && after.parent;
-                if (origin) {
-                    // it's slides, and the parent's title hasn't changed
-                    origin.title = after.title;
-                    rec.value.origin = origin;
-                }
+        // check for copy information in add ops
+        let origin = ['copy', 'attach'].includes(rec.action) && after.parent;
+        if (origin) {
+            // it's slides, and the parent's title hasn't changed
+            origin.title = after.title;
+            rec.value.origin = origin;
+        }
 
-                if (rec.oldValue) {
-                    let before = slide.revisions.find((r) => r.id === rec.oldValue.ref.revision);
-                    rec.oldValue.ref.title = before.title;
-                }
+        if (rec.oldValue) {
+            let before = slide.revisions.find((r) => r.id === rec.oldValue.ref.revision);
+            rec.oldValue.ref.title = before.title;
+        }
+    }
 
-                done();
-            }).catch(done);
-
-        }, (err) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(deckChanges);
-            }
-        });
-
-    });
-
+    return deckChanges;
 }
 
-
-function fillDeckInfo(deckChanges) {
-    // TODO handle circular dependency
+async function fillDeckInfo(deckChanges) {
+    // TODO avoid this circular reference
     let deckDB = require('../database/deckDatabase');
 
     // we need a deck title if we are doing a deck data update, or a deck node update
     let deckUpdates = deckChanges.filter((c) => (c.op === 'update' || (c.value && c.value.kind === 'deck') ));
-    return new Promise((resolve, reject) => {
-        async.eachSeries(deckUpdates, (rec, done) => {
-            if (rec.op === 'update') {
-                // deck data update, last path needs title
-                let [deckValue] = rec.path.slice(-1);
-                deckDB.getRevision(util.toIdentifier(deckValue)).then((deckRevision) => {
-                    deckValue.title = deckRevision.title;
-                    done();
-                }).catch(done);
-            } else {
-                // we want to add title and originRevision for old and new deck
-                deckDB.get(rec.value.ref.id).then((deck) => {
-                    if (!deck) return; // ignore errors ?
+    for (let rec of deckUpdates) {
+        if (rec.op === 'update') {
+            // deck data update, last path needs title
+            let [deckValue] = rec.path.slice(-1);
+            let deckRevision = await deckDB.getRevision(util.toIdentifier(deckValue));
 
-                    let after = deck.revisions.find((r) => r.id === rec.value.ref.revision);
-                    if (after.originRevision)
-                        rec.value.ref.originRevision = after.originRevision;
-                    rec.value.ref.title = after.title;
+            deckValue.title = deckRevision.title;
+        } else {
+            // we want to add title and originRevision for old and new deck
+            let deck = await deckDB.get(rec.value.ref.id);
+            if (!deck) continue; // ignore errors ?
 
-                    // check for fork information in add ops
-                    let origin = ['fork', 'attach'].includes(rec.action) && deck.origin;
-                    if (origin) {
-                        rec.value.origin = origin;
-                    }
+            let after = deck.revisions.find((r) => r.id === rec.value.ref.revision);
+            if (after.originRevision) {
+                rec.value.ref.originRevision = after.originRevision;
+            }
+            rec.value.ref.title = after.title;
 
-                    if (rec.oldValue) {
-                        let before = deck.revisions.find((r) => r.id === rec.oldValue.ref.revision);
-                        if (before.originRevision)
-                            rec.oldValue.ref.originRevision = before.originRevision;
-                        rec.oldValue.ref.title = before.title;
-
-                        if (origin) {
-                            rec.oldValue.origin = origin;
-                        }
-                    }
-
-                    done();
-                }).catch(done);
+            // check for fork information in add ops
+            let origin = ['fork', 'attach'].includes(rec.action) && deck.origin;
+            if (origin) {
+                rec.value.origin = origin;
             }
 
-        }, (err) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(deckChanges);
+            if (rec.oldValue) {
+                let before = deck.revisions.find((r) => r.id === rec.oldValue.ref.revision);
+                if (before.originRevision) {
+                    rec.oldValue.ref.originRevision = before.originRevision;
+                }
+                rec.oldValue.ref.title = before.title;
+
+                if (origin) {
+                    rec.oldValue.origin = origin;
+                }
             }
-        });
+        }
+    }
 
-    });
-
+    return deckChanges;
 }
