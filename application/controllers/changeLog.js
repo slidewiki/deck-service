@@ -15,9 +15,15 @@ let self = module.exports = {
         deckDB.getChangeLog(deckId).then((changeLog) => {
             if (!changeLog) return boom.notFound();
 
-            return prepareChangeLog(changeLog, variantFilter, request.query.simplify);
+            // always reverse the order, as the input is timestamp ascending
+            if (request.query.raw) return changeLog.reverse();
 
-        }).then(reply).catch((error) => {
+            return prepareChangeLog(changeLog, variantFilter);
+
+        }).then((changeLog) => {
+            if (request.query.simplify) simplify(changeLog);
+            reply(changeLog);
+        }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
         });
@@ -31,9 +37,15 @@ let self = module.exports = {
         slideDB.getChangeLog(slideId, rootId).then((changeLog) => {
             if (!changeLog) return boom.notFound();
 
-            return prepareChangeLog(changeLog, variantFilter, request.query.simplify);
+            // always reverse the order, as the input is timestamp ascending
+            if (request.query.raw) return changeLog.reverse();
 
-        }).then(reply).catch((error) => {
+            return prepareChangeLog(changeLog, variantFilter);
+
+        }).then((changeLog) => {
+            if (request.query.simplify) simplify(changeLog);
+            reply(changeLog);
+        }).catch((error) => {
             request.log('error', error);
             reply(boom.badImplementation());
         });
@@ -44,7 +56,7 @@ let self = module.exports = {
 const mergeMoves = true;
 const mergeParents = true;
 
-function prepareChangeLog(changeLog, variantFilter, simplifyOutput) {
+function prepareChangeLog(changeLog, variantFilter) {
     if (mergeParents) {
         changeLog = mergeChangeParents(changeLog);
     }
@@ -72,9 +84,12 @@ function prepareChangeLog(changeLog, variantFilter, simplifyOutput) {
     // remove primary or other variants
     // if variantFilter does not match, essentially variant-specific changes including to the primary are all purged
     _.remove(changeLog, (cur) => {
-        // keep all add/remove records
         if (['add', 'remove'].includes(cur.op)) {
-            return false;
+            // keep all add/remove records
+            if (!cur.value.variant) return false;
+
+            // remove/keep records for other variants
+            if (checkVariants && !_.isEqual(cur.value.variant, variantFilter) ) return true;
         }
 
         if (cur.op === 'replace') {
@@ -194,6 +209,20 @@ function prepareChangeLog(changeLog, variantFilter, simplifyOutput) {
                 };
             }
 
+            if (cur.variant) {
+                // it's an update to the deck variant properties
+                if (_.isEmpty(cur.values) && _.isEmpty(cur.oldValues)) {
+                    // means we only added a deck translation
+                    cur.action = 'translate';
+                    let [leaf] = cur.path.slice(-1);
+                    cur.translated = {
+                        kind: 'deck',
+                        title: leaf.title,
+                        language: cur.variant.language,
+                    };
+                }
+            }
+
         } else if (cur.action === 'edit') {
             // check for slide rename
             if (cur.value.ref.title !== cur.oldValue.ref.title) {
@@ -207,34 +236,60 @@ function prepareChangeLog(changeLog, variantFilter, simplifyOutput) {
 
         }
 
+        // check for new slide translations
+        if (cur.op === 'add' && cur.value.variant) {
+            cur.action = 'translate';
+            cur.translated = {
+                kind: 'slide',
+                title: '',
+                language: cur.value.variant.language,
+            };
+
+            if (cur.oldValue) {
+                cur.translated.title = cur.oldValue.ref.title;
+            }
+        }
+
         // set `action` to value of `op` if it's missing
         if (!cur.action) cur.action = cur.op;
     });
 
-    if (simplifyOutput) {
-        changeLog.forEach((cur) => {
-            // format paths and updates
-            cur.path = formatPath(cur.path);
-            if (cur.from) cur.from = formatPath(cur.from);
-
-            if (['fork', 'attach'].includes(cur.action)) cur.forkOf = util.toIdentifier(cur.value.origin);
-
-            // format node updates
-            if (cur.value) cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
-            if (cur.oldValue) cur.oldValue = `${cur.oldValue.kind}:${formatRef(cur.oldValue.ref)}`;
-
-            if (cur.reverted) cur.reverted = `from ${cur.reverted.from} to ${cur.reverted.to}`;
-            if (cur.renamed) {
-                cur.renamed = `${cur.renamed.kind} from '${cur.renamed.from}' to '${cur.renamed.to}'`;
-                delete cur.values;
-                delete cur.oldValues;
-            }
-
-        });
-    }
-
     // always reverse the order, as the input is timestamp ascending
     return changeLog.reverse();
+}
+
+function simplify(changeLog) {
+    changeLog.forEach((cur) => {
+        // format paths and updates
+        cur.path = formatPath(cur.path);
+        if (cur.from) cur.from = formatPath(cur.from);
+
+        if (['fork', 'attach'].includes(cur.action)) cur.forkOf = util.toIdentifier(cur.value.origin);
+
+        // format node updates
+        if (cur.value) {
+            let variant = cur.value.variant;
+            cur.value = `${cur.value.kind}:${formatRef(cur.value.ref)}`;
+            if (variant) cur.value += `:${Object.entries(variant)}`;
+        }
+        
+        if (cur.oldValue) {
+            let variant = cur.oldValue.variant;
+            cur.oldValue = `${cur.oldValue.kind}:${formatRef(cur.oldValue.ref)}`;
+            if (variant) cur.oldValue += `:${Object.entries(variant)}`;
+        }
+
+        if (cur.reverted) cur.reverted = `from ${cur.reverted.from} to ${cur.reverted.to}`;
+        if (cur.renamed) {
+            cur.renamed = `${cur.renamed.kind} from '${cur.renamed.from}' to '${cur.renamed.to}'`;
+            delete cur.values;
+            delete cur.oldValues;
+        }
+        if (cur.translated) {
+            cur.translated = `${cur.oldValue} into ${cur.translated.language}`;
+            delete cur.oldValue;
+        }
+    });
 }
 
 function formatPath(path) {

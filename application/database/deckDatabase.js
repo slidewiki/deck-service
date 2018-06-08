@@ -2293,7 +2293,7 @@ let self = module.exports = {
         return deck.variants || [];
     },
 
-    addDeckVariant: async function(deckId, variantData, userId) {
+    addDeckVariant: async function(deckId, variantData, userId, rootId, parentOperations=[]) {
         let deck = await self.get(deckId);
         if (!deck) return;
 
@@ -2311,17 +2311,25 @@ let self = module.exports = {
         if (existingVariant || latestRevision.language === variantFilter.language) {
             throw boom.badData(`deck variant for ${Object.entries(variantFilter)} already exists for deck ${deckId}`);
         }
-        latestRevision.variants.push(variantData);
 
-        // TODO change log
+        // start tracking here
+        // if missing, the deck is the root
+        rootId = rootId || deckId;
+        let deckTracker = ChangeLog.deckTracker(deck, rootId, userId, parentOperations);
+
+        // here deck changes
+        latestRevision.variants.push(variantData);
 
         let decks = await helper.getCollection('decks');
         // changed the latestRevision object which is still referenced by the deck object, so saving the deck object will work
         await decks.save(deck);
 
+        // this returns the operations that will be propagate to subdecks
+        let deckChanges = await deckTracker.applyChangeLog();
+
         // need to apply this recursively as well !!!
         for (let subdeck of _.filter(latestRevision.contentItems, { kind: 'deck' }) ) {
-            await self.addDeckVariant(subdeck.ref.id, variantData, userId);
+            await self.addDeckVariant(subdeck.ref.id, variantData, userId, rootId, parentOperations.concat(deckChanges));
         }
 
         // respond with provided variant data on success
@@ -2876,7 +2884,6 @@ let self = module.exports = {
                             valueQuery,
                         ]
                     } },
-                    // { $project: { _id: 0 } }, // TODO re-insert this after 3.4 upgrade
                     { $sort: { timestamp: 1 } },
                 ]);
             }).then((result) => result.toArray());

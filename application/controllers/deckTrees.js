@@ -223,6 +223,8 @@ const self = module.exports = {
                     if (source.id === target.id) {
                         // this means we create a slide copy and insert it after the slide in target
                         addAction = 'copy';
+                        // set the source root to the rootId if it's not set
+                        if (!source.rootId) source.rootId = rootId;
                     }
 
                     // if source.rootId is defined, means it's an external attach of a slide in a deck

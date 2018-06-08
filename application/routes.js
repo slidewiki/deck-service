@@ -1249,6 +1249,7 @@ module.exports = function(server) {
                 query: {
                     language: Joi.string().empty(''),
                     simplify: Joi.boolean().truthy('1').falsy('0', ''),
+                    raw: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
             tags: ['api'],
@@ -1267,7 +1268,9 @@ module.exports = function(server) {
                 },
                 query: {
                     root: Joi.string().description('Identifier of deck tree root in the form deckId-deckRevisionId, revision is optional').required(),
+                    language: Joi.string().empty(''),
                     simplify: Joi.boolean().truthy('1').falsy('0', ''),
+                    raw: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
             tags: ['api'],

@@ -33,9 +33,9 @@ const ChangeLogRecord = {
 
             // pick each variant change one by one, and add appropriate values in the diffs
 
-            // indexMatch[1] includes the variant index changed
+            // indexMatch[1] includes the variant index changed (or added/removed)
             let variantIndex = parseInt(indexMatch[1]);
-            // indexMatch[2] includes the variant property changed
+            // indexMatch[2] includes the variant property changed (if any)
             let variantProperty = indexMatch[2];
             if (rec.op === 'replace') {
                 // set the variant info
@@ -49,8 +49,13 @@ const ChangeLogRecord = {
                 Object.assign(beforeDiff, _.pick(beforeDiff.variants[variantIndex], variantProperty));
             } else if (rec.op === 'add') {
                 variant = _.omit(afterDiff.variants[variantIndex], variantDeckProperties);
+                if (variantProperty) {
+                    Object.assign(afterDiff, _.pick(afterDiff.variants[variantIndex], variantProperty));
+                } else {
+                    // the variant was newly added, add the non variant properties from rec.value
+                    Object.assign(afterDiff, _.pick(rec.value, variantDeckProperties));
+                }
 
-                Object.assign(afterDiff, _.pick(afterDiff.variants[variantIndex], variantProperty));
             } else {
                 // TODO throw ?
                 console.warn(`unexpected variants diff op: ${JSON.stringify(rec)} for path`, path);
@@ -62,7 +67,8 @@ const ChangeLogRecord = {
         delete beforeDiff.variants;
         delete afterDiff.variants;
 
-        if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff)) return;
+        // diffs may be empty, but a variant may have been added
+        if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff) && !variant);
 
         let result = {
             op: 'update',
@@ -75,7 +81,9 @@ const ChangeLogRecord = {
             timestamp: (new Date()).toISOString(),
         };
 
-        if (variant) result.variant = variant;
+        if (variant) {
+            result.variant = variant;
+        }
 
         return result;
     },
@@ -93,10 +101,11 @@ const ChangeLogRecord = {
 
     },
 
-    createNodeInsert: function(value, index, path, isVariant) {
+    // if primaryRef is set, means the value is a newly created variant to it
+    createNodeInsert: function(value, index, path, primaryRef) {
         if (!_.isEmpty(path) && _.isNumber(index)) path = path.concat({ index });
 
-        if (isVariant) {
+        if (primaryRef) {
             // split variant and ref
             let variant = _.omit(value, 'id', 'revision');
             let ref = _.pick(value, 'id', 'revision');
@@ -104,7 +113,7 @@ const ChangeLogRecord = {
         }
 
         // we keep the added value and its index
-        return {
+        let result = {
             op: 'add',
 
             path: path,
@@ -113,6 +122,14 @@ const ChangeLogRecord = {
             timestamp: (new Date()).toISOString(),
         };
 
+        if (primaryRef) {
+            result.oldValue = {
+                kind: 'slide',
+                ref: primaryRef,
+            };
+        }
+
+        return result;
     },
 
     createNodeUpdate: function(before, after, index, path, isVariant) {
@@ -280,7 +297,7 @@ let self = module.exports = {
 
                     if (rec.op === 'add') {
                         // we expect adding an element or a variant to an element, will throw an error otherwise
-                        let indexMatch = rec.path.match(/^\/(\d+)(?:\/variants\/(\d+))?$/);
+                        let indexMatch = rec.path.match(/^\/(\d+)(\/variants(?:\/(\d+))?)?$/);
 
                         if (!indexMatch) {
                             throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.stringify(rec)}`);
@@ -288,13 +305,25 @@ let self = module.exports = {
 
                         // indexMatch[1] includes just the index added, or the index where the variant was added
                         let index = parseInt(indexMatch[1]);
-                        // indexMatch[2] includes the index of the variant added (if any)
-                        let variantIndex = parseInt(indexMatch[2]);
-
-                        let isVariant = Number.isFinite(variantIndex);
+                        // indexMatch[2] includes includes the string /variants with the optional the index of the variant added (if any)
+                        let isVariant = !!indexMatch[2];
                         if (isVariant) {
-                            let variant = contentItemsAfter.getIn([index, 'variants', variantIndex]);
-                            return ChangeLogRecord.createNodeInsert(variant.toJS(), index, path, isVariant);
+                            let variant;
+
+                            // indexMatch[3] includes the index of the variant, if it wasn't the first added
+                            let variantIndex = parseInt(indexMatch[3]);
+                            if (Number.isFinite(variantIndex)) {
+                                variant = contentItemsAfter.getIn([index, 'variants', variantIndex]).toJS();
+                            } else {
+                                // just take it from the record value, which is always an array;
+                                // we only ever expect a single item there
+                                [variant] = rec.value;
+                            }
+
+                            // we also need to record the primary slide version, we use the index for that
+                            let primary = contentItemsAfter.getIn([index, 'ref']).toJS();
+
+                            return ChangeLogRecord.createNodeInsert(variant, index, path, primary);
                         } else {
                             return ChangeLogRecord.createNodeInsert(contentItemsAfter.get(index).toJS(), index, path);
                         }
@@ -485,10 +514,9 @@ async function fillSlideInfo(deckChanges) {
         let checkParent = ['copy', 'attach'].includes(rec.action);
 
         // we want to add title and old title of slide
-        let slide = await slideDB.get(rec.value.ref.id);
-        if (!slide) continue; // ignore errors ?
+        let after = await slideDB.getSlideRevision(util.toIdentifier(rec.value.ref));
+        if (!after) continue; // ignore errors ?
 
-        let after = _.find(slide.revisions, { id: rec.value.ref.revision });
         rec.value.ref.title = after.title;
 
         // check for copy information in add ops
@@ -500,8 +528,10 @@ async function fillSlideInfo(deckChanges) {
         }
 
         if (rec.oldValue) {
-            let before = _.find(slide.revisions,  { id: rec.oldValue.ref.revision });
-            rec.oldValue.ref.title = before.title;
+            let before = await slideDB.getSlideRevision(util.toIdentifier(rec.oldValue.ref));
+            if (before) {
+                rec.oldValue.ref.title = before.title;
+            }
         }
     }
 
