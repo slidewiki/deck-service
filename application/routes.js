@@ -773,7 +773,10 @@ module.exports = function(server) {
             validate: {
                 params: {
                     id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional')
-                }
+                },
+                query: {
+                    force: Joi.boolean().truthy('1').falsy('0', ''),
+                },
             },
             tags: ['api'],
             description: 'Triggers regeneration of thumbnails for all slides under the specified deck.',

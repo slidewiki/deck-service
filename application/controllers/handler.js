@@ -2149,7 +2149,7 @@ let self = module.exports = {
                     slide.content = `<h2>${slide.title}</h2>`;
                 }
 
-                fileService.createThumbnail(slide.content, slide.id, slide.theme).then(() => {
+                fileService.createThumbnail(slide.content, slide.id, slide.theme, request.query.force).then(() => {
                     done(null, { id: slide.id, status: 'OK' });
                 }).catch((err) => {
                     done(null, { id: slide.id, status: err.message });
