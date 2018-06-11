@@ -13,6 +13,7 @@ const self = module.exports = {
 
         return rp.post({
             uri: `${Microservices.file.uri}/thumbnail/slide/${slideId}/${theme}`,
+            qs: { force },
             body: encodedContent,
             headers: {
                 'Content-Type': 'text/plain'
