@@ -68,7 +68,7 @@ const ChangeLogRecord = {
         delete afterDiff.variants;
 
         // diffs may be empty, but a variant may have been added
-        if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff) && !variant);
+        if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff) && !variant) return;
 
         let result = {
             op: 'update',
