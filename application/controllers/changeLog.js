@@ -13,7 +13,7 @@ let self = module.exports = {
         let variantFilter = _.pick(request.query, 'language');
 
         deckDB.getChangeLog(deckId).then((changeLog) => {
-            if (!changeLog) return boom.notFound();
+            if (!changeLog) throw boom.notFound();
 
             // always reverse the order, as the input is timestamp ascending
             if (request.query.raw) return changeLog.reverse();
@@ -24,6 +24,7 @@ let self = module.exports = {
             if (request.query.simplify) simplify(changeLog);
             reply(changeLog);
         }).catch((error) => {
+            if (error.isBoom) return reply(error);
             request.log('error', error);
             reply(boom.badImplementation());
         });
@@ -35,7 +36,7 @@ let self = module.exports = {
         let variantFilter = _.pick(request.query, 'language');
 
         slideDB.getChangeLog(slideId, rootId).then((changeLog) => {
-            if (!changeLog) return boom.notFound();
+            if (!changeLog) throw boom.notFound();
 
             // always reverse the order, as the input is timestamp ascending
             if (request.query.raw) return changeLog.reverse();
@@ -46,6 +47,7 @@ let self = module.exports = {
             if (request.query.simplify) simplify(changeLog);
             reply(changeLog);
         }).catch((error) => {
+            if (error.isBoom) return reply(error);
             request.log('error', error);
             reply(boom.badImplementation());
         });
