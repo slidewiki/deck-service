@@ -2,63 +2,51 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-describe('REST API', () => {
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
+
+chai.should();
+
+describe('REST API usage deck', () => {
 
     const JWT = require('jsonwebtoken');
     const secret = 'NeverShareYourSecret';
-    
+
     let server;
 
     before((done) => {
-        //Clean everything up before doing new tests
+        // Clean everything up before doing new tests
         Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        require('chai').should();
-        let hapi = require('hapi');
-        server = new hapi.Server();
-        server.connection({
-            host: 'localhost',
-            port: 3000
-        });
-        let plugins = [
-            require('hapi-auth-jwt2')
-        ];
-        server.register(plugins, (err) => {
-            if (err) {
-                console.error(err);
-                global.process.exit();
-            } else {
-                server.auth.strategy('jwt', 'jwt', {
-                    key: secret,
-                    validateFunc: (decoded, request, callback) => {callback(null, true);},
-                    verifyOptions: {
-                        ignoreExpiration: true
-                    },
-                    headerKey: '----jwt----',
-                });
-                
-                /*
-                const config = require('../configuration'),
-                    db = require('../database/helper');
-                db.cleanDatabase(config.MongoDB.SLIDEWIKIDATABASE);
-                */
-                
-                server.start(() => {
-                    server.log('info', 'Server started at ' + server.info.uri);
-                    require('../routes.js')(server);
-                    done();
-                });
-            }
+
+        require('../testServer')(secret).then((newServer) => {
+            server = newServer;
+            server.start(done);
         });
     });
 
-    const deckData = {
-        title: 'new deck',
-        root_deck: '1',
-        parent_deck: {
-            id: '1',
-            revision: '1'
-        },
-    };
+    after(() => {
+        return Promise.resolve().then(() => server && server.stop());
+    });
+
+
+    let parentId;
+    before(() => {
+        return server.inject({
+            method: 'POST',
+            url: '/deck/new',
+            payload: { title: 'parent deck' },
+            headers: {
+                'Content-Type': 'application/json',
+                '----jwt----': authToken,
+            },
+        }).then((response) => {
+            // grab the id!
+            let payload = JSON.parse(response.payload);
+            parentId = String(payload.id);
+            return response;
+        });
+    });
     
     let authToken = JWT.sign( { userid: 1 }, secret );
     
@@ -77,7 +65,14 @@ describe('REST API', () => {
             return server.inject({
                 method: 'POST',
                 url: '/deck/new',
-                payload: deckData,
+                payload: {
+                    title: 'new deck',
+                    root_deck: parentId,
+                    parent_deck: {
+                        id: parentId,
+                        revision: '1'
+                    },
+                },
                 headers: {
                     'Content-Type': 'application/json',
                     '----jwt----': authToken,

@@ -2,11 +2,18 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-describe('REST API for edit rights requests', () => {
-    const mockery = require('mockery');
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
+
+chai.should();
+
+describe('REST API edit rights requests', () => {
 
     const JWT = require('jsonwebtoken');
     const secret = 'NeverShareYourSecret';
+
+    const mockery = require('mockery');
 
     let server;
 
@@ -29,48 +36,24 @@ describe('REST API for edit rights requests', () => {
         });
         // end mock
 
-        //Clean everything up before doing new tests
+        // Clean everything up before doing new tests
         Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        require('chai').should();
-        let hapi = require('hapi');
-        server = new hapi.Server();
-        server.connection({
-            host: 'localhost',
-            port: 3000
-        });
-        let plugins = [
-            require('hapi-auth-jwt2')
-        ];
-        server.register(plugins, (err) => {
-            if (err) {
-                console.error(err);
-                global.process.exit();
-            } else {
-                server.auth.strategy('jwt', 'jwt', {
-                    key: secret,
-                    validateFunc: (decoded, request, callback) => {callback(null, true);},
-                    verifyOptions: {
-                        ignoreExpiration: true
-                    },
-                    headerKey: '----jwt----',
-                });
-                
-                // const db = require('../database/helper');
-                // db.cleanDatabase();
 
-                server.start(() => {
-                    server.log('info', 'Server started at ' + server.info.uri);
-                    require('../routes.js')(server);
-                    done();
-                });
-            }
+        require('../testServer')(secret).then((newServer) => {
+            server = newServer;
+            server.start(done);
         });
+
     });
 
-    // disable mocking
     after(() => {
-        mockery.disable();
+        return Promise.resolve().then(() => {
+            // disable mocking
+            mockery.disable();
+            return server && server.stop();
+        });
     });
+
 
     let ownerId = 1, newEditorId = 2, editorId = 3, groupEditorId = 4;
 

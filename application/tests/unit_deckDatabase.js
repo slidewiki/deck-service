@@ -2,14 +2,14 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-let chai = require('chai');
-let chaiAsPromised = require('chai-as-promised');
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
 chai.use(chaiAsPromised);
 
 chai.should();
 
-let helper = require('../database/helper.js');
-let deckDB = require('../database/deckDatabase');
+const helper = require('../database/helper.js');
+const deckDB = require('../database/deckDatabase');
 
 describe('deckDatabase', function() {
 
@@ -19,6 +19,10 @@ describe('deckDatabase', function() {
                 helper.applyFixtures(db, require('./fixtures/decktree-editors.json'))
             )
         );
+    });
+
+    after(function() {
+        return helper.closeConnection();
     });
 
     // TODO any tests involving restricted / private decks are commented out/skipped until feature is enabled

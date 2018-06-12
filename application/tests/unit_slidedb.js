@@ -2,28 +2,27 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-//Mocking is missing completely TODO add mocked objects
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
 
-describe('Database', () => {
+chai.should();
 
-    let db, deckdb, treedb, helper; //expect
+const helper = require('../database/helper.js');
+const db = require('../database/slideDatabase.js');
+const deckdb = require('../database/deckDatabase');
+const treedb = require('../database/deckTreeDatabase');
 
-    beforeEach((done) => {
-        //Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        require('chai').should();
-        let chai = require('chai');
-        let chaiAsPromised = require('chai-as-promised');
-        chai.use(chaiAsPromised);
-        //expect = require('chai').expect;
-        db = require('../database/slideDatabase.js');
-        deckdb = require('../database/deckDatabase.js');
-        treedb = require('../database/deckTreeDatabase');
-        helper = require('../database/helper.js');
-        helper.cleanDatabase()
-        .then(() => done())
-        .catch((error) => done(error));
+describe('slideDatabase', () => {
+
+    before(() => {
+        return helper.cleanDatabase();
     });
+
+    after(() => {
+        return helper.closeConnection();
+    });
+
 
     context('when having an empty database', () => {
         it('should return nothing when requesting a non existant slide', () => {
@@ -65,6 +64,7 @@ describe('Database', () => {
                 'footer': '',
                 'license': 'CC0'
             };
+
             let res = deckdb.insert(deck);
             //res.then((data) => console.log('resolved', data));
             return Promise.all([

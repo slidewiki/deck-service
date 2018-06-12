@@ -2,50 +2,33 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-//Mocking is missing completely TODO add mocked objects
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
 
-describe('REST API', () => {
+chai.should();
+
+describe('REST API new slide', () => {
 
     const JWT = require('jsonwebtoken');
     const secret = 'NeverShareYourSecret';
 
     let server;
 
-    beforeEach((done) => {
-        //Clean everything up before doing new tests
+    before((done) => {
+        // Clean everything up before doing new tests
         Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        require('chai').should();
-        let hapi = require('hapi');
-        server = new hapi.Server();
-        server.connection({
-            host: 'localhost',
-            port: 3000
-        });
-        let plugins = [
-            require('hapi-auth-jwt2')
-        ];
-        server.register(plugins, (err) => {
-            if (err) {
-                console.error(err);
-                global.process.exit();
-            } else {
-                server.auth.strategy('jwt', 'jwt', {
-                    key: secret,
-                    validateFunc: (decoded, request, callback) => {callback(null, true);},
-                    verifyOptions: {
-                        ignoreExpiration: true
-                    },
-                    headerKey: '----jwt----',
-                });
 
-                server.start(() => {
-                    server.log('info', 'Server started at ' + server.info.uri);
-                    require('../routes.js')(server);
-                    done();
-                });
-            }
+        require('../testServer')(secret).then((newServer) => {
+            server = newServer;
+            server.start(done);
         });
     });
+
+    after(() => {
+        return Promise.resolve().then(() => server && server.stop());
+    });
+
 
     let slide = {
         title: 'Dummy',
