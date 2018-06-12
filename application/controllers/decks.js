@@ -134,6 +134,24 @@ let self = module.exports = {
 
     },
 
+    getContributors: function(request, reply) {
+        let deckId = request.params.id;
+        deckDB.getDeck(deckId).then((deck) => {
+            if (!deck) throw boom.notFound();
+
+            return deckDB.getDeckContributors(deckId)
+            .then((contribIds) => contribIds.map((id) => ({
+                id,
+                count: 1,
+                type: (id === deck.user) ? 'creator' : 'contributor',
+            })));
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
     getDeckOwners: function(request, reply) {
         let query = {};
         if (request.query.user) {

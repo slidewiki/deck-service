@@ -3,6 +3,7 @@
 const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
+const slides = require('./controllers/slides');
 const decks = require('./controllers/decks');
 const deckTrees = require('./controllers/deckTrees');
 const changeLog = require('./controllers/changeLog');
@@ -141,6 +142,21 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deck/{id}/contributors',
+        handler: decks.getContributors,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the users that have contributed in any way in the deck content',
+        },
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/editors',
         handler: handlers.getEditors,
         config: {
@@ -179,6 +195,11 @@ module.exports = function(server) {
                             })),
                     }),
                 }),
+            },
+            plugins: {
+                'hapi-swagger': {
+                    deprecated: true,
+                },
             },
         },
     });
@@ -708,6 +729,21 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/slide/{id}/contributors',
+        handler: slides.getContributors,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the users that have contributed in any way in the slide content',
+        },
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/datasources',
         handler: handlers.getDeckDataSources,
         config: {
@@ -1119,9 +1155,14 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Get tags of a deck #DEPRECATED',
+            description: 'Get tags of a deck',
             response: {
                 schema: Joi.array().items(apiModels.tag),
+            },
+            plugins: {
+                'hapi-swagger': {
+                    deprecated: true,
+                },
             },
         }
     });
@@ -1143,9 +1184,14 @@ module.exports = function(server) {
                     }).requiredKeys('operation', 'user', 'tag')
             },
             tags: ['api'],
-            description: 'Add/Remove a tag from a deck #DEPRECATED',
+            description: 'Add/Remove a tag from a deck',
             response: {
                 schema: Joi.array().items(apiModels.tag),
+            },
+            plugins: {
+                'hapi-swagger': {
+                    deprecated: true,
+                },
             },
         }
     });
@@ -1186,9 +1232,14 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Get tags of a slide #DEPRECATED',
+            description: 'Get tags of a slide',
             response: {
                 schema: Joi.array().items(apiModels.tag),
+            },
+            plugins: {
+                'hapi-swagger': {
+                    deprecated: true,
+                },
             },
         }
     });
@@ -1210,9 +1261,14 @@ module.exports = function(server) {
                     }).requiredKeys('operation', 'user', 'tag'),
             },
             tags: ['api'],
-            description: 'Add/Remove a tag from a slide #DEPRECATED',
+            description: 'Add/Remove a tag from a slide',
             response: {
                 schema: Joi.array().items(apiModels.tag),
+            },
+            plugins: {
+                'hapi-swagger': {
+                    deprecated: true,
+                },
             },
         }
     });

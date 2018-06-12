@@ -1805,7 +1805,9 @@ let self = module.exports = {
 
                 // add all deck revision owners up to and including this revision
                 deckRevisions.forEach((rev) => {
-                    pushIfNotExist(contributorsList, rev.user);
+                    if (rev.user > 0) {
+                        pushIfNotExist(contributorsList, rev.user);
+                    }
                 });
                 pushIfNotExist(contributorsList, deck.user);
 

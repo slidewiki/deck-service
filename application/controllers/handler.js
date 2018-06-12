@@ -1604,6 +1604,7 @@ let self = module.exports = {
     },
 
     //returns the editors of a deck
+    // DEPRECATED
     getEditors: function(request, reply){
         let deckId = request.params.id;
 
