@@ -1562,9 +1562,9 @@ let self = module.exports = {
     },
 
     // returns an implicit list of editors of a given deck
-    getDeckEditors(deck_id, editorsList){
+    getDeckContributors(deck_id, contributorsList){
         deck_id = String(deck_id);
-        if (!editorsList) editorsList = [];
+        if (!contributorsList) contributorsList = [];
 
         let revision_id = -1;
         let decktreesplit = deck_id.split('-');
@@ -1587,9 +1587,9 @@ let self = module.exports = {
 
                 // add all deck revision owners up to and including this revision
                 deckRevisions.forEach((rev) => {
-                    pushIfNotExist(editorsList, rev.user);
+                    pushIfNotExist(contributorsList, rev.user);
                 });
-                pushIfNotExist(editorsList, deck.user);
+                pushIfNotExist(contributorsList, deck.user);
 
                 // figure out the subdecks by id and revision
                 let contentItems = deckRevisions.map((rev) => rev.contentItems);
@@ -1599,14 +1599,14 @@ let self = module.exports = {
                 return new Promise((resolve, reject) => {
                     async.eachSeries(contentItems, (citem, callback) => {
                         col.findOne({_id: parseInt(citem.ref.id)})
-                        .then((innerDeck) => self.getDeckEditors(innerDeck._id+'-'+citem.ref.revision, editorsList))
+                        .then((innerDeck) => self.getDeckContributors(innerDeck._id+'-'+citem.ref.revision, contributorsList))
                         .then(() => callback())
                         .catch(callback);
                     }, (err) => {
                         if (err) {
                             reject(err);
                         } else {
-                            resolve(editorsList);
+                            resolve(contributorsList);
                         }
                     });
                 });
@@ -1634,10 +1634,9 @@ let self = module.exports = {
             });
 
         } else {
-            // we need all contributors
-            return self.getDeckEditors(deckId)
-            .then((contributors) => {
 
+            // this way we always return a Promise and handle returns/throws correctly
+            return Promise.resolve().then(() => {
                 if (accessLevel === 'public' || accessLevel === 'restricted') {
                     // we now read the editors property of the deck, providing some defaults
                     let users = [], groups = [];
@@ -1651,7 +1650,7 @@ let self = module.exports = {
                     }
 
                     return {
-                        users: [...(new Set(users.map((u) => u.id))), ...contributors],
+                        users: users.map((u) => u.id),
                         groups: groups.map((g) => g.id),
                     };
 

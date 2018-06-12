@@ -146,7 +146,7 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Get the users and groups authorized for editing the deck (includes contributors)',
+            description: 'Get the users and groups authorized for editing the deck, as well as all the contributors',
             response: {
                 schema: Joi.object().keys({
                     contributors: Joi.array().items(
