@@ -1,6 +1,7 @@
 /*
 Handles the requests by executing stuff and replying to the client. Uses promises to get stuff done.
 */
+/* eslint promise/always-return: "off" */
 
 
 
@@ -153,7 +154,7 @@ let self = module.exports = {
                             return deckDB.updateContentItem(newSlide, '', request.payload.root_deck, 'slide', userId, request.payload.top_root_deck)
                             .then(({updatedDeckRevision}) => {
                                 // the updateContentItem returns, amongs other things, the updated revision of the parent (root_deck)
-                                // we need this to have access to the theme for the new updated slide 
+                                // we need this to have access to the theme for the new updated slide
 
                                 //create thumbnail for the new slide revision
                                 let content = newSlide.revisions[0].content, newSlideId = newSlide._id+'-'+newSlide.revisions[0].id;
@@ -470,6 +471,7 @@ let self = module.exports = {
                 let newSlide = {
                     'title': 'New slide',
                     'content': slidetemplate,
+                    'markdown': '',
                     'language': request.payload.language,
                     'license': request.payload.license,
                     'user': inserted.ops[0].user,
@@ -477,9 +479,16 @@ let self = module.exports = {
                     'position' : 1
                 };
 
+                if (request.payload.hasOwnProperty('slideDimensions')) {
+                    newSlide.dimensions = request.payload.slideDimensions;
+                }
+
                 if(request.payload.hasOwnProperty('first_slide')){
                     if(request.payload.first_slide.hasOwnProperty('content')){
                         newSlide.content = request.payload.first_slide.content;
+                    }
+                    if(request.payload.first_slide.hasOwnProperty('markdown')){
+                        newSlide.markdown = request.payload.first_slide.markdown;
                     }
                     if(request.payload.first_slide.hasOwnProperty('title')){
                         newSlide.title = request.payload.first_slide.title;
@@ -523,7 +532,6 @@ let self = module.exports = {
     // new simpler implementation of deck update with permission checking and NO new_revision: true option
     updateDeck: function(request, reply) {
         let userId = request.auth.credentials.userid;
-
         let deckId = request.params.id;
         // TODO we should keep this required, no fall-back values!
         let rootDeckId = request.payload.top_root_deck;
@@ -579,6 +587,7 @@ let self = module.exports = {
 
                 return _.pick(fork, [
                     'id', 'title', 'user',
+                    'hidden',
                     'timestamp', 'lastUpdate', 'current', 'origin',
                 ]);
 
@@ -710,7 +719,7 @@ let self = module.exports = {
                 if(err.isBoom) return reply(err);
 
                 request.log('error', err);
-                reply(boom.badImplementation());                
+                reply(boom.badImplementation());
             });
         } else {
             deckDB.getDeckTreeFromDB(request.params.id)
@@ -933,16 +942,27 @@ let self = module.exports = {
                         let slide = {
                             'title': 'New slide',
                             'content': slidetemplate,
+                            'allowMarkdown': false,
+                            'markdown': '',
                             'language': parentDeck.revisions[0].language,
                             'license': parentDeck.license,
                             'root_deck': parentID,
                             'position' : slidePosition,
                             'user': userId,
-                            'theme' : request.payload.theme
+                            'theme' : request.payload.theme,
                         };
 
+                        if (parentDeck.slideDimensions) {
+                            slide.dimensions = parentDeck.slideDimensions;
+                        }
                         if(request.payload.hasOwnProperty('content')){
                             slide.content = request.payload.content;
+                        }
+                        if(request.payload.hasOwnProperty('markdown')){
+                            slide.markdown = request.payload.markdown;
+                        }
+                        if(request.payload.hasOwnProperty('allowMarkdown')){
+                            slide.allowMarkdown = request.payload.allowMarkdown;
                         }
                         if(request.payload.hasOwnProperty('title')){
                             slide.title = request.payload.title;
@@ -955,7 +975,7 @@ let self = module.exports = {
                         }
 
                         // create the new slide into the database
-                                                
+
                         // insert the slide
                         slideDB.insert(slide).then((inserted) => {
                             // empty results means something wrong with the payload
@@ -1090,7 +1110,7 @@ let self = module.exports = {
                                 return deckDB.insertNewContentItem(deck, deckPosition, parentID, 'deck', deckRevision+1, userId).then(() => {
                                     return Promise.all([
                                         // track all created forks AFTER it's attached
-                                        deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, true),
+                                        deckDB._trackDecksForked(top_root_deck, forkResult.id_map, userId, 'attach'),
                                         // add to usage AFTER it's attached
                                         deckDB.addToUsage({ref:{id:deck._id, revision: deckRevision+1}, kind: 'deck'}, parentID.split('-')),
                                         //we have to return from the callback, else empty node is returned because it is updated asynchronously
@@ -1153,8 +1173,14 @@ let self = module.exports = {
                             'root_deck': parentID,
                             'top_root_deck': top_root_deck,
                             'theme': parentDeck.revisions[0].theme,
+                            'allowMarkdown': parentDeck.revisions[0].allowMarkdown,
                             'position' : deckPosition
                         };
+
+                        if (parentDeck.slideDimensions) {
+                            deck.slideDimensions = parentDeck.slideDimensions;
+                        }
+
                         //create the new deck
                         self.newDeck({
                             'payload' : deck,
@@ -1237,6 +1263,7 @@ let self = module.exports = {
                 let new_slide = {
                     'title' : request.payload.name,
                     'content' : slide.revisions[0].content,
+                    'markdown' : slide.revisions[0].markdown,
                     'speakernotes' : slide.revisions[0].speakernotes,
                     'user' : String(userId),
                     'root_deck' : root_deck,
@@ -1246,6 +1273,9 @@ let self = module.exports = {
                     'tags' : slide.revisions[0].tags,
                     'dataSources' : slide.revisions[0].dataSources
                 };
+                if (slide.revisions[0].dimensions) {
+                    new_slide.dimensions = slide.revisions[0].dimensions;
+                }
                 if(new_slide.speakernotes === null){
                     new_slide.speakernotes = '';
                 }
@@ -1397,23 +1427,23 @@ let self = module.exports = {
             };
             //append the node (revised or not) in the new position
             self.createDeckTreeNode(forwardedRequest,
-            (inserted) => {
-                if (inserted.isBoom) return reply(inserted);
+                (inserted) => {
+                    if (inserted.isBoom) return reply(inserted);
 
-                if(inserted.hasOwnProperty('changeset') && removed.hasOwnProperty('changeset')){
-                    inserted_changeset = inserted.changeset;
-                    inserted.inserted_changeset = inserted_changeset;
-                    inserted.removed_changeset = removed_changeset;
-                }
-                else if(removed.hasOwnProperty('changeset')){
-                    inserted.changeset = removed_changeset;
-                }
-                if(inserted.hasOwnProperty('changeset')){
-                    inserted_changeset = inserted.changeset;
-                    inserted.changeset = inserted_changeset;
-                }
-                reply(inserted);
-            });
+                    if(inserted.hasOwnProperty('changeset') && removed.hasOwnProperty('changeset')){
+                        inserted_changeset = inserted.changeset;
+                        inserted.inserted_changeset = inserted_changeset;
+                        inserted.removed_changeset = removed_changeset;
+                    }
+                    else if(removed.hasOwnProperty('changeset')){
+                        inserted.changeset = removed_changeset;
+                    }
+                    if(inserted.hasOwnProperty('changeset')){
+                        inserted_changeset = inserted.changeset;
+                        inserted.changeset = inserted_changeset;
+                    }
+                    reply(inserted);
+                });
         });
 
     },
@@ -1536,6 +1566,28 @@ let self = module.exports = {
             reply(boom.badImplementation());
         });
 
+    },
+
+    requestEditRights: function(request, reply) {
+        let deckId = request.params.id;
+        let userId = request.auth.credentials.userid;
+
+        deckDB.userPermissions(deckId, userId).then((perm) => {
+            if (!perm) return boom.notFound();
+
+            if (perm.edit) {
+                // user already has permissions, return error
+                return boom.badData();
+            }
+
+            return deckDB.addEditRightsRequest(deckId, userId);
+
+        }).then((res) => {
+            reply(res);
+        }).catch((err) => {
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
     },
 
     userPermissions: function(request, reply) {
@@ -1707,7 +1759,8 @@ let self = module.exports = {
         }
 
         let decksPromise = deckDB.find('decks', {
-            user: userid
+            user: userid,
+            hidden: { $in: [false, null] },
         });
 
         decksPromise.then((decks) => {
@@ -1799,6 +1852,7 @@ let self = module.exports = {
 
             return deckDB.getUsage(deckId);
 
+            /* eslint-disable no-unreachable */
             // TODO dead code
             return deckDB.getRootDecks(deckId)
             .then((roots) => {
@@ -1814,7 +1868,7 @@ let self = module.exports = {
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
             });
-
+            /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1831,6 +1885,7 @@ let self = module.exports = {
             return deckDB.getRootDecks(deckId)
             .then((roots) => {
                 return roots;
+                /* eslint-disable no-unreachable */
                 // TODO dead code
                 return Promise.all(roots.map((r) => {
                     return deckDB.findPath(util.toIdentifier(r), deckId)
@@ -1841,6 +1896,7 @@ let self = module.exports = {
                         return path;
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
+                /* eslint-enable no-unreachable */
             });
 
         }).then(reply).catch((err) => {
@@ -1857,6 +1913,7 @@ let self = module.exports = {
 
             return deckDB.getUsage(slideId, 'slide');
 
+            /* eslint-disable no-unreachable */
             // TODO dead code
             return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
                 return roots;
@@ -1875,6 +1932,7 @@ let self = module.exports = {
                 })).then((paths) => paths.map(util.toPlatformPath));
 
             });
+            /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
             request.log('error', err);
             reply(boom.badImplementation());
@@ -1890,6 +1948,7 @@ let self = module.exports = {
 
             return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
                 return roots;
+                /* eslint-disable no-unreachable */
                 // TODO dead code
                 return Promise.all(roots.map((r) => {
                     // path method does not return the slide id, so we take it from the root
@@ -1903,6 +1962,7 @@ let self = module.exports = {
                         return path;
                     });
                 })).then((paths) => paths.map(util.toPlatformPath));
+                /* eslint-disable no-unreachable */
 
             });
         }).then(reply).catch((err) => {
@@ -2089,7 +2149,7 @@ let self = module.exports = {
                     slide.content = `<h2>${slide.title}</h2>`;
                 }
 
-                fileService.createThumbnail(slide.content, slide.id, slide.theme).then(() => {
+                fileService.createThumbnail(slide.content, slide.id, slide.theme, request.query.force).then(() => {
                     done(null, { id: slide.id, status: 'OK' });
                 }).catch((err) => {
                     done(null, { id: slide.id, status: err.message });

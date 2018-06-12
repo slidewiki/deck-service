@@ -80,6 +80,7 @@ describe('REST API', () => {
                 url: '/deck/new',
                 payload: {
                     title: 'new deck',
+                    hidden: false,
                 },
                 headers: {
                     'Content-Type': 'application/json',

@@ -18,62 +18,112 @@ const async = require('async');
 
 let self = module.exports = {
 
-    list: (query, options) => {
-        let projectStage = {};
-        if (options.idOnly) {
-            projectStage._id = 1;
+    list: function(query, options={}) {
+        let projectStage = {
+            user: 1,
+            active: 1,
+            hidden: 1,
+            description: 1,
+            timestamp: 1,
+            lastUpdate: 1,
+            revisions: 1,
+            tags: 1, 
+            translation: 1,
+            countRevisions: 1, 
+            title: 1,
+        };
+
+        // sort stage
+        let sortStage = {};
+        if (options.sort === 'title') {
+            sortStage = { 'revisions.title': 1 };
+        } else if(options.sort === 'timestamp') {
+            sortStage = { timestamp: -1 };
+        } else if(options.sort === 'lastUpdate') {
+            sortStage = { lastUpdate: -1 };
         } else {
-            Object.assign(projectStage, {
-                timestamp: 1,
-                description: 1,
-                lastUpdate: 1,
-                translation: 1,
-                active: 1,
-                revisions: 1,
-            });
+            sortStage = { _id: 1 };
         }
 
         return helper.getCollection('decks').then((decks) => {
+            let pipeline = [
+                { $match: query },
+                {
+                    $project: {
+                        user: 1,
+                        active: 1,
+                        hidden: 1,
+                        description: 1,
+                        timestamp: 1,
+                        lastUpdate: 1,
+                        revisions: 1,
+                        tags: 1,
+                        translation: 1,
+                        countRevisions: {
+                            $size: '$revisions'
+                        }
+                    }
+                },
+                { $unwind: '$revisions' },
+                {
+                    '$redact': {
+                        '$cond': {
+                            if: { $eq: [ '$active', '$revisions.id' ] },
+                            then: '$$DESCEND',
+                            else: '$$PRUNE'
+                        }
+                    }
+                },
+            ];
+
             if (options.rootsOnly) {
-                let result = decks.aggregate([
-                    { $match: query },
-                    { $project: { revisions: 1 } },
-                    { $unwind: '$revisions' },
-                    { $group: {
-                        _id: '$_id',
+                pipeline.push(
+                    { $addFields: {
                         usageCount: {
-                            $sum: { $size: '$revisions.usage' }
+                            $size: '$revisions.usage'
                         },
-                    } },
-                    { $match: { 'usageCount': 0 } },
-                ]);
-
-                if (options.idOnly) {
-                    return result;
-                }
-
-                return result.map((d) => d._id).toArray().then((deckIds) => {
-                    return decks.find({ _id: { $in: deckIds } });
-                });
-
+                    } }
+                );
+                pipeline.push(
+                    { $match: { 'usageCount': 0 } }
+                );
             } else {
-                return decks.find(query);
+                pipeline.push(
+                    {
+                        $project: projectStage
+                    }
+                );
             }
 
-        }).then((result) => result.project(projectStage).sort({ _id: 1 }).toArray());
+            // just count the result set
+            if (options.countOnly) {
+                pipeline.push({ $count: 'totalCount' });
 
+            } else {
+                // add sorting
+                pipeline.push({ $sort: sortStage });
+
+                // some routes don't support pagination
+                if (options.pageSize) {
+                    pipeline.push({ $skip: (options.page - 1) * options.pageSize });
+                    pipeline.push({ $limit: options.pageSize });
+                }
+            }
+
+            return decks.aggregate(pipeline);
+        }).then( (result) => result.toArray());
     },
 
     //gets a specified deck and all of its revision, or only the given revision
     get: function(identifier) {
         identifier = String(identifier);
         let idArray = identifier.split('-');
-        
+
         return helper.connectToDatabase()
         .then((db) => db.collection('decks'))
         .then((col) => col.findOne({ _id: parseInt(idArray[0]) }))
         .then((found) => {
-            if (!found) return;            
+            if (!found) return;
             // add some extra revision metadata
             let [latestRevision] = found.revisions.slice(-1);
             found.latestRevisionId = latestRevision.id;
@@ -167,7 +217,7 @@ let self = module.exports = {
                                     if (found.revisions[i].user === old_deck.user_id){
                                         index = parseInt(i)+1;
                                         resolve(found._id+'-'+index); //the last revision for this user
-                                    };
+                                    }
                                 }
                                 resolve(found._id + '-' + found.revisions.length); //the last revision if there is no revision for this user
                                 // async.eachOf(found.revisions, (value, key, cbEach) => {
@@ -419,6 +469,33 @@ let self = module.exports = {
 
     },
 
+    // returns the new or existing request, with isNew set to true if it was new
+    // returns undefined if deck does not exist
+    addEditRightsRequest: function(deckId, userId) {
+        return self.get(deckId).then((existingDeck) => {
+            if (!existingDeck) return;
+
+            let editRightsRequests = existingDeck.editRightsRequests;
+            if (!editRightsRequests) {
+                editRightsRequests = [];
+            }
+
+            let existingRequest = editRightsRequests.find((r) => r.user === userId);
+            if (existingRequest) {
+                return Object.assign({ isNew: false }, existingRequest);
+            }
+
+            let timestamp = new Date().toISOString();
+            let newRequest = { user: userId, requestedAt: timestamp };
+            editRightsRequests.push(newRequest);
+
+            return helper.getCollection('decks')
+            .then((decks) => decks.findOneAndUpdate({ _id: deckId }, { $set: { editRightsRequests }}))
+            .then(() => Object.assign({ isNew: true }, newRequest));
+        });
+
+    },
+
     // TODO properly implement a PATCH-like method for partial updates
     replaceEditors: function(id, payload) {
         let deckId = parseInt(id);
@@ -430,6 +507,14 @@ let self = module.exports = {
             .then((existingDeck) => {
                 if (!_.isEmpty(payload.editors) ) {
                     existingDeck.editors = payload.editors;
+
+                    if (!_.isEmpty(existingDeck.editRightsRequests)) {
+                        // filter out any edit rights requests with users in editors list
+                        let filteredRequests = existingDeck.editRightsRequests
+                        .filter((r) => !existingDeck.editors.users.some((e) => e.id === r.user));
+
+                        existingDeck.editRightsRequests = filteredRequests;
+                    }
                 }
 
                 // TODO validation is BROKEN needs update here as well
@@ -507,6 +592,10 @@ let self = module.exports = {
                 existingDeck.description = deck.description;
                 existingDeck.license = deck.license;
 
+                if (deck.slideDimensions) {
+                    existingDeck.slideDimensions = deck.slideDimensions;
+                }
+
                 // TODO add comment, abstract, footer
 
                 if (!_.isEmpty(deck.tags)) {
@@ -527,9 +616,18 @@ let self = module.exports = {
                         console.warn(`could not update slide thumbnails for deck ${id}, error was: ${err.message}`);
                     });
                 }
-
+                if(!deck.hasOwnProperty('allowMarkdown') || deck.allowMarkdown === null){
+                    deckRevision.allowMarkdown = false;
+                }
+                else{
+                    deckRevision.allowMarkdown = deck.allowMarkdown;
+                }
                 // changes ended here
                 deckTracker.applyChangeLog();
+
+                if (deck.hasOwnProperty('hidden')) {
+                    existingDeck.hidden = deck.hidden;
+                }
 
                 // lastUpdated update
                 existingDeck.lastUpdate = (new Date()).toISOString();
@@ -1161,31 +1259,31 @@ let self = module.exports = {
         .then((db) => db.collection('decks'))
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
-              .then((existingDeck) => {
-                  //first remove usage of deck from old revision
-                  if(root_deck){
-                      let usageArray = existingDeck.revisions[parseInt(idArray[1])-1].usage;
-                      for(let i = 0; i < usageArray.length; i++){
-                          if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
-                              usageArray.splice(i,1);
-                              break;
-                          }
-                      }
-                      //then update usage array of new/reverted revision
-                      let contains = false;
-                      for(let j = 0; j < existingDeck.revisions[parseInt(new_revision_id)-1].usage.length; j++){
-                          if(existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
-                              contains = true;
-                              break;
-                          }
-                      }
-                      if(!contains)
-                          existingDeck.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
-                  }
-                  existingDeck.active = new_revision_id;
-                  col.save(existingDeck);
-                  return existingDeck;
-              });
+            .then((existingDeck) => {
+                //first remove usage of deck from old revision
+                if(root_deck){
+                    let usageArray = existingDeck.revisions[parseInt(idArray[1])-1].usage;
+                    for(let i = 0; i < usageArray.length; i++){
+                        if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
+                            usageArray.splice(i,1);
+                            break;
+                        }
+                    }
+                    //then update usage array of new/reverted revision
+                    let contains = false;
+                    for(let j = 0; j < existingDeck.revisions[parseInt(new_revision_id)-1].usage.length; j++){
+                        if(existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingDeck.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
+                            contains = true;
+                            break;
+                        }
+                    }
+                    if(!contains)
+                        existingDeck.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+                }
+                existingDeck.active = new_revision_id;
+                col.save(existingDeck);
+                return existingDeck;
+            });
         });
     },
 
@@ -1219,6 +1317,7 @@ let self = module.exports = {
                     latestRevisionId: latestRevision.id,
                     title: striptags(deck.revisions[revision_id].title),
                     theme: deck.revisions[revision_id].theme,
+                    allowMarkdown: deck.revisions[revision_id].allowMarkdown,
                     type: 'deck',
                     children: [],
                 };
@@ -1238,6 +1337,7 @@ let self = module.exports = {
                                             id: slide._id+'-'+slide.revisions[slide_revision].id,
                                             type: 'slide',
                                             theme: deck.revisions[revision_id].theme,
+                                            allowMarkdown: deck.revisions[revision_id].allowMarkdown,
                                         });
                                         callback();
                                     });
@@ -1255,7 +1355,7 @@ let self = module.exports = {
                                     deckTree.children.push(res);
                                     callback();
                                 });
-                            }).catch(callback);;
+                            }).catch(callback);
                         }
                     }, (err) => {
                         if (err) {
@@ -1341,6 +1441,7 @@ let self = module.exports = {
                     type: 'deck',
                     user: String(deckRevision.user),
                     theme: deckRevision.theme,
+                    allowMarkdown: deckRevision.allowMarkdown,
                     children: []
                 };
             }
@@ -1368,10 +1469,12 @@ let self = module.exports = {
                                 deckTree.children.push({
                                     title:slideRevision.title,
                                     content: slideRevision.content,
+                                    markdown: slideRevision.markdown,
                                     speakernotes: slideRevision.speakernotes,
                                     user: String(slideRevision.user),
                                     id: slide._id+'-'+slideRevision.id,
                                     theme: deckRevision.theme,
+                                    allowMarkdown: deckRevision.allowMarkdown,
                                     type: 'slide'
                                 });
                                 callback();
@@ -1698,7 +1801,12 @@ let self = module.exports = {
                                     active: 1,
                                     // TODO revisit how we maintain this attribute
                                     translations: found.translations || [],
+                                    // forked decks are created as hidden like they were new ones
+                                    hidden: true,
                                 };
+                                if (found.slideDimensions) {
+                                    copiedDeck.slideDimensions = found.slideDimensions;
+                                }
 
                                 // set the fork origin kind to 'translation' if language is also set
                                 if (languageToTranslate) {
@@ -2062,7 +2170,7 @@ let self = module.exports = {
             let query = { 'origin.id': deckId };
             if (userId) {
                 query.user = userId;
-            };
+            }
 
             // then run the query itself
             return self.find('decks', query);
@@ -2183,6 +2291,11 @@ let self = module.exports = {
         }
 
         let pipeline = [
+            { $match: {
+                'revisions.contentItems': {
+                    $elemMatch: elemMatchQuery,
+                }
+            } },
             { $project: {
                 revisions: {
                     id: 1,
@@ -2281,32 +2394,36 @@ let self = module.exports = {
     },
 
     _getRootDecks(itemId, itemKind='deck', keepVisibleOnly=true) {
-        return self.getUsage(itemId, itemKind).then((parents) => {
-            // return self if is deck and is root
-            if (parents.length === 0) {
-                if (itemKind === 'deck') {
-                    return [util.parseIdentifier(itemId)];
-                } else {
-                    // orphan slide
-                    return [];
+        return self.get(itemId).then( (deck) => {
+            return self.getUsage(itemId, itemKind).then((parents) => {
+                // return self if is deck and is root
+                if (parents.length === 0) {
+                    if (itemKind === 'deck') {
+                        let item = util.parseIdentifier(itemId);
+                        item.hidden = deck.hidden;
+                        return [item];
+                    } else {
+                        // orphan slide
+                        return [];
+                    }
                 }
-            }
 
-            return parents.reduce((promise, parent) => {
-                return promise.then((roots) => {
-                    let parentId = util.toIdentifier(parent);
-                    // a deck/slide parent is always a deck
-                    return self.getRootDecks(parentId, 'deck', keepVisibleOnly).then((deepRoots) => {
-                        // when method is called by client code the itemId may have revision
-                        // in such a case `parent` includes a `using` attribute
-                        // let's propagate that that in deep results
-                        if (parent.using) {
-                            deepRoots.forEach((u) => u.using = parent.using);
-                        }
-                        return roots.concat(deepRoots);
+                return parents.reduce((promise, parent) => {
+                    return promise.then((roots) => {
+                        let parentId = util.toIdentifier(parent);
+                        // a deck/slide parent is always a deck
+                        return self.getRootDecks(parentId, 'deck', keepVisibleOnly).then((deepRoots) => {
+                            // when method is called by client code the itemId may have revision
+                            // in such a case `parent` includes a `using` attribute
+                            // let's propagate that that in deep results
+                            if (parent.using) {
+                                deepRoots.forEach((u) => u.using = parent.using);
+                            }
+                            return roots.concat(deepRoots);
+                        });
                     });
-                });
-            }, Promise.resolve([]));
+                }, Promise.resolve([]));
+            });
         });
     },
 
@@ -2345,30 +2462,29 @@ let self = module.exports = {
                 return { fork: true, edit: true, admin: true, readOnly };
             }
 
-            // default level is public
-            let accessLevel = deck.accessLevel || 'public';
+            let canFork = !deck.hidden;
             return self.getDeckUsersGroups(deck, deckId)
             .then((editors) => {
                 if (editors.users.includes(userId)) {
                     // user is an editor
-                    return { fork: true, edit: true, admin: false, readOnly };
+                    return { fork: canFork, edit: true, admin: false, readOnly };
                 } else {
                     // we also need to check if the groups allowed to edit the deck include the user
                     return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
 
                         if (groupsUsers.includes(userId)) {
                             // user is an editor
-                            return { fork: true, edit: true, admin: false, readOnly };
+                            return { fork: canFork, edit: true, admin: false, readOnly };
                         } else {
                             // user is not an editor or owner
                             // also return if user can fork the deck (e.g. if it's public)
-                            return { fork: (accessLevel !== 'private'), edit: false, admin: false, readOnly };
+                            return { fork: canFork, edit: false, admin: false, readOnly };
                         }
 
                     }).catch((err) => {
                         console.warn(`could not fetch usergroup info from service: ${err.message}`);
                         // we're not sure, let's just not allow this user
-                        return { fork: (accessLevel !== 'private'), edit: false, admin: false, readOnly };
+                        return { fork: canFork, edit: false, admin: false, readOnly };
                     });
                 }
             });
@@ -2382,15 +2498,12 @@ let self = module.exports = {
         return self.get(deckId).then((deck) => {
             if (!deck) return;
 
-            // next, we need to check the accessLevel, defaults to 'public'
-            let accessLevel = deck.accessLevel || 'public';
-
-            if (accessLevel === 'private') {
+            if (deck.hidden) {
                 // no-one but the deck owner can fork it!!
                 return deck.user === userId;
             }
 
-            // any other access level means you can fork it always
+            // if not hidden you can fork it always
             return true;
         });
     },
@@ -2658,12 +2771,17 @@ let self = module.exports = {
 
     // get  recent decks
     getAllRecent: function(limit, offset){
-        return self.findWithLimitAndSort('decks', {}, limit, offset, {'timestamp': -1});
+        return self.findWithLimitAndSort('decks', {
+            hidden: { $in: [false, null] },
+        }, limit, offset, {'timestamp': -1});
     },
 
     // get featured decks
     getAllFeatured: function(limit, offset){
-        return self.findWithLimit('decks', {'revisions.isFeatured': 1}, limit, offset);
+        return self.findWithLimit('decks', {
+            'revisions.isFeatured': 1,
+            hidden: { $in: [false, null] },
+        }, limit, offset);
     },
 
     // get first slide
@@ -2709,7 +2827,7 @@ let self = module.exports = {
                 // remove from 'deck' collection
                 let removeDeckPromise = helper.getCollection('decks')
                 .then((col) => {
-                    col.remove({'_id': existingDeck._id});                
+                    col.remove({'_id': existingDeck._id});
                 });
 
                 // update usage of its content slides
@@ -2753,7 +2871,7 @@ let self = module.exports = {
 
                 return Promise.all([removeDeckPromise, updateSlidesUsagePromise]);
             });
-        });     
+        });
     },
 
     // moves the entire deck tree including all subdecks to the archive
@@ -2767,7 +2885,7 @@ let self = module.exports = {
                 throw boom.methodNotAllowed(`cannot archive a non-root deck ${deckId}`);
             }
 
-            // archive subdecks 
+            // archive subdecks
             let archiveSubdecks = new Promise( (resolve, reject) => {
                 self.getFlatDecksFromDB(String(deckId)).then((res) => {
                     if (!res) return reject(boom.notFound());
@@ -2780,7 +2898,7 @@ let self = module.exports = {
                         }).catch( (err) => {
                             callback(err);
                         });
-                        
+
                     }, (err) => {
                         if(err){
                             reject(err);
@@ -2808,7 +2926,7 @@ let self = module.exports = {
 
             return self.getRevision(deckId).then( (revision) => {
 
-                path.push({id: deck._id, revision: deck.revisionId});
+                path.push({id: deck._id, revision: deck.revisionId, hidden: deck.hidden});
 
                 let decktree = {
                     id: deck._id, 
@@ -2824,6 +2942,7 @@ let self = module.exports = {
                     tags: revision.tags.map ( (tag) => { return tag.tagName; }),
                     contributors: deck.contributors.map( (contr) => {return contr.user;}),
                     path: path,
+                    hidden: deck.hidden,
                     contents: []
                 };
 
@@ -2854,16 +2973,16 @@ let self = module.exports = {
                                     if(!revision) callback();
 
                                     let slideDetails = {
-                                        id: slide._id, 
-                                        revisionId: revision.id, 
-                                        type: 'slide', 
-                                        title: revision.title, 
-                                        content: revision.content, 
-                                        speakernotes: revision.speakernotes, 
-                                        timestamp: slide.timestamp, 
-                                        lastUpdate: slide.lastUpdate, 
-                                        language: revision.language, 
-                                        owner: slide.user, 
+                                        id: slide._id,
+                                        revisionId: revision.id,
+                                        type: 'slide',
+                                        title: revision.title,
+                                        content: revision.content,
+                                        speakernotes: revision.speakernotes,
+                                        timestamp: slide.timestamp,
+                                        lastUpdate: slide.lastUpdate,
+                                        language: revision.language,
+                                        owner: slide.user,
                                         contributors: slide.contributors.map( (contr) => {return contr.user; }),
                                         path: path,
                                     };
@@ -2873,7 +2992,7 @@ let self = module.exports = {
                                 });
                             }).catch(callback);
                         }
-                    }, (err) => {               
+                    }, (err) => {
                         if (err) {
                             reject(err);
                         } else {
@@ -2886,7 +3005,7 @@ let self = module.exports = {
     },
 };
 
-// regenerates direct slide thumbnails according to the deck revision theme 
+// regenerates direct slide thumbnails according to the deck revision theme
 function updateDeckThumbnails(deckRevision, newTheme) {
     return deckRevision.contentItems.filter((citem) => citem.kind === 'slide').reduce((p, citem) => {
         return p.then(() => {
@@ -2993,16 +3112,25 @@ function convertToNewDeck(deck){
     if(!deck.hasOwnProperty('theme') || deck.theme === null){
         deck.theme = 'default';
     }
+    if(!deck.hasOwnProperty('allowMarkdown') || deck.allowMarkdown === null){
+        deck.allowMarkdown = false;
+    }
     if(deck.hasOwnProperty('editors') && deck.editors === null){
         deck.editors = {users: [], groups: []};
     }
     else if(!deck.hasOwnProperty('editors')){
         deck.editors = {users: [], groups: []};
     }
+
+    if (!deck.hasOwnProperty('hidden')) {
+        // all new decks (or subdecks) are hidden by default unless overriden
+        deck.hidden = true;
+    }
     //should we have a default accessLevel?
     const result = {
         _id: deck._id,
         user: deck.user,
+        hidden: deck.hidden,
         accessLevel: deck.accessLevel,
         editors: deck.editors,
         timestamp: now.toISOString(),
@@ -3027,9 +3155,15 @@ function convertToNewDeck(deck){
             abstract: deck.abstract,
             footer: deck.footer,
             contentItems: [],
-            theme: deck.theme
+            theme: deck.theme,
+            allowMarkdown: deck.allowMarkdown
         }]
     };
+
+    if (deck.slideDimensions) {
+        result.slideDimensions = deck.slideDimensions;
+    }
+
     return result;
 }
 

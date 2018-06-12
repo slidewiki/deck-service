@@ -100,7 +100,8 @@ describe('REST API', () => {
                     joined:'1111-11-11'
                 }
             ]
-        }
+        },
+        slideDimensions: { width: 800, height: 400 },
     };
     
     let authToken = JWT.sign( { userid: 1 }, secret );
@@ -116,8 +117,7 @@ describe('REST API', () => {
     };
     let options2 = {
         method: 'GET',
-        url: '/deck/', // + '{id}'
-                       // + '{id}/revisions', + '{id}/revisionCount', + '{id}/slides?limit={string}', + '{id}/slideCount'
+        url: '/deck/',
         headers: {
             'Content-Type': 'application/json',
         }
@@ -146,6 +146,7 @@ describe('REST API', () => {
                 payload.contributors[0].should.be.an('object').and.contain.keys('user');
                 payload.contributors[0].user.should.equal(1);
                 //payload.contributors[0].count.should.equal(1); // 'count' not used
+
                 payload.revisions.should.be.an('array').and.have.length(1);
                 let revision = payload.revisions[0];
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'user', 'tags');
@@ -176,6 +177,9 @@ describe('REST API', () => {
                 payload.contributors[0].should.be.an('object').and.contain.keys('user');
                 payload.contributors[0].user.should.equal(2);
                 //payload.contributors[0].count.should.equal(1); // 'count' not used
+                payload.should.have.a.nested.property('slideDimensions.width', 800);
+                payload.should.have.a.nested.property('slideDimensions.height', 400);
+
                 payload.revisions.should.be.an('array').and.have.length(1);
                 let revision = payload.revisions[0];
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'user', 'tags');
@@ -209,8 +213,9 @@ describe('REST API', () => {
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('_id', 'user', 'timestamp', 'license', 'revisions', 'editors', 'contributors',
-                                                                'revisionId', 'language');
+                payload.should.be.an('object').and.contain.keys(
+                    '_id', 'user', 'timestamp', 'license', 'revisions', 'editors', 'contributors', 'revisionId', 'language'
+                );
                 payload._id.should.equal(parseInt(deckID));
                 payload.user.should.equal(2);
                 payload.license.should.equal('CC BY-SA');
@@ -223,6 +228,8 @@ describe('REST API', () => {
                 payload.contributors[0].should.be.an('object').and.contain.keys('user');
                 payload.contributors[0].user.should.equal(2);
                 //payload.contributors[0].count.should.equal(2); // 'count' not used
+                payload.should.have.a.property('slideDimensions').that.is.an('object').and.contains.keys('width', 'height');
+
                 payload.revisions.should.be.an('array').and.have.length(1);
                 let revision = payload.revisions[0];
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'lastUpdate', 'user', 'tags');

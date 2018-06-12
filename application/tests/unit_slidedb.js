@@ -244,7 +244,7 @@ describe('Database', () => {
             let res = ins2.then((ins2) => db.updateUsage(ins2.value._id+'-1','2', '25-1' ));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.have.property('_id').that.is.not.empty,
+                res.should.eventually.have.property('_id').that.is.a('number'),
             ]);
         });
 

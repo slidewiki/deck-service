@@ -201,6 +201,9 @@ const deckRevision = {
         visibility: {
             type: 'boolean'
         },
+        allowMarkdown: {
+            type: 'boolean'
+        },
         translation: {
             type: 'object',
             properties: {
@@ -256,6 +259,13 @@ const deck = {
             format: 'date-time'
         },
         user: objectid,
+
+        // marks a deck so that it's not listed in either the user's decks page or search results
+        hidden: {
+            type: 'boolean',
+            default: false,
+        },
+
         // // TODO include these here after validation is fixed across the service
         // accessLevel: {
         //     type: 'string',
@@ -284,6 +294,22 @@ const deck = {
                 }
             },
             required: ['id', 'revision'],
+        },
+
+        // default slide dimensions (in pixels)
+        slideDimensions: {
+            type: 'object',
+            properties: {
+                width: {
+                    type: 'integer',
+                    minimum: 1,
+                },
+                height:{
+                    type: 'integer',
+                    minimum: 1,
+                },
+            },
+            required: ['width', 'height'],
         },
 
         // kind: {

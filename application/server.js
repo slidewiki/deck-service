@@ -51,6 +51,7 @@ let plugins = [
     require('hapi-auth-jwt2')
 ];
 
+const createIndexes = require('./database/createIndexes');
 server.register(plugins, (err) => {
     if (err) {
         console.error(err);
@@ -68,9 +69,14 @@ server.register(plugins, (err) => {
 
         // server.auth.default('false');
 
-        server.start(() => {
-            server.log('info', 'Server started at ' + server.info.uri);
-            require('./routes.js')(server);
+        createIndexes().catch((err) => {
+            console.warn('error creating the indexes on the database collection:');
+            console.warn(err.message);
+        }).then(() => {
+            server.start(() => {
+                server.log('info', 'Server started at ' + server.info.uri);
+                require('./routes.js')(server);
+            });
         });
     }
 });

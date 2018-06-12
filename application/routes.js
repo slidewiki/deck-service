@@ -6,19 +6,23 @@ const Joi = require('joi'),
 const decks = require('./controllers/decks');
 const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
+const groups = require('./controllers/groups');
 
 const availableThemes = Joi.string()
-                      .default('default')
-                      .valid('default', 'sky', 'beige', 'black', 'blood', 'league', 'moon', 'night', 'odimadrid', 'oeg', 'openuniversity', 'simple', 'solarized', 'white')
-                      .description('Available themes to apply to the thumbnail');
+.default('default').empty('')
+.valid('', 'default', 'sky', 'beige', 'black', 'blood', 'league', 'moon', 'night', 'odimadrid', 'oeg', 'openuniversity', 'simple', 'solarized', 'white')
+.description('Available themes to apply to the thumbnail');
 
+const slideDimensions = Joi.object().keys({
+    width: Joi.number().integer().positive(),
+    height: Joi.number().integer().positive(),
+});
 
 // TODO better organize joi validation models
 const apiModels = {};
-apiModels.tag = Joi.object().keys({
-    tagName: Joi.string(),
-    defaultName: Joi.string()
-}).requiredKeys('tagName');
+
+apiModels.tag = require('./models/JoiModels/tag');
+apiModels.group = require('./models/JoiModels/group');
 
 module.exports = function(server) {
 
@@ -30,13 +34,25 @@ module.exports = function(server) {
         handler: decks.listDecks,
         config: {
             validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().description('JWT header provided by /login')
+                }).unknown(),
                 query: {
-                    user: Joi.number().integer().description('Return only decks owned by user with set id').required(),
+                    user: Joi.number().integer().description('Return only decks owned by user with set id'),
                     rootsOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only root decks, i.e. decks that are not subdecks'),
-                    idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata'),
+                    idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata. Ignores paging, roles, status or authentication'),
+                    roles: Joi.string().regex(/^(owner(,editor)?)$|^(editor(,owner)?)$/).empty('').description('A comma delimited list of roles (values: [owner, editor])'),
+                    status: Joi.string().valid('public', 'hidden', 'any').empty('').default('public').description('Specify whether to include hidden decks, only public, or all. Ignored if no authentication provided.'),
+                    sort: Joi.string().valid('id', 'title', 'lastUpdate', 'timestamp').default('id'),
+                    page: Joi.number().integer().positive().default(1).description('Page number'),
+                    pageSize: Joi.number().integer().positive().default(10).description('Number of items per page'),
                 },
             },
             tags: ['api'],
+            auth: {
+                strategy: 'jwt',
+                mode: 'optional'
+            },
             description: 'Retrieve deck metadata with optional filter, sorting, and paging parameters (until paging is implemented, user param is required)',
         }
     });
@@ -199,6 +215,25 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'POST',
+        path: '/deck/{id}/requestEditRights',
+        handler: handlers.requestEditRights,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('The deck id (without revision)'),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Apply for edit rights on the deck',
+        },
+    });
+
+    server.route({
         method: 'GET',
         path: '/deck/{id}/permissions',
         handler: handlers.userPermissions,
@@ -287,6 +322,7 @@ module.exports = function(server) {
                     }),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                     theme : availableThemes,
+                    slideDimensions: slideDimensions,
                     editors: Joi.object().keys({
                         groups: Joi.array().items(Joi.object().keys({
                             id: Joi.number().required(),
@@ -296,7 +332,8 @@ module.exports = function(server) {
                             id: Joi.number().required(),
                             joined: Joi.string().isoDate().required(),
                         })).default([])
-                    })
+                    }),
+                    hidden: Joi.boolean().default(true),
                 }),
 
                 headers: Joi.object({
@@ -324,6 +361,7 @@ module.exports = function(server) {
                     translation: Joi.string().alphanum().lowercase(),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
+                    allowMarkdown: Joi.boolean(),
                     root_deck: Joi.string(),
                     top_root_deck: Joi.string(),
                     parent_deck: Joi.object().keys({
@@ -336,7 +374,9 @@ module.exports = function(server) {
                     footer: Joi.string().allow(''),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     theme : availableThemes,
+                    slideDimensions: slideDimensions,
                     new_revision: Joi.boolean(),
+                    hidden: Joi.boolean(),
                 }),
 
                 headers: Joi.object({
@@ -560,6 +600,7 @@ module.exports = function(server) {
                     description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
+                    dimensions: slideDimensions,
                 }).requiredKeys('content', 'root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -583,6 +624,7 @@ module.exports = function(server) {
                 payload: Joi.object().keys({
                     title: Joi.string(),
                     content: Joi.string(),
+                    markdown: Joi.string(),
                     speakernotes: Joi.string(),
                     root_deck: Joi.string(),
                     top_root_deck: Joi.string(),
@@ -600,6 +642,7 @@ module.exports = function(server) {
                     position: Joi.string().alphanum().lowercase().min(0),
                     language: Joi.string(),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                    dimensions: slideDimensions,
                     dataSources: Joi.array().items(Joi.object().keys({
                         type: Joi.string(),
                         title: Joi.string(),
@@ -730,7 +773,10 @@ module.exports = function(server) {
             validate: {
                 params: {
                     id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional')
-                }
+                },
+                query: {
+                    force: Joi.boolean().truthy('1').falsy('0', ''),
+                },
             },
             tags: ['api'],
             description: 'Triggers regeneration of thumbnails for all slides under the specified deck.',
@@ -746,7 +792,7 @@ module.exports = function(server) {
             validate: {
                 params: {
                     id: Joi.string()
-                }, 
+                },
                 query: {
                     enrich: Joi.boolean().truthy('1').falsy('0', ''),
                 }
@@ -1231,6 +1277,216 @@ module.exports = function(server) {
             },
             tags: ['api'],
             description: 'Retrieve decks with optional filter, sorting, and paging parameters'
+        }
+    });
+
+    //------------------------------- Deck Group Routes -----------------------------//
+
+    server.route({
+        method: 'GET',
+        path: '/group/{id}',
+        handler: groups.get,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('id of the group to retrieve'),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve a deck group',
+            response: {
+                schema: apiModels.group.getModel
+            }
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/groups',
+        handler: groups.insert,
+        config: {
+            validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                payload: apiModels.group.newModel
+            },
+            tags: ['api'],
+            description: 'Create a new deck group',
+            auth: 'jwt',
+            response: {
+                schema: apiModels.group.getModel
+            }
+        }
+    });
+
+    server.route({
+        method: 'PUT',
+        path: '/group/{id}',
+        handler: groups.replaceMetadata,
+        config: {
+            validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                params: {
+                    id: Joi.number().integer()
+                },
+                payload: apiModels.group.onlyMetadata
+            },
+            tags: ['api'],
+            description: 'Replace metadata of an existing deck group',
+            auth: 'jwt',
+            response: {
+                schema: apiModels.group.getModel
+            }
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/group/{id}/decks',
+        handler: decks.listGroupDecks,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer()
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            description: 'Get the list of decks in group', 
+            auth: {
+                strategy: 'jwt',
+                mode: 'optional'
+            },
+        }
+    });
+
+    server.route({
+        method: 'PUT',
+        path: '/group/{id}/decks',
+        handler: groups.replaceDecks,
+        config: {
+            validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                params: {
+                    id: Joi.number().integer()
+                },
+                payload: apiModels.group.onlyDecks
+            },
+            tags: ['api'],
+            description: 'Replace decks of an existing deck group',
+            auth: 'jwt',
+            response: {
+                schema: apiModels.group.getModel
+            }
+        }
+    });
+
+    server.route({
+        method: 'PATCH',
+        path: '/group/{id}/decks',
+        handler: groups.updateDecks,
+        config: {
+            validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                params: {
+                    id: Joi.number().integer()
+                },
+                payload: Joi.array().items(apiModels.group.updateOp)
+            },
+            tags: ['api'],
+            description: 'Add/Remove deck ids from the deck group',
+            auth: 'jwt',
+            response: {
+                schema: apiModels.group.getModel
+            }
+        }
+    });
+
+    server.route({
+        method: 'DELETE',
+        path: '/group/{id}',
+        handler: groups.delete,
+        config: {
+            validate: {
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+                params: {
+                    id: Joi.number().integer()
+                },
+            },
+            response: {
+                emptyStatusCode: 204
+            },
+            tags: ['api'],
+            description: 'Delete a deck group',
+            auth: 'jwt'
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/deck/{id}/groups',
+        handler: groups.getDeckGroups,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                },
+                query: {
+                    user: Joi.number().integer().description('Optionally filter with deck group owner id'),
+                    usergroup: [
+                        Joi.number().integer().description('a user group id'),
+                        Joi.array().items(Joi.number().integer()).description('array of user group ids')
+                    ]
+                }
+            },
+            tags: ['api'],
+            description: 'Retrieve the deck\'s deck groups'
+        }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/groups',
+        handler: groups.list,
+        config: {
+            validate: {
+                query: {
+                    user: Joi.number().integer().description('a user id'),
+                    usergroup: [
+                        Joi.number().integer().description('a user group id'),
+                        Joi.array().items(Joi.number().integer()).description('array of user group ids')
+                    ],
+                    page: Joi.number().integer().min(0).default(0).required().description('page to be retrieved'),
+                    per_page: Joi.number().integer().positive().default(20).required().description('number of results within a page')
+                },
+            },
+            tags: ['api'],
+            description: 'Get a list of deck groups',
+            response: {
+                schema: Joi.object().keys({
+                    metadata: Joi.object().keys({
+                        page: Joi.number(),
+                        per_page: Joi.number(),
+                        total_count: Joi.number(),
+                        links: Joi.object().keys({
+                            previous: Joi.string().allow(['', null]),
+                            next: Joi.string().allow(['', null]),
+                        }),
+                    }),
+                    documents: Joi.array().items(apiModels.group.getModel),
+                }),
+            },
         }
     });
 

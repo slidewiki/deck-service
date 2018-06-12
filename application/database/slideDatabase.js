@@ -75,8 +75,8 @@ let self = module.exports = {
         return helper.connectToDatabase()
         .then((db) => db.collection('slides'))
         .then((col) => col.find({ _id:  { $in : identifiers.selectedIDs }}))
-    .then((stream) => stream.sort({timestamp: -1}))
-    .then((stream) => stream.toArray());
+        .then((stream) => stream.sort({timestamp: -1}))
+        .then((stream) => stream.toArray());
     },
 
     getAllFromCollection: function() {
@@ -301,28 +301,28 @@ let self = module.exports = {
         .then((db) => db.collection('slides'))
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
-              .then((existingSlide) => {
-                  //first remove usage of deck from old revision
-                  let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
-                  for(let i = 0; i < usageArray.length; i++){
-                      if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
-                          usageArray.splice(i,1);
-                          break;
-                      }
-                  }
-                  //then update usage array of new/reverted revision
-                  let contains = false;
-                  for(let j = 0; j < existingSlide.revisions[parseInt(new_revision_id)-1].usage.length; j++){
-                      if(existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
-                          contains = true;
-                          break;
-                      }
-                  }
-                  if(!contains)
-                      existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
+            .then((existingSlide) => {
+                //first remove usage of deck from old revision
+                let usageArray = existingSlide.revisions[parseInt(idArray[1])-1].usage;
+                for(let i = 0; i < usageArray.length; i++){
+                    if(usageArray[i].id === parseInt(rootDeckArray[0]) && usageArray[i].revision === parseInt(rootDeckArray[1])){
+                        usageArray.splice(i,1);
+                        break;
+                    }
+                }
+                //then update usage array of new/reverted revision
+                let contains = false;
+                for(let j = 0; j < existingSlide.revisions[parseInt(new_revision_id)-1].usage.length; j++){
+                    if(existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].id === parseInt(rootDeckArray[0]) && existingSlide.revisions[parseInt(new_revision_id)-1].usage[j].revision === parseInt(rootDeckArray[1])){
+                        contains = true;
+                        break;
+                    }
+                }
+                if(!contains)
+                    existingSlide.revisions[parseInt(new_revision_id)-1].usage.push({'id': parseInt(rootDeckArray[0]), 'revision': parseInt(rootDeckArray[1])});
 
-                  return col.save(existingSlide).then(() => existingSlide);
-              });
+                return col.save(existingSlide).then(() => existingSlide);
+            });
         });
     },
 
@@ -470,6 +470,9 @@ function convertToNewSlide(slide) {
     if(slide.language === null){
         slide.language = 'en_EN';
     }
+    if(slide.markdown === null){
+        slide.markdown = '';
+    }
     let contributorsArray = [{'user': slide.user, 'count': 1}];
     const result = {
         _id: slide._id,
@@ -487,12 +490,16 @@ function convertToNewSlide(slide) {
             user: slide.user,
             title: slide.title,
             content: slide.content,
+            markdown: slide.markdown,
             speakernotes: slide.speakernotes,
             parent: slide.parent_slide,
             tags: slide.tags,
             license: slide.license,
         }]
     };
+    if (slide.dimensions) {
+        result.revisions[0].dimensions = slide.dimensions;
+    }
     return result;
 }
 
@@ -501,6 +508,9 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
     slide.user = parseInt(slide.user);
     if(slide.language === null){
         slide.language = 'en_EN';
+    }
+    if(slide.markdown === null){
+        slide.markdown = '';
     }
     const result = {
         lastUpdate: now.toISOString(),
@@ -513,12 +523,16 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
             user: slide.user,
             title: slide.title,
             content: slide.content,
+            markdown: slide.markdown,
             speakernotes: slide.speakernotes,
             tags: slide.tags,
             dataSources: slide.dataSources,
             license: slide.license
         }]
     };
+    if (slide.dimensions) {
+        result.revisions[0].dimensions = slide.dimensions;
+    }
     return result;
 }
 
