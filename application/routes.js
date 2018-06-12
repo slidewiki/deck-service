@@ -150,7 +150,7 @@ module.exports = function(server) {
                 },
             },
             tags: ['api'],
-            description: 'Get the users and groups authorized for editing the deck (includes contributors)',
+            description: 'Get the users and groups authorized for editing the deck, as well as all the contributors',
             response: {
                 schema: Joi.object().keys({
                     contributors: Joi.array().items(
@@ -779,7 +779,10 @@ module.exports = function(server) {
             validate: {
                 params: {
                     id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional')
-                }
+                },
+                query: {
+                    force: Joi.boolean().truthy('1').falsy('0', ''),
+                },
             },
             tags: ['api'],
             description: 'Triggers regeneration of thumbnails for all slides under the specified deck.',

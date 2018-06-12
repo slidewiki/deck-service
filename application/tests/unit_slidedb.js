@@ -406,7 +406,7 @@ describe('Database', () => {
             ]);
         });
 
-        it('should return editors of an existing deck', () => {
+        it('should return contributors of an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
                 'language': 'en_EN',
@@ -422,7 +422,7 @@ describe('Database', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck);
-            let res = ins.then((ins) => deckdb.getDeckEditors(ins._id+'-1'));
+            let res = ins.then((ins) => deckdb.getDeckContributors(ins._id+'-1'));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
             ]);

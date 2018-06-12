@@ -1634,8 +1634,8 @@ let self = module.exports = {
                     return editors.groups;
                 }),
 
-                // we also need the implicit editors (AKA contributors)...
-                deckDB.getDeckEditors(deckId)
+                // we also need the deck contributors...
+                deckDB.getDeckContributors(deckId)
                 .then((contribIds) => {
                     let contributors = contribIds.map((id) => ({ id }) );
                     return userService.fetchUserInfo(contribIds)
@@ -2261,7 +2261,7 @@ let self = module.exports = {
                     slide.content = `<h2>${slide.title}</h2>`;
                 }
 
-                fileService.createThumbnail(slide.content, slide.id, slide.theme).then(() => {
+                fileService.createThumbnail(slide.content, slide.id, slide.theme, request.query.force).then(() => {
                     done(null, { id: slide.id, status: 'OK' });
                 }).catch((err) => {
                     done(null, { id: slide.id, status: err.message });
