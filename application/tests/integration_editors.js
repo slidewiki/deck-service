@@ -128,10 +128,7 @@ describe('REST API', () => {
                     response.statusCode.should.equal(200);
                     response.payload.should.be.a('string');
                     let payload = JSON.parse(response.payload);
-                    payload.should.be.an('object').and.contain.keys('contributors', 'editors');
-                    payload.contributors.should.be.an('array').and.have.length(1);
-                    payload.contributors[0].should.be.an('object').and.contain.keys('id');
-                    payload.contributors[0].id.should.equal(1);               
+                    payload.should.be.an('object').and.contain.keys('editors');
                     payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                     payload.editors.users.should.be.an('array').and.have.length(2);
                     payload.editors.users[0].should.an('object').and.contain.keys('id', 'joined');

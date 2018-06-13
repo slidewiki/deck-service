@@ -1603,56 +1603,18 @@ let self = module.exports = {
 
     },
 
-    //returns the editors of a deck
-    // DEPRECATED
+    // returns the users and groups authorized for editing the deck
     getEditors: function(request, reply){
         let deckId = request.params.id;
 
-        // we need the explicit editors in the deck object
-        deckDB.get(deckId)
-        .then((deck) => {
+        deckDB.get(deckId).then((deck) => {
             if (!deck) return reply(boom.notFound());
 
-            let editors = deck.editors || { users: [], groups: [] };
-            // editors.users = _.map(editors.users || [], ['id', 'joined']);
-            editors.users = editors.users || [];
-            // editors.groups = _.map(editors.groups || [], ['id', 'joined']);
-            editors.groups = editors.groups || [];
+            let {users, groups} = deck.editors || {};
+            if (!users) users = [];
+            if (!groups) groups = [];
 
-            // connecting to userService might fail, in that case response will include what the deck service can provide
-            return Promise.all([
-                userService.fetchUserInfo(_.map(editors.users, 'id'))
-                .then((userInfo) => util.assignToAllById(editors.users, userInfo))
-                .catch((err) => {
-                    request.log('warn', `could not fetch user info: ${err.message || err}`);
-                    return editors.users;
-                }),
-
-                userService.fetchGroupInfo(_.map(editors.groups, 'id'))
-                .then((groupInfo) => util.assignToAllById(editors.groups, groupInfo))
-                .catch((err) => {
-                    request.log('warn', `could not fetch group info: ${err.message || err}`);
-                    return editors.groups;
-                }),
-
-                // we also need the deck contributors...
-                deckDB.getDeckContributors(deckId)
-                .then((contribIds) => {
-                    let contributors = contribIds.map((id) => ({ id }) );
-                    return userService.fetchUserInfo(contribIds)
-                    .then((contribInfo) => util.assignToAllById(contributors, contribInfo))
-                    .catch((err) => {
-                        request.log('warn', `could not fetch group info: ${err.message || err}`);
-                        return contributors;
-                    });
-                }),
-
-            ]).then(([users, groups, contributors]) => {
-                reply({
-                    contributors,
-                    editors: { users, groups }
-                });
-            });
+            reply({ editors: {users, groups} });
 
         }).catch((err) => {
             request.log('error', err);

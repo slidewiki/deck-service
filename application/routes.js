@@ -147,7 +147,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -162,44 +162,24 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional and will be ignored'),
                 },
             },
             tags: ['api'],
-            description: 'Get the users and groups authorized for editing the deck, as well as all the contributors',
+            description: 'Get the users and groups authorized for editing the deck',
             response: {
                 schema: Joi.object().keys({
-                    contributors: Joi.array().items(
-                        Joi.object().keys({
-                            id: Joi.number(),
-                            username: Joi.string(),
-                            picture: Joi.string().allow(['', null]),
-                            country: Joi.string().allow(['', null]),
-                            organization: Joi.string().allow(['', null]),
-                        })),
                     editors: Joi.object().keys({
-                        users: Joi.array().items(
-                            Joi.object().keys({
-                                id: Joi.number(),
-                                username: Joi.string(),
-                                picture: Joi.string().allow(['', null]),
-                                joined: Joi.string().isoDate(),
-                                country: Joi.string().allow(['', null]),
-                                organization: Joi.string().allow(['', null]),
-                            })),
-                        groups: Joi.array().items(
-                            Joi.object().keys({
-                                id: Joi.number(),
-                                name: Joi.string(),
-                                joined: Joi.string().isoDate(),
-                            })),
+                        users: Joi.array().items({
+                            id: Joi.number(),
+                            joined: Joi.string().isoDate(),
+                        }),
+                        groups: Joi.array().items({
+                            id: Joi.number(),
+                            joined: Joi.string().isoDate(),
+                        })
                     }),
                 }),
-            },
-            plugins: {
-                'hapi-swagger': {
-                    deprecated: true,
-                },
             },
         },
     });
@@ -211,7 +191,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional and will be ignored'),
                 },
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -226,7 +206,7 @@ module.exports = function(server) {
                             id: Joi.number().required(),
                             joined: Joi.string().isoDate().required(),
                         })).default([])
-                    }).required(),
+                    }).required().options({ stripUnknown: true }),
                 }),
             },
             tags: ['api'],
@@ -473,7 +453,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -734,7 +714,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -749,7 +729,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     language: Joi.string().empty(''),
@@ -768,7 +748,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId'),
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}'),
                 },
                 query: {
                     countOnly: Joi.boolean().truthy('1').falsy('0', ''),
@@ -814,7 +794,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional')
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional')
                 },
                 query: {
                     force: Joi.boolean().truthy('1').falsy('0', ''),
@@ -1089,7 +1069,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1104,7 +1084,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: slideId-slideRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1120,7 +1100,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1135,7 +1115,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: slideId-slideRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1151,7 +1131,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional')
                 },
             },
             tags: ['api'],
@@ -1174,7 +1154,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional')
                 },
                 payload:
                     Joi.object().keys({
@@ -1203,7 +1183,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional')
                 },
                 payload: Joi.object().keys({
                     top_root_deck: Joi.string().description('The deck id-revision string for the root of the deck tree'),
@@ -1228,7 +1208,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}')
                 },
             },
             tags: ['api'],
@@ -1251,7 +1231,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}')
                 },
                 payload:
                     Joi.object().keys({
@@ -1280,7 +1260,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     mediaType: Joi.string().valid('pictures', 'video', 'audio').required()
@@ -1303,7 +1283,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     language: Joi.string().empty(''),
@@ -1323,10 +1303,10 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form slideId-slideRevisionId, revision is optional and will be ignored'),
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}, revision is optional and will be ignored'),
                 },
                 query: {
-                    root: Joi.string().description('Identifier of deck tree root in the form deckId-deckRevisionId, revision is optional').required(),
+                    root: Joi.string().description('Identifier of deck tree root in the form {id}-{revision}, revision is optional').required(),
                     language: Joi.string().empty(''),
                     simplify: Joi.boolean().truthy('1').falsy('0', ''),
                     raw: Joi.boolean().truthy('1').falsy('0', ''),
@@ -1347,7 +1327,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     keepVisibleOnly: Joi.boolean().default(true)
@@ -1365,7 +1345,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     keepVisibleOnly: Joi.boolean().default(true)
@@ -1385,7 +1365,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1568,7 +1548,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     user: Joi.number().integer().description('Optionally filter with deck group owner id'),
