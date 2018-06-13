@@ -20,6 +20,7 @@
     "coverall": "npm run coverage && nyc report --reporter=text-lcov | coveralls && rm -rf ./.nyc_output",
     "countLOC": "sloc -f cli-table -k total,source,comment,empty -e node_modules\\|coverage ./",
     "countLOC:details": "sloc -f cli-table -d -e node_modules\\|coverage ./",
+    "precommit": "npm run lint",
     "start:watch": "nodemon",
     "start:mongodb": "docker run -d --name mongotest -p 27018:27017 mongo",
     "stop:mongodb": "docker stop mongotest && docker rm mongotest"
@@ -57,14 +58,11 @@
     "coveralls": "^3.0.0",
     "eslint": "^4.0.0",
     "eslint-plugin-promise": "^3.4.0",
+    "husky": "^0.14.3",
     "mocha": "^5.2.0",
     "mockery": "^2.1.0",
     "nodemon": "^1.11.0",
     "nyc": "^11.6.0",
-    "pre-commit": "^1.2.0",
     "sloc": "^0.2.0"
-  },
-  "pre-commit": [
-    "lint"
-  ]
+  }
 }
