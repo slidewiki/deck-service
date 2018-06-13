@@ -8,7 +8,7 @@ chai.use(chaiAsPromised);
 
 chai.should();
 
-describe.skip('REST API contributors', () => {
+describe.skip('REST API contributors api', () => {
 
     const JWT = require('jsonwebtoken');
     const secret = 'NeverShareYourSecret';
@@ -70,26 +70,27 @@ describe.skip('REST API contributors', () => {
         it('the owner should be the only contributor to the deck, with two contributions', () => {
             return server.inject({
                 method: 'GET',
-                url: `/deck/${deckId}`,
+                url: `/deck/${deckId}/contributors`,
             }).then((response) => {
                 response.statusCode.should.equal(200);
 
                 let payload = JSON.parse(response.payload);
-                payload.should.have.property('contributors').that.has.deep.members([{ user: ownerId, count: 2 }]);
+                payload.should.have.deep.members([{ id: ownerId, type: 'creator', count: 2 }]);
             });
         });
 
         it('the owner should be the only contributor to the first slide of the deck', () => {
             return server.inject({
                 method: 'GET',
-                url: `/slide/${firstSlide.id}-${firstSlide.revision}`,
+                url: `/slide/${firstSlide.id}-${firstSlide.revision}/contributors`,
             }).then((response) => {
                 response.statusCode.should.equal(200);
 
                 let payload = JSON.parse(response.payload);
-                payload.should.have.property('contributors').that.has.deep.members([{ user: ownerId, count: 1 }]);
+                payload.should.have.deep.members([{ id: ownerId, type: 'creator', count: 1 }]);
             });
         });
+
 
         context('and the owner updates the metadata of the deck', () => {
             before(() => {
@@ -117,12 +118,12 @@ describe.skip('REST API contributors', () => {
             it('the owner should still be the only contributor to the deck, with three contributions', () => {
                 return server.inject({
                     method: 'GET',
-                    url: `/deck/${deckId}`,
+                    url: `/deck/${deckId}/contributors`,
                 }).then((response) => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.property('contributors').that.has.deep.members([{ user: ownerId, count: 3 }]);
+                    payload.should.have.deep.members([{ id: ownerId, type: 'creator', count: 3 }]);
                 });
             });
 
@@ -158,12 +159,12 @@ describe.skip('REST API contributors', () => {
             it('the owner should have four contributions to the deck', () => {
                 return server.inject({
                     method: 'GET',
-                    url: `/deck/${deckId}`,
+                    url: `/deck/${deckId}/contributors`,
                 }).then((response) => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.property('contributors').that.deep.includes({ user: ownerId, count: 4 });
+                    payload.should.deep.include({ id: ownerId, type: 'creator', count: 4 });
                 });
             });
 
@@ -175,11 +176,11 @@ describe.skip('REST API contributors', () => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.property('contributors').that.has.deep.members([{ user: ownerId, count: 1 }]);
+                    payload.should.have.deep.members([{ id: ownerId, type: 'creator', count: 1 }]);
                 });
             });
 
-            context.skip('and some editor renames the new slide', () => {
+            context('and some editor renames the new slide', () => {
                 let editorId = 4;
                 before(() => {
                     return server.inject({
@@ -208,14 +209,14 @@ describe.skip('REST API contributors', () => {
                 it('the deck should have two contributors, with the editor having one contribution and the owner still four', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${deckId}`,
+                        url: `/deck/${deckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.has.deep.members([
-                            { user: ownerId, count: 4 },
-                            { user: editorId, count: 1 },
+                        payload.should.have.deep.members([
+                            { id: ownerId, type: 'creator', count: 4 },
+                            { id: editorId, type: 'contributor', count: 1 },
                         ]);
                     });
                 });
@@ -247,13 +248,13 @@ describe.skip('REST API contributors', () => {
                     it('the deck should have again just owner as the only contributor, still with four contributions', () => {
                         return server.inject({
                             method: 'GET',
-                            url: `/deck/${deckId}`,
+                            url: `/deck/${deckId}/contributors`,
                         }).then((response) => {
                             response.statusCode.should.equal(200);
 
                             let payload = JSON.parse(response.payload);
-                            payload.should.have.property('contributors').that.has.deep.members([
-                                { user: ownerId, count: 4 },
+                            payload.should.have.deep.members([
+                                { id: ownerId, type: 'creator', count: 4 },
                             ]);
                         });
                     });
@@ -294,12 +295,12 @@ describe.skip('REST API contributors', () => {
             it('the owner should have five contributions to the parent', () => {
                 return server.inject({
                     method: 'GET',
-                    url: `/deck/${deckId}`,
+                    url: `/deck/${deckId}/contributors`,
                 }).then((response) => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.property('contributors').that.deep.includes({ user: ownerId, count: 5 });
+                    payload.should.deep.include({ id: 1, type: 'creator', count: 5 });
                 });
             });
 
@@ -335,12 +336,12 @@ describe.skip('REST API contributors', () => {
                 it('the owner should still have five contributions to the parent deck', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${deckId}`,
+                        url: `/deck/${deckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.deep.includes({ user: ownerId, count: 5 });
+                        payload.should.deep.include({ id: ownerId, type: 'creator', count: 5 });
                     });
                 });
 
@@ -371,31 +372,31 @@ describe.skip('REST API contributors', () => {
                 it('the owner should still be the only contributor to the parent with five contributions', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${deckId}`,
+                        url: `/deck/${deckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.deep.includes({ user: ownerId, count: 5 });
+                        payload.should.deep.include({ id: ownerId, type: 'creator', count: 5 });
                     });
                 });
 
                 it('the subdeck should have two contributors, with the editor having one contribution', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${subdeckId}`,
+                        url: `/deck/${subdeckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.is.an('array').of.length(2);
-                        payload.contributors.should.that.deep.include({ user: editorId, count: 1 });
+                        payload.should.be.an('array').of.length(2);
+                        payload.should.deep.include({ id: editorId, type: 'contributor', count: 1 });
                     });
                 });
 
             });
 
-            context.skip('and another editor moves the subdeck', () => {
+            context('and another editor moves the subdeck', () => {
                 before(() => {
                     return server.inject({
                         method: 'PUT',
@@ -429,20 +430,20 @@ describe.skip('REST API contributors', () => {
                 it('the editor that moved the subdeck should not have any contributions and the owner of the subdeck should still have five contributions to the deck', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${deckId}`,
+                        url: `/deck/${deckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        // TODO fix this, moving adds one contribution to the subdeck owner
-                        payload.should.have.property('contributors').that.deep.includes({ user: ownerId, count: 5 });
-                        payload.contributors.forEach((c) => c.should.not.have.property('user', otherId));
+                        payload.should.deep.include({ id: ownerId, type: 'creator', count: 5 });
+                        payload.forEach((c) => c.should.not.have.property('id', otherId));
                     });
                 });
 
             });
 
         });
+
 
         context('and an editor adds an additional slide', () => {
             let slideId;
@@ -474,14 +475,14 @@ describe.skip('REST API contributors', () => {
             it('the deck should have two contributors, with the editor having one contribution and the owner still five', () => {
                 return server.inject({
                     method: 'GET',
-                    url: `/deck/${deckId}`,
+                    url: `/deck/${deckId}/contributors`,
                 }).then((response) => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.property('contributors').that.has.deep.members([
-                        { user: ownerId, count: 5 },
-                        { user: editorId, count: 1 },
+                    payload.should.have.deep.members([
+                        { id: ownerId, type: 'creator', count: 5 },
+                        { id: editorId, type: 'contributor', count: 1 },
                     ]);
                 });
             });
@@ -511,15 +512,15 @@ describe.skip('REST API contributors', () => {
                 it('the deck should have three contributors, with the editors having one contribution each, and the owner still five', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${deckId}`,
+                        url: `/deck/${deckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.has.deep.members([
-                            { user: ownerId, count: 5 },
-                            { user: editorId, count: 1 },
-                            { user: otherId, count: 1 },
+                        payload.should.have.deep.members([
+                            { id: ownerId, type: 'creator', count: 5 },
+                            { id: editorId, type: 'contributor', count: 1 },
+                            { id: otherId, type: 'contributor', count: 1 },
                         ]);
                     });
                 });
@@ -527,19 +528,19 @@ describe.skip('REST API contributors', () => {
                 it('the slide should have two contributors, having one contribution each', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/slide/${slideId}`,
+                        url: `/slide/${slideId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.has.deep.members([
-                            { user: editorId, count: 1 },
-                            { user: otherId, count: 1 },
+                        payload.should.have.deep.members([
+                            { id: editorId, type: 'creator', count: 1 },
+                            { id: otherId, type: 'contributor', count: 1 },
                         ]);
                     });
                 });
 
-                context.skip('and that other editor moves the additional slide', () => {
+                context('and that other editor moves the additional slide', () => {
                     before(() => {
                         return server.inject({
                             method: 'PUT',
@@ -573,15 +574,14 @@ describe.skip('REST API contributors', () => {
                     it('the editor that moved the slide and the revision owner of the slide should still have one contribution each to the deck', () => {
                         return server.inject({
                             method: 'GET',
-                            url: `/deck/${deckId}`,
+                            url: `/deck/${deckId}/contributors`,
                         }).then((response) => {
                             response.statusCode.should.equal(200);
 
                             let payload = JSON.parse(response.payload);
-                            payload.should.have.property('contributors').that.deep.includes.members([
-                                { user: otherId, count: 1 },
-                                // TODO fix this
-                                // { user: editorId, count: 1 },
+                            payload.should.deep.include.members([
+                                { id: otherId, type: 'contributor', count: 1 },
+                                { id: editorId, type: 'contributor', count: 1 },
                             ]);
                         });
                     });
@@ -590,7 +590,7 @@ describe.skip('REST API contributors', () => {
 
             });
 
-            context.skip('and another editor duplicates the additional slide', () => {
+            context('and another editor duplicates the additional slide', () => {
                 let duplicateSlideId;
                 before(() => {
                     return server.inject({
@@ -620,18 +620,17 @@ describe.skip('REST API contributors', () => {
                     });
                 });
 
-                // TODO fix this, the contributions are reversed
-                it.skip('the editor that copied the slide should have two contributions to the deck, while the revision owner of the slide should still have one', () => {
+                it('the editor that copied the slide should have two contributions to the deck, while the revision owner of the slide should still have one', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${deckId}`,
+                        url: `/deck/${deckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.includes.deep.members([
-                            { user: editorId, count: 1 },
-                            { user: otherId, count: 2 },
+                        payload.should.include.deep.members([
+                            { id: editorId, type: 'contributor', count: 1 },
+                            { id: otherId, type: 'contributor', count: 2 },
                         ]);
                     });
                 });
@@ -639,14 +638,14 @@ describe.skip('REST API contributors', () => {
                 it('the editor that copied the slide and the revision owner of the slide should have one contribution each to the slide copy', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/slide/${duplicateSlideId}`,
+                        url: `/slide/${duplicateSlideId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.has.deep.members([
-                            { user: editorId, count: 1 },
-                            { user: otherId, count: 1 },
+                        payload.should.have.deep.members([
+                            { id: editorId, type: 'contributor', count: 1 },
+                            { id: otherId, type: 'creator', count: 1 },
                         ]);
                     });
                 });
@@ -685,15 +684,15 @@ describe.skip('REST API contributors', () => {
             it('the deck should have three contributors, with one editor having one, the other two, and the owner still five', () => {
                 return server.inject({
                     method: 'GET',
-                    url: `/deck/${deckId}`,
+                    url: `/deck/${deckId}/contributors`,
                 }).then((response) => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.property('contributors').that.has.deep.members([
-                        { user: editorId, count: 1 },
-                        { user: otherId, count: 2 },
-                        { user: ownerId, count: 5 },
+                    payload.should.deep.members([
+                        { id: editorId, type: 'contributor', count: 1 },
+                        { id: otherId, type: 'contributor', count: 2 },
+                        { id: ownerId, type: 'creator', count: 5 },
                     ]);
                 });
             });
@@ -730,12 +729,12 @@ describe.skip('REST API contributors', () => {
                 it('the editor should still have two contributions to the parent', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${deckId}`,
+                        url: `/deck/${deckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.deep.includes({ user: otherId, count: 2 });
+                        payload.should.deep.include({ id: otherId, type: 'contributor', count: 2 });
                     });
                 });
 
@@ -773,12 +772,12 @@ describe.skip('REST API contributors', () => {
                 it('the editor should still have two contributions to the root deck', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${deckId}`,
+                        url: `/deck/${deckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.deep.includes({ user: otherId, count: 2 });
+                        payload.should.deep.include({ id: otherId, type: 'contributor', count: 2 });
                     });
                 });
 
@@ -874,32 +873,32 @@ describe.skip('REST API contributors', () => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.property('contributors').that.deep.includes({ user: ownerId, count: 6 });
+                    payload.should.deep.include({ id: ownerId, type: 'creator', count: 6 });
                 });
             });
 
             it('the owner should have one contribution to the deck as it was attached', () => {
                 return server.inject({
                     method: 'GET',
-                    url: `/deck/${attachedDeckId}`,
+                    url: `/deck/${attachedDeckId}/contributors`,
                 }).then((response) => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.property('contributors').that.deep.includes({ user: ownerId, count: 1 });
+                    payload.should.deep.include({ id: ownerId, type: 'creator', count: 1 });
                 });
             });
 
             it('the owner should have zero contributions to the origin deck that was attached', () => {
                 return server.inject({
                     method: 'GET',
-                    url: `/deck/${otherDeckId}`,
+                    url: `/deck/${otherDeckId}/contributors`,
                 }).then((response) => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.property('contributors').that.is.an('array');
-                    payload.contributors.forEach((c) => c.should.not.have.property('user', ownerId));
+                    payload.should.be.an('array');
+                    payload.forEach((c) => c.should.not.have.property('id', ownerId));
                 });
             });
 
@@ -933,15 +932,14 @@ describe.skip('REST API contributors', () => {
                 it('the original slide author should have two contributions to the root deck (and the editor three ???)', () => {
                     return server.inject({
                         method: 'GET',
-                        url: `/deck/${deckId}`,
+                        url: `/deck/${deckId}/contributors`,
                     }).then((response) => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.property('contributors').that.deep.includes.members([
-                            { user: someUserId, count: 2 },
-                            // TODO fix this
-                            // { user: editorId, count: 3 },
+                        payload.should.deep.include.members([
+                            { id: someUserId, type: 'contributor', count: 2 },
+                            { id: editorId, type: 'contributor', count: 3 },
                         ]);
                     });
                 });
@@ -951,15 +949,14 @@ describe.skip('REST API contributors', () => {
                     return Promise.all(attachedSlideIds.map((attachedSlideId) => {
                         return server.inject({
                             method: 'GET',
-                            url: `/slide/${attachedSlideId}`,
+                            url: `/slide/${attachedSlideId}/contributors`,
                         }).then((response) => {
                             response.statusCode.should.equal(200);
 
                             let payload = JSON.parse(response.payload);
-                            payload.should.have.property('contributors').that.deep.includes.members([
-                                { user: someUserId, count: 1 },
-                                // TODO fix this
-                                // { user: editorId, count: 1 },
+                            payload.should.deep.include.members([
+                                { id: someUserId, type: 'creator', count: 1 },
+                                { id: editorId, type: 'contributor', count: 1 },
                             ]);
                         });
                     }));
@@ -971,13 +968,13 @@ describe.skip('REST API contributors', () => {
                     return Promise.all(otherSlides.map((otherSlide) => {
                         return server.inject({
                             method: 'GET',
-                            url: `/slide/${otherSlide.id}-${otherSlide.revision}`,
+                            url: `/slide/${otherSlide.id}-${otherSlide.revision}/contributors`,
                         }).then((response) => {
                             response.statusCode.should.equal(200);
 
                             let payload = JSON.parse(response.payload);
-                            payload.should.have.property('contributors').that.is.an('array');
-                            payload.contributors.forEach((c) => c.should.not.have.property('user', editorId));
+                            payload.should.be.an('array');
+                            payload.forEach((c) => c.should.not.have.property('id', editorId));
                         });
                     }));
 
