@@ -71,11 +71,21 @@ let self = module.exports = {
         if (!slide) return; // not found
 
         let slideUsers = [slide.revisionUser];
+        if (slide.revision > 1) {
+            // it has been edited at least once, let's include the creator as well
+            // TODO this is a temp solution until parents are properly implemented
+            slideUsers.push(slide.user);
+        }
         // we want to also include the users of the parents of the slide
         if (slide.parent) {
-            // parent is a ref
-            let parent = await slideDB.getSlideRevision(util.toIdentifier(slide.parent));
-            parent && slideUsers.push(parent.revisionUser);
+            if (slide.parent.id === slide.id && slide.parent.revision === 1) {
+                // let's not add the creator if they're already there
+                // TODO this is a temp solution until parents are properly implemented
+            } else {
+                // parent is a ref
+                let parent = await slideDB.getSlideRevision(util.toIdentifier(slide.parent));
+                parent && slideUsers.push(parent.revisionUser);
+            }
         }
 
         let usersCounts = _.countBy(slideUsers);
