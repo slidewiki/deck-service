@@ -10,18 +10,15 @@ chai.should();
 
 describe('REST API new slide', () => {
 
-    const JWT = require('jsonwebtoken');
-    const secret = 'NeverShareYourSecret';
+    const testServer = require('../testServer');
+    const tokenFor = testServer.tokenFor;
 
     let server;
 
-    before((done) => {
-        // Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-
-        require('../testServer')(secret).then((newServer) => {
+    before(() => {
+        return testServer.init().then((newServer) => {
             server = newServer;
-            server.start(done);
+            return server.start();
         });
     });
 
@@ -38,7 +35,7 @@ describe('REST API new slide', () => {
         root_deck: '25-1'
     };
 
-    let authToken = JWT.sign( { userid: 1 }, secret );
+    let authToken = tokenFor(1);
 
     let options = {
         method: 'POST',

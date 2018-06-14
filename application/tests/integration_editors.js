@@ -10,18 +10,15 @@ chai.should();
 
 describe('REST API editors', () => {
 
-    const JWT = require('jsonwebtoken');
-    const secret = 'NeverShareYourSecret';
+    const testServer = require('../testServer');
+    const tokenFor = testServer.tokenFor;
 
     let server;
 
-    before((done) => {
-        // Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-
-        require('../testServer')(secret).then((newServer) => {
+    before(() => {
+        return testServer.init().then((newServer) => {
             server = newServer;
-            server.start(done);
+            return server.start();
         });
     });
 
@@ -52,7 +49,7 @@ describe('REST API editors', () => {
         }
     };
     
-    let authToken = JWT.sign( { userid: 1 }, secret );
+    let authToken = tokenFor(1);
     
     let options = {
         method: 'GET',
@@ -148,7 +145,7 @@ describe('REST API editors', () => {
                 payload.readOnly.should.equal(false);
             }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
-                let authToken = JWT.sign( { userid: 3 }, secret );
+                let authToken = tokenFor(3);
                 opt.headers['----jwt----'] = authToken;
                 opt.url += deckID + '-1' + '/permissions';
                 return server.inject(opt).then((response) => {
@@ -164,7 +161,7 @@ describe('REST API editors', () => {
                 });
             }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
-                let authToken = JWT.sign( { userid: 2 }, secret );
+                let authToken = tokenFor(2);
                 opt.headers['----jwt----'] = authToken;
                 opt.url += deckID + '-1' + '/permissions';
                 return server.inject(opt).then((response) => {

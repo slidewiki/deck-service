@@ -10,38 +10,38 @@ chai.should();
 
 describe('REST API edit rights requests', () => {
 
-    const JWT = require('jsonwebtoken');
-    const secret = 'NeverShareYourSecret';
-
     const mockery = require('mockery');
+    // mock user service
+    mockery.registerMock('../services/user', {
+        fetchUserInfo: () => {
+            return Promise.reject('not mocking optional function');
+        },
+        fetchGroupInfo: () => {
+            console.log('aaa');
+            return Promise.reject('not mocking optional function');
+        },
+        fetchUsersForGroups: (groupIds) => {
+            return Promise.resolve([groupEditorId]);
+        }
+    });
+    // end mock
 
-    let server;
+    // enable it
+    mockery.enable({
+        warnOnReplace: false,
+        warnOnUnregistered: false,
+    });
 
-    before((done) => {
-        // mock user service
-        mockery.enable({
-            warnOnReplace: false,
-            warnOnUnregistered: false,
-        });
-        mockery.registerMock('../services/user', {
-            fetchUserInfo: () => {
-                return Promise.reject('not mocking optional function');
-            },
-            fetchGroupInfo: () => {
-                return Promise.reject('not mocking optional function');
-            },
-            fetchUsersForGroups: (groupIds) => {
-                return Promise.resolve([groupEditorId]);
-            }
-        });
-        // end mock
+    let server, tokenFor;
+ 
+    before(() => {
+        // then load libraries
+        const testServer = require('../testServer');
+        tokenFor = testServer.tokenFor;
 
-        // Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-
-        require('../testServer')(secret).then((newServer) => {
+        return testServer.init().then((newServer) => {
             server = newServer;
-            server.start(done);
+            return server.start();
         });
 
     });
@@ -56,11 +56,6 @@ describe('REST API edit rights requests', () => {
 
 
     let ownerId = 1, newEditorId = 2, editorId = 3, groupEditorId = 4;
-
-    let ownerToken = JWT.sign( { userid: ownerId }, secret );
-    let newEditorToken = JWT.sign( { userid: newEditorId }, secret );
-    let editorToken = JWT.sign( { userid: editorId }, secret );
-    let groupEditorToken = JWT.sign( { userid: groupEditorId }, secret );
 
     let deckId;
 
@@ -78,7 +73,7 @@ describe('REST API edit rights requests', () => {
             },
             headers: {
                 'Content-Type': 'application/json',
-                '----jwt----': ownerToken,
+                '----jwt----': tokenFor(ownerId),
             },
         }).then((response) => {
             // grab the id!
@@ -93,7 +88,7 @@ describe('REST API edit rights requests', () => {
             method: 'POST',
             url: `/deck/${deckId}/requestEditRights`,
             headers: {
-                '----jwt----': newEditorToken,
+                '----jwt----': tokenFor(newEditorId),
             },
         }).then((response) => {
             response.should.have.property('statusCode', 200);
@@ -108,7 +103,7 @@ describe('REST API edit rights requests', () => {
             method: 'POST',
             url: `/deck/${deckId}/requestEditRights`,
             headers: {
-                '----jwt----': newEditorToken,
+                '----jwt----': tokenFor(newEditorId),
             },
         }).then((response) => {
             response.should.have.property('statusCode', 200);
@@ -120,7 +115,7 @@ describe('REST API edit rights requests', () => {
 
     it('should not accept a request for edit rights for a user already authorized', () => {
         return Promise.all(
-            [ownerToken, editorToken, groupEditorToken]
+            [tokenFor(ownerId), tokenFor(editorId), tokenFor(groupEditorId)]
             .map((token) => server.inject({
                 method: 'POST',
                 url: `/deck/${deckId}/requestEditRights`,
@@ -133,21 +128,20 @@ describe('REST API edit rights requests', () => {
 
     context('when a edit rights request is granted for some user', () => {
         let someUserId = 666;
-        let someUserToken = JWT.sign( { userid: someUserId }, secret );
 
         before(() => {
             return server.inject({
                 method: 'POST',
                 url: `/deck/${deckId}/requestEditRights`,
                 headers: {
-                    '----jwt----': someUserToken,
+                    '----jwt----': tokenFor(someUserId),
                 },
             })
             .then(() => server.inject({
                 method: 'POST',
                 url: `/deck/${deckId}/requestEditRights`,
                 headers: {
-                    '----jwt----': JWT.sign( { userid: 1111 }, secret ),
+                    '----jwt----': tokenFor(1111),
                 },
             }))
             .then(() => server.inject({
@@ -162,7 +156,7 @@ describe('REST API edit rights requests', () => {
                     url: `/deck/${deckId}/editors`,
                     payload: {editors},
                     headers: {
-                        '----jwt----': ownerToken,
+                        '----jwt----': tokenFor(ownerId),
                     },
                 });
             });
@@ -182,7 +176,7 @@ describe('REST API edit rights requests', () => {
                         url: `/deck/${deckId}/editors`,
                         payload: {editors},
                         headers: {
-                            '----jwt----': ownerToken,
+                            '----jwt----': tokenFor(ownerId),
                         },
                     });
                 });
@@ -193,7 +187,7 @@ describe('REST API edit rights requests', () => {
                     method: 'POST',
                     url: `/deck/${deckId}/requestEditRights`,
                     headers: {
-                        '----jwt----': someUserToken,
+                        '----jwt----': tokenFor(someUserId),
                     },
                 }).then((response) => {
                     response.should.have.property('statusCode', 200);

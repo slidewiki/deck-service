@@ -10,19 +10,15 @@ chai.should();
 
 describe('REST API contributors api', () => {
 
-    const JWT = require('jsonwebtoken');
-    const secret = 'NeverShareYourSecret';
-    const tokenFor = (userid) => JWT.sign( { userid }, secret);
+    const testServer = require('../testServer');
+    const tokenFor = testServer.tokenFor;
 
     let server;
 
-    before((done) => {
-        // Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-
-        require('../testServer')(secret).then((newServer) => {
+    before(() => {
+        return testServer.init().then((newServer) => {
             server = newServer;
-            server.start(done);
+            return server.start();
         });
     });
 
