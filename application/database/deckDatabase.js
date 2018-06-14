@@ -1780,6 +1780,7 @@ let self = module.exports = {
     },
 
     // returns an implicit list of editors of a given deck
+    // DEPRECATED
     getDeckContributors(deck_id, contributorsList){
         deck_id = String(deck_id);
         if (!contributorsList) contributorsList = [];

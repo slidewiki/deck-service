@@ -149,6 +149,9 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
+                query: {
+                    language: Joi.string().empty(''),
+                },
             },
             tags: ['api'],
             description: 'Get the users that have contributed in any way in the deck content',
@@ -714,7 +717,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}, revision is optional'),
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}'),
                 },
             },
             tags: ['api'],

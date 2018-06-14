@@ -3,8 +3,11 @@
 const _ = require('lodash');
 
 const boom = require('boom');
+
 const deckDB = require('../database/deckDatabase');
 const groupDB = require('../database/groupsDatabase');
+const contributorsDB = require('../database/contributors');
+
 const userService = require('../services/user');
 const querystring = require('querystring');
 
@@ -136,15 +139,10 @@ let self = module.exports = {
 
     getContributors: function(request, reply) {
         let deckId = request.params.id;
-        deckDB.getDeck(deckId).then((deck) => {
-            if (!deck) throw boom.notFound();
-
-            return deckDB.getDeckContributors(deckId)
-            .then((contribIds) => contribIds.map((id) => ({
-                id,
-                count: 1,
-                type: (id === deck.user) ? 'creator' : 'contributor',
-            })));
+        let variantFilter = _.pick(request.query, 'language');
+        contributorsDB.getDeckContributors(deckId, variantFilter).then((contributors) => {
+            if (!contributors) throw boom.notFound();
+            return contributors;
         }).then(reply).catch((err) => {
             if (err.isBoom) return reply(err);
             request.log('error', err);

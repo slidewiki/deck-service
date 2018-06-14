@@ -81,11 +81,24 @@ let self = module.exports = {
         if (!slideRevision) return; // not found
 
         // merge revision data into slide data
+        // don't mix revision owner with deck owner
+        slideRevision.revisionUser = slideRevision.user;
+        delete slideRevision.user;
+
+        // also the revision timestamp and lastUpdate
+        slideRevision.revisionTimestamp = slideRevision.timestamp;
+        delete slideRevision.timestamp;
+        slideRevision.revisionLastUpdate = slideRevision.lastUpdate;
+        delete slideRevision.lastUpdate;
+
         _.merge(slide, slideRevision);
 
         // add proper ids, revision id
         slide.id = id;
         slide.revision = revision;
+        // and revision count
+        slide.revisionCount = slide.revisions.length;
+
         // remove other revisions
         delete slide.revisions;
 
@@ -184,6 +197,8 @@ let self = module.exports = {
             id: newRevisionId,
             timestamp: now,
             user: userId,
+            // also record the previous revision
+            parent: _.pick(slideRef, 'id', 'revision'),
             usage: [],
         });
 
@@ -232,7 +247,7 @@ let self = module.exports = {
             user: userId,
             root_deck: parentDeckId,
             comment: `Duplicate slide of ${util.toIdentifier(originalSlide)}`,
-            // used internally
+            // also record the previous revision
             parent_slide: _.pick(originalSlide, 'id', 'revision'),
         });
 
@@ -727,6 +742,8 @@ let self = module.exports = {
             user: userId,
             // this is the parent deck
             root_deck: util.toIdentifier(slideNode.parent),
+            // also record the previous revision
+            parent_slide: _.pick(originalSlide, 'id', 'revision'),
         });
 
         let inserted = await self.insert(newSlide);

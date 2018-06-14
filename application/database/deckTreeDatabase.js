@@ -225,6 +225,7 @@ const self = module.exports = {
     },
 
     // we guard the copy deck revision tree method against abuse, by checking for change logs of one
+    // DEPRECATED
     copyDeckTreeOld: async function(deckId, user, forAttach) {
         let deck = util.parseIdentifier(deckId);
         let existingDeck = await deckDB.get(deck.id);
@@ -253,6 +254,7 @@ const self = module.exports = {
 
     // copies a given deck revision tree by copying all of its sub-decks into new decks
     // forAttach is true when forking is done during deck attach process
+    // DEPRECATED
     _copyDeckTreeOld: async function(deckId, user, forAttach) {
         let res = await deckDB.getFlatDecks(deckId);
 
