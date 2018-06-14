@@ -8,10 +8,6 @@ const helper = require('./helper');
 const slideDB = require('./slideDatabase');
 const deckDB = require('./deckDatabase');
 
-const includeContributorType = true;
-const includeCreatorType = true;
-const includeTranslatorType = false;
-
 let self = module.exports = {
 
     getDeckContributors: async function(deckId, variantFilter) {
@@ -51,44 +47,22 @@ let self = module.exports = {
         };
         treeItems.unshift(rootItem);
 
-        if (!includeContributorType) {
-            // we count everything by user
-            let usersCounts = _.countBy(treeItems, 'user');
-            // keys in groups are strings
-            return Object.entries(usersCounts).map(([user, count]) => ({ id: Number.parseInt(user), count }));
-        }
-
         // we first group everything by user
         let usersItems = _.groupBy(treeItems, 'user');
         // then for each user we produce separate counts for contribution types
-        return Object.entries(usersItems).reduce((contributors, [user, items]) => {
+        return Object.entries(usersItems).map(([user, items]) => {
             // keys in groups are strings
             user = Number.parseInt(user);
-            // for creator just return everything (API is lacking here maybe)
-            if (includeCreatorType && user === deck.user) {
-                contributors.push({
-                    id: user,
-                    type: 'creator',
-                    count: items.length,
-                });
-            } else if (!includeTranslatorType) {
-                contributors.push({
-                    id: user,
-                    type: 'contributor',
-                    count: items.length,
-                });
-            } else {
-                // count by type
-                let typeCounts = _.countBy(items, (i) => (i.variant ? 'translator' : 'contributor'));
-                contributors.push(...Object.entries(typeCounts).map(([type, count]) => ({
-                    id: user,
-                    type,
-                    count,
-                })));
-            }
-
-            return contributors;
-        }, []);
+            // count by type
+            let typeCounts = _.countBy(items, (i) => (i.variant ? 'translator' : 'contributor'));
+            // two types at most, get them
+            return {
+                id: user,
+                type: (user === deck.user) ? 'creator' : 'contributor',
+                count: items.length,
+                translations: typeCounts.translator,
+            };
+        });
 
     },
 
@@ -105,15 +79,11 @@ let self = module.exports = {
         }
 
         let usersCounts = _.countBy(slideUsers);
-        if (!includeContributorType) {
-            return Object.entries(usersCounts).map(([user, count]) => ({ id: Number.parseInt(user), count }));
-        }
-
         return Object.entries(usersCounts).map(([user, count]) => {
             user = Number.parseInt(user);
             return {
                 id: user,
-                type: (includeCreatorType && user === slide.user) ? 'creator': 'contributor',
+                type: (user === slide.user) ? 'creator': 'contributor',
                 count,
             };
         });
@@ -137,7 +107,7 @@ async function getTreeItems(deck, variantFilter) {
             if (_.isEmpty(variantFilter)) {
                 // include the slide
                 result.push(_.pick(item, 'kind', 'ref'));
-                // and all the variants ???
+                // TODO and all the variants ???
                 // variants = item.variants;
             } else {
                 // check for matching variant
