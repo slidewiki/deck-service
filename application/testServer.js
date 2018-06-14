@@ -9,7 +9,7 @@ module.exports = function(secret) {
         let server = new hapi.Server();
 
         server.connection({
-            host: 'localhost',
+            host: '0.0.0.0',
             port: 3030,
         });
 
