@@ -8,33 +8,33 @@ chai.use(chaiAsPromised);
 
 chai.should();
 
+const mockery = require('mockery');
+
 describe('REST API edit rights requests', () => {
-
-    const mockery = require('mockery');
-    // mock user service
-    mockery.registerMock('../services/user', {
-        fetchUserInfo: () => {
-            return Promise.reject('not mocking optional function');
-        },
-        fetchGroupInfo: () => {
-            console.log('aaa');
-            return Promise.reject('not mocking optional function');
-        },
-        fetchUsersForGroups: (groupIds) => {
-            return Promise.resolve([groupEditorId]);
-        }
-    });
-    // end mock
-
-    // enable it
-    mockery.enable({
-        warnOnReplace: false,
-        warnOnUnregistered: false,
-    });
-
     let server, tokenFor;
  
     before(() => {
+        // first enable mocks
+        mockery.enable({
+            useCleanCache: true,
+            warnOnReplace: false,
+            warnOnUnregistered: false,
+        });
+
+        // then register user service mock
+        mockery.registerMock('../services/user', {
+            fetchUserInfo: () => {
+                return Promise.reject('not mocking optional function');
+            },
+            fetchGroupInfo: () => {
+                console.log('aaa');
+                return Promise.reject('not mocking optional function');
+            },
+            fetchUsersForGroups: (groupIds) => {
+                return Promise.resolve([groupEditorId]);
+            }
+        });
+
         // then load libraries
         const testServer = require('../testServer');
         tokenFor = testServer.tokenFor;
