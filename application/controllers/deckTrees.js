@@ -286,12 +286,18 @@ const self = module.exports = {
                 }
 
                 // no source.id, need to create a new slide
-                let newSlidePayload = {
+                let newSlidePayload = Object.assign({
+                    // defaults
                     title: 'New slide',
                     content: slidetemplate,
                     markdown: '',
                     speakernotes: '',
-                };
+                }, _.pick(request.payload, [
+                    'title',
+                    'content',
+                    'license',
+                    'speakernotes',
+                ]));
                 return treeDB.createSlide(newSlidePayload, target.parentId, target.position + 1, rootId, userId).then((newContentItem) => {
                     if (!newContentItem) {
                         // could not find the target.parentId
@@ -339,13 +345,19 @@ const self = module.exports = {
                     throw boom.badData(`could not locate specified deck: ${target.parentId}`);
                 }
                 // this creates an empty subdeck, let's also add a sample slide
-                // init the payload from the optional first_slide object data
+                // init the payload from the optional slide data in the call
                 let newSlidePayload = Object.assign({
+                    // defaults
                     title: 'New slide',
                     content: slidetemplate,
                     markdown: '',
                     speakernotes: '',
-                }, request.payload.first_slide);
+                }, _.pick(request.payload, [
+                    'title',
+                    'content',
+                    'license',
+                    'speakernotes',
+                ]));
 
                 return treeDB.createSlide(newSlidePayload, util.toIdentifier(newContentItem.ref), 0, rootId, userId).then((newSlide) => {
                     // we have to return from the callback, else empty node is returned because it is updated asynchronously
