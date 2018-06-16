@@ -1953,7 +1953,7 @@ let self = module.exports = {
 
     getDeckRootDecks: function(request, reply){
         let deckId = request.params.id;
-        let deck = util.parseIdentifier(deckId);
+        let deck = util.parseIdentifier(deckId) || {};
         deckDB.get(deck.id).then((existingDeck) => {
             if (!existingDeck) return boom.notFound();
 

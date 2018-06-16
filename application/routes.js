@@ -309,7 +309,7 @@ module.exports = function(server) {
             validate: {
                 payload: Joi.object().keys({
                     description: Joi.string().allow('').default(''),
-                    language: Joi.string(),
+                    language: Joi.string().default('en-GB'),
                     translation: Joi.object().keys({
                         status: Joi.string().valid('original', 'google', 'revised')
                     }),

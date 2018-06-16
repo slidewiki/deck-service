@@ -15,6 +15,7 @@ const helper = require('./helper'),
     oid = require('mongodb').ObjectID;
 
 const deckDB = require('./deckDatabase');
+const usageDB = require('./usage');
 
 let self = module.exports = {
 
@@ -378,11 +379,11 @@ let self = module.exports = {
             return deckDB.updateContentItem(slide, revisionId, parentDeckId, 'slide', userId, rootDeckId)
             .then(({oldRevision, updatedDeckRevision}) => {
                 // make old slide id canonical
-                let oldSlideId = util.toIdentifier({ id: slideId, revision: parseInt(oldRevision) });
+                let oldSlideRef = { id: slideId, revision: parseInt(oldRevision) };
 
-                //update the usage of the reverted slide to point to the parent deck before returning
-                return self.updateUsage(oldSlideId, revisionId, parentDeckId)
-                .then((updatedSlide) => updatedSlide);
+                // move the parent deck from the usage of the current slide revision to the new one
+                return usageDB.moveToUsage(parentDeck, { kind: 'slide', ref: oldSlideRef }, revisionId)
+                .then(() => slide);
             });
         });
     },
@@ -429,6 +430,7 @@ let self = module.exports = {
         }));
     },
 
+    // DEPRECATED
     updateUsage: function(slide, new_revision_id, root_deck){
         let idArray = slide.split('-');
         let rootDeckArray = root_deck.split('-');
@@ -461,6 +463,7 @@ let self = module.exports = {
         });
     },
 
+    // DEPRECATED
     addToUsage: function(itemToAdd, root_deck_path){
         let itemId = itemToAdd.ref.id;
         let itemRevision = itemToAdd.ref.revision;
@@ -486,6 +489,7 @@ let self = module.exports = {
             });
         }
     },
+
 
     getTags(slideIdParam){
         let {slideId, revisionId} = splitSlideIdParam(slideIdParam);
@@ -862,6 +866,7 @@ function convertToNewSlide(slide) {
     return result;
 }
 
+// DEPRECATED
 function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
     let now = new Date();
     slide.user = parseInt(slide.user);

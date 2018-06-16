@@ -8,6 +8,8 @@ const util = require('../lib/util');
 const helper = require('./helper');
 const deckDB = require('./deckDatabase');
 const slideDB = require('./slideDatabase');
+const usageDB = require('./usage');
+const contributorsDB = require('./contributors');
 
 const fileService = require('../services/file');
 
@@ -517,6 +519,16 @@ const self = module.exports = {
             console.info(`assert ${found.parentId} should equal ${sourceId}`);
         }
 
+        // because of usage maintenance, we need (?) to first remove, then add the item to new position
+
+        // delete it from current parent deck
+        await deckDB.removeContentItem(sourcePosition, sourceId, rootId, userId);
+        // if moving in same deck and target is on or after source index, decrement the target index
+        // TODO make this better (?)
+        if (sourceId === targetDeckId && targetPosition >= sourcePosition) {
+            targetPosition--;
+        }
+
         // prepare a content item node to attach it to target
         let newContentItem = _.pick(found, 'kind', 'ref', 'variants');
         // add it after the target index
@@ -533,14 +545,6 @@ const self = module.exports = {
                 });
             }
         }
-
-        // if moving in same deck update the source index since it will have changed now
-        // TODO make this better (?)
-        if (sourceId === targetDeckId && sourcePosition > targetPosition ) {
-            sourcePosition++;
-        }
-        // then delete it from previous parent deck
-        await deckDB.removeContentItem(sourcePosition, sourceId, rootId, userId);
 
         return newContentItem;
     },
@@ -767,7 +771,7 @@ const self = module.exports = {
                 console.warn(`error tracking attach deck copy ${forkResult.root_node} to ${targetId}`);
             }),
             // add to usage
-            deckDB.addToUsage(newContentItem, targetId.split('-')).catch((err) => {
+            usageDB.addToUsage(targetDeck, [newContentItem]).catch((err) => {
                 console.warn(`error processing usage while attaching deck copy ${forkResult.root_node} to ${targetId}`);
             }),
         ]);

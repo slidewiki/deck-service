@@ -14,25 +14,13 @@ const helper = require('./helper'),
     striptags = require('striptags'),
     validateDeck = require('../models/deck').validateDeck;
 
+const usageDB = require('./usage');
+
 const async = require('async');
 
 let self = module.exports = {
 
     list: function(query, options={}) {
-        let projectStage = {
-            user: 1,
-            active: 1,
-            hidden: 1,
-            description: 1,
-            timestamp: 1,
-            lastUpdate: 1,
-            revisions: 1,
-            tags: 1, 
-            translation: 1,
-            countRevisions: 1, 
-            title: 1,
-        };
-
         // sort stage
         let sortStage = {};
         if (options.sort === 'title') {
@@ -86,12 +74,6 @@ let self = module.exports = {
                 );
                 pipeline.push(
                     { $match: { 'usageCount': 0 } }
-                );
-            } else {
-                pipeline.push(
-                    {
-                        $project: projectStage
-                    }
                 );
             }
 
@@ -777,7 +759,7 @@ let self = module.exports = {
     },
 
     // simpler implementation of replace that does not update anything, just creates the revision
-    revise: function(deckId, path, userId, parentOperations=[]) {
+    revise: async function(deckId, path, userId, parentOperations=[]) {
         userId = parseInt(userId);
 
         let deck = util.parseIdentifier(deckId);
@@ -788,170 +770,95 @@ let self = module.exports = {
         // root is first; if path length is 1, the root is the deck itself
         let rootDeckId = util.toIdentifier(path[0]);
 
-        return self.get(deck.id).then((existingDeck) => {
-            if (!existingDeck) return;
+        let existingDeck = await self.get(deck.id);
+        if (!existingDeck) return;
 
-            // we will create the new revision as a copy of the input revision
-            let originRevision;
-            if (deck.revision) {
-                // this can be used for revert as well
-                originRevision = existingDeck.revisions.find((r) => r.id === deck.revision);
-            } else {
-                // if missing, we want the latest
-                [originRevision] = existingDeck.revisions.slice(-1);
-            }
-            if (!originRevision) return;
+        // we will create the new revision as a copy of the input revision
+        let originRevision;
+        if (deck.revision) {
+            // this can be used for revert as well
+            originRevision = existingDeck.revisions.find((r) => r.id === deck.revision);
+        } else {
+            // if missing, we want the latest
+            [originRevision] = existingDeck.revisions.slice(-1);
+        }
+        if (!originRevision) return;
 
-            // start tracking
-            let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId, parentOperations);
+        // start tracking
+        let deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId, parentOperations);
 
-            let newRevision = _.cloneDeep(originRevision);
-            // get the next revision id
-            let newRevisionId = Math.max(...existingDeck.revisions.map((r) => r.id)) + 1;
-            newRevision.id = newRevisionId;
+        let newRevision = _.cloneDeep(originRevision);
+        // get the next revision id
+        let newRevisionId = Math.max(...existingDeck.revisions.map((r) => r.id)) + 1;
+        newRevision.id = newRevisionId;
 
-            // update the new revision metadata
-            let now = (new Date()).toISOString();
-            newRevision.timestamp = now;
-            newRevision.lastUpdate = now;
+        // update the new revision metadata
+        let now = (new Date()).toISOString();
+        newRevision.timestamp = now;
+        newRevision.lastUpdate = now;
 
-            newRevision.user = userId;
+        newRevision.user = userId;
 
-            // we need to add some extra metadata when reverting, let's add it always :)
-            newRevision.originRevision = originRevision.id;
+        // we need to add some extra metadata when reverting, let's add it always :)
+        newRevision.originRevision = originRevision.id;
 
-            // usage array stuff
-            newRevision.usage = [];
-            if (parentDeck) {
-                // if replacing a subdeck we remove the parent deck revision from the usage of the originRevision
-                _.remove(originRevision.usage, (u) => {
-                    return (u.id === parentDeck.id && u.revision === parentDeck.revision);
-                });
-
-                // and we add it to the newRevision
-                newRevision.usage.push(parentDeck);
-            }
-
-            // add the new revision!
-            existingDeck.revisions.push(newRevision);
-
-            // update the contributors to the deck
-            let contributors = existingDeck.contributors;
-            if (!contributors) {
-                existingDeck.contributors = contributors = [];
-            }
-
-            // should a user that simply creates a revision be considered a contributor?
-            // for now, the answer is yes, but only if it's an actual user
-            if (userId > 0) {
-                let existingContributor = contributors.find((c) => c.user === userId);
-                if (existingContributor) {
-                    // if found, simply increment the count
-                    existingContributor.count++;
-                } else {
-                    // otherwise add it
-                    existingContributor = { user: userId, count: 1};
-                    contributors.push(existingContributor);
-                }
-            }
-
-            // final metadata
-            existingDeck.active = newRevisionId;
-            existingDeck.lastUpdate = now;
-
-            // update usage of each slide or subdeck
-            // TODO compute usage in a delayed job
-            async.eachSeries(originRevision.contentItems, (item, done) => {
-                let promise;
-                if (item.kind === 'slide') {
-                    promise = helper.getCollection('slides').then((col) => {
-                        return col.findOneAndUpdate(
-                            {
-                                _id: item.ref.id,
-                                'revisions.id': item.ref.revision,
-                            },
-                            { $push: {
-                                'revisions.$.usage': {
-                                    id: deck.id,
-                                    revision: newRevisionId,
-                                },
-                            } }
-                        );
-                    });
-
-                } else {
-                    promise = helper.getCollection('decks').then((col) => {
-                        return col.findOneAndUpdate(
-                            {
-                                _id: item.ref.id,
-                                'revisions.id': item.ref.revision,
-                            },
-                            { $push: {
-                                'revisions.$.usage': {
-                                    id: deck.id,
-                                    revision: newRevisionId,
-                                },
-                            } }
-                        );
-                    });
-                }
-
-                promise.then((res) => {
-                    if (!res.value) {
-                        // something's wrong
-                        console.warn(item);
-                    }
-                    done();
-                }).catch(done);
-
-            }, (err) => {
-                if (err) {
-                    console.warn(err);
-                }
+        // update usage for new and origin revision
+        newRevision.usage = [];
+        if (parentDeck) {
+            // if replacing a subdeck we remove the parent deck revision from the usage of the originRevision
+            _.remove(originRevision.usage, (u) => {
+                return (u.id === parentDeck.id && u.revision === parentDeck.revision);
             });
 
-            return helper.getCollection('decks').then((col) => {
-                var batch = col.initializeOrderedBulkOp();
-                // update current revision first
-                batch.find({
-                    _id: deck.id,
-                    'revisions.id': originRevision.id,
-                }).updateOne({
-                    $set: {
-                        'revisions.$': originRevision,
-                    },
-                });
-                // then push new and other updates
-                batch.find({ _id: deck.id }).updateOne({
-                    $set: {
-                        active: newRevisionId,
-                        lastUpdate: now,
-                        contributors: contributors,
-                    },
-                    $push: { 'revisions': newRevision },
-                });
-                return batch.execute().then((res) => existingDeck);
+            // and we add it to the newRevision
+            newRevision.usage.push(parentDeck);
+        }
 
-                // return col.save(existingDeck).then(() => existingDeck);
-            }).then((updatedDeck) => {
-                // complete the tracking after revision (it may be nothing)
-                return deckTracker.applyChangeLog(updatedDeck).then((deckChanges) => {
-                    // deckChanges may be nothing if an error occured
+        // add the new revision!
+        existingDeck.revisions.push(newRevision);
 
-                    if (!parentDeck) return [updatedDeck, deckChanges];
+        // final metadata
+        existingDeck.active = newRevisionId;
+        existingDeck.lastUpdate = now;
 
-                    // update parent deck first before returning
-                    return self.updateContentItem(updatedDeck, '', util.toIdentifier(parentDeck), 'deck', userId, rootDeckId, parentOperations)
-                    .then(({deckChanges: moreDeckChanges}) => {
-                        return [updatedDeck, deckChanges.concat(moreDeckChanges)];
-                    });
+        // add new revision to usage of each slide or subdeck
+        // TODO let it fail ??? 
+        usageDB.addToUsage({
+            id: deck.id,
+            revision: newRevisionId,
+        }, originRevision.contentItems)
+        .catch((err) => console.warn(err));
 
-                });
+        let decks = await helper.getCollection('decks');
+        let batch = decks.initializeOrderedBulkOp();
 
-            });
-
+        // update current revision first
+        batch.find({
+            _id: deck.id,
+            'revisions.id': originRevision.id,
+        }).updateOne({
+            $set: {
+                'revisions.$': originRevision,
+            },
         });
+        // then push new and other updates
+        batch.find({ _id: deck.id }).updateOne({
+            $set: {
+                active: newRevisionId,
+                lastUpdate: now,
+            },
+            $push: { 'revisions': newRevision },
+        });
+        await batch.execute();
 
+        // complete the tracking after revision (it may be nothing)
+        let deckChanges = await deckTracker.applyChangeLog(existingDeck);
+        // deckChanges may be nothing if an error occured
+        if (!parentDeck) return [existingDeck, deckChanges];
+
+        // update parent deck first before returning
+        let {deckChanges: moreDeckChanges} = await self.updateContentItem(existingDeck, '', util.toIdentifier(parentDeck), 'deck', userId, rootDeckId, parentOperations);
+        return [existingDeck, deckChanges.concat(moreDeckChanges)];
     },
 
     // this is what we use to create a new revision, we need to do this recursively in the deck tree
@@ -1166,7 +1073,6 @@ let self = module.exports = {
     // new method for inserting, simply receives the content item and adds it 
     // into a deck at the specified position, or appends it at the end if no position is given
     insertContentItem: async function(citem, position, deckId, userId, rootDeckId, action) {
-        // TODO fix usage 
         position = parseInt(position);
         let deckRef = util.parseIdentifier(deckId);
 
@@ -1175,6 +1081,11 @@ let self = module.exports = {
 
         // always mess with the latest revision!
         let [updatedRevision] = existingDeck.revisions.slice(-1);
+        // normalize deckRef
+        if (!deckRef.revision) {
+            deckRef.revision = updatedRevision.id;
+        }
+
         let deckTracker;
         if (rootDeckId) {
             // only track this when rootDeckId is provided
@@ -1220,51 +1131,57 @@ let self = module.exports = {
 
         if (deckTracker) deckTracker.applyChangeLog();
 
-        return decks.save(existingDeck).then(() => updatedRevision);
+        await decks.save(existingDeck);
+
+        // handle usage as well
+        await usageDB.addToUsage(deckRef, [citem]);
+
+        return updatedRevision;
     },
 
-    //removes (unlinks) a content item from a given deck
-    removeContentItem: function(position, root_deck, top_root_deck, userId){
-        let root_deck_path = root_deck.split('-');
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(root_deck_path[0])})
-            .then((existingDeck) => {
-                //TODO must check if the root_deck comes with a revision id or not, and get the element accordingly
-                let activeRevisionId = existingDeck.active;
-                if(root_deck_path.length > 1){
-                    activeRevisionId = parseInt(root_deck_path[1]);
-                }
+    // removes (unlinks) a content item from a given deck
+    removeContentItem: async function(position, root_deck, top_root_deck, userId){
+        let parentDeck = util.parseIdentifier(root_deck) || {};
 
-                // skip tracking if no top_root_deck or userId provided
-                let deckTracker;
-                if (top_root_deck && userId) {
-                    deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, userId);
-                }
+        let decks = await helper.getCollection('decks');
+        let existingDeck = await decks.findOne({_id: parentDeck.id});
 
-                let deckRevision = _.find(existingDeck.revisions, {id: activeRevisionId});
-                let citems = deckRevision.contentItems;
-                for(let i = position-1; i < citems.length; i++){
-                    citems[i].order = citems[i].order-1;
-                }
-                let citemToRemove = citems[position-1];
-                self.removeFromUsage(citemToRemove, root_deck_path);
+        // TODO get the active (?) if missing
+        if (!parentDeck.revision) {
+            parentDeck.revision = existingDeck.active;
+        }
 
-                citems.splice(position-1, 1);
-                deckRevision.contentItems = citems;
+        // skip tracking if no top_root_deck or userId provided
+        let deckTracker;
+        if (top_root_deck && userId) {
+            deckTracker = ChangeLog.deckTracker(existingDeck, top_root_deck, userId);
+        }
 
-                existingDeck.lastUpdate = new Date().toISOString();
-                deckRevision.lastUpdate = existingDeck.lastUpdate;
+        let deckRevision = _.find(existingDeck.revisions, { id: parentDeck.revision });
+        let citems = deckRevision.contentItems;
+        for(let i = position-1; i < citems.length; i++){
+            citems[i].order = citems[i].order-1;
+        }
+        let citemToRemove = citems[position-1];
 
-                if (deckTracker) deckTracker.applyChangeLog();
+        citems.splice(position-1, 1);
+        deckRevision.contentItems = citems;
 
-                return col.save(existingDeck).then(() => citemToRemove);
-            });
-        });
+        existingDeck.lastUpdate = new Date().toISOString();
+        deckRevision.lastUpdate = existingDeck.lastUpdate;
+
+        if (deckTracker) deckTracker.applyChangeLog();
+
+        await decks.save(existingDeck);
+
+        // handle usage as well
+        await usageDB.removeFromUsage(parentDeck, [citemToRemove]);
+
+        return citemToRemove;
     },
 
     //removes an item from the usage of a given deck
+    // DEPRECATED
     removeFromUsage: function(itemToRemove, root_deck_path){
         let itemId = itemToRemove.ref.id;
         let itemRevision = itemToRemove.ref.revision;
@@ -1309,6 +1226,7 @@ let self = module.exports = {
     },
 
     //adds an item to the usage of a given deck
+    // DEPRECATED
     addToUsage: function(itemToAdd, root_deck_path){
 
         let itemId = itemToAdd.ref.id;
@@ -1393,6 +1311,7 @@ let self = module.exports = {
         });
     },
 
+    // DEPRECATED
     updateUsage: function(deck, new_revision_id, root_deck){
         let idArray = deck.split('-');
         let rootDeckArray = root_deck.split('-');
