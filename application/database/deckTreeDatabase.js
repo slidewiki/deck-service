@@ -587,7 +587,7 @@ const self = module.exports = {
         if (!forAttach) {
             // if not attaching, we need to track stuff here
             // TODO wait for it ?
-            deckDB._trackDecksForked(rootDeckId, copiedIdsMap, userId, 'fork');
+            await deckDB._trackDecksForked(rootDeckId, copiedIdsMap, userId, 'fork');
         } // TODO ELSE ????
 
         if (reviseAfterCopy) {

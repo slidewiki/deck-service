@@ -13,7 +13,7 @@ module.exports = {
     authorizeUser: async function (userId, deckId, rootId) {
         let uniqueDeckIds = _.uniq(_.compact([deckId, rootId]));
 
-        for (let index in uniqueDeckIds) {
+        for (let index = 0; index < uniqueDeckIds.length; index++) {
             let deckId = uniqueDeckIds[index];
             let perms = await deckDB.userPermissions(uniqueDeckIds[index], userId);
 

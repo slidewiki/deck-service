@@ -25,6 +25,8 @@ const userService = require('../services/user');
 const tagService = require('../services/tag');
 const fileService = require('../services/file');
 
+const auth = require('./auth');
+
 const slidetemplate = '<div class="pptx2html" style="position: relative; width: 960px; height: 720px;">'+
 
     '<div _id="2" _idx="undefined" _name="Title 1" _type="title" class="block content v-mid h-mid" style="position: absolute; top: 38.3334px; left: 66px; width: 828px; height: 139.167px; z-index: 23488;">'+
@@ -192,7 +194,7 @@ let self = module.exports = {
 
                 let userId = request.auth.credentials.userid;
                 let parentDeckId = util.toIdentifier(slideNode.parent);
-                return authorizeUser(userId, parentDeckId, rootId).then((boomError) => {
+                return auth.authorizeUser(userId, parentDeckId, rootId).then((boomError) => {
                     if (boomError) throw boomError;
 
                     return slideDB.updateSlideNode(slideNode, request.payload, userId).then((slideRef) => {
@@ -246,7 +248,7 @@ let self = module.exports = {
 
                 let userId = request.auth.credentials.userid;
                 let parentDeckId = util.toIdentifier(slideNode.parent);
-                return authorizeUser(userId, parentDeckId, rootId).then((boomError) => {
+                return auth.authorizeUser(userId, parentDeckId, rootId).then((boomError) => {
                     if (boomError) throw boomError;
 
                     let revisionId = parseInt(request.payload.revision_id);
@@ -541,7 +543,7 @@ let self = module.exports = {
         let deckId = request.params.id;
         // TODO we should keep this required, no fall-back values!
         let rootDeckId = request.payload.top_root_deck;
-        authorizeUser(userId, deckId, rootDeckId).then((boom) => {
+        auth.authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             // authorizeUser returns nothing if all's ok
             if (boom) return boom;
 
@@ -605,7 +607,7 @@ let self = module.exports = {
         let userId = request.auth.credentials.userid;
         let deckId = request.params.id;
 
-        authorizeUser(userId, deckId, deckId).then((boom) => {
+        auth.authorizeUser(userId, deckId, deckId).then((boom) => {
             // authorizeUser returns nothing if all's ok
             if (boom) throw boom;
 
@@ -691,7 +693,7 @@ let self = module.exports = {
         let deckId = request.params.id;
         let rootDeckId = request.payload.top_root_deck;
 
-        authorizeUser(userId, deckId, rootDeckId).then((boom) => {
+        auth.authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             // authorizeUser returns nothing if all's ok
             if (boom) return boom;
 
@@ -713,7 +715,7 @@ let self = module.exports = {
         let deckId = request.params.id;
         let rootDeckId = request.payload.top_root_deck;
 
-        authorizeUser(userId, deckId, rootDeckId).then((boom) => {
+        auth.authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             // authorizeUser returns nothing if all's ok
             if (boom) return boom;
 
@@ -1502,7 +1504,7 @@ let self = module.exports = {
         // will ignore any revision included here
 
         // TODO proper authorization checking the actual parent id
-        return authorizeUser(userId, rootDeckId, rootDeckId).then((boomError) => {
+        return auth.authorizeUser(userId, rootDeckId, rootDeckId).then((boomError) => {
             if (boomError) throw boomError;
 
             // let's only worry about slides for now
@@ -2078,7 +2080,7 @@ let self = module.exports = {
         let deckId = request.params.id;
         let rootDeckId = request.payload.top_root_deck;
 
-        authorizeUser(userId, deckId, rootDeckId).then((boomError) => {
+        auth.authorizeUser(userId, deckId, rootDeckId).then((boomError) => {
             if (boomError) return boomError;
 
             return deckDB.get(deckId).then( (deck) => {
