@@ -9,7 +9,7 @@ const self = module.exports = {
 
     // creates a thumbnail for a given slide
     createThumbnail: function(slideContent, slideId, theme='default', force=false) {
-        if (!Microservices.file.enabled) return Promise.resolve();
+        if (Microservices.file.disabled) return Promise.resolve();
 
         let encodedContent = he.encode(slideContent, { allowUnsafeSymbols: true });
 
