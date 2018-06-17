@@ -397,6 +397,7 @@ let self = module.exports = {
         .then((col) => {
             return col.findOne({_id: parseInt(idArray[0])})
             .then((existingSlide) => {
+                // TODO fix this
                 try {
                     const revisionId = idArray[1];
                     let revision = (revisionId !== undefined) ? existingSlide.revisions.find((revision) => String(revision.id) === String(revisionId)) : undefined;
@@ -404,8 +405,7 @@ let self = module.exports = {
                         revision.dataSources = dataSources;
                     }
 
-                    col.save(existingSlide);
-                    return dataSources;
+                    return col.save(existingSlide).then(() => dataSources);
                 } catch (e) {
                     console.log('saveDataSources failed', e);
                 }
@@ -529,7 +529,7 @@ let self = module.exports = {
                     return element.tagName === tag.tagName;
                 })){
                     slide.revisions[revisionId].tags.push(tag);
-                    col.save(slide);
+                    return col.save(slide).then(() => slide.revisions[revisionId].tags);
                 }
 
                 return slide.revisions[revisionId].tags;
@@ -552,8 +552,7 @@ let self = module.exports = {
                     return el.tagName !== tag.tagName;
                 });
 
-                col.save(slide);
-                return slide.revisions[revisionId].tags;
+                return col.save(slide).then(() => slide.revisions[revisionId].tags);
             });
         });
     },
@@ -704,7 +703,7 @@ let self = module.exports = {
         }
 
         // finished updating deck
-        deckTracker.applyChangeLog(await decks.findOne(parentQuery));
+        await deckTracker.applyChangeLog(await decks.findOne(parentQuery));
 
         // new slide created, replacing the older one, let's fix the usage
         let slides = await helper.getCollection('slides');
@@ -774,7 +773,7 @@ let self = module.exports = {
         }
 
         // finished updating deck
-        deckTracker.applyChangeLog(await decks.findOne(parentQuery));
+        await deckTracker.applyChangeLog(await decks.findOne(parentQuery));
 
         // move the parent deck from the usage of the current slide revision to the new one
         await usageDB.moveToUsage(parentRef, { kind: 'slide', ref: oldSlideRef }, revisionId);
@@ -835,7 +834,7 @@ let self = module.exports = {
         // console.log(updatedDeck);
 
         // finished updating deck
-        deckTracker.applyChangeLog(await decks.findOne(parentQuery));
+        await deckTracker.applyChangeLog(await decks.findOne(parentQuery));
 
         // respond with new variant data on success
         return newVariant;

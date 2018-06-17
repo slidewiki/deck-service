@@ -556,21 +556,6 @@ let self = module.exports = {
                 if (!result) return boom.notFound();
                 let {replaced, changed} = result;
 
-                if (changed.theme) {
-                    // theme was changed, update thumbs for all direct slides
-
-                    slideDB.getDeckSlides(deckId).then((slides) => {
-                        for (let slide of slides) {
-                            let slideId = util.toIdentifier(slide);
-                            fileService.createThumbnail(slide.content, slideId, changed.theme).catch((err) => {
-                                console.warn(`could not update thumbnail for slide ${slideId}, error was: ${err.message}`);
-                            });
-                        }
-                    }).catch((err) => {
-                        console.warn(`could not update slide thumbnails for deck ${deckId}, error was: ${err.message}`);
-                    });
-                }
-
                 // send tags to tag-service
                 if (!_.isEmpty(request.payload.tags)) {
                     tagService.upload(request.payload.tags, userId).catch((e) => {
@@ -578,7 +563,22 @@ let self = module.exports = {
                     });
                 }
 
-                return replaced;
+                if (!changed.theme) return replaced;
+
+                // theme was changed, update thumbs for all direct slides
+                return slideDB.getDeckSlides(deckId).then((slides) => {
+                    for (let slide of slides) {
+                        let slideId = util.toIdentifier(slide);
+                        fileService.createThumbnail(slide.content, slideId, changed.theme).catch((err) => {
+                            console.warn(`could not update thumbnail for slide ${slideId}, error was: ${err.message}`);
+                        });
+                    }
+
+                    return replaced;
+                }).catch((err) => {
+                    console.warn(`could not update slide thumbnails for deck ${deckId}, error was: ${err.message}`);
+                });
+
             });
 
         }).then((response) => {

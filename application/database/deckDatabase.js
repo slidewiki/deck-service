@@ -675,8 +675,6 @@ let self = module.exports = {
                 else{
                     deckRevision.allowMarkdown = deck.allowMarkdown;
                 }
-                // changes ended here
-                deckTracker.applyChangeLog();
 
                 if (deck.hasOwnProperty('hidden')) {
                     existingDeck.hidden = deck.hidden;
@@ -703,7 +701,9 @@ let self = module.exports = {
                     throw validateDeck.errors;
                 }
 
-                return col.findOneAndReplace({ _id: parseInt(id) }, existingDeck, { returnOriginal: false })
+                // save changes and wait for them
+                return deckTracker.applyChangeLog()
+                .then(() => col.findOneAndReplace({ _id: parseInt(id) }, existingDeck, { returnOriginal: false }))
                 .then((result) => {
                     // return the new deck in database and a hash of changes of interest to caller
                     return {
@@ -747,14 +747,12 @@ let self = module.exports = {
                 deckRevision.title = newName;
             }
 
-            // changes ended here
-            deckTracker.applyChangeLog();
-
             // lastUpdated update
             deck.lastUpdate = (new Date()).toISOString();
             deckRevision.lastUpdate = deck.lastUpdate;
 
-            return col.findOneAndReplace({_id: parseInt(deckId)}, deck, { returnOriginal: false })
+            return deckTracker.applyChangeLog()
+            .then(() => col.findOneAndReplace({_id: parseInt(deckId)}, deck, { returnOriginal: false }))
             .then((result) => result.value);
         }));
     },
@@ -1041,10 +1039,6 @@ let self = module.exports = {
                     };
                     citems.splice(position-1, 0, newCitem);
                     updatedRevision.contentItems = citems;
-
-                    if (deckTracker) deckTracker.applyChangeLog();
-
-                    return col.save(existingDeck).then(() => updatedRevision);
                 }
                 else{
                     // add it to the end
@@ -1060,12 +1054,11 @@ let self = module.exports = {
                     };
                     citems.push(newCitem);
                     updatedRevision.contentItems = citems;
-
-                    if (deckTracker) deckTracker.applyChangeLog();
-
-                    return col.save(existingDeck).then(() => updatedRevision);
                 }
 
+                return col.save(existingDeck)
+                .then(() => deckTracker && deckTracker.applyChangeLog())
+                .then(() => updatedRevision);
             });
         });
 
@@ -1130,7 +1123,7 @@ let self = module.exports = {
         // update content items array
         updatedRevision.contentItems = citems;
 
-        if (deckTracker) deckTracker.applyChangeLog();
+        if (deckTracker) await deckTracker.applyChangeLog();
 
         await decks.save(existingDeck);
 
@@ -1171,7 +1164,7 @@ let self = module.exports = {
         existingDeck.lastUpdate = new Date().toISOString();
         deckRevision.lastUpdate = existingDeck.lastUpdate;
 
-        if (deckTracker) deckTracker.applyChangeLog();
+        if (deckTracker) await deckTracker.applyChangeLog();
 
         await decks.save(existingDeck);
 
@@ -1296,11 +1289,9 @@ let self = module.exports = {
                     existingDeck.contributors.push({ user: userId, count: 1 });
                 }
 
-                return decks.save(existingDeck).then(() => {
-                    if (deckTracker) {
-                        return deckTracker.applyChangeLog();
-                    }
-                }).then((deckChanges) => {
+                return decks.save(existingDeck)
+                .then(() => deckTracker && deckTracker.applyChangeLog())
+                .then((deckChanges) => {
                     return {
                         oldRevision,
                         newRevision,
@@ -2695,7 +2686,7 @@ let self = module.exports = {
                     return element.tagName === tag.tagName;
                 })){
                     deck.revisions[revisionId].tags.push(tag);
-                    col.save(deck);
+                    return col.save(deck).then(() => deck.revisions[revisionId].tags);
                 }
 
                 return deck.revisions[revisionId].tags;
@@ -2724,8 +2715,7 @@ let self = module.exports = {
                     return el.tagName !== tag.tagName;
                 });
 
-                col.save(deck);
-                return deck.revisions[revisionId].tags;
+                return col.save(deck).then(() => deck.revisions[revisionId].tags);
             });
         });
     },
@@ -2752,9 +2742,8 @@ let self = module.exports = {
             latestRevision.lastUpdate = now;
 
             // changes ended here
-            deckTracker.applyChangeLog();
-
-            return helper.getCollection('decks')
+            return deckTracker.applyChangeLog()
+            .then(() => helper.getCollection('decks'))
             .then((col) => col.findOneAndReplace({ _id: deck.id }, existingDeck, { returnOriginal: false }) )
             .then((updated) => updated.value);
         });
