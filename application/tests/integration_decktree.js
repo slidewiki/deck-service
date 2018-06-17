@@ -57,7 +57,7 @@ describe('REST API deck tree', () => {
         response.result.should.have.property('theme', theme);
         response.result.should.have.property('children').that.is.an('array').of.length(1);
 
-        response.result.children[0].should.include.keys('id', 'type', 'title');;
+        response.result.children[0].should.include.keys('id', 'type', 'title');
         response.result.children[0].title.should.equal(String(0));
         slideIds.push(response.result.children[0].id);
     });
