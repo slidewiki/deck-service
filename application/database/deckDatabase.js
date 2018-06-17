@@ -1273,7 +1273,7 @@ let self = module.exports = {
                 // pre-compute what the for loop does
                 let deckTracker;
                 if (rootDeckId) { // tracking is optional
-                    ChangeLog.deckTracker(existingDeck, rootDeckId, userId, parentOperations, revertedRevId ? 'revert' : undefined);
+                    deckTracker = ChangeLog.deckTracker(existingDeck, rootDeckId, userId, parentOperations, revertedRevId ? 'revert' : undefined);
                 }
 
                 existingDeck.lastUpdate = new Date().toISOString();

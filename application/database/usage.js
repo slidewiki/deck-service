@@ -51,8 +51,8 @@ const self = module.exports = {
 
         let found = await col.findOne({ _id: ref.id });
 
-        let oldUsage = _.find(found, { id: ref.revision }).usage;
-        let newUsage = _.find(found, { id: newRevision }).usage;
+        let oldUsage = _.find(found.revisions, { id: ref.revision }).usage;
+        let newUsage = _.find(found.revisions, { id: newRevision }).usage;
 
         // make sure we only have id, revision
         parentDeck = _.pick(parentDeck, 'id', 'revision');

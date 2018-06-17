@@ -453,12 +453,8 @@ const self = module.exports = {
                         // create thumbnail for the new slide revision
                         let content = updatedSlide.revisions[0].content;
                         let newSlideId = util.toIdentifier(newSlideRef);
-
-                        if (!content) {
-                            content = '<h2>' + updatedSlide.revisions[0].title + '</h2>';
-                        }
                         fileService.createThumbnail(content, newSlideId, newSlideRef.theme).catch((err) => {
-                            console.warn(`could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                            console.warn(`could not create thumbnail for renamed slide ${newSlideId}, error was: ${err.message}`);
                         });
 
                         // TODO might also need to create a thumbnail

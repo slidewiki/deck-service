@@ -95,12 +95,6 @@ let self = module.exports = {
 
             // create thumbnail from the newly created slide revision
             let content = createdSlide.revisions[0].content, slideId = createdSlide.id+'-'+1;
-            if (content === '') {
-                // content = '<h2>'+inserted.revisions[0].title+'</h2>';
-                // TODO for now we use hardcoded template for new slides
-                content = slidetemplate;
-            }
-
             // themeless
             fileService.createThumbnail(content, slideId).catch((err) => {
                 request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
@@ -182,46 +176,48 @@ let self = module.exports = {
 
     // updates slide by creating a new revision
     updateSlideNode: function(request, reply) {
-        let userId = request.auth.credentials.userid;
         let slideId = request.params.id;
-        let rootId = request.payload.top_root_deck;
 
         // ignore the language (TODO remove from API as well)
         delete request.payload.language;
 
-        // TODO authenticate
+        slideDB.exists(slideId).then((exists) => {
+            if (!exists) throw boom.notFound();
 
-        slideDB.findSlideNode(rootId, slideId).then((slideNode) => {
-            if (!slideNode) {
-                throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootId}`);
-            }
-
-            return slideDB.updateSlideNode(slideNode, request.payload, userId).then((slideRef) => {
-                // send tags to tag-service
-                if (request.payload.tags && request.payload.tags.length > 0) {
-                    tagService.upload(request.payload.tags, userId).catch( (e) => {
-                        request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
-                    });
+            let rootId = request.payload.top_root_deck;
+            return slideDB.findSlideNode(rootId, slideId).then((slideNode) => {
+                if (!slideNode) {
+                    throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootId}`);
                 }
 
-                // we must update all decks in the 'usage' attribute
-                return slideDB.get(slideRef.id).then((newSlide) => {
-                    // prepare the newSlide response object
-                    newSlide.revisions = [_.find(newSlide.revisions, { id: slideRef.revision })];
+                let userId = request.auth.credentials.userid;
+                let parentDeckId = util.toIdentifier(slideNode.parent);
+                return authorizeUser(userId, parentDeckId, rootId).then((boomError) => {
+                    if (boomError) throw boomError;
 
-                    // create thumbnail for the new slide revision
-                    let content = newSlide.revisions[0].content;
-                    let newSlideId = util.toIdentifier(slideRef);
+                    return slideDB.updateSlideNode(slideNode, request.payload, userId).then((slideRef) => {
+                        // send tags to tag-service
+                        if (request.payload.tags && request.payload.tags.length > 0) {
+                            tagService.upload(request.payload.tags, userId).catch( (e) => {
+                                request.log('warning', 'Could not save tags to tag-service for slide ' + slideId + ': ' + e.message);
+                            });
+                        }
 
-                    if (!content) {
-                        content = '<h2>' + newSlide.revisions[0].title + '</h2>';
-                    }
-                    request.log('info', `creating thumbnail for new slide revision ${newSlideId} with theme ${slideRef.theme}`);
-                    fileService.createThumbnail(content, newSlideId, slideRef.theme).catch((err) => {
-                        console.warn(`could not create thumbnail for updated slide ${newSlideId}: ${err.message || err}`);
+                        // we must update all decks in the 'usage' attribute
+                        return slideDB.get(slideRef.id).then((newSlide) => {
+                            // prepare the newSlide response object
+                            newSlide.revisions = [_.find(newSlide.revisions, { id: slideRef.revision })];
+
+                            let content = newSlide.revisions[0].content;
+                            let newSlideId = util.toIdentifier(slideRef);
+                            // create thumbnail for the new slide revision
+                            fileService.createThumbnail(content, newSlideId, slideRef.theme).catch((err) => {
+                                console.warn(`could not create thumbnail for updated slide ${newSlideId}, error was: ${err.message}`);
+                            });
+
+                            reply(newSlide);
+                        });
                     });
-
-                    reply(newSlide);
                 });
             });
 
@@ -236,55 +232,53 @@ let self = module.exports = {
     // reverts a slide to a previous revision, w.r.t. a parent deck
     revertSlideRevision: function(request, reply) {
         let slideId = request.params.id;
+
         slideDB.exists(slideId).then((exists) => {
-            if (!exists) return boom.notFound();
+            if (!exists) throw boom.notFound();
 
-            let rootDeckId = request.payload.top_root_deck;
-            // we need to find the parent from the path!
-            return deckDB.findPath(rootDeckId, slideId, 'slide').then((path) => {
+            let rootId = request.payload.top_root_deck;
+            // we need to find the slide node in the tree!
+            return slideDB.findSlideNode(rootId, slideId).then((slideNode) => {
                 // could not find path due to bad payload
-                if (!path || !path.length) return boom.badData(`could not find slide: ${slideId} in deck tree: ${rootDeckId} `);
-
-                // the parent of the slide is the second to last item of the path
-                // path has at least length 2, guaranteed
-                let [parentDeck] = path.slice(-2, -1);
-                let parentDeckId = util.toIdentifier(parentDeck);
+                if (!slideNode) {
+                    throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootId} `);
+                }
 
                 let userId = request.auth.credentials.userid;
-                return authorizeUser(userId, parentDeckId, rootDeckId).then((boomError) => {
-                    if (boomError) return boomError;
+                let parentDeckId = util.toIdentifier(slideNode.parent);
+                return authorizeUser(userId, parentDeckId, rootId).then((boomError) => {
+                    if (boomError) throw boomError;
 
-                    let slide = util.parseIdentifier(slideId);
                     let revisionId = parseInt(request.payload.revision_id);
-                    return slideDB.revert(slide.id, revisionId, path, userId).then((updatedSlide) => {
+                    return slideDB.revertSlideNode(slideNode, revisionId, userId).then((slideRef) => {
                         // if revert returns nothing, it's not because of 404, but no path was found!
-                        if (!updatedSlide) return boom.badData(`unknown revision id: ${revisionId} for slide: ${slideId}`);
+                        if (!slideRef) {
+                            throw boom.badData(`unknown revision id: ${revisionId} for slide: ${slideId}`);
+                        }
 
-                        // keep only the new slide revision in revisions array for response
-                        let slideRevision = updatedSlide.revisions.find((r) => r.id === revisionId);
-                        updatedSlide.revisions = [slideRevision];
+                        let revertedSlideId = util.toIdentifier(slideRef);
+                        return slideDB.get(revertedSlideId).then((updatedSlide) => {
+                            // keep only the new slide revision in revisions array for response
+                            let slideRevision = _.find(updatedSlide.revisions, { id: revisionId });
+                            updatedSlide.revisions = [slideRevision];
 
-                        // also, create a thumbnail with the parent deck's theme
-                        let revertedSlideId = `${slide.id}-${revisionId}`;
-                        deckDB.get(parentDeckId).then((existingDeck) => {
-                            // parentDeckId is canonical, so only one revision here
-                            let slideTheme = existingDeck.revisions[0].theme;
-                            return fileService.createThumbnail(slideRevision.content, revertedSlideId, slideTheme);
-                        }).catch((err) => {
-                            request.log('warn', `could not create thumbnail for slide duplicate ${revertedSlideId}: ${err.message || err}`);
+                            // also, create a thumbnail with the parent deck's theme
+                            fileService.createThumbnail(slideRevision.content, revertedSlideId, slideRef.theme).catch((err) => {
+                                console.warn(`could not create thumbnail for reverted slide ${revertedSlideId}, error was: ${err.message}`);
+                            });
+
+                            return updatedSlide;
                         });
 
-                        return updatedSlide;
                     });
 
                 });
 
             });
 
-        }).then((response) => {
-            reply(response);
-        }).catch((error) => {
-            request.log('error', error);
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
             reply(boom.badImplementation());
         });
 
@@ -527,12 +521,6 @@ let self = module.exports = {
                     .then((updatedDeckRevision) => {
                         //create the thumbnail for the new slide
                         let content = newSlide.content, slideId = insertedSlide.id+'-'+1;
-                        if(content === ''){
-                            content = '<h2>'+newSlide.title+'</h2>';
-                            //for now we use hardcoded template for new slides
-                            content = slidetemplate;
-                        }
-
                         fileService.createThumbnail(content, slideId, updatedDeckRevision.theme).catch((err) => {
                             request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
                         });

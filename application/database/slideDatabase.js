@@ -72,7 +72,7 @@ let self = module.exports = {
     // this could likely replace #get as it returns a more uniform data structure,
     // only with the requested revision data merged into a single object
     getSlideRevision: async function(identifier) {
-        let {id, revision} = util.parseIdentifier(identifier);
+        let {id, revision} = util.parseIdentifier(identifier) || {};
         if (!revision) return; // not found (like)
 
         let slide = await self.get(id);
@@ -360,6 +360,7 @@ let self = module.exports = {
         });
     },
 
+    // DEPRECATED
     revert: function(slideId, revisionId, path, userId) {
         return self.get(slideId).then((slide) => {
             if (!slide) return;
@@ -713,6 +714,70 @@ let self = module.exports = {
         _.remove(oldSlide.usage, parentRef);
         newSlide.usage.push(parentRef);
         await slides.save(slide);
+
+        // include the theme of the parent in the result
+        // TODO maybe we could skip this in the future
+        Object.assign(result, { theme: slideNode.parent.theme } );
+
+        // respond with new variant data or new slide ref on success
+        return result;
+    },
+
+    revertSlideNode: async function(slideNode, revisionId, userId) {
+        // pick the id of the root of the path
+        let [{id: rootId}] = slideNode.path;
+
+        // check if slideNode was matched against a variant slide
+        let [{variant: slideVariant}] = slideNode.path.slice(-1);
+
+        let parentRef = _.pick(slideNode.parent, 'id', 'revision');
+
+        // start tracking changes
+        let decks = await helper.getCollection('decks');
+        let parentQuery = { _id: parentRef.id };
+        let deckTracker = ChangeLog.deckTracker(await decks.findOne(parentQuery), rootId, userId);
+
+        let newSlideRef, oldSlideRef, result;
+        if (slideVariant) {
+            // we need to revert the variant instead of the primary slide
+            oldSlideRef = _.pick(slideVariant, 'id', 'revision');
+            newSlideRef = { id: oldSlideRef.id, revision: revisionId };
+
+            // check if revisionId we revert to exists
+            let newSlideRevision = self.getSlideRevision(util.toIdentifier(newSlideRef));
+            if (!newSlideRevision) return; // could not find revision to revert to!
+
+            // update the existing variant with new ref data
+            let newVariant = Object.assign(slideVariant, newSlideRef);
+            await deckDB.setContentVariant(parentRef.id, slideNode.index, newVariant, userId);
+
+            result = newVariant;
+        } else {
+            // we revert the primary slide
+            oldSlideRef = _.pick(slideNode.slide, 'id', 'revision');
+            newSlideRef = { id: oldSlideRef.id, revision: revisionId };
+
+            // check if revisionId we revert to exists
+            let newSlideRevision = self.getSlideRevision(util.toIdentifier(newSlideRef));
+            if (!newSlideRevision) return; // could not find revision to revert to!
+
+            // TODO change this
+            let dummyItem = {
+                _id: newSlideRef.id,
+                revisions: [{ id: newSlideRef.revision }],
+            };
+            let parentDeckId = util.toIdentifier(parentRef);
+            await deckDB.updateContentItem(dummyItem, revisionId, parentDeckId, 'slide', userId);
+            // omit rootId in call above to not track the update twice
+
+            result = newSlideRef;
+        }
+
+        // finished updating deck
+        deckTracker.applyChangeLog(await decks.findOne(parentQuery));
+
+        // move the parent deck from the usage of the current slide revision to the new one
+        await usageDB.moveToUsage(parentRef, { kind: 'slide', ref: oldSlideRef }, revisionId);
 
         // include the theme of the parent in the result
         // TODO maybe we could skip this in the future
