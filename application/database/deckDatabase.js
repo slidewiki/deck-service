@@ -352,6 +352,7 @@ let self = module.exports = {
     findPath: function(sourceDeckId, targetId, targetKind = 'deck', path) {
         let source = util.parseIdentifier(sourceDeckId);
         let target = util.parseIdentifier(targetId);
+        if (!target) return [];
 
         // deck is default if invalid (?)
         if (!['deck', 'slide'].includes(targetKind)) targetKind = 'deck';

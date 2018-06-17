@@ -480,13 +480,13 @@ const self = module.exports = {
         if (!position) {
             position = found.position;
         } else {
-            console.info(`assert ${found.position} should equal ${position}`);
+            console.warn(`assert ${found.position} should equal ${position}`);
         }
 
         if (!parentId) {
             parentId = found.parentId;
         } else {
-            console.info(`assert ${found.parentId} should equal ${parentId}`);
+            console.warn(`assert ${found.parentId} should equal ${parentId}`);
         }
 
         // delete it from parent deck!
@@ -510,13 +510,13 @@ const self = module.exports = {
         if (!sourcePosition) {
             sourcePosition = found.position;
         } else {
-            console.info(`assert ${found.position} should equal ${sourcePosition}`);
+            console.warn(`assert ${found.position} should equal ${sourcePosition}`);
         }
 
         if (!sourceId) {
             sourceId = found.parentId;
         } else {
-            console.info(`assert ${found.parentId} should equal ${sourceId}`);
+            console.warn(`assert ${found.parentId} should equal ${sourceId}`);
         }
 
         // because of usage maintenance, we need (?) to first remove, then add the item to new position
@@ -569,7 +569,7 @@ const self = module.exports = {
             let counts = await deckDB.getChangesCounts(deck.id);
             if (counts[deck.revision] === 1) {
                 // we want to copy a fresh revision, let's copy the one before it
-                console.log(`copying ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
+                console.warn(`copying ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
                 deck.revision = deck.revision - 1;
             } else {
                 // unknown revision, old deck without changelog, or a revision with changes
@@ -603,7 +603,7 @@ const self = module.exports = {
             // with the latest revision we have just created now
             let usage = await deckDB.getUsage(deckId);
             // if a deck has no roots, itself is the root
-            console.log(`updating deck revision used for ${deck.id} in ${usage.length} parent decks`);
+            console.warn(`updating deck revision used for ${deck.id} in ${usage.length} parent decks`);
 
             for (let parentDeck of usage) {
                 // citem, revertedRevId, root_deck, ckind, user, top_root_deck, parentOperations

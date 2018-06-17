@@ -5,7 +5,7 @@
 const chai = require('chai');
 chai.should();
 
-describe.only('REST API usage', () => {
+describe('REST API usage', () => {
 
     const util = require('../lib/util');
     const testServer = require('../testServer');
@@ -855,7 +855,6 @@ describe.only('REST API usage', () => {
                             throw new Error(`could not add subdeck:\n\t${response.payload}`);
                         } 
                         subsubdeckId = JSON.parse(response.payload).id;
-                        console.log(subsubdeckId);
                     });
                 });
 
