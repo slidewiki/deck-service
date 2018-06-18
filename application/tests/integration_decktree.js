@@ -34,6 +34,7 @@ describe('REST API deck tree', () => {
             payload: {
                 title,
                 theme,
+                language: 'en-GB',
                 first_slide: {
                     title: String(0),
                 },
@@ -60,6 +61,25 @@ describe('REST API deck tree', () => {
         response.result.children[0].should.include.keys('id', 'type', 'title');
         response.result.children[0].title.should.equal(String(0));
         slideIds.push(response.result.children[0].id);
+    });
+
+    it('should not be able to change deck language', async () => {
+        let title = 'The root for deck tree tests';
+        let theme = 'sky';
+        let language = 'el-GR';
+        let response = await server.inject({
+            method: 'PUT',
+            url: `/deck/${deckId}`,
+            payload: {
+                title,
+                theme,
+                language,
+            },
+            headers: {
+                '----jwt----': authToken,
+            },
+        });
+        response.statusCode.should.equal(422);
     });
 
     it('should append some slides', async () => {

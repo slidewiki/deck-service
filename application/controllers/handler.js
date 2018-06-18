@@ -223,9 +223,9 @@ let self = module.exports = {
                 });
             });
 
-        }).catch((error) => {
-            if (error.isBoom) return reply(error);
-            request.log('error', error);
+        }).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
             reply(boom.badImplementation());
         });
 
@@ -440,7 +440,7 @@ let self = module.exports = {
         let deckId = request.params.id; // it should already be a number
 
         deckDB.get(deckId).then((deck) => {
-            if (!deck) return boom.notFound();
+            if (!deck) throw boom.notFound();
 
             return deckDB.getChangesCounts(deckId).then((changesCounts) => {
                 return deck.revisions.reverse().map((rev, index, list) => {
@@ -460,10 +460,9 @@ let self = module.exports = {
                     return rev;
                 });
             });
-        }).then((response) => {
-            reply(response);
-        }).catch((error) => {
-            request.log('error', error);
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
             reply(boom.badImplementation());
         });
 
@@ -545,7 +544,7 @@ let self = module.exports = {
         let rootDeckId = request.payload.top_root_deck;
         auth.authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             // authorizeUser returns nothing if all's ok
-            if (boom) return boom;
+            if (boom) throw boom;
 
             // force ignore new_revision
             delete request.payload.new_revision;
@@ -555,7 +554,7 @@ let self = module.exports = {
 
             // update the deck without creating a new revision
             return deckDB.update(deckId, request.payload).then((result) => {
-                if (!result) return boom.notFound();
+                if (!result) throw boom.notFound();
                 let {replaced, changed} = result;
 
                 // send tags to tag-service
@@ -583,10 +582,8 @@ let self = module.exports = {
 
             });
 
-        }).then((response) => {
-            // response is either the deck update response or boom
-            reply(response);
-        }).catch((err) => {
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -617,7 +614,6 @@ let self = module.exports = {
             reply(result);
         }).catch((err) => {
             if (err.isBoom) return reply(err);
-
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -695,13 +691,11 @@ let self = module.exports = {
 
         auth.authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             // authorizeUser returns nothing if all's ok
-            if (boom) return boom;
+            if (boom) throw boom;
 
             return deckDB.createDeckRevision(deckId, userId, rootDeckId);
-        }).then((response) => {
-            // response is either the new deck revision or boom
-            reply(response);
-        }).catch((err) => {
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -717,7 +711,7 @@ let self = module.exports = {
 
         auth.authorizeUser(userId, deckId, rootDeckId).then((boom) => {
             // authorizeUser returns nothing if all's ok
-            if (boom) return boom;
+            if (boom) throw boom;
 
             // continue as normal
             let revisionId = request.payload.revision_id;
@@ -726,16 +720,14 @@ let self = module.exports = {
             .then((updatedDeck) => {
                 // means the revision_id in the payload was invalid
                 if (!updatedDeck) {
-                    return boom.badData(`could not find ${revisionId} for deck ${deckId}`);
+                    throw boom.badData(`could not find ${revisionId} for deck ${deckId}`);
                 }
 
                 return updatedDeck;
             });
 
-        }).then((response) => {
-            // response is either the new deck revision or boom
-            reply(response);
-        }).catch((err) => {
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -1638,18 +1630,17 @@ let self = module.exports = {
         let userId = request.auth.credentials.userid;
 
         deckDB.userPermissions(deckId, userId).then((perm) => {
-            if (!perm) return boom.notFound();
+            if (!perm) throw boom.notFound();
 
             if (perm.edit) {
                 // user already has permissions, return error
-                return boom.badData();
+                throw boom.badData();
             }
 
             return deckDB.addEditRightsRequest(deckId, userId);
 
-        }).then((res) => {
-            reply(res);
-        }).catch((err) => {
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -1913,7 +1904,7 @@ let self = module.exports = {
         let deckId = request.params.id;
         let deck = util.parseIdentifier(deckId);
         deckDB.get(deck.id).then((existingDeck) => {
-            if (!existingDeck) return boom.notFound();
+            if (!existingDeck) throw boom.notFound();
 
             return deckDB.getUsage(deckId);
 
@@ -1935,6 +1926,7 @@ let self = module.exports = {
             });
             /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -1945,7 +1937,7 @@ let self = module.exports = {
         let deckId = request.params.id;
         let deck = util.parseIdentifier(deckId) || {};
         deckDB.get(deck.id).then((existingDeck) => {
-            if (!existingDeck) return boom.notFound();
+            if (!existingDeck) throw boom.notFound();
 
             return deckDB.getRootDecks(deckId)
             .then((roots) => {
@@ -1965,6 +1957,7 @@ let self = module.exports = {
             });
 
         }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -1974,7 +1967,7 @@ let self = module.exports = {
         let slideId = request.params.id;
         let slide = util.parseIdentifier(slideId);
         slideDB.get(slide.id).then((existingSlide) => {
-            if (!existingSlide) return boom.notFound();
+            if (!existingSlide) throw boom.notFound();
 
             return deckDB.getUsage(slideId, 'slide');
 
@@ -1999,6 +1992,7 @@ let self = module.exports = {
             });
             /* eslint-enable no-unreachable */
         }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -2009,7 +2003,7 @@ let self = module.exports = {
         let slideId = request.params.id;
         let slide = util.parseIdentifier(slideId);
         slideDB.get(slide.id).then((existingSlide) => {
-            if (!existingSlide) return boom.notFound();
+            if (!existingSlide) throw boom.notFound();
 
             return deckDB.getRootDecks(slideId, 'slide').then((roots) => {
                 return roots;
@@ -2031,6 +2025,7 @@ let self = module.exports = {
 
             });
         }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -2081,19 +2076,17 @@ let self = module.exports = {
         let rootDeckId = request.payload.top_root_deck;
 
         auth.authorizeUser(userId, deckId, rootDeckId).then((boomError) => {
-            if (boomError) return boomError;
+            if (boomError) throw boomError;
 
             return deckDB.get(deckId).then( (deck) => {
-                if(!deck) return boom.notFound();
+                if(!deck) throw boom.notFound();
 
                 return deckDB.replaceTags(deckId, request.payload.tags, userId, rootDeckId).then((updatedDeck) => {
                     return updatedDeck;
                 });
             });
-        }).then( (response) => {
-            // response is either the deck update or boom
-            reply(response);
-        }).catch((err) => {
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
         });
