@@ -82,16 +82,14 @@ let self = module.exports = {
         });
     },
 
-    //inserts a new slide into the database
+    // inserts a new slide into the database
     newSlide: function(request, reply) {
         let userId = request.auth.credentials.userid;
 
-        // make sure user id is set
-        let payload = Object.assign({ user: userId }, request.payload);
         // insert the slide
-        slideDB.insert(payload).then((inserted) => {
+        slideDB.insert(request.payload, userId).then((inserted) => {
             // empty results means something wrong with the payload
-            if (!inserted) return reply(boom.badData());
+            if (!inserted) throw boom.badData();
 
             let createdSlide = co.rewriteID(inserted);
 
@@ -102,11 +100,11 @@ let self = module.exports = {
                 request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
             });
 
-            reply(createdSlide);
-        }).catch((error) => {
-            if (error.isBoom) return reply(error);
+            return createdSlide;
 
-            request.log('error', error);
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
             reply(boom.badImplementation());
         });
 
@@ -400,38 +398,23 @@ let self = module.exports = {
         let deckId = request.params.id;
         let variantFilter = _.pick(request.query, 'language');
         deckDB.get(deckId, variantFilter).then((deck) => {
-            if (co.isEmpty(deck))
-                reply(boom.notFound());
-            else {
-                const deckIdParts = request.params.id.split('-');
-                const deckRevisionId = (deckIdParts.length > 1) ? deckIdParts[deckIdParts.length - 1] : deck.active;
+            if (!deck) throw boom.notFound();
 
-                if (deck.revisions !== undefined && deck.revisions.length > 0 && deck.revisions[0] !== null) {
-                    // add first slide id-revision for all revisions
-                    deck.revisions.forEach((rev) => {
-                        rev.firstSlide = deckDB.getFirstSlide(rev);
-                    });
+            // TODO this is only until we remove the damned revisions array from response payload
+            // the last is the selected one, or the latest one
+            let [defaultRevision] = deck.revisions.slice(-1);
+            deck.language = defaultRevision.language;
 
-                    let deckRevision = deck.revisions.find((revision) => String(revision.id) === String(deckRevisionId));
+            // add first slide id-revision for all revisions
+            deck.revisions.forEach((rev) => {
+                rev.firstSlide = deckDB.getFirstSlide(rev);
+            });
 
-                    if (deckRevision !== undefined) {
-                        //add language of the active revision to the deck
-                        if (deckRevision.language){
-                            deck.language = deckRevision.language.length === 2 ? deckRevision.language : deckRevision.language.substring(0, 2);
-                        }else{
-                            deck.language = 'en';
-                        }
-                        reply(deck);
-                    } else {
-                        reply(deck);
-                    }
-                } else {
-                    reply(deck);
-                }
-            }
-        }).catch((error) => {
-            if (error.isBoom) return reply(error);
-            request.log('error', error);
+            return deck;
+
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
             reply(boom.badImplementation());
         });
     },
@@ -468,71 +451,44 @@ let self = module.exports = {
 
     },
 
-    //creates a new deck in the database
+    // creates a new deck in the database
     newDeck: function(request, reply) {
-        request.payload.user = request.auth.credentials.userid;
+        let userId = request.auth.credentials.userid;
 
-        //insert the deck into the database
-        deckDB.insert(request.payload).then((inserted) => {
+        // insert the deck into the database
+        deckDB.insert(request.payload, userId).then((inserted) => {
             // empty results means something wrong with the payload
-            if (!inserted) return reply(boom.badData());
+            if (!inserted) throw boom.badData();
+            let newDeckId = String(inserted._id) + '-1';
 
-            if (co.isEmpty(inserted))
-                throw inserted;
-            else{
-                //create a new slide inside the new deck
-                let newSlide = {
-                    'title': 'New slide',
-                    'content': slidetemplate,
-                    'markdown': '',
-                    'language': request.payload.language,
-                    'license': request.payload.license,
-                    'user': inserted.user,
-                    'root_deck': String(inserted._id)+'-1',
-                    'position' : 1
-                };
+            // create a new slide inside the new deck
+            let newSlide = Object.assign({
+                // defaults
+                title: 'New slide',
+                content: slidetemplate,
+                markdown: '',
+                speakernotes: '',
+            }, _.pick(request.payload, [
+                'language',
+                'license',
+            ]), _.pick(request.payload.first_slide, [
+                'title',
+                'content',
+                'markdown',
+                'speakernotes',
+            ]));
 
-                if (request.payload.hasOwnProperty('slideDimensions')) {
-                    newSlide.dimensions = request.payload.slideDimensions;
-                }
-
-                if(request.payload.hasOwnProperty('first_slide')){
-                    if(request.payload.first_slide.hasOwnProperty('content')){
-                        newSlide.content = request.payload.first_slide.content;
-                    }
-                    if(request.payload.first_slide.hasOwnProperty('markdown')){
-                        newSlide.markdown = request.payload.first_slide.markdown;
-                    }
-                    if(request.payload.first_slide.hasOwnProperty('title')){
-                        newSlide.title = request.payload.first_slide.title;
-                    }
-                    if(request.payload.first_slide.hasOwnProperty('speakernotes')){
-                        newSlide.speakernotes = request.payload.first_slide.speakernotes;
-                    }
-                }
-                //insert the slide into the database
-                return slideDB.insert(newSlide)
-                .then((insertedSlide) => {
-                    insertedSlide.id = insertedSlide._id;
-                    //update the content items of the new deck to contain the new slide
-                    // top root is the root_deck if missing from payload
-                    let top_root_deck = request.payload.top_root_deck || newSlide.root_deck;
-
-                    return deckDB.insertNewContentItem(insertedSlide, 0, newSlide.root_deck, 'slide', 1, newSlide.user, top_root_deck)
-                    .then((updatedDeckRevision) => {
-                        //create the thumbnail for the new slide
-                        let content = newSlide.content, slideId = insertedSlide.id+'-'+1;
-                        fileService.createThumbnail(content, slideId, updatedDeckRevision.theme).catch((err) => {
-                            request.log('warn', `could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
-                        });
-
-                        reply(co.rewriteID(inserted));
-                    });
-                });
+            if (request.payload.slideDimensions) {
+                newSlide.dimensions = request.payload.slideDimensions;
             }
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
+
+            return treeDB.createSlide(newSlide, newDeckId, 0, newDeckId, userId)
+            .then((newContentItem) => co.rewriteID(inserted));
+
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation(err));
         });
     },
 
@@ -1525,7 +1481,16 @@ let self = module.exports = {
                         throw boom.badData(`variant for ${Object.entries(variantFilter)} already exists for slide: ${slideId} in deck tree: ${rootDeckId}`);
                     }
 
-                    return slideDB.addSlideNodeVariant(slideNode, request.payload, userId);
+                    return slideDB.addSlideNodeVariant(slideNode, request.payload, userId).then((newVariant) => {
+                        // also create a thumbnail
+                        let newSlideId = util.toIdentifier(newVariant);
+                        // content is the same as the primary slide
+                        fileService.createThumbnail(slideNode.slide.content, newSlideId, slideNode.parent.theme).catch((err) => {
+                            console.warn(`could not create thumbnail for new slide variant ${newSlideId}, error was: ${err.message}`);
+                        });
+
+                        return newVariant;
+                    });
                 });
             });
 

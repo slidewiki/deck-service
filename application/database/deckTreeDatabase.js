@@ -617,7 +617,7 @@ const self = module.exports = {
     },
 
     // recursively copies the deck revision tree
-    _copyDeckTree: async function(deckId, userId, parentDeckId) {
+    _copyDeckTree: async function(deckId, userId) {
         let originDeck = await deckDB.getDeck(deckId);
 
         // create a copy based on original deck data
@@ -635,19 +635,17 @@ const self = module.exports = {
             'allowMarkdown',
         ]);
 
-        // assign metadata
+        // assign origin metadata
         Object.assign(newDeck, {
-            user: userId,
             origin: _.pick(originDeck, [
                 'id',
                 'revision',
                 'title',
                 'user',
             ]),
-            root_deck: parentDeckId, // could be nothing
         });
 
-        let inserted = await deckDB.insert(newDeck);
+        let inserted = await deckDB.insert(newDeck, userId, true);
         // create the new deck reference
         let newDeckRef = {
             id: inserted._id,
@@ -757,7 +755,7 @@ const self = module.exports = {
 
         // we need to keep only what we support as variant filter, which is language only
         let targetVariants = (targetDeck.variants || []).map((v) => _.pick(v, 'language'));
-        await mergeDeckVariants(newContentItem.ref.id, targetVariants, _.pick(targetDeck, 'language'));
+        await mergeDeckVariants(newContentItem.ref.id, targetVariants, _.pick(targetDeck, 'language'), userId);
 
         // omitting the rootDeckId in the call to insertContentItem means this change won't be tracked,
         // as it will be tracked right after this code, we just need to attach now
@@ -792,14 +790,8 @@ const self = module.exports = {
             'slideDimensions',
         ]));
 
-        // assign metadata
-        Object.assign(payload, {
-            'user': userId,
-            'root_deck': targetId,
-        });
-
         // add it to database
-        let newDeck = await deckDB.insert(payload);
+        let newDeck = await deckDB.insert(payload, userId, true);
         // get the content item to insert
         let newContentItem = { ref: { id: newDeck._id, revision: 1 }, kind: 'deck' };
 
@@ -828,7 +820,7 @@ const self = module.exports = {
         return newContentItem;
     },
 
-    createSlide: async function(payload, targetId, targetPosition, rootId, userId) {
+    createSlide: async function(payload, targetId, targetPosition, rootId, userId, addAction) {
         let parentDeck = await deckDB.getDeck(targetId);
         if (!parentDeck) return; // targetId not found
         // normalize the id
@@ -843,19 +835,18 @@ const self = module.exports = {
             payload.dimensions= parentDeck.slideDimensions;
         }
 
-        // assign metadata
-        Object.assign(payload, {
-            'user': userId,
-            'root_deck': targetId,
-        });
-
         // add it to database
-        let newSlide = await slideDB.insert(payload);
+        let newSlide = await slideDB.insert(payload, userId);
         // get the content item to insert
         let newContentItem = { ref: { id: newSlide._id, revision: 1 }, kind: 'slide' };
 
         // this method also tracks the slide insertion
-        await deckDB.insertContentItem(newContentItem, targetPosition, targetId, userId, rootId);
+        let updatedDeckRevision = await deckDB.insertContentItem(newContentItem, targetPosition, targetId, userId, rootId, addAction);
+        // we can now pick the theme of the parent deck and create the thumbnail!
+        let newSlideId = util.toIdentifier(newContentItem.ref);
+        fileService.createThumbnail(newSlide.revisions[0].content, newSlideId, updatedDeckRevision.theme).catch((err) => {
+            console.warn(`could not create thumbnail for slide ${newSlideId}, error was: ${err.message}`);
+        });
 
         // return the new content item
         return newContentItem;
@@ -866,7 +857,7 @@ const self = module.exports = {
 // adds all the variants to the deck deckId and its subdecks, if missing
 // also sets the relevant deck properties to the values specified in defaults
 // defaults should never be included in new variants to merge
-async function mergeDeckVariants(deckId, variants, defaults) {
+async function mergeDeckVariants(deckId, variants, defaults, userId) {
     let deck = await deckDB.get(deckId);
 
     // always work with latest revision
@@ -900,6 +891,45 @@ async function mergeDeckVariants(deckId, variants, defaults) {
         } else {
             // push all variant data into variants array
             latestRevision.variants.push(oldVariantData);
+        }
+
+        // we also need to rearrange the variants in the slide nodes
+        for (let item of _.filter(latestRevision.contentItems, { kind: 'slide' }) ) {
+            // generate a variant object from the primary slide and the current revision language
+            let primaryAsVariant = Object.assign(
+                _.pick(item.ref, 'id', 'revision'),
+                _.pick(latestRevision, 'language')
+            );
+
+            // find the variant that will become primary
+            let slideVariant = _.find(item.variants, defaults);
+            if (slideVariant) {
+                // remove it!
+                _.remove(item.variants, defaults);
+            } else {
+                // if it doesn't exist, we need to make a copy of the current primary
+                let primarySlide = await slideDB.getSlideRevision(util.toIdentifier(primaryAsVariant));
+                // and set its language to the new language
+                Object.assign(primarySlide, defaults, {
+                    // also record the copy origin
+                    parent_slide: _.pick(primarySlide, 'id', 'revision'),
+                });
+
+                let copy = await slideDB.insert(primarySlide, userId);
+                slideVariant = Object.assign({
+                    id: copy._id,
+                    revision: 1, // brand new!
+                }, defaults);
+            }
+
+            // simply replace primary with data from the slide variant
+            Object.assign(item, {
+                ref: _.pick(slideVariant, 'id', 'revision'),
+            });
+
+            // and push the primary in the variants
+            if (!item.variants) item.variants = [];
+            item.variants.push(primaryAsVariant);
         }
 
         // if defaults was in variants, update the variant data (title, description)

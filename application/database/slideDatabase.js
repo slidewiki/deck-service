@@ -130,39 +130,25 @@ let self = module.exports = {
         .then((stream) => stream.toArray());
     },
 
-    insert: function(slide) {
-        // check if parentDeck has revision
-        let parentDeck = util.parseIdentifier(slide.root_deck);
-        if (parentDeck && !parentDeck.revision) {
-            // need to find the latest revision id
-            return deckDB.getLatestRevision(parentDeck.id)
-            .then((parentRevision) => {
-                if (!parentRevision) return;
+    insert: async function(payload, userId) {
+        let newId = await helper.getNextId('slides');
 
-                parentDeck.revision = parentRevision;
-                slide.root_deck = util.toIdentifier(parentDeck);
+        payload = Object.assign({
+            // TODO put defaults here ?
+        }, payload, {
+            // TODO put other metadata here ?
+            _id: newId,
+            user: userId,
+        });
 
-                return self._insert(slide);
-            });
+        let convertedSlide = convertToNewSlide(payload);
+        if (!slideModel(convertedSlide)) {
+            throw new Error(JSON.stringify(slideModel.errors));
         }
 
-        return self._insert(slide);
-    },
-
-    _insert: function(slide) {
-        return helper.connectToDatabase()
-        .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
-        .then((newId) => {
-            return helper.getCollection('slides').then((slides) => {
-                slide._id = newId;
-                const convertedSlide = convertToNewSlide(slide);
-                if (!slideModel(convertedSlide)) {
-                    throw new Error(JSON.stringify(slideModel.errors));
-                }
-
-                return slides.insertOne(convertedSlide).then((result) => result.ops[0]);
-            });
-        });
+        let slides = await helper.getCollection('slides');
+        let result = await slides.insertOne(convertedSlide);
+        return result.ops[0];
     },
 
     // new method that simply creates a new slide revision based on another, plus changes in payload
@@ -245,14 +231,12 @@ let self = module.exports = {
 
         // assign metadata
         Object.assign(newSlide, {
-            user: userId,
-            root_deck: parentDeckId,
             comment: `Duplicate slide of ${util.toIdentifier(originalSlide)}`,
             // also record the previous revision
             parent_slide: _.pick(originalSlide, 'id', 'revision'),
         });
 
-        return self.insert(newSlide);
+        return self.insert(newSlide, userId);
     },
 
     // DEPRECATED
@@ -807,14 +791,11 @@ let self = module.exports = {
         ]));
         // assign other data
         Object.assign(newSlide, {
-            user: userId,
-            // this is the parent deck
-            root_deck: util.toIdentifier(slideNode.parent),
             // also record the previous revision
             parent_slide: _.pick(originalSlide, 'id', 'revision'),
         });
 
-        let inserted = await self.insert(newSlide);
+        let inserted = await self.insert(newSlide, userId);
         let newVariant = {
             id: inserted._id,
             revision: 1, // brand new!
@@ -831,7 +812,14 @@ let self = module.exports = {
 
         // update the deck
         let updatedDeck = await deckDB.setContentVariant(slideNode.parent.id, slideNode.index, newVariant, userId);
-        // console.log(updatedDeck);
+
+        // as we are creating and attaching a new slide let's add the parent to its usage as well
+        // TODO maybe improve this ?
+        let slides = await helper.getCollection('slides');
+        await slides.findOneAndUpdate({
+            _id: newVariant.id,
+            'revisions.id': newVariant.revision,
+        }, { $push: { 'revisions.$.usage': _.pick(slideNode.parent, 'id', 'revision') } });
 
         // finished updating deck
         await deckTracker.applyChangeLog(await decks.findOne(parentQuery));
@@ -841,8 +829,33 @@ let self = module.exports = {
     },
 
     copySlideNode: async function(rootId, slideId, newParentId, userId) {
+        let parentDeck = await deckDB.getDeck(newParentId);
         let slideNode = await self.findSlideNode(rootId, slideId);
         // slideNode includes data for the original slide, and references for variants
+
+        // since we're copying for attach, we need to match the node variants to the parent's
+        let parentDefaults = _.pick(parentDeck, 'language');
+        if (slideNode.slide.language !== parentDeck.language) {
+            // primaries differ, let's rearrange the slide node
+
+            // generate a variant object from the primary slide and its language
+            let primaryAsVariant = _.pick(slideNode.slide, 'id', 'revision', 'language');
+
+            // find the variant that will become primary
+            let newPrimary = _.find(slideNode.variants, parentDefaults);
+            if (newPrimary) {
+                // remove it!
+                _.remove(slideNode.variants, parentDefaults);
+            } else {
+                // if it doesn't exist, we need to override its language
+                // so that its copy later on will have the correct one
+                Object.assign(slideNode.slide, parentDefaults);
+            }
+
+            // push the primary in the variants
+            if (!slideNode.variants) slideNode.variants = [];
+            slideNode.variants.push(primaryAsVariant);
+        }
 
         // let's copy the primary slide of the node
         let duplicate = await self.copy(slideNode.slide, newParentId, userId);
@@ -888,11 +901,6 @@ function convertToNewSlide(slide) {
     let now = new Date();
     slide.user = parseInt(slide.user);
 
-    let usageArray = [util.parseIdentifier(slide.root_deck)];
-
-    if(slide.language === null){
-        slide.language = 'en_EN';
-    }
     if(slide.markdown === null){
         slide.markdown = '';
     }
@@ -912,7 +920,7 @@ function convertToNewSlide(slide) {
         description: slide.description,
         revisions: [{
             id: 1,
-            usage: usageArray,
+            usage: [],
             timestamp: now.toISOString(),
             user: slide.user,
             title: slide.title,

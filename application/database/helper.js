@@ -164,6 +164,10 @@ let self = module.exports = {
         return getNextId(dbconn, collectionName, fieldName);
     },
 
+    getNextId: function(collectionName) {
+        return self.connectToDatabase().then((db) => getNextId(db, collectionName));
+    },
+
     applyFixtures: function(db, data) {
         let async = require('async');
         let names = Object.keys(data.collections);

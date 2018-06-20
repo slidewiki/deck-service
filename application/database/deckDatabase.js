@@ -436,56 +436,32 @@ let self = module.exports = {
     },
 
     // inserts a deck into the database
-    insert: function(deck) {
-        // check if parentDeck has revision
-        let parentDeck = util.parseIdentifier(deck.root_deck);
-        if (parentDeck && !parentDeck.revision) {
-            // need to find the latest revision id
-            return self.getLatestRevision(parentDeck.id)
-            .then((parentRevision) => {
-                if (!parentRevision) return;
+    insert: async function(payload, userId, skipTracking=false) {
+        let newId = await helper.getNextId('decks');
 
-                parentDeck.revision = parentRevision;
-                deck.root_deck = util.toIdentifier(parentDeck);
+        payload = Object.assign({
+            // TODO put defaults here ?
+        }, payload, {
+            // TODO put other metadata here ?
+            _id: newId,
+            user: userId,
+        });
 
-                return self._insert(deck);
-            });
+        const convertedDeck = convertToNewDeck(payload);
+        if (!validateDeck(convertedDeck)) {
+            throw new Error(JSON.stringify(validateDeck.errors));
         }
 
-        return self._insert(deck);
-    },
+        let decks = await helper.getCollection('decks');
+        let result = await decks.insertOne(convertedDeck);
 
-    // inserts a deck into the database
-    _insert: function(deck) {
-        return helper.connectToDatabase()
-        .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
-        .then((newId) => {
-            return helper.getCollection('decks')
-            .then((col) => {
-                deck._id = newId;
+        if (!skipTracking) {
+            // also track in change log, but only if it's not a subdeck or a fork etc.
+            ChangeLog.trackDeckCreated(convertedDeck._id, userId);
+        }
 
-                const convertedDeck = convertToNewDeck(deck);
-                if (!validateDeck(convertedDeck)) {
-                    throw new Error(JSON.stringify(validateDeck.errors));
-                }
-
-                let trackNewDeck = true;
-                if (deck.origin || deck.root_deck) {
-                    // it's a copy or a new subdeck, don't track it!
-                    trackNewDeck = false;
-                }
-
-                return col.insertOne(convertedDeck).then((result) => {
-                    // the deck.root_deck means we are adding a subdeck to that deck
-                    if (trackNewDeck) {
-                        // also track in change log, but only if it's not a subdeck
-                        ChangeLog.trackDeckCreated(convertedDeck._id, convertedDeck.user);
-                    }
-                    // just added this one deck
-                    return result.ops[0];
-                });
-            });
-        });
+        // just added this one deck
+        return result.ops[0];
     },
 
     // TODO only used for accessLevel tests right now, should be removed or properly integrated
@@ -3162,11 +3138,6 @@ function getOrder(activeRevision){
 function convertToNewDeck(deck){
     let now = new Date();
 
-    let usageArray = [];
-    if (deck.root_deck) {
-        usageArray.push(util.parseIdentifier(deck.root_deck));
-    }
-
     deck.user = parseInt(deck.user);
     let contributorsArray = [{'user': deck.user, 'count': 1}];
     if(!deck.hasOwnProperty('tags') || deck.tags === null){
@@ -3206,7 +3177,7 @@ function convertToNewDeck(deck){
         active: 1,
         revisions: [{
             id: 1,
-            usage: usageArray, //create new array and insert root deck
+            usage: [],
             title: deck.title,
             timestamp: now.toISOString(),
             lastUpdate: now.toISOString(),

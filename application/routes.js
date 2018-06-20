@@ -850,7 +850,7 @@ module.exports = function(server) {
                     ).single(),
                     content: Joi.string(),
                     title: Joi.string(),
-                    license: Joi.string(),
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                     speakernotes: Joi.string(),
                 }).requiredKeys('selector'),
                 headers: Joi.object({

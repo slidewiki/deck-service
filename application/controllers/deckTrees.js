@@ -268,19 +268,27 @@ const self = module.exports = {
                             throw boom.badData(`could not locate slide to attach: ${source.id}`);
                         }
 
-                        return slideDB.copy(slide, target.parentId, userId).then((inserted) => {
-                            // it's slide copy, so revision is 1
-                            let newContentItem = { ref: { id: inserted._id, revision: 1 }, kind: 'slide' };
-                            return deckDB.insertContentItem(newContentItem, target.position + 1, target.parentId, userId, rootId, addAction).then((updatedDeckRevision) => {
-                                // we can now pick the theme of the parent deck and create the thumbnail!
-                                let newSlideId = util.toIdentifier(newContentItem.ref);
-                                fileService.createThumbnail(inserted.revisions[0].content, newSlideId, updatedDeckRevision.theme).catch((err) => {
-                                    console.warn(`could not create thumbnail for slide ${newSlideId}, error was: ${err.message}`);
-                                });
+                        // create a copy based on original slide data
+                        let newSlidePayload = _.pick(slide, [
+                            'title',
+                            'content',
+                            'markdown',
+                            'license',
+                            'speakernotes',
+                            'dimensions',
+                            'language',
+                        ]);
+                        // assign metadata
+                        Object.assign(newSlidePayload, {
+                            comment: `Duplicate slide of ${util.toIdentifier(slide)}`,
+                            // also record the previous revision
+                            parent_slide: _.pick(slide, 'id', 'revision'),
+                        });
 
-                                // return the node data, same as the original
-                                return { title: slide.title, id: newSlideId, type: 'slide' };
-                            });
+                        return treeDB.createSlide(newSlidePayload, target.parentId, target.position + 1, rootId, userId, addAction).then((newContentItem) => {
+                            let newSlideId = util.toIdentifier(newContentItem.ref);
+                            // return the node data, same as the original
+                            return { title: slide.title, id: newSlideId, type: 'slide' };
                         });
                     });
                 }
@@ -359,24 +367,13 @@ const self = module.exports = {
                     'speakernotes',
                 ]));
 
-                return treeDB.createSlide(newSlidePayload, util.toIdentifier(newContentItem.ref), 0, rootId, userId).then((newSlide) => {
-                    // we have to return from the callback, else empty node is returned because it is updated asynchronously
-                    return treeDB.getDeckTree(newContentItem.ref.id).then((newTree) => {
-                        // let's create a thumbnail but dont wait for it
-                        let slideId = util.toIdentifier(newSlide.ref);
-                        fileService.createThumbnail(newSlidePayload.content, slideId, newTree.theme).catch((err) => {
-                            console.warn(`could not create thumbnail for new slide ${slideId}: ${err.message || err}`);
-                        });
-
-                        return newTree;
-                    });
-                });
+                return treeDB.createSlide(newSlidePayload, util.toIdentifier(newContentItem.ref), 0, rootId, userId)
+                .then(() => treeDB.getDeckTree(newContentItem.ref.id));
 
             });
 
         }).then(reply).catch((err) => {
             if (err.isBoom) return reply(err);
-
             request.log('error', err);
             reply(boom.badImplementation());
         });
@@ -465,9 +462,9 @@ const self = module.exports = {
         }
 
         // handle errors with promise
-        renamePromise.catch((error) => {
-            if (error.isBoom) return reply(error);
-            request.log('error', error);
+        renamePromise.catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
             reply(boom.badImplementation());
         });
 

@@ -45,11 +45,6 @@ describe('REST API new deck', () => {
             }
         ],
         title: 'new deck',
-        root_deck: '1',
-        parent_deck: {
-            id: '1',
-            revision: '1'
-        },
         abstract: 'dummy',
         comment: 'dummy',
         footer: 'dummy',
@@ -161,7 +156,7 @@ describe('REST API new deck', () => {
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'user', 'tags');
                 revision.user.should.equal(2);
                 revision.id.should.equal(1);
-                revision.usage.should.be.an('array').and.have.length(1);
+                revision.usage.should.be.an('array').and.have.length(0);
                 revision.tags.should.be.an('array').and.have.length(2);
             });
         });
@@ -211,7 +206,7 @@ describe('REST API new deck', () => {
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'lastUpdate', 'user', 'tags');
                 revision.user.should.equal(2);
                 revision.id.should.equal(1);
-                revision.usage.should.be.an('array').and.have.length(1);
+                revision.usage.should.be.an('array').and.have.length(0);
                 revision.tags.should.be.an('array').and.have.length(2);
             });
         });
