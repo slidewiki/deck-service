@@ -189,15 +189,6 @@ let self = module.exports = {
             usage: [],
         });
 
-        // update contributors array
-        let contributors = slide.contributors || [];
-        let existingContributor = _.find(contributors, { user: userId });
-        if (existingContributor) {
-            existingContributor.count++;
-        } else {
-            contributors.push({ user: userId, count: 1 });
-        }
-
         let slides = await helper.getCollection('slides');
         let updatedSlide = await slides.findOneAndUpdate(
             { _id: slideRef.id },
@@ -205,7 +196,6 @@ let self = module.exports = {
                 $push: { revisions: newRevision },
                 $set: { 
                     lastUpdate: now,
-                    contributors,
                 },
             }
         );
@@ -727,7 +717,6 @@ function convertToNewSlide(slide) {
     // remove nils (undefined or nulls)
     slide = _.omitBy(slide, _.isNil);
 
-    let contributorsArray = [{'user': slide.user, 'count': 1}];
     const result = {
         _id: slide._id,
         user: slide.user,
@@ -735,7 +724,6 @@ function convertToNewSlide(slide) {
         lastUpdate: now.toISOString(),
         language: slide.language,
         license: slide.license,
-        contributors: contributorsArray,
         description: slide.description,
         revisions: [{
             id: 1,

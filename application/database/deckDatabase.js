@@ -661,16 +661,6 @@ let self = module.exports = {
                     existingDeck.editors = deck.editors;
                 }
 
-                if(existingDeck.hasOwnProperty('contributors')){
-                    let contributors = existingDeck.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(deck.user));
-                    if(existingUserContributorIndex > -1)
-                        contributors[existingUserContributorIndex].count++;
-                    else{
-                        contributors.push({'user': parseInt(deck.user), 'count': 1});
-                    }
-                    existingDeck.contributors = contributors;
-                }
                 if (!validateDeck(deckRevision)) {
                     throw validateDeck.errors;
                 }
@@ -988,21 +978,6 @@ let self = module.exports = {
                 }
                 // TODO some async updates happening here, need to handle errors to avoid data corruption
 
-                if(existingDeck.hasOwnProperty('contributors')){
-                    let revIndex = 0;
-                    if(citem.revisions.length > 1){
-                        revIndex = parseInt(citem_revision_id)-1;
-                    }
-                    let contributors = existingDeck.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', parseInt(citem.revisions[revIndex].user));
-                    if(existingUserContributorIndex > -1)
-                        contributors[existingUserContributorIndex].count++;
-                    else{
-                        contributors.push({'user': parseInt(citem.revisions[revIndex].user), 'count': 1});
-                    }
-                    existingDeck.contributors = contributors;
-                }
-
                 let updatedRevision = _.find(existingDeck.revisions, {id: activeRevisionId});
 
                 existingDeck.lastUpdate = new Date().toISOString();
@@ -1259,16 +1234,6 @@ let self = module.exports = {
                 let oldRevision = existingItem.ref.revision;
                 existingItem.ref.revision = newRevision;
 
-                if (!existingDeck.hasOwnProperty('contributors')) {
-                    existingDeck.contributors = [];
-                }
-                let existingContributor = existingDeck.contributors.find((c) => c.user === userId);
-                if (existingContributor) {
-                    existingContributor.count++;
-                } else {
-                    existingDeck.contributors.push({ user: userId, count: 1 });
-                }
-
                 return decks.save(existingDeck)
                 .then(() => deckTracker && deckTracker.applyChangeLog())
                 .then((deckChanges) => {
@@ -1289,14 +1254,6 @@ let self = module.exports = {
         let existingDeck = await self.getDeck(parentDeckId);
         if (!existingDeck) return;
 
-        let contributors = existingDeck.contributors || [];
-        let existingContributor = _.find(contributors, { user: userId });
-        if (existingContributor) {
-            existingContributor.count++;
-        } else{
-            contributors.push({ user: userId, count: 1 });
-        }
-
         let contentItem = existingDeck.contentItems[index];
         let variants = contentItem.variants || [];
         let existingVariant = _.find(variants, { language: newVariant.language });
@@ -1312,7 +1269,6 @@ let self = module.exports = {
         let result = await decks.findOneAndUpdate(
             { _id: existingDeck.id, 'revisions.id': existingDeck.revision },
             { $set: {
-                contributors,
                 lastUpdate: now,
                 'revisions.$.lastUpdate': now,
                 [`revisions.$.contentItems.${index}.variants`]: variants,
@@ -2354,7 +2310,6 @@ let self = module.exports = {
                     language: revision.language, 
                     owner: deck.user, 
                     tags: revision.tags.map ( (tag) => { return tag.tagName; }),
-                    contributors: deck.contributors.map( (contr) => {return contr.user;}),
                     path: path,
                     hidden: deck.hidden,
                     contents: []
@@ -2397,7 +2352,6 @@ let self = module.exports = {
                                         lastUpdate: slide.lastUpdate,
                                         language: revision.language,
                                         owner: slide.user,
-                                        contributors: slide.contributors.map( (contr) => {return contr.user; }),
                                         path: path,
                                     };
 
@@ -2494,7 +2448,7 @@ function convertToNewDeck(deck){
     let now = new Date();
 
     deck.user = parseInt(deck.user);
-    let contributorsArray = [{'user': deck.user, 'count': 1}];
+
     if(!deck.hasOwnProperty('tags') || deck.tags === null){
         deck.tags = [];
     }
@@ -2528,7 +2482,6 @@ function convertToNewDeck(deck){
         lastUpdate: now.toISOString(),
         datasource: deck.datasource,
         license: deck.license,
-        contributors: contributorsArray,
         active: 1,
         revisions: [{
             id: 1,

@@ -376,7 +376,7 @@ const self = module.exports = {
             language: deck.language,
             owner: deck.user, 
             tags: _.map(deck.tags, 'tagName'),
-            contributors: _.map(deck.contributors, 'user'),
+            contributors: _.map(await contributorsDB.getDeckContributors(deckId), 'id'),
             path: path,
             contents: [],
         };
@@ -832,7 +832,7 @@ async function exportSlide(slideId) {
     return Object.assign(result, {
         type: 'slide',
         owner: slide.user,
-        contributors: _.map(slide.contributors, 'user'),
+        contributors: _.map(await contributorsDB.getSlideContributors(slideId), 'id'),
     });
 }
 
