@@ -766,10 +766,6 @@ const self = module.exports = {
         await deckDB._trackDecksForked(targetRootId, forkResult.id_map, userId, 'attach').catch((err) => {
             console.warn(`error tracking attach deck copy ${forkResult.root_node} to ${targetId}`);
         });
-        // add to usage
-        await usageDB.addToUsage(targetDeck, [newContentItem]).catch((err) => {
-            console.warn(`error processing usage while attaching deck copy ${forkResult.root_node} to ${targetId}`);
-        });
 
         // return the deck copy information
         return forkResult;

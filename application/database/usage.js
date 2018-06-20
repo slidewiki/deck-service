@@ -93,7 +93,7 @@ async function _addToUsage(parentDeck, ref, col) {
     let revision = _.find(found.revisions, { id: ref.revision });
 
     // then add it to usage of new item revision (if not there already)
-    if (!_.find(revision.usage, parentDeck)) {
+    if (!_.find(revision.usage, _.pick(parentDeck, 'id', 'revision'))) {
         await col.findOneAndUpdate(
             {
                 _id: ref.id,

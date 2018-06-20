@@ -798,11 +798,10 @@ let self = module.exports = {
 
         // add new revision to usage of each slide or subdeck
         // TODO let it fail ??? 
-        usageDB.addToUsage({
+        await usageDB.addToUsage({
             id: deck.id,
             revision: newRevisionId,
-        }, originRevision.contentItems)
-        .catch((err) => console.warn(err));
+        }, originRevision.contentItems);
 
         let decks = await helper.getCollection('decks');
         let batch = decks.initializeOrderedBulkOp();
