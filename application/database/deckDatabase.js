@@ -1063,12 +1063,7 @@ let self = module.exports = {
         // copy edit rights from existingDeck to new
         if (citem.kind === 'deck') {
             let attachedDeckId = util.toIdentifier(citem.ref);
-            // TODO check why i do a get here before doing the replacing... 
-            self.get(attachedDeckId).then(() => {
-                return self.deepReplaceEditors(attachedDeckId, { editors: existingDeck.editors });
-            }).catch((err) => {
-                console.warn(`could not properly set edit rights for ${attachedDeckId} when adding it to ${deckId}; error was: ${err}`);
-            });
+            await self.deepReplaceEditors(attachedDeckId, { editors: existingDeck.editors });
         }
 
         // TODO add contributor data after attaching if needed
