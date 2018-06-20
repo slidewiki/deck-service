@@ -922,8 +922,8 @@ describe('REST API usage', () => {
 
         context('and we attach some other deck to the deck', () => {
             let otherDeckId, otherSlides, attachedDeckId;
-            before(() => {
-                return server.inject({
+            before(async () => {
+                let response = await server.inject({
                     method: 'POST',
                     url: '/deck/new',
                     payload: {
@@ -932,72 +932,57 @@ describe('REST API usage', () => {
                     headers: {
                         '----jwt----': authToken,
                     },
-                }).then((response) => {
-                    if (response.statusCode !== 200) {
-                        throw new Error(`could not create the other deck:\n\t${response.payload}`);
-                    }
-                    otherDeckId = JSON.parse(response.payload).id;
-
-                    return Promise.all([
-                        // add another slide there
-                        server.inject({
-                            method: 'POST',
-                            url: '/decktree/node/create',
-                            payload: {
-                                selector: {
-                                    id: String(otherDeckId),
-                                    spath: '',
-                                },
-                                nodeSpec: {
-                                    type: 'slide',
-                                },
-                            },
-                            headers: {
-                                '----jwt----': authToken,
-                            },
-                        }).then((response) => {
-                            if (response.statusCode !== 200) {
-                                throw new Error(`could not add a slide:\n\t${response.payload}`);
-                            }
-
-                            // and get the slide refs
-                            return server.inject({
-                                method: 'GET',
-                                url: '/deck/' + otherDeckId,
-                            }).then((response) => {
-                                if (response.statusCode !== 200) {
-                                    throw new Error(`could not get the other deck:\n\t${response.payload}`);
-                                }
-                                otherSlides = JSON.parse(response.payload).revisions[0].contentItems.map((i) => i.ref);
-                            });
-                        }),
-                        // attach the deck
-                        server.inject({
-                            method: 'POST',
-                            url: '/decktree/node/create',
-                            payload: {
-                                selector: {
-                                    id: String(deckId),
-                                    spath: '',
-                                },
-                                nodeSpec: {
-                                    id: String(otherDeckId),
-                                    type: 'deck',
-                                },
-                            },
-                            headers: {
-                                '----jwt----': authToken,
-                            },
-                        }).then((response) => {
-                            if (response.statusCode !== 200) {
-                                throw new Error(`could not attach the other deck:\n\t${response.payload}`);
-                            }
-                            attachedDeckId = JSON.parse(response.payload).id;
-                        })
-                    ]);
-
                 });
+                response.should.have.property('statusCode', 200);
+                otherDeckId = response.result.id;
 
+                // add another slide there
+                response = await server.inject({
+                    method: 'POST',
+                    url: '/decktree/node/create',
+                    payload: {
+                        selector: {
+                            id: String(otherDeckId),
+                            spath: '',
+                        },
+                        nodeSpec: {
+                            type: 'slide',
+                        },
+                    },
+                    headers: {
+                        '----jwt----': authToken,
+                    },
+                });
+                response.should.have.property('statusCode', 200);
+
+                // and get the slide refs
+                response = await server.inject({
+                    method: 'GET',
+                    url: '/deck/' + otherDeckId,
+                });
+                response.should.have.property('statusCode', 200);
+                otherSlides = response.result.revisions[0].contentItems.map((i) => i.ref);
+
+                // attach the deck
+                response = await server.inject({
+                    method: 'POST',
+                    url: '/decktree/node/create',
+                    payload: {
+                        selector: {
+                            id: String(deckId),
+                            spath: '',
+                        },
+                        nodeSpec: {
+                            id: String(otherDeckId),
+                            type: 'deck',
+                        },
+                    },
+                    headers: {
+                        '----jwt----': authToken,
+                    },
+                });
+                response.should.have.property('statusCode', 200);
+                attachedDeckId = response.result.id;
             });
 
             it('the origin of the deck that was attached should not include the deck in its usage (DB)', () => {
@@ -1148,85 +1133,86 @@ describe('REST API usage', () => {
 
             });
 
-        });
 
-        context('and we create a new revision of the root deck', () => {
-            before(() => {
-                return server.inject({
-                    method: 'POST',
-                    url: `/deck/${deckId}/revision`,
-                    payload: {
-                        top_root_deck: String(deckId),
-                    },
-                    headers: {
-                        '----jwt----': authToken,
-                    },
-                }).then((response) => {
-                    if (response.statusCode !== 200) {
-                        throw new Error(`could not create deck revision:\n\t${response.payload}`);
-                    }
+            context('and we create a new revision of the root deck', () => {
+                before(() => {
+                    return server.inject({
+                        method: 'POST',
+                        url: `/deck/${deckId}/revision`,
+                        payload: {
+                            top_root_deck: String(deckId),
+                        },
+                        headers: {
+                            '----jwt----': authToken,
+                        },
+                    }).then((response) => {
+                        if (response.statusCode !== 200) {
+                            throw new Error(`could not create deck revision:\n\t${response.payload}`);
+                        }
+                    });
                 });
-            });
 
-            it('usage of subdeck should be updated with new revision (DB)', () => {
-                return server.inject({
-                    method: 'GET',
-                    url: `/deck/${subdeckId}`,
-                }).then((response) => {
-                    response.statusCode.should.equal(200);
+                it('usage of subdeck should be updated with new revision (DB)', () => {
+                    return server.inject({
+                        method: 'GET',
+                        url: `/deck/${subdeckId}`,
+                    }).then((response) => {
+                        response.statusCode.should.equal(200);
 
-                    let payload = JSON.parse(response.payload);
-                    payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
-                        { id: deckId, revision: 1 },
-                    ]);
-                    payload.should.have.nested.property('revisions.1.usage').that.has.deep.members([
-                        { id: deckId, revision: 2 },
-                    ]);
+                        let payload = JSON.parse(response.payload);
+                        payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
+                            { id: deckId, revision: 1 },
+                        ]);
+                        payload.should.have.nested.property('revisions.1.usage').that.has.deep.members([
+                            { id: deckId, revision: 2 },
+                        ]);
+                    });
                 });
-            });
 
-            it('usage of subdeck should be updated with new revision (API)', () => {
-                return server.inject({
-                    method: 'GET',
-                    url: `/deck/${subdeckId}/usage`,
-                }).then((response) => {
-                    response.statusCode.should.equal(200);
+                it('usage of subdeck should be updated with new revision (API)', () => {
+                    return server.inject({
+                        method: 'GET',
+                        url: `/deck/${subdeckId}/usage`,
+                    }).then((response) => {
+                        response.statusCode.should.equal(200);
 
-                    let payload = JSON.parse(response.payload);
-                    payload.should.deep.have.members([
-                        { id: deckId, revision: 1, theme: 'sky', using: 1 },
-                        { id: deckId, revision: 2, theme: 'sky', using: 2 },
-                    ]);
+                        let payload = JSON.parse(response.payload);
+                        payload.should.deep.have.members([
+                            { id: deckId, revision: 1, theme: 'sky', using: 1 },
+                            { id: deckId, revision: 2, theme: 'sky', using: 2 },
+                        ]);
+                    });
                 });
-            });
 
-            it('deep usage of sub-subdeck should have been updated to include only the latest revisions', () => {
-                return server.inject({
-                    method: 'GET',
-                    url: `/deck/${parseInt(subsubdeckId)}/deepUsage`,
-                }).then((response) => {
-                    response.statusCode.should.equal(200);
+                it('deep usage of sub-subdeck should have been updated to include only the latest revisions', () => {
+                    return server.inject({
+                        method: 'GET',
+                        url: `/deck/${parseInt(subsubdeckId)}/deepUsage`,
+                    }).then((response) => {
+                        response.statusCode.should.equal(200);
 
-                    let payload = JSON.parse(response.payload);
-                    payload.should.have.deep.members([
-                        { id: deckId, revision: 2, theme: 'sky', using: 2 },
-                        { id: subdeckId, revision: 2, theme: 'sky', using: 2 },
-                    ]);
+                        let payload = JSON.parse(response.payload);
+                        payload.should.have.deep.members([
+                            { id: deckId, revision: 2, theme: 'sky', using: 2 },
+                            { id: subdeckId, revision: 2, theme: 'sky', using: 2 },
+                        ]);
+                    });
                 });
-            });
 
-            it('root deck of sub-subdeck should be at the same revision as the revision we created', () => {
-                return server.inject({
-                    method: 'GET',
-                    url: `/deck/${parseInt(subsubdeckId)}/rootDecks`,
-                }).then((response) => {
-                    response.statusCode.should.equal(200);
+                it('root deck of sub-subdeck should be at the same revision as the revision we created', () => {
+                    return server.inject({
+                        method: 'GET',
+                        url: `/deck/${parseInt(subsubdeckId)}/rootDecks`,
+                    }).then((response) => {
+                        response.statusCode.should.equal(200);
 
-                    let payload = JSON.parse(response.payload);
-                    payload.should.have.deep.members([
-                        { id: deckId, revision: 2, hidden: false, using: 2 },
-                    ]);
+                        let payload = JSON.parse(response.payload);
+                        payload.should.have.deep.members([
+                            { id: deckId, revision: 2, hidden: false, using: 2 },
+                        ]);
+                    });
                 });
+
             });
 
         });
