@@ -716,7 +716,12 @@ let self = module.exports = {
             if (!_.isEmpty(variantFilter)) {
                 let existingVariant = _.find(deckRevision.variants, variantFilter);
                 if (!existingVariant) {
-                    throw boom.badData(`missing deck translation for language ${variantFilter.language} in deck ${deck_id}`);
+                    // try to match the revision!
+                    existingVariant = _.find([deckRevision], variantFilter);
+                    if (!existingVariant) {
+                        throw boom.badData(`missing deck variant for ${Object.entries(variantFilter)} in deck ${deck_id}`);
+                    }
+                    // the existingVariant is the same object as the deckRevision by now
                 }
                 existingVariant.title = newName;
             } else {

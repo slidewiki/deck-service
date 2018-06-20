@@ -644,7 +644,8 @@ let self = module.exports = {
             slideVariant = _.find(slideNode.variants, variantFilter);
 
             // if still not there, add it
-            if (!slideVariant) {
+            // but also check if the filter matches the primary slide properties!!!
+            if (!slideVariant && !_.find([slideNode.slide], variantFilter) ) {
                 // creates and adds a brand new slide variant
                 return self.addSlideNodeVariant(slideNode, payload, userId);
             }
