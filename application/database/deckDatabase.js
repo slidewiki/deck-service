@@ -134,8 +134,8 @@ let self = module.exports = {
                 // check if variant language exists
                 let variantData = _.find(deckRevision.variants, variantFilter);
                 if (variantData) {
-                    // remove the variantData from variants
-                    _.remove(deckRevision.variants, variantFilter);
+                    // TODO remove the variantData from variants ???
+                    // _.remove(deckRevision.variants, variantFilter);
 
                     // put the original (non-variant) data in a separate object here
                     let originalData = _.pick(deckRevision, Object.keys(variantData));
@@ -145,11 +145,6 @@ let self = module.exports = {
                     // replace variant data in result object (but only if assigned already in variantData)
                     // found variant data, we need to first 
                     _.merge(deckRevision, variantData);
-                } else {
-                    // TODO if not found, and specific revision WAS requested, we return error (do we have to ????)
-                    if (revisionId) {
-                        throw boom.badData(`missing deck variant for ${Object.entries(variantFilter)} in deck ${identifier}`);
-                    } // else no worries
                 }
             }
         }

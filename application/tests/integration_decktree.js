@@ -297,10 +297,11 @@ describe('REST API deck tree', () => {
             { language: 'el-GR' },
         ]);
 
-        // read the deck tree
+        // read the deck tree, should include both original and translation
         response = await server.inject(`/decktree/${deckId}`);
         response.statusCode.should.equal(200);
         response.result.should.have.property('variants').that.has.deep.members([
+            { language: 'en-GB' },
             { language: 'el-GR' },
         ]);
     });
@@ -331,6 +332,7 @@ describe('REST API deck tree', () => {
         response.result.should.have.property('title', 'New deck');
         response.result.should.have.property('language', 'en-GB');
         response.result.should.have.property('variants').that.has.deep.members([
+            { language: 'en-GB', },
             { language: 'el-GR', title: 'Μια παρουσίαση στα ελληνικά' },
         ]);
 
@@ -341,6 +343,7 @@ describe('REST API deck tree', () => {
         response.result.should.have.property('language', 'el-GR');
         response.result.should.have.property('variants').that.has.deep.members([
             { language: 'en-GB', title: 'New deck', original: true },
+            { language: 'el-GR', title: 'Μια παρουσίαση στα ελληνικά' },
         ]);
 
         // read the translations of the subdeck
