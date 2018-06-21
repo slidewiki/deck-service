@@ -601,17 +601,25 @@ let self = module.exports = {
                 // language is treated differently now
                 let variantFilter = _.pick(deck, 'language');
                 if (!_.isEmpty(variantFilter) && variantFilter.language !== deckRevision.language) {
+                    // the data to update / add
+                    let variantData = _.pick(deck, [
+                        'title',
+                        'description',
+                    ]);
                     let variant = _.find(deckRevision.variants, variantFilter);
                     if (variant) {
-                        let variantData = _.pick(deck, [
-                            'title',
-                            'description',
-                        ]);
                         // update the data if present in payload
                         Object.assign(variant, variantData);
                     } else {
-                        throw boom.badData(`missing deck translation for language ${variantFilter.language} in deck ${id}`);
+                        // create a new variant!
+                        Object.assign(variantData, variantFilter);
+                        if (deckRevision.variants) {
+                            deckRevision.variants.push(variantData);
+                        } else {
+                            deckRevision.variants = [variantData];
+                        }
                     }
+
                 } else {
                     // language must never be provided in API when changing the deck with default language
                     deckRevision.title = deck.title;
@@ -714,7 +722,14 @@ let self = module.exports = {
                     // try to match the revision!
                     existingVariant = _.find([deckRevision], variantFilter);
                     if (!existingVariant) {
-                        throw boom.badData(`missing deck variant for ${Object.entries(variantFilter)} in deck ${deck_id}`);
+                        // ok, we can create it!!!!
+                        existingVariant = Object.assign({}, variantFilter);
+                        // make sure revision actually has variants!
+                        if (deckRevision.variants) {
+                            deckRevision.variants.push(existingVariant);
+                        } else {
+                            deckRevision.variants = [existingVariant];
+                        }
                     }
                     // the existingVariant is the same object as the deckRevision by now
                 }
