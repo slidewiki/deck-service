@@ -271,12 +271,10 @@ describe('REST API deck tree', () => {
             { language: 'el-GR' },
         ]);
 
-        // read the translations of the subdeck
+        // read the translations of the subdeck, should not have any new ones (no propagation)
         response = await server.inject(`/deck/${subdeckId}/translations`);
         response.statusCode.should.equal(200);
-        response.result.should.have.deep.members([
-            { language: 'el-GR' },
-        ]);
+        response.result.should.be.an('array').of.length(0);
 
         // read the deck tree, should include both original and translation
         response = await server.inject(`/decktree/${deckId}`);

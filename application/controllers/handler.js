@@ -566,9 +566,7 @@ let self = module.exports = {
 
             // reply new variant data on success
             return deckDB.addDeckVariant(deckId, request.payload, userId);
-        }).then((result) => {
-            reply(result);
-        }).catch((err) => {
+        }).then(reply).catch((err) => {
             if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());

@@ -2191,22 +2191,21 @@ let self = module.exports = {
         return deck.variants || [];
     },
 
-    addDeckVariant: async function(deckId, variantData, userId, rootId, parentOperations=[]) {
+    addDeckVariant: async function(deckId, variantData, userId, rootId) {
         let deck = await self.get(deckId);
         if (!deck) return;
 
         // always work with latest revision
         let [latestRevision] = deck.revisions.slice(-1);
         // ensure variants
-        if (!latestRevision.hasOwnProperty('variants')) {
+        if (latestRevision.variants) {
             latestRevision.variants = [];
         }
 
         // check against the deck language and the variants array
         // for now we only support language as variant definition
         let variantFilter = _.pick(variantData, 'language');
-        let existingVariant = _.find(latestRevision.variants, variantFilter);
-        if (existingVariant || latestRevision.language === variantFilter.language) {
+        if (latestRevision.language === variantFilter.language || _.find(latestRevision.variants, variantFilter)) {
             throw boom.badData(`deck variant for ${Object.entries(variantFilter)} already exists for deck ${deckId}`);
         }
 
@@ -2219,16 +2218,13 @@ let self = module.exports = {
         latestRevision.variants.push(variantData);
 
         let decks = await helper.getCollection('decks');
-        // changed the latestRevision object which is still referenced by the deck object, so saving the deck object will work
-        await decks.save(deck);
+        await decks.findOneAndUpdate(
+            { _id: deck._id, 'revisions.id': latestRevision.id },
+            { $set: { 'revisions.$.variants': latestRevision.variants } }
+        );
 
-        // this returns the operations that will be propagate to subdecks
-        let deckChanges = await deckTracker.applyChangeLog();
-
-        // need to apply this recursively as well !!!
-        for (let subdeck of _.filter(latestRevision.contentItems, { kind: 'deck' }) ) {
-            await self.addDeckVariant(subdeck.ref.id, variantData, userId, rootId, parentOperations.concat(deckChanges));
-        }
+        // wait before responding
+        await deckTracker.applyChangeLog();
 
         // respond with provided variant data on success
         return variantData;
