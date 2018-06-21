@@ -32,7 +32,7 @@ const self = module.exports = {
             language: deck.language,
             theme: deck.theme,
             allowMarkdown: deck.allowMarkdown,
-            variants: deck.variants,
+            variants: deck.variants || [],
             children: [],
         };
 
@@ -59,11 +59,34 @@ const self = module.exports = {
                     allowMarkdown: deck.allowMarkdown,
                 });
 
+                // we collect language from slides as well as subdecks
+                let variantSpec = _.pick(slide, 'language');
+                if (!_.find(deckTree.variants, variantSpec) ) {
+                    deckTree.variants.push(variantSpec);
+                }
+
             } else {
                 // it's a deck
                 let innerTree = await self.getDeckTree(itemId, variantFilter);
                 deckTree.children.push(innerTree);
+
+                // we also want to merge the variants information into the current node
+                innerTree.variants.forEach((child) => {
+                    // we only need the variant info from children (e.g. language)
+                    // so no title or description or original (?)
+                    let childVariant = _.omit(child, 'title', 'description', 'original');
+                    // we skip stuff we already have, or stuff the deck tree node mathches (language)
+                    if (!_.find([deckTree], childVariant) && !_.find(deckTree.variants, childVariant) ) {
+                        deckTree.variants.push(childVariant);
+                    }
+                });
             }
+        }
+
+        // we also push the current deck language
+        let selfVariant = _.pick(deckTree, 'language');
+        if (!_.find(deckTree.variants, selfVariant) ) {
+            deckTree.variants.push(selfVariant);
         }
 
         return deckTree;

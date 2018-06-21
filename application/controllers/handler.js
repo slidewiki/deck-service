@@ -405,9 +405,22 @@ let self = module.exports = {
             let [defaultRevision] = deck.revisions.slice(-1);
             deck.language = defaultRevision.language;
 
-            // add first slide id-revision for all revisions
             deck.revisions.forEach((rev) => {
+                // add first slide id-revision for all revisions
                 rev.firstSlide = deckDB.getFirstSlide(rev);
+
+                if (_.isEmpty(variantFilter)) {
+                    // add the primary language in the variants for completeness of the list
+                    let originalData = Object.assign({
+                        original: true,
+                    }, _.pick(rev, 'language', 'title', 'language'));
+                    if (rev.variants) {
+                        rev.variants.unshift(originalData);
+                    } else {
+                        rev.variants = [originalData];
+                    }
+                }
+
             });
 
             return deck;
@@ -547,12 +560,14 @@ let self = module.exports = {
     },
 
     getDeckVariants: function(request, reply){
-        deckDB.getDeckVariants(request.params.id).then((variants) => {
-            if (!variants) return reply(boom.notFound());
-            reply(variants);
-        }).catch((error) => {
-            request.log('error', error);
-            reply(boom.badImplementation());
+        // reuse another handler
+        self.getDeck(request, (deck) => {
+            // reply error if returned
+            if (deck.isBoom) return reply(deck);
+
+            // if revisions more than one, pick the last one
+            let [deckRevision] = deck.revisions.slice(-1);
+            reply(deckRevision.variants || []);
         });
     },
 
