@@ -830,22 +830,6 @@ const self = module.exports = {
         // get the content item to insert
         let newContentItem = { ref: { id: newDeck._id, revision: 1 }, kind: 'deck' };
 
-        // we also add to the subdeck the same variants as the parent deck
-        // for now, only language is variant specifier
-        let targetVariants = (parentDeck.variants || []).map((v) => _.pick(v, 'language'));
-        if (!_.isEmpty(targetVariants)) {
-            newDeck.variants = targetVariants;
-
-            // also save the variants
-            let decks = await helper.getCollection('decks');
-            await decks.findOneAndUpdate(
-                { _id: newContentItem.ref.id, 'revisions.id': newContentItem.ref.revision },
-                { $set: {
-                    'revisions.$.variants': targetVariants,
-                } }
-            );
-        }
-
         // omitting the rootDeckId in the call to insertContentItem means this change won't be tracked,
         // as it will be tracked right after this code, we just need to attach now
         // first so that the rest of the tracking will work
