@@ -105,19 +105,9 @@ let self = module.exports = {
         let found = await col.findOne({ _id: deckId });
         if (!found) return;
 
-        // add some extra revision metadata
-        let [latestRevision] = found.revisions.slice(-1);
-        found.latestRevisionId = latestRevision.id;
-
-        if (!revisionId) {
-            // this is the requested revision, if not set it is the 'active' revision
-            found.revisionId = found.active;
-        } else {
-            // this is the requested revision
-            found.revisionId = revisionId;
-
+        if (revisionId) {
             let revision = _.find(found.revisions, { id: revisionId });
-            if (!revision) return;
+            if (!revision) return; // not found!
 
             // include only requested
             found.revisions = [revision];
@@ -1732,50 +1722,47 @@ let self = module.exports = {
     },
 
     // return the set of users and groups with write access to the deck
-    getDeckUsersGroups(deck, deckId) {
-        // TODO change this
-        // deck is optional, so if deckId is missing, `deck` holds the actual deckId
-        if (deckId === undefined) {
-            deckId = deck;
-
-            return self.get(deckId)
-            .then((deck) => self.getDeckUsersGroups(deck, deckId));
+    async getDeckUsersGroups(deckOrId) {
+        let deck;
+        if (typeof deckOrId !== 'object') {
+            // it's an id
+            deck = await self.getDeck(deckOrId);
+        } else {
+            // it's the deck
+            deck = deckOrId;
         }
+        if (!deck) return; // not found
 
         let accessLevel = deck.accessLevel || 'public';
 
         if (accessLevel === 'private') {
-            return Promise.resolve({
+            return {
                 users: [deck.user],
                 groups: [],
-            });
+            };
 
         } else {
 
-            // this way we always return a Promise and handle returns/throws correctly
-            return Promise.resolve().then(() => {
-                if (accessLevel === 'public' || accessLevel === 'restricted') {
-                    // we now read the editors property of the deck, providing some defaults
-                    let users = [], groups = [];
-                    if (deck.editors) {
-                        if (deck.editors.users) {
-                            users = deck.editors.users;
-                        }
-                        if (deck.editors.groups) {
-                            groups = deck.editors.groups;
-                        }
+            if (accessLevel === 'public' || accessLevel === 'restricted') {
+                // we now read the editors property of the deck, providing some defaults
+                let users = [], groups = [];
+                if (deck.editors) {
+                    if (deck.editors.users) {
+                        users = deck.editors.users;
                     }
-
-                    return {
-                        users: users.map((u) => u.id),
-                        groups: groups.map((g) => g.id),
-                    };
-
-                } else {
-                    throw new Error(`Unexpected accessLevel: ${accessLevel}`);
+                    if (deck.editors.groups) {
+                        groups = deck.editors.groups;
+                    }
                 }
 
-            });
+                return {
+                    users: users.map((u) => u.id),
+                    groups: groups.map((g) => g.id),
+                };
+
+            } else {
+                throw new Error(`Unexpected accessLevel: ${accessLevel}`);
+            }
 
         }
 
@@ -2198,7 +2185,7 @@ let self = module.exports = {
         // always work with latest revision
         let [latestRevision] = deck.revisions.slice(-1);
         // ensure variants
-        if (latestRevision.variants) {
+        if (!latestRevision.variants) {
             latestRevision.variants = [];
         }
 
@@ -2212,7 +2199,7 @@ let self = module.exports = {
         // start tracking here
         // if missing, the deck is the root
         rootId = rootId || deckId;
-        let deckTracker = ChangeLog.deckTracker(deck, rootId, userId, parentOperations);
+        let deckTracker = ChangeLog.deckTracker(deck, rootId, userId);
 
         // here deck changes
         latestRevision.variants.push(variantData);
@@ -2549,48 +2536,46 @@ let self = module.exports = {
     },
 
     // computes all deck permissions the user has been granted
-    userPermissions(deckId, userId) {
+    async userPermissions(deckId, userId) {
         userId = parseInt(userId);
-        return self.get(deckId)
-        .then((deck) => {
-            if (!deck) return;
+        let deck = await self.getDeck(deckId);
 
-            // return {readOnly: true} if requesting any revision other than the latest
-            // depending on `deckId` format, the deck may include just the requested revision or all of them
-            let readOnly = (deck.revisionId !== deck.latestRevisionId);
+        if (!deck) return;
 
-            if (deck.user === userId) {
-                // deck owner, return all
-                return { fork: true, edit: true, admin: true, readOnly };
+        // return {readOnly: true} if requesting any revision other than the latest
+        let readOnly = (deck.revision !== deck.latestRevision);
+        if (deck.user === userId) {
+            // deck owner, return all
+            return { fork: true, edit: true, admin: true, readOnly };
+        }
+
+        let canFork = !deck.hidden;
+        let editors = await self.getDeckUsersGroups(deck);
+
+        if (editors.users.includes(userId)) {
+            // user is an editor
+            return { fork: canFork, edit: true, admin: false, readOnly };
+        } else {
+            // we also need to check if the groups allowed to edit the deck include the user
+            let groupsUsers;
+            try {
+                groupsUsers = await userService.fetchUsersForGroups(editors.groups);
+            } catch (err) {
+                console.warn(`could not fetch usergroup info from service: ${err.message}`);
+                // we're not sure, let's just not allow this user
+                return { fork: canFork, edit: false, admin: false, readOnly };
             }
 
-            let canFork = !deck.hidden;
-            return self.getDeckUsersGroups(deck, deckId)
-            .then((editors) => {
-                if (editors.users.includes(userId)) {
-                    // user is an editor
-                    return { fork: canFork, edit: true, admin: false, readOnly };
-                } else {
-                    // we also need to check if the groups allowed to edit the deck include the user
-                    return userService.fetchUsersForGroups(editors.groups).then((groupsUsers) => {
+            if (groupsUsers.includes(userId)) {
+                // user is an editor
+                return { fork: canFork, edit: true, admin: false, readOnly };
+            } else {
+                // user is not an editor or owner
+                // also return if user can fork the deck (e.g. if it's public)
+                return { fork: canFork, edit: false, admin: false, readOnly };
+            }
 
-                        if (groupsUsers.includes(userId)) {
-                            // user is an editor
-                            return { fork: canFork, edit: true, admin: false, readOnly };
-                        } else {
-                            // user is not an editor or owner
-                            // also return if user can fork the deck (e.g. if it's public)
-                            return { fork: canFork, edit: false, admin: false, readOnly };
-                        }
-
-                    }).catch((err) => {
-                        console.warn(`could not fetch usergroup info from service: ${err.message}`);
-                        // we're not sure, let's just not allow this user
-                        return { fork: canFork, edit: false, admin: false, readOnly };
-                    });
-                }
-            });
-        });
+        }
 
     },
 
@@ -2980,22 +2965,20 @@ let self = module.exports = {
 
     // DEPRECATED
     getEnrichedDeckTree: function(deckId, onlyDecks=false, path=[]){
-        return self.get(deckId).then( (deck) => {
+        return self.getDeck(deckId).then( (deck) => {
             if(!deck) return;
 
-            // if no revision is specidied, then use the active
-            let identifier = util.parseIdentifier(deckId);
-            identifier.revision = (identifier.revision) ? identifier.revision : deck.revisionId;
-            deckId = util.toIdentifier(identifier);
+            // make deckId canonical
+            deckId = util.toIdentifier(deck);
 
             return self.getRevision(deckId).then( (revision) => {
 
-                path.push({id: deck._id, revision: deck.revisionId, hidden: deck.hidden});
+                path.push({id: deck._id, revision: deck.revision, hidden: deck.hidden});
 
                 let decktree = {
                     id: deck._id, 
-                    revisionId: deck.revisionId, 
-                    latestRevisionId: deck.latestRevisionId, 
+                    revisionId: deck.revision, 
+                    latestRevisionId: deck.latestRevision, 
                     type: 'deck',
                     title: revision.title, 
                     description: deck.description, 

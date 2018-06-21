@@ -405,6 +405,18 @@ let self = module.exports = {
             let [defaultRevision] = deck.revisions.slice(-1);
             deck.language = defaultRevision.language;
 
+            // add some deprecated names for revision, latestRevision
+            let deckRef = util.parseIdentifier(deckId);
+            if (deckRef.revision) {
+                deck.revisionId = deck.revision;
+                // TODO remove this, not really latest
+                deck.latestRevisionId = defaultRevision.id;
+            } else {
+                // default to active (?)
+                deck.revisionId = deck.active;
+                deck.latestRevisionId = defaultRevision.id;
+            }
+
             // add first slide id-revision for all revisions
             deck.revisions.forEach((rev) => {
                 rev.firstSlide = deckDB.getFirstSlide(rev);
