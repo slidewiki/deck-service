@@ -769,16 +769,9 @@ const self = module.exports = {
         // get the new deck we are going to attach
         let newContentItem = { ref: util.parseIdentifier(forkResult.root_deck), kind: 'deck' };
 
-        // before attaching, we need to merge the parent deck variants into the child deck variants
-        // we also need to update the child language to match the parents' (????)
-        // because the child deck may have subdecks, this needs to be done recursively
+        // normalize the target deck id
         let targetDeck = await deckDB.getDeck(targetId);
-        // normalize the id
         targetId = util.toIdentifier(targetDeck);
-
-        // we need to keep only what we support as variant filter, which is language only
-        let targetVariants = (targetDeck.variants || []).map((v) => _.pick(v, 'language'));
-        await mergeDeckVariants(newContentItem.ref.id, targetVariants, _.pick(targetDeck, 'language'), userId);
 
         // omitting the rootDeckId in the call to insertContentItem means this change won't be tracked,
         // as it will be tracked right after this code, we just need to attach now
@@ -872,115 +865,6 @@ const self = module.exports = {
     },
 
 };
-
-// adds all the variants to the deck deckId and its subdecks, if missing
-// also sets the relevant deck properties to the values specified in defaults
-// defaults should never be included in new variants to merge
-async function mergeDeckVariants(deckId, variants, defaults, userId) {
-    let deck = await deckDB.get(deckId);
-
-    // always work with latest revision
-    let [latestRevision] = deck.revisions.slice(-1);
-    // ensure variants
-    if (!latestRevision.hasOwnProperty('variants')) {
-        latestRevision.variants = [];
-    }
-
-    // merge variants provided into deck variants
-    for (let variant of variants) {
-        let existingVariant = _.find(latestRevision.variants, variant);
-        if (!existingVariant) {
-            latestRevision.variants.push(variant);
-        }
-    }
-
-    // remove the defaults from the deck variants if there
-    // check if defaults is in variants and remove it
-    let existingDefaults = _.find(latestRevision.variants, defaults);
-    _.remove(latestRevision.variants, defaults);
-
-    // assign the defaults: language is the only one supported for now
-    if (defaults.language !== latestRevision.language) {
-        // add the current language of the deck to the variants array
-        let oldVariantData = _.pick(latestRevision, 'language', 'title', 'description');
-        let existingVariant = _.find(latestRevision.variants, _.pick(oldVariantData, 'language'));
-        if (existingVariant) {
-            // update with values from latestRevision as we are changing the language
-            Object.assign(existingVariant, oldVariantData);
-        } else {
-            // push all variant data into variants array
-            latestRevision.variants.push(oldVariantData);
-        }
-
-        // we also need to rearrange the variants in the slide nodes
-        for (let item of _.filter(latestRevision.contentItems, { kind: 'slide' }) ) {
-            // generate a variant object from the primary slide and the current revision language
-            let primaryAsVariant = Object.assign(
-                _.pick(item.ref, 'id', 'revision'),
-                _.pick(latestRevision, 'language')
-            );
-
-            // find the variant that will become primary
-            let slideVariant = _.find(item.variants, defaults);
-            if (slideVariant) {
-                // remove it!
-                _.remove(item.variants, defaults);
-            } else {
-                // if it doesn't exist, we need to make a copy of the current primary
-                let primarySlide = await slideDB.getSlideRevision(util.toIdentifier(primaryAsVariant));
-                // and set its language to the new language
-                Object.assign(primarySlide, defaults, {
-                    // also record the copy origin
-                    parent_slide: _.pick(primarySlide, 'id', 'revision'),
-                });
-
-                let copy = await slideDB.insert(primarySlide, userId);
-                slideVariant = Object.assign({
-                    id: copy._id,
-                    revision: 1, // brand new!
-                }, defaults);
-            }
-
-            // simply replace primary with data from the slide variant
-            Object.assign(item, {
-                ref: _.pick(slideVariant, 'id', 'revision'),
-            });
-
-            // and push the primary in the variants
-            if (!item.variants) item.variants = [];
-            item.variants.push(primaryAsVariant);
-        }
-
-        // if defaults was in variants, update the variant data (title, description)
-        if (existingDefaults) {
-            Object.assign(latestRevision, existingDefaults);
-        }
-
-        // finally, change the language!
-        latestRevision.language = defaults.language;
-    }
-
-    let decks = await helper.getCollection('decks');
-    // put the changed revision object
-    await decks.findOneAndUpdate(
-        { _id: deck._id, 'revisions.id': latestRevision.id },
-        { $set: {
-            'revisions.$': latestRevision,
-        } }
-    );
-
-    // need to apply this recursively as well !!!
-    // current deck is synced. let's sync its children as well
-
-    // we need to keep only what we support as variant filter, which is language only
-    let newVariants = latestRevision.variants.map((v) => _.pick(v, 'language'));
-    for (let subdeck of _.filter(latestRevision.contentItems, { kind: 'deck' }) ) {
-        await mergeDeckVariants(subdeck.ref.id, newVariants, defaults);
-    }
-
-    // respond with merged variants on success
-    return latestRevision.variants;
-}
 
 async function exportSlide(slideId) {
     let slide = await slideDB.getSlideRevision(slideId);

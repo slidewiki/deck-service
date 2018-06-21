@@ -830,33 +830,8 @@ let self = module.exports = {
     },
 
     copySlideNode: async function(rootId, slideId, newParentId, userId) {
-        let parentDeck = await deckDB.getDeck(newParentId);
         let slideNode = await self.findSlideNode(rootId, slideId);
         // slideNode includes data for the original slide, and references for variants
-
-        // since we're copying for attach, we need to match the node variants to the parent's
-        let parentDefaults = _.pick(parentDeck, 'language');
-        if (slideNode.slide.language !== parentDeck.language) {
-            // primaries differ, let's rearrange the slide node
-
-            // generate a variant object from the primary slide and its language
-            let primaryAsVariant = _.pick(slideNode.slide, 'id', 'revision', 'language');
-
-            // find the variant that will become primary
-            let newPrimary = _.find(slideNode.variants, parentDefaults);
-            if (newPrimary) {
-                // remove it!
-                _.remove(slideNode.variants, parentDefaults);
-            } else {
-                // if it doesn't exist, we need to override its language
-                // so that its copy later on will have the correct one
-                Object.assign(slideNode.slide, parentDefaults);
-            }
-
-            // push the primary in the variants
-            if (!slideNode.variants) slideNode.variants = [];
-            slideNode.variants.push(primaryAsVariant);
-        }
 
         // let's copy the primary slide of the node
         let duplicate = await self.copy(slideNode.slide, newParentId, userId);

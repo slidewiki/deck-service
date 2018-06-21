@@ -76,7 +76,7 @@ describe('REST API attach', () => {
         });
 
         context('and we attach some other deck to the deck', () => {
-            let otherDeckId, otherSlides, attachedDeckId;
+            let otherDeckId, attachedDeckId;
             before(async () => {
                 let response = await server.inject({
                     method: 'POST',
@@ -129,16 +129,6 @@ describe('REST API attach', () => {
                     throw new Error(`could not create the other deck:\n\t${response.payload}`);
                 }
 
-                // and get the slide refs
-                response = await server.inject({
-                    method: 'GET',
-                    url: '/deck/' + otherDeckId,
-                });
-                if (response.statusCode !== 200) {
-                    throw new Error(`could not get the other deck:\n\t${response.payload}`);
-                }
-                otherSlides = JSON.parse(response.payload).revisions[0].contentItems.map((i) => i.ref);
-
                 // attach the deck
                 response = await server.inject({
                     method: 'POST',
@@ -163,77 +153,65 @@ describe('REST API attach', () => {
                 attachedDeckId = JSON.parse(response.payload).id;
             });
 
-            it('the parent should have the attached deck language as one of its translations', async () => {
-                // read the parent translations
+            it('the parent deck tree should include the attached deck languages as translations', async () => {
+                // read the parent deck tree
                 let response = await server.inject({
                     method: 'GET',
-                    url: `/deck/${deckId}/translations`,
+                    url: `/decktree/${deckId}`,
                 });
                 response.should.have.property('statusCode', 200);
 
-                response.result.should.have.deep.members([
-                    { language: 'el-GR' },
+                response.result.should.have.property('variants').that.includes.deep.members([
                     { language: 'fr-FR' },
-                ]);
-
-                // read the attached language
-                response = await server.inject({
-                    method: 'GET',
-                    url: `/deck/${attachedDeckId}`,
-                });
-                response.should.have.property('statusCode', 200);
-                response.result.should.have.nested.property('revisions.0.language', 'en-GB');
-                response.result.should.have.nested.property('revisions.0.title', 'Un deck');
-
-                // read the attached translations
-                response = await server.inject({
-                    method: 'GET',
-                    url: `/deck/${attachedDeckId}/translations`,
-                });
-                response.should.have.property('statusCode', 200);
-
-                response.result.should.have.deep.members([
                     { language: 'de-DE' },
-                    { language: 'el-GR' },
-                    { language: 'fr-FR', title: 'Un deck' },
                 ]);
 
             });
 
-            it('the slides of the attached deck should be variant nodes in parent', async() => {
-                for (let slide of otherSlides) {
-                    let response = await server.inject(`/decktree/node/translations?${qs.stringify({
-                        id: deckId,
-                        stype: 'slide',
-                        sid: `${slide.id}-${slide.revision}`,
-                    })}`);
-                    response.statusCode.should.equal(200);
-                    response.result.should.have.deep.members([
-                        { id: slide.id, revision: slide.revision, language: 'fr-FR' }
-                    ]);
-                }
-            });
-
-            it('the slides of the attached deck should have been copied to become primary slides in the parent deck', async() => {
-                let response = await server.inject(`/decktree/${attachedDeckId}`);
-                response.statusCode.should.equal(200);
-
-                response.result.should.have.property('children').that.is.an('array').of.length(2);
-
-                for (let node of response.result.children) {
-                    // fetch the slide data
-                    let response = await server.inject(`/slide/${node.id}`);
-                    response.statusCode.should.equal(200);
-                    response.result.should.have.property('language', 'en-GB');
-                    otherSlides.should.deep.include(_.pick(response.result.revisions[0].parent, 'id', 'revision'));
-                }
-
-            });
-
-            context('and we attach directly two other slides', () => {
-                let attachedSlideIds;
+            context('and we attach directly two slides from some deck with a language not in deck translations', () => {
+                let attachedSlideIds, otherSlides;
                 before(async () => {
+                    // create a deck in some language
                     let response = await server.inject({
+                        method: 'POST',
+                        url: '/deck/new',
+                        payload: {
+                            title: 'Una deca',
+                            language: 'es-ES',
+                        },
+                        headers: {
+                            '----jwt----': authToken,
+                        },
+                    });
+                    response.should.have.property('statusCode', 200);
+                    let spanishDeckId = response.result.id;
+
+                    // add another slide there
+                    response = await server.inject({
+                        method: 'POST',
+                        url: '/decktree/node/create',
+                        payload: {
+                            selector: {
+                                id: String(spanishDeckId),
+                                spath: '',
+                            },
+                            nodeSpec: {
+                                type: 'slide',
+                            },
+                        },
+                        headers: {
+                            '----jwt----': authToken,
+                        },
+                    });
+                    response.should.have.property('statusCode', 200);
+
+                    // and get the slide refs
+                    response = await server.inject(`/deck/${spanishDeckId}`);
+                    response.should.have.property('statusCode', 200);
+
+                    otherSlides = response.result.revisions[0].contentItems.map((i) => i.ref);
+
+                    response = await server.inject({
                         method: 'POST',
                         url: '/decktree/node/create',
                         payload: {
@@ -244,46 +222,26 @@ describe('REST API attach', () => {
                             nodeSpec: otherSlides.map((slide) => ({
                                 id: `${slide.id}-${slide.revision}`,
                                 type: 'slide',
-                                root: String(otherDeckId),
+                                root: String(spanishDeckId),
                             })),
                         },
                         headers: {
                             '----jwt----': authToken,
                         },
                     });
-                    if (response.statusCode !== 200) {
-                        throw new Error(`could not attach the other slides:\n\t${response.payload}`);
-                    }
+                    response.should.have.property('statusCode', 200);
+
                     attachedSlideIds = response.result.map((e) => e.id);
                 });
 
-                it('the slides as they were attached should have the same language as in the parent deck', async () => {
-                    for (let slideId of attachedSlideIds) {
-                        let response = await server.inject(`/slide/${slideId}`);
-                        response.statusCode.should.equal(200);
-                        response.result.should.have.property('language', 'en-GB');
+                it('the deck tree should also include the new language in its translations', async () => {
+                    let response = await server.inject(`/decktree/${deckId}`);
+                    response.statusCode.should.equal(200);
 
-                        otherSlides.should.deep.include(_.pick(response.result.revisions[0].parent, 'id', 'revision'));
-                    }
-                });
+                    response.result.should.have.property('variants').that.includes.deep.members([
+                        { language: 'es-ES' },
+                    ]);
 
-                it('the slide nodes of the attached decks should have variants in the origin language that are copies of the original slides', async () => {
-                    for (let slideId of attachedSlideIds) {
-                        let response = await server.inject(`/decktree/node/translations?${qs.stringify({
-                            id: deckId,
-                            stype: 'slide',
-                            sid: slideId,
-                        })}`);
-                        response.statusCode.should.equal(200);
-
-                        response.result.should.be.an('array').of.length(1);
-                        response.result[0].should.have.property('language', 'fr-FR');
-                        
-                        response = await server.inject(`/slide/${response.result[0].id}-${response.result[0].revision}`);
-                        response.statusCode.should.equal(200);
-
-                        otherSlides.should.deep.include(_.pick(response.result.revisions[0].parent, 'id', 'revision'));
-                    }
                 });
 
             });
