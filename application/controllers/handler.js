@@ -408,7 +408,7 @@ let self = module.exports = {
             // add some deprecated names for revision, latestRevision
             let deckRef = util.parseIdentifier(deckId);
             if (deckRef.revision) {
-                deck.revisionId = deck.revision;
+                deck.revisionId = defaultRevision.id;
                 // TODO remove this, not really latest
                 deck.latestRevisionId = defaultRevision.id;
             } else {

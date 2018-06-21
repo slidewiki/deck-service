@@ -26,6 +26,9 @@ const apiModels = {};
 apiModels.tag = require('./models/JoiModels/tag');
 apiModels.group = require('./models/JoiModels/group');
 
+// TODO fixup language codes
+const languageModel = Joi.string().regex(/[a-z]{2}([_-][A-Z]{2})?/);
+
 module.exports = function(server) {
 
     //------------------------------- deck routes -----------------------------//
@@ -117,7 +120,7 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 query: {
-                    language: Joi.string().empty(''),
+                    language: languageModel.empty(''),
                 },
             },
             tags: ['api'],
@@ -150,7 +153,7 @@ module.exports = function(server) {
                     id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
-                    language: Joi.string().empty(''),
+                    language: languageModel.empty(''),
                 },
             },
             tags: ['api'],
@@ -309,7 +312,7 @@ module.exports = function(server) {
             validate: {
                 payload: Joi.object().keys({
                     description: Joi.string().allow('').default(''),
-                    language: Joi.string().default('en-GB'),
+                    language: languageModel.default('en-GB'),
                     translation: Joi.object().keys({
                         status: Joi.string().valid('original', 'google', 'revised')
                     }),
@@ -365,7 +368,7 @@ module.exports = function(server) {
                 },
                 payload: Joi.object().keys({
                     description: Joi.string().allow('').default(''),
-                    language: Joi.string(),
+                    language: languageModel,
                     translation: Joi.string().alphanum().lowercase(),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
@@ -474,7 +477,7 @@ module.exports = function(server) {
                     id: Joi.number().integer().description('The deck id (without revision)'),
                 },
                 payload: {
-                    language: Joi.string().required(),
+                    language: languageModel.required(),
                 },
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -573,7 +576,7 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 query: {
-                    language: Joi.string().empty(''),
+                    language: languageModel.empty(''),
                     limit: Joi.string().optional(),
                     offset: Joi.string().optional(),
                     countOnly: Joi.boolean().truthy('1').falsy('0', ''),
@@ -604,7 +607,7 @@ module.exports = function(server) {
                         revision: Joi.string().alphanum().lowercase()
                     }),
                     position: Joi.string().alphanum().lowercase().min(0),
-                    language: Joi.string(),
+                    language: languageModel,
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
@@ -649,7 +652,7 @@ module.exports = function(server) {
                     description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     position: Joi.string().alphanum().lowercase().min(0),
-                    language: Joi.string(),
+                    language: languageModel,
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     dimensions: slideDimensions,
                     dataSources: Joi.array().items(Joi.object().keys({
@@ -735,7 +738,7 @@ module.exports = function(server) {
                     id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
-                    language: Joi.string().empty(''),
+                    language: languageModel.empty(''),
                     countOnly: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
@@ -819,7 +822,7 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 query: {
-                    language: Joi.string().empty(''),
+                    language: languageModel.empty(''),
                     enrich: Joi.boolean().truthy('1').falsy('0', ''),
                 }
             },
@@ -870,7 +873,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 payload: Joi.object().keys({
-                    language: Joi.string(),
+                    language: languageModel,
                     selector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
                         spath: Joi.string().empty(''),
@@ -969,7 +972,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 payload: Joi.object().keys({
-                    language: Joi.string(),
+                    language: languageModel,
                     selector: Joi.object().keys({
                         id: Joi.string(),
                         spath: Joi.string().empty(''),
@@ -1289,7 +1292,7 @@ module.exports = function(server) {
                     id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
-                    language: Joi.string().empty(''),
+                    language: languageModel.empty(''),
                     simplify: Joi.boolean().truthy('1').falsy('0', ''),
                     raw: Joi.boolean().truthy('1').falsy('0', ''),
                 },
@@ -1310,7 +1313,7 @@ module.exports = function(server) {
                 },
                 query: {
                     root: Joi.string().description('Identifier of deck tree root in the form {id}-{revision}, revision is optional').required(),
-                    language: Joi.string().empty(''),
+                    language: languageModel.empty(''),
                     simplify: Joi.boolean().truthy('1').falsy('0', ''),
                     raw: Joi.boolean().truthy('1').falsy('0', ''),
                 },
