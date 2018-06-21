@@ -25,14 +25,14 @@ describe('REST API deck tree', () => {
     });
 
     let deckId, slideIds = [];
+    let originalTitle = 'The root for deck tree tests';
     it('should create a new deck', async () => {
-        let title = 'The root for deck tree tests';
         let theme = 'sky';
         let response = await server.inject({
             method: 'POST',
             url: '/deck/new',
             payload: {
-                title,
+                title: originalTitle,
                 theme,
                 language: 'en-GB',
                 first_slide: {
@@ -54,7 +54,7 @@ describe('REST API deck tree', () => {
         response.statusCode.should.equal(200);
         response.result.should.have.property('type', 'deck');
         response.result.should.have.property('id', `${deckId}-1`);
-        response.result.should.have.property('title', title);
+        response.result.should.have.property('title', originalTitle);
         response.result.should.have.property('theme', theme);
         response.result.should.have.property('children').that.is.an('array').of.length(1);
 
@@ -282,7 +282,7 @@ describe('REST API deck tree', () => {
         response = await server.inject(`/decktree/${deckId}`);
         response.statusCode.should.equal(200);
         response.result.should.have.property('variants').that.has.deep.members([
-            { language: 'en-GB' },
+            { language: 'en-GB', original: true, title: originalTitle },
             { language: 'el-GR' },
         ]);
     });
@@ -312,8 +312,8 @@ describe('REST API deck tree', () => {
         response.statusCode.should.equal(200);
         response.result.should.have.property('title', 'New deck');
         response.result.should.have.property('language', 'en-GB');
-        response.result.should.have.property('variants').that.has.deep.members([
-            { language: 'en-GB', },
+        response.result.should.have.property('variants').that.includes.deep.members([
+            { language: 'en-GB', title: 'New deck', original: true },
             { language: 'el-GR', title: 'Μια παρουσίαση στα ελληνικά' },
         ]);
 
