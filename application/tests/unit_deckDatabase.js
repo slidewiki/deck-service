@@ -2,16 +2,47 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-let chai = require('chai');
-let chaiAsPromised = require('chai-as-promised');
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
 chai.use(chaiAsPromised);
 
 chai.should();
 
-let helper = require('../database/helper.js');
-let deckDB = require('../database/deckDatabase');
+const mockery = require('mockery');
 
 describe('deckDatabase', function() {
+
+    const groupEditorId = 6;
+
+    let helper, deckDB, treeDB;
+
+    before(function() {
+        // first enable mocks
+        mockery.enable({
+            useCleanCache: true,
+            warnOnReplace: false,
+            warnOnUnregistered: false,
+        });
+
+        // then register user service mock
+        mockery.registerMock('../services/user', {
+            fetchUserInfo: () => {
+                return Promise.reject('not mocking optional function');
+            },
+            fetchGroupInfo: () => {
+                console.log('aaa');
+                return Promise.reject('not mocking optional function');
+            },
+            fetchUsersForGroups: (groupIds) => {
+                return Promise.resolve([groupEditorId]);
+            }
+        });
+
+        // and require stuff
+        helper = require('../database/helper.js');
+        deckDB = require('../database/deckDatabase');
+        treeDB = require('../database/deckTreeDatabase');
+    });
 
     beforeEach(function() {
         return helper.cleanDatabase().then(() =>
@@ -19,6 +50,14 @@ describe('deckDatabase', function() {
                 helper.applyFixtures(db, require('./fixtures/decktree-editors.json'))
             )
         );
+    });
+
+    after(function() {
+        return Promise.resolve().then(() => {
+            // disable mocking
+            mockery.disable();
+            return helper.closeConnection();
+        });
     });
 
     // TODO any tests involving restricted / private decks are commented out/skipped until feature is enabled
@@ -100,9 +139,8 @@ describe('deckDatabase', function() {
 
             });
 
-            // TODO properly setup a test for this, needs a mock for the user service
-            it.skip('should return true for a user explicitly authorized via groups', function() {
-                return deckDB.forkAllowed('54', 6)
+            it('should return true for a user explicitly authorized via groups', function() {
+                return deckDB.forkAllowed('54', groupEditorId)
                 .then((forkAllowed) => {
                     forkAllowed.should.equal(true);
                 });
@@ -185,9 +223,8 @@ describe('deckDatabase', function() {
 
             });
 
-            // TODO properly setup a test for this, needs a mock for the user service
-            it.skip('should allow edit for a user explicitly authorized via groups', function() {
-                return deckDB.userPermissions('54', 6)
+            it('should allow edit for a user explicitly authorized via groups', function() {
+                return deckDB.userPermissions('54', groupEditorId)
                 .then((perms) => {
                     perms.should.have.property('edit', true);
                 });
@@ -235,9 +272,8 @@ describe('deckDatabase', function() {
 
         });
 
-        // TODO properly setup a test for this, needs a mock for the user service
-        it.skip('should return false for a user explicitly authorized via groups', function() {
-            return deckDB.adminAllowed('54', 6)
+        it('should return false for a user explicitly authorized via groups', function() {
+            return deckDB.adminAllowed('54', groupEditorId)
             .then((allowed) => {
                 allowed.should.equal(false);
             });

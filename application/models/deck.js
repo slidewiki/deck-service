@@ -55,6 +55,25 @@ const trackedDeckRevisionProperties = {
             },
         },
     },
+
+    variants: {
+        type: 'array',
+        items: {
+            type: 'object',
+            properties: {
+                title: {
+                    type: 'string',
+                },
+                description: {
+                    type: 'string',
+                },
+                language: {
+                    type: 'string',
+                },
+            },
+        },
+    },
+
 };
 
 const contributor = {

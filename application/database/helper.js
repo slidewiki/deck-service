@@ -19,16 +19,21 @@ function testDbName(name) {
 }
 
 function testConnection(dbname) {
-    if (!co.isEmpty(dbConnection)) { //TODO test for alive
-        if (dbConnection.s.databaseName === dbname)
-            return true;
-        else {
-            dbConnection.close();
-            dbConnection = null;
-            return false;
+    return Promise.resolve().then(() => {
+        if (!co.isEmpty(dbConnection)) { //TODO test for alive
+            if (dbConnection.s.databaseName === dbname) {
+                return true;
+            } else {
+                // console.warn(`switching database from ${dbConnection.s.databaseName} to ${dbname}`);
+                return dbConnection.close().then(() => {
+                    dbConnection = null;
+                    return false;
+                });
+            }
         }
-    }
-    return false;
+
+        return false;
+    });
 }
 
 //Uses extra collection for autoincrementation
@@ -75,28 +80,20 @@ function getNextId(db, collectionName, fieldName) {
 }
 
 let self = module.exports = {
+
     createDatabase: function(dbname) {
-        dbname = testDbName(dbname);
-
-        let myPromise = new Promise((resolve, reject) => {
-            let db = new Db(dbname, new Server(config.HOST, config.PORT));
-            db.open().then((connection) => {
-                connection.collection('test').insertOne({ //insert the first object to know that the database is properly created TODO this is not real test....could fail without your knowledge
-                    id: 1,
-                    data: {}
-                }, () => {
-                    resolve(connection);
-                });
-            }).catch(reject);
+        return self.connectToDatabase(dbname).then((connection) => {
+            return connection.collection('test').insertOne({
+                id: 1,
+                data: {}
+            }).then(() => connection);
         });
-
-        return myPromise;
     },
 
     cleanDatabase: function(dbname) {
         dbname = testDbName(dbname);
 
-        return this.connectToDatabase(dbname)
+        return self.connectToDatabase(dbname)
         .then((db) => {
             const DatabaseCleaner = require('database-cleaner');
             const databaseCleaner = new DatabaseCleaner('mongodb');
@@ -109,13 +106,15 @@ let self = module.exports = {
     connectToDatabase: function(dbname) {
         dbname = testDbName(dbname);
 
-        if (testConnection(dbname)) {
-            return Promise.resolve(dbConnection);
-        } else {
-            return MongoClient.connect('mongodb://' + config.HOST + ':' + config.PORT + '/' + dbname)
-            .then((db) => {
-                if (db.s.databaseName !== dbname)
-                    throw new 'Wrong Database!';
+        return testConnection(dbname).then((passed) => {
+            if (passed) {
+                return dbConnection;
+            }
+
+            return MongoClient.connect(`mongodb://${config.HOST}:${config.PORT}/${dbname}`).then((db) => {
+                if (db.s.databaseName !== dbname) {
+                    throw new Error('Wrong Database!');
+                }
 
                 // log connection status and reset connection once reconnect fails
                 db.on('close', (err) => {
@@ -142,7 +141,19 @@ let self = module.exports = {
                 console.error(err.message);
                 process.exit(-1);
             });
-        }
+
+        });
+
+    },
+
+    closeConnection() {
+        return Promise.resolve().then(() => {
+            if (dbConnection) return dbConnection.close();
+        }).then((res) => {
+            // also reset the variable
+            dbConnection = null;
+            return res;
+        });
     },
 
     getCollection: function(name) {
@@ -151,6 +162,10 @@ let self = module.exports = {
 
     getNextIncrementationValueForCollection: function (dbconn, collectionName, fieldName) {
         return getNextId(dbconn, collectionName, fieldName);
+    },
+
+    getNextId: function(collectionName) {
+        return self.connectToDatabase().then((db) => getNextId(db, collectionName));
     },
 
     applyFixtures: function(db, data) {

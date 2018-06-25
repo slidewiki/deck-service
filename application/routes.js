@@ -3,7 +3,9 @@
 const Joi = require('joi'),
     handlers = require('./controllers/handler');
 
+const slides = require('./controllers/slides');
 const decks = require('./controllers/decks');
+const deckTrees = require('./controllers/deckTrees');
 const changeLog = require('./controllers/changeLog');
 const archives = require('./controllers/archives');
 const groups = require('./controllers/groups');
@@ -23,6 +25,10 @@ const apiModels = {};
 
 apiModels.tag = require('./models/JoiModels/tag');
 apiModels.group = require('./models/JoiModels/group');
+
+// only support two-character language codes
+// TODO also add validation
+const languageModel = Joi.string().regex(/[a-z]{2}([_-][A-Z]{2})?/).max(2).truncate();
 
 module.exports = function(server) {
 
@@ -114,6 +120,9 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string()
                 },
+                query: {
+                    language: languageModel.empty(''),
+                },
             },
             tags: ['api'],
             description: 'Get metadata of a deck'
@@ -137,42 +146,45 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/deck/{id}/contributors',
+        handler: decks.getContributors,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
+                },
+                query: {
+                    language: languageModel.empty(''),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the users that have contributed in any way in the deck content',
+        },
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/editors',
         handler: handlers.getEditors,
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional and will be ignored'),
                 },
             },
             tags: ['api'],
-            description: 'Get the users and groups authorized for editing the deck, as well as all the contributors',
+            description: 'Get the users and groups authorized for editing the deck',
             response: {
                 schema: Joi.object().keys({
-                    contributors: Joi.array().items(
-                        Joi.object().keys({
-                            id: Joi.number(),
-                            username: Joi.string(),
-                            picture: Joi.string().allow(['', null]),
-                            country: Joi.string().allow(['', null]),
-                            organization: Joi.string().allow(['', null]),
-                        })),
                     editors: Joi.object().keys({
-                        users: Joi.array().items(
-                            Joi.object().keys({
-                                id: Joi.number(),
-                                username: Joi.string(),
-                                picture: Joi.string().allow(['', null]),
-                                joined: Joi.string().isoDate(),
-                                country: Joi.string().allow(['', null]),
-                                organization: Joi.string().allow(['', null]),
-                            })),
-                        groups: Joi.array().items(
-                            Joi.object().keys({
-                                id: Joi.number(),
-                                name: Joi.string(),
-                                joined: Joi.string().isoDate(),
-                            })),
+                        users: Joi.array().items({
+                            id: Joi.number(),
+                            joined: Joi.string().isoDate(),
+                        }),
+                        groups: Joi.array().items({
+                            id: Joi.number(),
+                            joined: Joi.string().isoDate(),
+                        })
                     }),
                 }),
             },
@@ -186,7 +198,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional and will be ignored'),
                 },
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -201,7 +213,7 @@ module.exports = function(server) {
                             id: Joi.number().required(),
                             joined: Joi.string().isoDate().required(),
                         })).default([])
-                    }).required(),
+                    }).required().options({ stripUnknown: true }),
                 }),
             },
             tags: ['api'],
@@ -301,7 +313,7 @@ module.exports = function(server) {
             validate: {
                 payload: Joi.object().keys({
                     description: Joi.string().allow('').default(''),
-                    language: Joi.string(),
+                    language: languageModel.default('en'),
                     translation: Joi.object().keys({
                         status: Joi.string().valid('original', 'google', 'revised')
                     }),
@@ -357,7 +369,7 @@ module.exports = function(server) {
                 },
                 payload: Joi.object().keys({
                     description: Joi.string().allow('').default(''),
-                    language: Joi.string(),
+                    language: languageModel,
                     translation: Joi.string().alphanum().lowercase(),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     title: Joi.string(),
@@ -427,28 +439,6 @@ module.exports = function(server) {
     });
 
     server.route({
-        method: 'PUT',
-        path: '/deck/{id}/translate',
-        handler: handlers.translateDeckRevision,
-        config: {
-            validate: {
-                params: {
-                    id: Joi.string()
-                },
-                payload: Joi.object().keys({
-                    language: Joi.string(),
-                }).requiredKeys('language'),
-                headers: Joi.object({
-                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
-                }).unknown(),
-            },
-            tags: ['api'],
-            auth: 'jwt',
-            description:'Translate a deck and store as a new fork'
-        }
-    });
-
-    server.route({
         method: 'GET',
         path: '/deck/{id}/revisions',
         handler: handlers.getDeckRevisions,
@@ -466,15 +456,37 @@ module.exports = function(server) {
     server.route({
         method: 'GET',
         path: '/deck/{id}/translations',
-        handler: handlers.getDeckTranslations,
+        handler: handlers.getDeckVariants,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'List all deck translations for current deck',
+        },
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/deck/{id}/translations',
+        handler: handlers.addDeckVariant,
         config: {
             validate: {
                 params: {
                     id: Joi.number().integer().description('The deck id (without revision)'),
                 },
+                payload: {
+                    language: languageModel.required(),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
             },
             tags: ['api'],
-            description: 'List all deck translations for current deck',
+            auth: 'jwt',
+            description: 'Set a language as part of the list of available translations of a deck',
         },
     });
 
@@ -565,6 +577,7 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 query: {
+                    language: languageModel.empty(''),
                     limit: Joi.string().optional(),
                     offset: Joi.string().optional(),
                     countOnly: Joi.boolean().truthy('1').falsy('0', ''),
@@ -595,7 +608,7 @@ module.exports = function(server) {
                         revision: Joi.string().alphanum().lowercase()
                     }),
                     position: Joi.string().alphanum().lowercase().min(0),
-                    language: Joi.string(),
+                    language: languageModel,
                     comment: Joi.string().allow(''),
                     description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
@@ -615,7 +628,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/slide/{id}',
-        handler: handlers.updateSlide,
+        handler: handlers.updateSlideNode,
         config: {
             validate: {
                 params: {
@@ -640,7 +653,7 @@ module.exports = function(server) {
                     description: Joi.string().allow('').default(''),
                     tags: Joi.array().items(apiModels.tag).default([]),
                     position: Joi.string().alphanum().lowercase().min(0),
-                    language: Joi.string(),
+                    language: languageModel,
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     dimensions: slideDimensions,
                     dataSources: Joi.array().items(Joi.object().keys({
@@ -651,7 +664,7 @@ module.exports = function(server) {
                         authors: Joi.string().allow(''),
                         year: Joi.string().allow('')
                     })).default([])
-                }).requiredKeys('content', 'root_deck'),
+                }).requiredKeys('top_root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
                 }).unknown(),
@@ -703,14 +716,30 @@ module.exports = function(server) {
 
     server.route({
         method: 'GET',
+        path: '/slide/{id}/contributors',
+        handler: slides.getContributors,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}'),
+                },
+            },
+            tags: ['api'],
+            description: 'Get the users that have contributed in any way in the slide content',
+        },
+    });
+
+    server.route({
+        method: 'GET',
         path: '/deck/{id}/datasources',
         handler: handlers.getDeckDataSources,
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
+                    language: languageModel.empty(''),
                     countOnly: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
@@ -726,7 +755,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId'),
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}'),
                 },
                 query: {
                     countOnly: Joi.boolean().truthy('1').falsy('0', ''),
@@ -772,7 +801,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional')
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional')
                 },
                 query: {
                     force: Joi.boolean().truthy('1').falsy('0', ''),
@@ -794,6 +823,7 @@ module.exports = function(server) {
                     id: Joi.string()
                 },
                 query: {
+                    language: languageModel.empty(''),
                     enrich: Joi.boolean().truthy('1').falsy('0', ''),
                 }
             },
@@ -805,13 +835,13 @@ module.exports = function(server) {
     server.route({
         method: 'POST',
         path: '/decktree/node/create',
-        handler: handlers.createDeckTreeNodeWithCheck,
+        handler: deckTrees.createDeckTreeNode,
         config: {
             validate: {
                 payload: Joi.object().keys({
                     selector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string().allow(''),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string(),
                     }),
@@ -819,11 +849,12 @@ module.exports = function(server) {
                         Joi.object().keys({
                             id: Joi.string(),
                             type: Joi.string(),
+                            root: Joi.string(),
                         })
                     ).single(),
                     content: Joi.string(),
                     title: Joi.string(),
-                    license: Joi.string(),
+                    license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                     speakernotes: Joi.string(),
                 }).requiredKeys('selector'),
                 headers: Joi.object({
@@ -839,13 +870,14 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/decktree/node/rename',
-        handler: handlers.renameDeckTreeNode,
+        handler: deckTrees.renameDeckTreeNode,
         config: {
             validate: {
                 payload: Joi.object().keys({
+                    language: languageModel,
                     selector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string(),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
@@ -864,13 +896,13 @@ module.exports = function(server) {
     server.route({
         method: 'DELETE',
         path: '/decktree/node/delete',
-        handler: handlers.deleteDeckTreeNode,
+        handler: deckTrees.removeDeckTreeNode,
         config: {
             validate: {
                 payload: Joi.object().keys({
                     selector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string(),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
@@ -888,19 +920,19 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/decktree/node/move',
-        handler: handlers.moveDeckTreeNode,
+        handler: deckTrees.moveDeckTreeNode,
         config: {
             validate: {
                 payload: Joi.object().keys({
                     sourceSelector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string().allow(''),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
                     targetSelector: Joi.object().keys({
                         id: Joi.string(), //id of the root deck
-                        spath: Joi.string().allow(''),
+                        spath: Joi.string().empty(''),
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
@@ -914,6 +946,65 @@ module.exports = function(server) {
             auth: 'jwt',
             description: 'Move a node (slide/deck) in a different position in the deck tree'
         }
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/decktree/node/translations',
+        handler: handlers.getDeckTreeNodeVariants,
+        config: {
+            validate: {
+                query: {
+                    id: Joi.string().required(),
+                    spath: Joi.string().empty(''),
+                    stype: Joi.string().default('slide'),
+                    sid: Joi.string().required(),
+                },
+            },
+            tags: ['api'],
+            description: 'List the translations available for a deck tree node (slide or subdeck)',
+        },
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/decktree/node/translations',
+        handler: handlers.addDeckTreeNodeVariant,
+        config: {
+            validate: {
+                payload: Joi.object().keys({
+                    language: languageModel,
+                    selector: Joi.object().keys({
+                        id: Joi.string(),
+                        spath: Joi.string().empty(''),
+                        stype: Joi.string().default('slide'),
+                        sid: Joi.string(),
+                    }).requiredKeys('id', 'sid'),
+                }).requiredKeys('language'),
+
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Add a translation for a deck tree node (slide only)',
+        },
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/decktree/{id}/export',
+        handler: deckTrees.exportDeckTree,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string(),
+                },
+            },
+            tags: ['api'],
+            description: 'Retrieve full data for the entire deck tree and slides',
+        },
     });
 
     //----------------------------- Archives Routes -----------------------------//
@@ -985,7 +1076,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1000,7 +1091,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: slideId-slideRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1016,7 +1107,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1031,7 +1122,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: slideId-slideRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1047,13 +1138,18 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional')
                 },
             },
             tags: ['api'],
-            description: 'Get tags of a deck #DEPRECATED',
+            description: 'Get tags of a deck',
             response: {
                 schema: Joi.array().items(apiModels.tag),
+            },
+            plugins: {
+                'hapi-swagger': {
+                    deprecated: true,
+                },
             },
         }
     });
@@ -1065,7 +1161,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional')
                 },
                 payload:
                     Joi.object().keys({
@@ -1075,9 +1171,14 @@ module.exports = function(server) {
                     }).requiredKeys('operation', 'user', 'tag')
             },
             tags: ['api'],
-            description: 'Add/Remove a tag from a deck #DEPRECATED',
+            description: 'Add/Remove a tag from a deck',
             response: {
                 schema: Joi.array().items(apiModels.tag),
+            },
+            plugins: {
+                'hapi-swagger': {
+                    deprecated: true,
+                },
             },
         }
     });
@@ -1089,7 +1190,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form: deckId-deckRevisionId')
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional')
                 },
                 payload: Joi.object().keys({
                     top_root_deck: Joi.string().description('The deck id-revision string for the root of the deck tree'),
@@ -1114,13 +1215,18 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}')
                 },
             },
             tags: ['api'],
-            description: 'Get tags of a slide #DEPRECATED',
+            description: 'Get tags of a slide',
             response: {
                 schema: Joi.array().items(apiModels.tag),
+            },
+            plugins: {
+                'hapi-swagger': {
+                    deprecated: true,
+                },
             },
         }
     });
@@ -1132,7 +1238,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form: slideId-slideRevisionId')
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}')
                 },
                 payload:
                     Joi.object().keys({
@@ -1142,9 +1248,14 @@ module.exports = function(server) {
                     }).requiredKeys('operation', 'user', 'tag'),
             },
             tags: ['api'],
-            description: 'Add/Remove a tag from a slide #DEPRECATED',
+            description: 'Add/Remove a tag from a slide',
             response: {
                 schema: Joi.array().items(apiModels.tag),
+            },
+            plugins: {
+                'hapi-swagger': {
+                    deprecated: true,
+                },
             },
         }
     });
@@ -1156,7 +1267,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     mediaType: Joi.string().valid('pictures', 'video', 'audio').required()
@@ -1179,10 +1290,12 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
+                    language: languageModel.empty(''),
                     simplify: Joi.boolean().truthy('1').falsy('0', ''),
+                    raw: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
             tags: ['api'],
@@ -1197,11 +1310,13 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of slide in the form slideId-slideRevisionId, revision is optional and will be ignored'),
+                    id: Joi.string().description('Identifier of slide in the form {id}-{revision}, revision is optional and will be ignored'),
                 },
                 query: {
-                    root: Joi.string().description('Identifier of deck tree root in the form deckId-deckRevisionId, revision is optional').required(),
+                    root: Joi.string().description('Identifier of deck tree root in the form {id}-{revision}, revision is optional').required(),
+                    language: languageModel.empty(''),
                     simplify: Joi.boolean().truthy('1').falsy('0', ''),
+                    raw: Joi.boolean().truthy('1').falsy('0', ''),
                 },
             },
             tags: ['api'],
@@ -1219,7 +1334,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     keepVisibleOnly: Joi.boolean().default(true)
@@ -1237,7 +1352,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     keepVisibleOnly: Joi.boolean().default(true)
@@ -1257,7 +1372,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -1440,7 +1555,7 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string().description('Identifier of deck in the form deckId-deckRevisionId, revision is optional'),
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
                 },
                 query: {
                     user: Joi.number().integer().description('Optionally filter with deck group owner id'),

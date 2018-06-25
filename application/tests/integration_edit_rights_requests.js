@@ -2,82 +2,60 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-describe('REST API for edit rights requests', () => {
-    const mockery = require('mockery');
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
 
-    const JWT = require('jsonwebtoken');
-    const secret = 'NeverShareYourSecret';
+chai.should();
 
-    let server;
+const mockery = require('mockery');
 
-    before((done) => {
-        // mock user service
+describe('REST API edit rights requests', () => {
+    let server, tokenFor;
+ 
+    before(() => {
+        // first enable mocks
         mockery.enable({
+            useCleanCache: true,
             warnOnReplace: false,
             warnOnUnregistered: false,
         });
+
+        // then register user service mock
         mockery.registerMock('../services/user', {
             fetchUserInfo: () => {
                 return Promise.reject('not mocking optional function');
             },
             fetchGroupInfo: () => {
+                console.log('aaa');
                 return Promise.reject('not mocking optional function');
             },
             fetchUsersForGroups: (groupIds) => {
                 return Promise.resolve([groupEditorId]);
             }
         });
-        // end mock
 
-        //Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        require('chai').should();
-        let hapi = require('hapi');
-        server = new hapi.Server();
-        server.connection({
-            host: 'localhost',
-            port: 3000
-        });
-        let plugins = [
-            require('hapi-auth-jwt2')
-        ];
-        server.register(plugins, (err) => {
-            if (err) {
-                console.error(err);
-                global.process.exit();
-            } else {
-                server.auth.strategy('jwt', 'jwt', {
-                    key: secret,
-                    validateFunc: (decoded, request, callback) => {callback(null, true);},
-                    verifyOptions: {
-                        ignoreExpiration: true
-                    },
-                    headerKey: '----jwt----',
-                });
-                
-                // const db = require('../database/helper');
-                // db.cleanDatabase();
+        // then load libraries
+        const testServer = require('../testServer');
+        tokenFor = testServer.tokenFor;
 
-                server.start(() => {
-                    server.log('info', 'Server started at ' + server.info.uri);
-                    require('../routes.js')(server);
-                    done();
-                });
-            }
+        return testServer.init().then((newServer) => {
+            server = newServer;
+            return server.start();
         });
+
     });
 
-    // disable mocking
     after(() => {
-        mockery.disable();
+        return Promise.resolve().then(() => {
+            // disable mocking
+            mockery.disable();
+            return server && server.stop();
+        });
     });
+
 
     let ownerId = 1, newEditorId = 2, editorId = 3, groupEditorId = 4;
-
-    let ownerToken = JWT.sign( { userid: ownerId }, secret );
-    let newEditorToken = JWT.sign( { userid: newEditorId }, secret );
-    let editorToken = JWT.sign( { userid: editorId }, secret );
-    let groupEditorToken = JWT.sign( { userid: groupEditorId }, secret );
 
     let deckId;
 
@@ -95,7 +73,7 @@ describe('REST API for edit rights requests', () => {
             },
             headers: {
                 'Content-Type': 'application/json',
-                '----jwt----': ownerToken,
+                '----jwt----': tokenFor(ownerId),
             },
         }).then((response) => {
             // grab the id!
@@ -110,7 +88,7 @@ describe('REST API for edit rights requests', () => {
             method: 'POST',
             url: `/deck/${deckId}/requestEditRights`,
             headers: {
-                '----jwt----': newEditorToken,
+                '----jwt----': tokenFor(newEditorId),
             },
         }).then((response) => {
             response.should.have.property('statusCode', 200);
@@ -125,7 +103,7 @@ describe('REST API for edit rights requests', () => {
             method: 'POST',
             url: `/deck/${deckId}/requestEditRights`,
             headers: {
-                '----jwt----': newEditorToken,
+                '----jwt----': tokenFor(newEditorId),
             },
         }).then((response) => {
             response.should.have.property('statusCode', 200);
@@ -137,7 +115,7 @@ describe('REST API for edit rights requests', () => {
 
     it('should not accept a request for edit rights for a user already authorized', () => {
         return Promise.all(
-            [ownerToken, editorToken, groupEditorToken]
+            [tokenFor(ownerId), tokenFor(editorId), tokenFor(groupEditorId)]
             .map((token) => server.inject({
                 method: 'POST',
                 url: `/deck/${deckId}/requestEditRights`,
@@ -150,21 +128,20 @@ describe('REST API for edit rights requests', () => {
 
     context('when a edit rights request is granted for some user', () => {
         let someUserId = 666;
-        let someUserToken = JWT.sign( { userid: someUserId }, secret );
 
         before(() => {
             return server.inject({
                 method: 'POST',
                 url: `/deck/${deckId}/requestEditRights`,
                 headers: {
-                    '----jwt----': someUserToken,
+                    '----jwt----': tokenFor(someUserId),
                 },
             })
             .then(() => server.inject({
                 method: 'POST',
                 url: `/deck/${deckId}/requestEditRights`,
                 headers: {
-                    '----jwt----': JWT.sign( { userid: 1111 }, secret ),
+                    '----jwt----': tokenFor(1111),
                 },
             }))
             .then(() => server.inject({
@@ -179,7 +156,7 @@ describe('REST API for edit rights requests', () => {
                     url: `/deck/${deckId}/editors`,
                     payload: {editors},
                     headers: {
-                        '----jwt----': ownerToken,
+                        '----jwt----': tokenFor(ownerId),
                     },
                 });
             });
@@ -199,7 +176,7 @@ describe('REST API for edit rights requests', () => {
                         url: `/deck/${deckId}/editors`,
                         payload: {editors},
                         headers: {
-                            '----jwt----': ownerToken,
+                            '----jwt----': tokenFor(ownerId),
                         },
                     });
                 });
@@ -210,7 +187,7 @@ describe('REST API for edit rights requests', () => {
                     method: 'POST',
                     url: `/deck/${deckId}/requestEditRights`,
                     headers: {
-                        '----jwt----': someUserToken,
+                        '----jwt----': tokenFor(someUserId),
                     },
                 }).then((response) => {
                     response.should.have.property('statusCode', 200);

@@ -1,7 +1,6 @@
 'use strict';
 
 const _ = require('lodash');
-const async = require('async');
 
 const Immutable = require('immutable');
 const diff = require('immutablediff');
@@ -13,6 +12,8 @@ const changeModel = require('../models/deckChange');
 
 const helper = require('../database/helper');
 
+const variantDeckProperties = ['title', 'description'];
+
 const ChangeLogRecord = {
 
     createUpdate: function(before, after, path) {
@@ -21,9 +22,55 @@ const ChangeLogRecord = {
         let beforeDiff = _.omitBy(before, (value, key) => _.isEqual(value, after[key]));
         let afterDiff = _.omitBy(after, (value, key) => _.isEqual(value, before[key]));
 
-        if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff)) return;
+        // special handling of variants
+        let variant;
+        // first compute the diff between them 
+        let theDiff = diff(Immutable.fromJS(beforeDiff), Immutable.fromJS(afterDiff));
+        theDiff.toJS().forEach((rec) => {
+            // find variants changes
+            let indexMatch = rec.path.match(/^\/variants\/(\d+)(?:\/([^/]+))?/);
+            if (!indexMatch) return;
 
-        return {
+            // pick each variant change one by one, and add appropriate values in the diffs
+
+            // indexMatch[1] includes the variant index changed (or added/removed)
+            let variantIndex = parseInt(indexMatch[1]);
+            // indexMatch[2] includes the variant property changed (if any)
+            let variantProperty = indexMatch[2];
+            if (rec.op === 'replace') {
+                // set the variant info
+                variant = _.omit(beforeDiff.variants[variantIndex], variantDeckProperties);
+
+                Object.assign(beforeDiff, _.pick(beforeDiff.variants[variantIndex], variantProperty));
+                Object.assign(afterDiff, _.pick(afterDiff.variants[variantIndex], variantProperty));
+            } else if (rec.op === 'remove') {
+                variant = _.omit(beforeDiff.variants[variantIndex], variantDeckProperties);
+
+                Object.assign(beforeDiff, _.pick(beforeDiff.variants[variantIndex], variantProperty));
+            } else if (rec.op === 'add') {
+                variant = _.omit(afterDiff.variants[variantIndex], variantDeckProperties);
+                if (variantProperty) {
+                    Object.assign(afterDiff, _.pick(afterDiff.variants[variantIndex], variantProperty));
+                } else {
+                    // the variant was newly added, add the non variant properties from rec.value
+                    Object.assign(afterDiff, _.pick(rec.value, variantDeckProperties));
+                }
+
+            } else {
+                // TODO throw ?
+                console.warn(`unexpected variants diff op: ${JSON.stringify(rec)} for path`, path);
+            }
+
+        });
+
+        // remove all variants info
+        delete beforeDiff.variants;
+        delete afterDiff.variants;
+
+        // diffs may be empty, but a variant may have been added
+        if (_.isEmpty(beforeDiff) && _.isEmpty(afterDiff) && !variant) return;
+
+        let result = {
             op: 'update',
 
             path: path,
@@ -33,6 +80,12 @@ const ChangeLogRecord = {
 
             timestamp: (new Date()).toISOString(),
         };
+
+        if (variant) {
+            result.variant = variant;
+        }
+
+        return result;
     },
 
     createNodeRemove: function(before, index, path) {
@@ -48,26 +101,48 @@ const ChangeLogRecord = {
 
     },
 
-    createNodeInsert: function(after, index, path) {
+    // if primaryRef is set, means the value is a newly created variant to it
+    createNodeInsert: function(value, index, path, primaryRef) {
         if (!_.isEmpty(path) && _.isNumber(index)) path = path.concat({ index });
 
-        // we set this to zero because the value will be the first item in after
-        if (!_.isNumber(index)) index = 0;
+        if (primaryRef) {
+            // split variant and ref
+            let variant = _.omit(value, 'id', 'revision');
+            let ref = _.pick(value, 'id', 'revision');
+            value = { kind: 'slide', ref, variant };
+        }
 
         // we keep the added value and its index
-        return {
+        let result = {
             op: 'add',
 
             path: path,
-            value: after[index],
+            value: value,
 
             timestamp: (new Date()).toISOString(),
         };
 
+        if (primaryRef) {
+            result.oldValue = {
+                kind: 'slide',
+                ref: primaryRef,
+            };
+        }
+
+        return result;
     },
 
-    createNodeUpdate: function(before, after, index, path) {
+    createNodeUpdate: function(before, after, index, path, isVariant) {
         if (!_.isEmpty(path) && _.isNumber(index)) path = path.concat({ index });
+
+        if (isVariant) {
+            // split variant and ref
+            [before, after] = [before, after].map((value) => {
+                let variant = _.omit(value, 'id', 'revision');
+                let ref = _.pick(value, 'id', 'revision');
+                return { kind: 'slide', ref, variant };
+            });
+        }
 
         return {
             op: 'replace',
@@ -188,9 +263,20 @@ let self = module.exports = {
                 return records;
             },
 
-            contentItemsRecords: function(path) {
-                const contentItemsAfter = Immutable.fromJS(revision.contentItems.map(omitOrder));
+            contentItemsRecords: function(path, updatedDeck) {
+                if (!updatedDeck) {
+                    updatedDeck = deck;
+                }
+
+                // we can only ever update the latest revision, let's compare to that ???
+                let [updatedRevision] = updatedDeck.revisions.slice(-1);
+
+                const contentItemsAfter = Immutable.fromJS(updatedRevision.contentItems.map(omitOrder));
                 const contentItemOps = diff(contentItemsBefore, contentItemsAfter);
+
+                if (!contentItemOps.isEmpty() && updatedRevision.id !== revision.id) {
+                    console.warn(`trying to apply content item change log across different revisions: ${revision.id} -> ${updatedRevision.id}`);
+                }
 
                 // we have a list of JSON patch-style operations, which we would like to save in the log
                 // in a reversible way as to provide full log capabilities without need for current state
@@ -201,38 +287,72 @@ let self = module.exports = {
                         let indexMatch = rec.path.match(/^\/(\d+)$/);
 
                         if (!indexMatch) {
-                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.strigify(rec)}`);
+                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.stringify(rec)}`);
                         }
 
-                        // indexMatch[1] includes just the index added
+                        // indexMatch[1] includes just the index removed
                         let index = parseInt(indexMatch[1]);
                         return ChangeLogRecord.createNodeRemove(contentItemsBefore.toJS(), index, path);
                     }
 
                     if (rec.op === 'add') {
-                        // we only expect adding an element will throw an error otherwise
-                        let indexMatch = rec.path.match(/^\/(\d+)$/);
+                        // we expect adding an element or a variant to an element, will throw an error otherwise
+                        let indexMatch = rec.path.match(/^\/(\d+)(\/variants(?:\/(\d+))?)?$/);
 
                         if (!indexMatch) {
-                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.strigify(rec)}`);
+                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.stringify(rec)}`);
                         }
 
-                        // indexMatch[1] includes just the index added
+                        // indexMatch[1] includes just the index added, or the index where the variant was added
                         let index = parseInt(indexMatch[1]);
-                        return ChangeLogRecord.createNodeInsert(contentItemsAfter.toJS(), index, path);
+                        // indexMatch[2] includes includes the string /variants with the optional the index of the variant added (if any)
+                        let isVariant = !!indexMatch[2];
+                        if (isVariant) {
+                            let variant;
+
+                            // indexMatch[3] includes the index of the variant, if it wasn't the first added
+                            let variantIndex = parseInt(indexMatch[3]);
+                            if (Number.isFinite(variantIndex)) {
+                                variant = contentItemsAfter.getIn([index, 'variants', variantIndex]).toJS();
+                            } else {
+                                // just take it from the record value, which is always an array;
+                                // we only ever expect a single item there
+                                [variant] = rec.value;
+                            }
+
+                            // we also need to record the primary slide version, we use the index for that
+                            let primary = contentItemsAfter.getIn([index, 'ref']).toJS();
+
+                            return ChangeLogRecord.createNodeInsert(variant, index, path, primary);
+                        } else {
+                            return ChangeLogRecord.createNodeInsert(contentItemsAfter.get(index).toJS(), index, path);
+                        }
+
                     }
 
                     if (rec.op === 'replace') {
-                        // for now we expect only revision changes to contentItems, so let's throw an Error otherwise
-                        let indexMatch = rec.path.match(/^\/(\d+)\/ref\/revision/);
+                        // we expect revision changes to contentItems, or to variants so let's throw an Error otherwise
+                        let indexMatch = rec.path.match(/^\/(\d+)\/(?:ref\/revision|variants\/(\d+)\/revision)/);
 
                         if (!indexMatch) {
-                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.strigify(rec)}`);
+                            throw new Error(`unexpected content item modification for deck revision ${deck._id}-${revision.id}: ${JSON.stringify(rec)}`);
                         }
 
-                        // indexMatch[1] includes just the index added
+                        // indexMatch[1] includes just the index replaced
                         let index = parseInt(indexMatch[1]);
-                        return ChangeLogRecord.createNodeUpdate(contentItemsBefore.get(index).toJS(), contentItemsAfter.get(index).toJS(), index, path);
+                        // indexMatch[2] includes the index of the variant replaced (optionally)
+                        let variantIndex = parseInt(indexMatch[2]);
+
+                        let before, after, isVariant = Number.isFinite(variantIndex);
+                        if (isVariant) {
+                            before = contentItemsBefore.getIn([index, 'variants', variantIndex]);
+                            after = contentItemsAfter.getIn([index, 'variants', variantIndex]);
+                        } else {
+                            before = contentItemsBefore.get(index).remove('variants');
+                            after = contentItemsAfter.get(index).remove('variants');
+                        }
+
+                        return ChangeLogRecord.createNodeUpdate(before.toJS(), after.toJS(), index, path, isVariant);
                     }
 
                 });
@@ -250,7 +370,7 @@ let self = module.exports = {
                     // first the deck changes
                     ...this.deckUpdateRecords(path, updatedDeck),
                     // then the children changes
-                    ...this.contentItemsRecords(path)])
+                    ...this.contentItemsRecords(path, updatedDeck)])
                 );
             },
 
@@ -314,17 +434,14 @@ let self = module.exports = {
             let logRecord;
             if (_.isEmpty(path) || path.length === 1) {
                 // means the deck is added as root, so no path, no index
-                logRecord = ChangeLogRecord.createNodeInsert([deckNode]);
+                logRecord = ChangeLogRecord.createNodeInsert(deckNode);
             } else {
                 // means the deck is created and inserted to a parent
 
                 // we need to remove the last part of the path for the record
                 let [leaf] = path.splice(-1);
                 // the index where we inserted it is in the last path part, which should be same as deckId
-                let after = []; // sparse array to accomodate createNodeInsert API
-                after[leaf.index] = { kind: 'deck', ref: _.pick(leaf, 'id', 'revision') };
-
-                logRecord = ChangeLogRecord.createNodeInsert(after, leaf.index, path);
+                logRecord = ChangeLogRecord.createNodeInsert({ kind: 'deck', ref: _.pick(leaf, 'id', 'revision') }, leaf.index, path);
             }
             // add the user!
             logRecord.user = userId;
@@ -386,107 +503,84 @@ function saveDeckChanges(deckChanges, userId) {
     });
 }
 
-function fillSlideInfo(deckChanges) {
+async function fillSlideInfo(deckChanges) {
     // TODO avoid this circular reference
     const slideDB = require('../database/slideDatabase');
 
     // we check to see if we need to also read some data for slide updates
     let slideUpdates = deckChanges.filter((c) => (c.value && c.value.kind === 'slide'));
-    return new Promise((resolve, reject) => {
-        async.eachSeries(slideUpdates, (rec, done) => {
-            // we want to add title and old title of slide
-            slideDB.get(rec.value.ref.id).then((slide) => {
-                if (!slide) return; // ignore errors ?
+    for (let rec of slideUpdates) {
+        // check for copy information
+        let checkParent = ['copy', 'attach'].includes(rec.action);
 
-                let after = slide.revisions.find((r) => r.id === rec.value.ref.revision);
-                rec.value.ref.title = after.title;
+        // we want to add title and old title of slide
+        let after = await slideDB.getSlideRevision(util.toIdentifier(rec.value.ref));
+        if (!after) continue; // ignore errors ?
 
-                // check for copy information in add ops
-                let origin = ['copy', 'attach'].includes(rec.action) && after.parent;
-                if (origin) {
-                    // it's slides, and the parent's title hasn't changed
-                    origin.title = after.title;
-                    rec.value.origin = origin;
-                }
+        rec.value.ref.title = after.title;
 
-                if (rec.oldValue) {
-                    let before = slide.revisions.find((r) => r.id === rec.oldValue.ref.revision);
-                    rec.oldValue.ref.title = before.title;
-                }
+        // check for copy information in add ops
+        let origin = checkParent && after.parent;
+        if (origin) {
+            // it's slides, and the parent's title hasn't changed
+            origin.title = after.title;
+            rec.value.origin = origin;
+        }
 
-                done();
-            }).catch(done);
-
-        }, (err) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(deckChanges);
+        if (rec.oldValue) {
+            let before = await slideDB.getSlideRevision(util.toIdentifier(rec.oldValue.ref));
+            if (before) {
+                rec.oldValue.ref.title = before.title;
             }
-        });
+        }
+    }
 
-    });
-
+    return deckChanges;
 }
 
-
-function fillDeckInfo(deckChanges) {
-    // TODO handle circular dependency
+async function fillDeckInfo(deckChanges) {
+    // TODO avoid this circular reference
     let deckDB = require('../database/deckDatabase');
 
     // we need a deck title if we are doing a deck data update, or a deck node update
     let deckUpdates = deckChanges.filter((c) => (c.op === 'update' || (c.value && c.value.kind === 'deck') ));
-    return new Promise((resolve, reject) => {
-        async.eachSeries(deckUpdates, (rec, done) => {
-            if (rec.op === 'update') {
-                // deck data update, last path needs title
-                let [deckValue] = rec.path.slice(-1);
-                deckDB.getRevision(util.toIdentifier(deckValue)).then((deckRevision) => {
-                    deckValue.title = deckRevision.title;
-                    done();
-                }).catch(done);
-            } else {
-                // we want to add title and originRevision for old and new deck
-                deckDB.get(rec.value.ref.id).then((deck) => {
-                    if (!deck) return; // ignore errors ?
+    for (let rec of deckUpdates) {
+        if (rec.op === 'update') {
+            // deck data update, last path needs title
+            let [deckValue] = rec.path.slice(-1);
+            let deckRevision = await deckDB.getRevision(util.toIdentifier(deckValue));
 
-                    let after = deck.revisions.find((r) => r.id === rec.value.ref.revision);
-                    if (after.originRevision)
-                        rec.value.ref.originRevision = after.originRevision;
-                    rec.value.ref.title = after.title;
+            deckValue.title = deckRevision.title;
+        } else {
+            // we want to add title and originRevision for old and new deck
+            let deck = await deckDB.get(rec.value.ref.id);
+            if (!deck) continue; // ignore errors ?
 
-                    // check for fork information in add ops
-                    let origin = ['fork', 'attach', 'translate'].includes(rec.action) && deck.origin;
-                    if (origin) {
-                        rec.value.origin = origin;
-                        if (rec.action === 'translate') {
-                            rec.translatedTo = deck.language;
-                        }
-                    }
+            let after = deck.revisions.find((r) => r.id === rec.value.ref.revision);
+            if (after.originRevision) {
+                rec.value.ref.originRevision = after.originRevision;
+            }
+            rec.value.ref.title = after.title;
 
-                    if (rec.oldValue) {
-                        let before = deck.revisions.find((r) => r.id === rec.oldValue.ref.revision);
-                        if (before.originRevision)
-                            rec.oldValue.ref.originRevision = before.originRevision;
-                        rec.oldValue.ref.title = before.title;
-
-                        if (origin) {
-                            rec.oldValue.origin = origin;
-                        }
-                    }
-
-                    done();
-                }).catch(done);
+            // check for fork information in add ops
+            let origin = ['fork', 'attach'].includes(rec.action) && deck.origin;
+            if (origin) {
+                rec.value.origin = origin;
             }
 
-        }, (err) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(deckChanges);
+            if (rec.oldValue) {
+                let before = deck.revisions.find((r) => r.id === rec.oldValue.ref.revision);
+                if (before.originRevision) {
+                    rec.oldValue.ref.originRevision = before.originRevision;
+                }
+                rec.oldValue.ref.title = before.title;
+
+                if (origin) {
+                    rec.oldValue.origin = origin;
+                }
             }
-        });
+        }
+    }
 
-    });
-
+    return deckChanges;
 }

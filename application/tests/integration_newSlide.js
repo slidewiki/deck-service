@@ -2,50 +2,30 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-//Mocking is missing completely TODO add mocked objects
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
 
-describe('REST API', () => {
+chai.should();
 
-    const JWT = require('jsonwebtoken');
-    const secret = 'NeverShareYourSecret';
+describe('REST API new slide', () => {
+
+    const testServer = require('../testServer');
+    const tokenFor = testServer.tokenFor;
 
     let server;
 
-    beforeEach((done) => {
-        //Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        require('chai').should();
-        let hapi = require('hapi');
-        server = new hapi.Server();
-        server.connection({
-            host: 'localhost',
-            port: 3000
-        });
-        let plugins = [
-            require('hapi-auth-jwt2')
-        ];
-        server.register(plugins, (err) => {
-            if (err) {
-                console.error(err);
-                global.process.exit();
-            } else {
-                server.auth.strategy('jwt', 'jwt', {
-                    key: secret,
-                    validateFunc: (decoded, request, callback) => {callback(null, true);},
-                    verifyOptions: {
-                        ignoreExpiration: true
-                    },
-                    headerKey: '----jwt----',
-                });
-
-                server.start(() => {
-                    server.log('info', 'Server started at ' + server.info.uri);
-                    require('../routes.js')(server);
-                    done();
-                });
-            }
+    before(() => {
+        return testServer.init().then((newServer) => {
+            server = newServer;
+            return server.start();
         });
     });
+
+    after(() => {
+        return Promise.resolve().then(() => server && server.stop());
+    });
+
 
     let slide = {
         title: 'Dummy',
@@ -55,7 +35,7 @@ describe('REST API', () => {
         root_deck: '25-1'
     };
 
-    let authToken = JWT.sign( { userid: 1 }, secret );
+    let authToken = tokenFor(1);
 
     let options = {
         method: 'POST',

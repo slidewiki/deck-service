@@ -2,54 +2,30 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-describe('REST API', () => {
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
 
-    const JWT = require('jsonwebtoken');
-    const secret = 'NeverShareYourSecret';
-    
+chai.should();
+
+describe('REST API tags', () => {
+
+    const testServer = require('../testServer');
+    const tokenFor = testServer.tokenFor;
+
     let server;
 
-    before((done) => {
-        //Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        require('chai').should();
-        let hapi = require('hapi');
-        server = new hapi.Server();
-        server.connection({
-            host: 'localhost',
-            port: 3000
-        });
-        let plugins = [
-            require('hapi-auth-jwt2')
-        ];
-        server.register(plugins, (err) => {
-            if (err) {
-                console.error(err);
-                global.process.exit();
-            } else {
-                server.auth.strategy('jwt', 'jwt', {
-                    key: secret,
-                    validateFunc: (decoded, request, callback) => {callback(null, true);},
-                    verifyOptions: {
-                        ignoreExpiration: true
-                    },
-                    headerKey: '----jwt----',
-                });
-                
-                /*
-                const config = require('../configuration'),
-                    db = require('../database/helper');
-                db.cleanDatabase(config.MongoDB.SLIDEWIKIDATABASE);
-                */
-                
-                server.start(() => {
-                    server.log('info', 'Server started at ' + server.info.uri);
-                    require('../routes.js')(server);
-                    done();
-                });
-            }
+    before(() => {
+        return testServer.init().then((newServer) => {
+            server = newServer;
+            return server.start();
         });
     });
+
+    after(() => {
+        return Promise.resolve().then(() => server && server.stop());
+    });
+
 
     const deckData = {
         tags: [
@@ -63,7 +39,7 @@ describe('REST API', () => {
         title: 'new deck',
     };
     
-    let authToken = JWT.sign( { userid: 1 }, secret );
+    let authToken = tokenFor(1);
     
     let options = {
         method: 'PUT',

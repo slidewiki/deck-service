@@ -3,23 +3,25 @@
 /* eslint promise/no-callback-in-promise: "off" */
 'use strict';
 
-//Mocking is missing completely TODO add mocked objects
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
 
-describe('Database', () => {
-    let helper, tempDatabase = 'AwesomeMoo3000';
+chai.should();
 
-    //get modules
-    beforeEach((done) => {
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        helper = require('../database/helper.js');
-        require('chai').should();
-        let chai = require('chai');
-        let chaiAsPromised = require('chai-as-promised');
-        chai.use(chaiAsPromised);
-        helper.cleanDatabase(tempDatabase)
-        .then(() => done())
-        .catch((error) => done(error));
+const helper = require('../database/helper.js');
+
+describe('Database Helper', () => {
+    let tempDatabase = 'AwesomeMoo3000';
+
+    beforeEach(() => {
+        return helper.cleanDatabase(tempDatabase);
     });
+
+    after(() => {
+        return helper.closeConnection();
+    });
+
 
     context('when connecting to an existing database', () => {
         it('should return the correct connection object', () => {
@@ -50,14 +52,10 @@ describe('Database', () => {
 
     context('when creating a new database', () => {
         it('should contain only one collection with one object', () => {
-            let cols = helper.createDatabase(tempDatabase).then((db) => db.collections);
-            let col = helper.createDatabase(tempDatabase).then((db) => db.collection('test'));
-            return Promise.all([
-                cols.should.be.fulfilled,
-                cols.should.eventually.have.property('length', 1),
-                col.should.be.fulfilled,
-                col.then((col) => col.count()).should.eventually.not.equal(0)
-            ]);
+            return helper.createDatabase(tempDatabase).then((db) => Promise.all([
+                db.collections.should.have.property('length', 1),
+                db.collection('test').count().should.eventually.not.equal(0)
+            ]));
         });
     });
 });

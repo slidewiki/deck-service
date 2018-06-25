@@ -3,8 +3,11 @@
 const _ = require('lodash');
 
 const boom = require('boom');
+
 const deckDB = require('../database/deckDatabase');
 const groupDB = require('../database/groupsDatabase');
+const contributorsDB = require('../database/contributors');
+
 const userService = require('../services/user');
 const querystring = require('querystring');
 
@@ -132,6 +135,19 @@ let self = module.exports = {
             reply(boom.badImplementation());
         });
 
+    },
+
+    getContributors: function(request, reply) {
+        let deckId = request.params.id;
+        let variantFilter = _.pick(request.query, 'language');
+        contributorsDB.getDeckContributors(deckId, variantFilter).then((contributors) => {
+            if (!contributors) throw boom.notFound();
+            return contributors;
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
     },
 
     getDeckOwners: function(request, reply) {

@@ -2,54 +2,30 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-describe('REST API', () => {
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
 
-    const JWT = require('jsonwebtoken');
-    const secret = 'NeverShareYourSecret';
+chai.should();
+
+describe('REST API new deck', () => {
+
+    const testServer = require('../testServer');
+    const tokenFor = testServer.tokenFor;
     
     let server;
 
-    before((done) => {
-        //Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        require('chai').should();
-        let hapi = require('hapi');
-        server = new hapi.Server();
-        server.connection({
-            host: 'localhost',
-            port: 3000
-        });
-        let plugins = [
-            require('hapi-auth-jwt2')
-        ];
-        server.register(plugins, (err) => {
-            if (err) {
-                console.error(err);
-                global.process.exit();
-            } else {
-                server.auth.strategy('jwt', 'jwt', {
-                    key: secret,
-                    validateFunc: (decoded, request, callback) => {callback(null, true);},
-                    verifyOptions: {
-                        ignoreExpiration: true
-                    },
-                    headerKey: '----jwt----',
-                });
-                
-                /*
-                const config = require('../configuration'),
-                    db = require('../database/helper');
-                db.cleanDatabase(config.MongoDB.SLIDEWIKIDATABASE);
-                */
-                
-                server.start(() => {
-                    server.log('info', 'Server started at ' + server.info.uri);
-                    require('../routes.js')(server);
-                    done();
-                });
-            }
+    before(() => {
+        return testServer.init().then((newServer) => {
+            server = newServer;
+            return server.start();
         });
     });
+
+    after(() => {
+        return Promise.resolve().then(() => server && server.stop());
+    });
+
 
     const minimumDeckData = {
         title: 'new deck', // warning appears if no title is set, temporary fix
@@ -69,11 +45,6 @@ describe('REST API', () => {
             }
         ],
         title: 'new deck',
-        root_deck: '1',
-        parent_deck: {
-            id: '1',
-            revision: '1'
-        },
         abstract: 'dummy',
         comment: 'dummy',
         footer: 'dummy',
@@ -104,8 +75,8 @@ describe('REST API', () => {
         slideDimensions: { width: 800, height: 400 },
     };
     
-    let authToken = JWT.sign( { userid: 1 }, secret );
-    let authToken2 = JWT.sign( { userid: 2 }, secret );
+    let authToken = tokenFor(1);
+    let authToken2 = tokenFor(2);
     
     let options = {
         method: 'POST',
@@ -185,7 +156,7 @@ describe('REST API', () => {
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'user', 'tags');
                 revision.user.should.equal(2);
                 revision.id.should.equal(1);
-                revision.usage.should.be.an('array').and.have.length(1);
+                revision.usage.should.be.an('array').and.have.length(0);
                 revision.tags.should.be.an('array').and.have.length(2);
             });
         });
@@ -235,7 +206,7 @@ describe('REST API', () => {
                 revision.should.be.an('object').and.contain.keys('id', 'usage', 'timestamp', 'lastUpdate', 'user', 'tags');
                 revision.user.should.equal(2);
                 revision.id.should.equal(1);
-                revision.usage.should.be.an('array').and.have.length(1);
+                revision.usage.should.be.an('array').and.have.length(0);
                 revision.tags.should.be.an('array').and.have.length(2);
             });
         });

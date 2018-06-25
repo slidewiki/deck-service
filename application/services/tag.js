@@ -5,6 +5,8 @@ const Microservices = require('../configs/microservices');
 
 const self = module.exports = {
     upload: function(newTags, user){
+        if (Microservices.tag.disabled) return Promise.resolve();
+
         return rp.post({
             uri: `${Microservices.tag.uri}/tag/upload`,
             json: true,

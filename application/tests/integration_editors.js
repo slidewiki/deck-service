@@ -2,54 +2,30 @@
 /* eslint-disable func-names, prefer-arrow-callback */
 'use strict';
 
-describe('REST API', () => {
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
 
-    const JWT = require('jsonwebtoken');
-    const secret = 'NeverShareYourSecret';
-    
+chai.should();
+
+describe('REST API editors', () => {
+
+    const testServer = require('../testServer');
+    const tokenFor = testServer.tokenFor;
+
     let server;
 
-    before((done) => {
-        //Clean everything up before doing new tests
-        Object.keys(require.cache).forEach((key) => delete require.cache[key]);
-        require('chai').should();
-        let hapi = require('hapi');
-        server = new hapi.Server();
-        server.connection({
-            host: 'localhost',
-            port: 3000
-        });
-        let plugins = [
-            require('hapi-auth-jwt2')
-        ];
-        server.register(plugins, (err) => {
-            if (err) {
-                console.error(err);
-                global.process.exit();
-            } else {
-                server.auth.strategy('jwt', 'jwt', {
-                    key: secret,
-                    validateFunc: (decoded, request, callback) => {callback(null, true);},
-                    verifyOptions: {
-                        ignoreExpiration: true
-                    },
-                    headerKey: '----jwt----',
-                });
-                
-                /*
-                const config = require('../configuration'),
-                    db = require('../database/helper');
-                db.cleanDatabase(config.MongoDB.SLIDEWIKIDATABASE);
-                */
-                
-                server.start(() => {
-                    server.log('info', 'Server started at ' + server.info.uri);
-                    require('../routes.js')(server);
-                    done();
-                });
-            }
+    before(() => {
+        return testServer.init().then((newServer) => {
+            server = newServer;
+            return server.start();
         });
     });
+
+    after(() => {
+        return Promise.resolve().then(() => server && server.stop());
+    });
+
 
     const deckData = {
         title: 'new deck',
@@ -73,7 +49,7 @@ describe('REST API', () => {
         }
     };
     
-    let authToken = JWT.sign( { userid: 1 }, secret );
+    let authToken = tokenFor(1);
     
     let options = {
         method: 'GET',
@@ -128,10 +104,7 @@ describe('REST API', () => {
                     response.statusCode.should.equal(200);
                     response.payload.should.be.a('string');
                     let payload = JSON.parse(response.payload);
-                    payload.should.be.an('object').and.contain.keys('contributors', 'editors');
-                    payload.contributors.should.be.an('array').and.have.length(1);
-                    payload.contributors[0].should.be.an('object').and.contain.keys('id');
-                    payload.contributors[0].id.should.equal(1);               
+                    payload.should.be.an('object').and.contain.keys('editors');
                     payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                     payload.editors.users.should.be.an('array').and.have.length(2);
                     payload.editors.users[0].should.an('object').and.contain.keys('id', 'joined');
@@ -172,7 +145,7 @@ describe('REST API', () => {
                 payload.readOnly.should.equal(false);
             }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
-                let authToken = JWT.sign( { userid: 3 }, secret );
+                let authToken = tokenFor(3);
                 opt.headers['----jwt----'] = authToken;
                 opt.url += deckID + '-1' + '/permissions';
                 return server.inject(opt).then((response) => {
@@ -188,7 +161,7 @@ describe('REST API', () => {
                 });
             }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
-                let authToken = JWT.sign( { userid: 2 }, secret );
+                let authToken = tokenFor(2);
                 opt.headers['----jwt----'] = authToken;
                 opt.url += deckID + '-1' + '/permissions';
                 return server.inject(opt).then((response) => {
