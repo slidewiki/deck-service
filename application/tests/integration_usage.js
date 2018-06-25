@@ -928,7 +928,7 @@ describe('REST API usage', () => {
                     url: '/deck/new',
                     payload: {
                         title: 'A deck to attach',
-                        language: 'en-GB',
+                        language: 'en',
                     },
                     headers: {
                         '----jwt----': authToken,

@@ -34,7 +34,7 @@ describe('REST API deck tree', () => {
             payload: {
                 title: originalTitle,
                 theme,
-                language: 'en-GB',
+                language: 'en',
                 first_slide: {
                     title: String(0),
                 },
@@ -256,7 +256,7 @@ describe('REST API deck tree', () => {
             method: 'POST',
             url: `/deck/${deckId}/translations`,
             payload: {
-                language: 'el-GR',
+                language: 'el',
             },
             headers: {
                 '----jwt----': authToken,
@@ -268,7 +268,7 @@ describe('REST API deck tree', () => {
         response = await server.inject(`/deck/${deckId}/translations`);
         response.statusCode.should.equal(200);
         response.result.should.have.deep.members([
-            { language: 'el-GR' },
+            { language: 'el' },
         ]);
 
         // read the translations of the subdeck, should not have any new ones (no propagation)
@@ -280,8 +280,8 @@ describe('REST API deck tree', () => {
         response = await server.inject(`/decktree/${deckId}`);
         response.statusCode.should.equal(200);
         response.result.should.have.property('variants').that.has.deep.members([
-            { language: 'en-GB', original: true, title: originalTitle },
-            { language: 'el-GR' },
+            { language: 'en', original: true, title: originalTitle },
+            { language: 'el' },
         ]);
     });
 
@@ -290,7 +290,7 @@ describe('REST API deck tree', () => {
             method: 'PUT',
             url: '/decktree/node/rename',
             payload: {
-                language: 'el-GR',
+                language: 'el',
                 selector: {
                     id: String(deckId),
                     spath: '',
@@ -309,33 +309,33 @@ describe('REST API deck tree', () => {
         response = await server.inject(`/decktree/${subdeckId}`);
         response.statusCode.should.equal(200);
         response.result.should.have.property('title', 'New deck');
-        response.result.should.have.property('language', 'en-GB');
+        response.result.should.have.property('language', 'en');
         response.result.should.have.property('variants').that.includes.deep.members([
-            { language: 'en-GB', title: 'New deck', original: true },
-            { language: 'el-GR', title: 'Μια παρουσίαση στα ελληνικά' },
+            { language: 'en', title: 'New deck', original: true },
+            { language: 'el', title: 'Μια παρουσίαση στα ελληνικά' },
         ]);
 
         // read the translated deck tree
-        response = await server.inject(`/decktree/${subdeckId}?language=el-GR`);
+        response = await server.inject(`/decktree/${subdeckId}?language=el`);
         response.statusCode.should.equal(200);
         response.result.should.have.property('title', 'Μια παρουσίαση στα ελληνικά');
-        response.result.should.have.property('language', 'el-GR');
+        response.result.should.have.property('language', 'el');
         response.result.should.have.property('variants').that.has.deep.members([
-            { language: 'en-GB', title: 'New deck', original: true },
-            { language: 'el-GR', title: 'Μια παρουσίαση στα ελληνικά' },
+            { language: 'en', title: 'New deck', original: true },
+            { language: 'el', title: 'Μια παρουσίαση στα ελληνικά' },
         ]);
 
         // read the translations of the subdeck
         response = await server.inject(`/deck/${subdeckId}/translations`);
         response.statusCode.should.equal(200);
         response.result.should.have.deep.members([
-            { language: 'el-GR', title: 'Μια παρουσίαση στα ελληνικά' },
+            { language: 'el', title: 'Μια παρουσίαση στα ελληνικά' },
         ]);
 
     });
 
     it('can rename a deck tree subdeck for a language not in the translations, and automatically add it to subdeck only', async () => {
-        let language = 'de-DE';
+        let language = 'de';
         let title = 'Eine Präsentation auf Deutsch';
         let response = await server.inject({
             method: 'PUT',
@@ -360,7 +360,7 @@ describe('REST API deck tree', () => {
         response = await server.inject(`/decktree/${subdeckId}`);
         response.statusCode.should.equal(200);
         response.result.should.have.property('title', 'New deck');
-        response.result.should.have.property('language', 'en-GB');
+        response.result.should.have.property('language', 'en');
         response.result.should.have.property('variants').that.includes.deep.members([
             { language, title },
         ]);
@@ -393,7 +393,7 @@ describe('REST API deck tree', () => {
             method: 'PUT',
             url: '/decktree/node/rename',
             payload: {
-                language: 'el-GR',
+                language: 'el',
                 selector: {
                     id: String(deckId),
                     spath: '',
@@ -411,13 +411,13 @@ describe('REST API deck tree', () => {
         // read the deck tree
         response = await server.inject(`/decktree/${deckId}`);
         let slide = response.result.children[0];
-        slide.should.have.property('language', 'en-GB');
+        slide.should.have.property('language', 'en');
         slide.should.have.property('title', String(0));
 
         // read the translated deck tree
-        response = await server.inject(`/decktree/${deckId}?language=el-GR`);
+        response = await server.inject(`/decktree/${deckId}?language=el`);
         let translatedSlide = response.result.children[0];
-        translatedSlide.should.have.property('language', 'el-GR');
+        translatedSlide.should.have.property('language', 'el');
         translatedSlide.should.have.property('title', 'Μηδέν');
 
         // read the translations of the slide node
@@ -427,7 +427,7 @@ describe('REST API deck tree', () => {
             sid: slideIds[0],
         }));
         response.result.should.be.an('array').of.length(1);
-        response.result[0].should.have.property('language', 'el-GR');
+        response.result[0].should.have.property('language', 'el');
         util.toIdentifier(response.result[0]).should.equal(translatedSlide.id);
 
         // check usage of both slides
@@ -466,13 +466,13 @@ describe('REST API deck tree', () => {
         // read the deck tree
         response = await server.inject(`/decktree/${deckId}`);
         let slide = response.result.children[4];
-        slide.should.have.property('language', 'en-GB');
+        slide.should.have.property('language', 'en');
         slide.should.have.property('title', String(0));
 
         // read the translated deck tree
-        response = await server.inject(`/decktree/${deckId}?language=el-GR`);
+        response = await server.inject(`/decktree/${deckId}?language=el`);
         let translatedSlide = response.result.children[4];
-        translatedSlide.should.have.property('language', 'el-GR');
+        translatedSlide.should.have.property('language', 'el');
         translatedSlide.should.have.property('title', 'Μηδέν');
 
         // read the translations of the slide node
@@ -482,7 +482,7 @@ describe('REST API deck tree', () => {
             sid: slideIds[0],
         }));
         response.result.should.be.an('array').of.length(1);
-        response.result[0].should.have.property('language', 'el-GR');
+        response.result[0].should.have.property('language', 'el');
         util.toIdentifier(response.result[0]).should.equal(translatedSlide.id);
 
         // check usage of both slides
@@ -501,7 +501,7 @@ describe('REST API deck tree', () => {
             method: 'PUT',
             url: '/decktree/node/rename',
             payload: {
-                language: 'el-GR',
+                language: 'el',
                 selector: {
                     id: String(deckId),
                     spath: '',
@@ -523,7 +523,7 @@ describe('REST API deck tree', () => {
         slideRef.revision.should.equal(1);
 
         // read the translated deck tree
-        response = await server.inject(`/decktree/${deckId}?language=el-GR`);
+        response = await server.inject(`/decktree/${deckId}?language=el`);
         let translatedSlide = response.result.children[4];
         translatedSlide.title.should.equal('Μηδέν ξανά');
 
@@ -562,7 +562,7 @@ describe('REST API deck tree', () => {
         slide.title.should.equal('Zero');
 
         // read the translated deck tree
-        response = await server.inject(`/decktree/${deckId}?language=el-GR`);
+        response = await server.inject(`/decktree/${deckId}?language=el`);
         let translatedSlide = response.result.children[4];
         translatedSlide.title.should.equal('Μηδέν ξανά');
 
@@ -601,13 +601,13 @@ describe('REST API deck tree', () => {
         // read the deck tree
         response = await server.inject(`/decktree/${subdeckId}`);
         let slide = response.result.children[0];
-        slide.should.have.property('language', 'en-GB');
+        slide.should.have.property('language', 'en');
         slide.should.have.property('title', 'Zero');
 
         // read the translated deck tree
-        response = await server.inject(`/decktree/${subdeckId}?language=el-GR`);
+        response = await server.inject(`/decktree/${subdeckId}?language=el`);
         let translatedSlide = response.result.children[0];
-        translatedSlide.should.have.property('language', 'el-GR');
+        translatedSlide.should.have.property('language', 'el');
         translatedSlide.should.have.property('title', 'Μηδέν ξανά');
 
         // read the translations of the slide node
@@ -617,7 +617,7 @@ describe('REST API deck tree', () => {
             sid: slideIds[0],
         }));
         response.result.should.be.an('array').of.length(1);
-        response.result[0].should.have.property('language', 'el-GR');
+        response.result[0].should.have.property('language', 'el');
         util.toIdentifier(response.result[0]).should.equal(translatedSlide.id);
 
         let subdeck = util.parseIdentifier(subdeckId);
@@ -633,7 +633,7 @@ describe('REST API deck tree', () => {
     });
 
     it('should not be able to change deck primary language, but it should add a deck translation instead', async () => {
-        let language = 'de-DE';
+        let language = 'de';
         let title = 'Die Wurzel für Deckbaumtests';
         let description = 'Auf Deutsch, bitte!';
         let response = await server.inject({
@@ -649,7 +649,7 @@ describe('REST API deck tree', () => {
             },
         });
         response.statusCode.should.equal(200);
-        response.result.should.have.nested.property('revisions.0.language', 'en-GB');
+        response.result.should.have.nested.property('revisions.0.language', 'en');
 
         response = await server.inject(`/deck/${deckId}/translations`);
         response.statusCode.should.equal(200);

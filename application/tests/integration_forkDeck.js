@@ -57,7 +57,7 @@ describe('REST API fork deck', () => {
                 payload: {
                     title: 'new deck',
                     hidden: false,
-                    language: 'en_GB',
+                    language: 'en',
                 },
                 headers: {
                     'Content-Type': 'application/json',

@@ -50,7 +50,7 @@ describe('slideDatabase', () => {
         it('should return the deck when inserting one', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -75,7 +75,7 @@ describe('slideDatabase', () => {
         it('should get a previously inserted deck', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -135,7 +135,7 @@ describe('slideDatabase', () => {
         it('should be able to replace an previously inserted deck without a new revision', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -248,7 +248,7 @@ describe('slideDatabase', () => {
         it('should return the decktree of an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -272,7 +272,7 @@ describe('slideDatabase', () => {
         it('should return the active revision of an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -295,7 +295,7 @@ describe('slideDatabase', () => {
         it('should rename an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -316,7 +316,7 @@ describe('slideDatabase', () => {
         it('should insert a content item into an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -337,7 +337,7 @@ describe('slideDatabase', () => {
         it('should return flat decks of an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -359,7 +359,7 @@ describe('slideDatabase', () => {
         it('should return flat slides of an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -381,7 +381,7 @@ describe('slideDatabase', () => {
         it('should return contributors of an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },
@@ -402,7 +402,7 @@ describe('slideDatabase', () => {
         it('should fork an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
-                'language': 'en_EN',
+                'language': 'en',
                 'translation': {
                     'status': 'original'
                 },

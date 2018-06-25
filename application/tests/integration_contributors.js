@@ -37,7 +37,7 @@ describe.skip('REST API contributors', () => {
                 url: '/deck/new',
                 payload: {
                     title: 'The root for contribution tests',
-                    language: 'en-GB',
+                    language: 'en',
                     editors: { users: [1, 2, 3, 4, 5].map((id) =>
                         ({ id, joined: new Date().toISOString() })
                     )},
@@ -97,7 +97,7 @@ describe.skip('REST API contributors', () => {
                         title: 'Updated deck title',
                         description: 'Updated deck description',
                         license: 'CC BY-SA',
-                        language: 'en-GB',
+                        language: 'en',
                     },
                     headers: {
                         '----jwt----': tokenFor(ownerId),
@@ -790,7 +790,7 @@ describe.skip('REST API contributors', () => {
                     url: '/deck/new',
                     payload: {
                         title: 'A deck to attach',
-                        language: 'en-GB',
+                        language: 'en',
                     },
                     headers: {
                         '----jwt----': tokenFor(someUserId),

@@ -33,7 +33,7 @@ describe('REST API attach', () => {
                 url: '/deck/new',
                 payload: {
                     title: 'The root for usage tests',
-                    language: 'en-GB',
+                    language: 'en',
                     hidden: false,
                 },
                 headers: {
@@ -49,7 +49,7 @@ describe('REST API attach', () => {
                 method: 'POST',
                 url: `/deck/${deckId}/translations`,
                 payload: {
-                    language: 'fr-FR',
+                    language: 'fr',
                 },
                 headers: {
                     '----jwt----': authToken,
@@ -63,7 +63,7 @@ describe('REST API attach', () => {
                 method: 'POST',
                 url: `/deck/${deckId}/translations`,
                 payload: {
-                    language: 'el-GR',
+                    language: 'el',
                 },
                 headers: {
                     '----jwt----': authToken,
@@ -83,7 +83,7 @@ describe('REST API attach', () => {
                     url: '/deck/new',
                     payload: {
                         title: 'Un deck',
-                        language: 'fr-FR',
+                        language: 'fr',
                     },
                     headers: {
                         '----jwt----': authToken,
@@ -98,7 +98,7 @@ describe('REST API attach', () => {
                     method: 'POST',
                     url: `/deck/${otherDeckId}/translations`,
                     payload: {
-                        language: 'de-DE',
+                        language: 'de',
                     },
                     headers: {
                         '----jwt----': authToken,
@@ -162,8 +162,8 @@ describe('REST API attach', () => {
                 response.should.have.property('statusCode', 200);
 
                 response.result.should.have.property('variants').that.includes.deep.members([
-                    { language: 'fr-FR' },
-                    { language: 'de-DE' },
+                    { language: 'fr' },
+                    { language: 'de' },
                 ]);
 
             });
@@ -177,7 +177,7 @@ describe('REST API attach', () => {
                         url: '/deck/new',
                         payload: {
                             title: 'Una deca',
-                            language: 'es-ES',
+                            language: 'es',
                         },
                         headers: {
                             '----jwt----': authToken,
@@ -239,7 +239,7 @@ describe('REST API attach', () => {
                     response.statusCode.should.equal(200);
 
                     response.result.should.have.property('variants').that.includes.deep.members([
-                        { language: 'es-ES' },
+                        { language: 'es' },
                     ]);
 
                 });
