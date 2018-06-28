@@ -117,24 +117,45 @@ const self = module.exports = {
 
     // returns a flattened structure of a deck's slides, and optionally its sub-decks
     // NEW implementation, old should be deprecated
-    getFlatSlides: async function(deckId, variantFilter, deckTree) {
+    getFlatSlides: async function(deckId, variantFilter) {
+        let result = await self.getFlatItems(deckId, variantFilter);
+        // remove the decks
+        _.remove(result.children, { type: 'deck' });
+        return result;
+    },
+
+    getFlatItems: async function(deckId, variantFilter, deckTree) {
         let deck = await deckDB.getDeck(deckId, variantFilter);
         if (!deck) return; // not found
 
         // make it canonical
         deckId = util.toIdentifier(deck);
+
+        let deckEntry = {
+            type: 'deck',
+            id: deckId,
+            title: deck.title,
+            language: deck.language,
+            theme: deck.theme,
+            allowMarkdown: deck.allowMarkdown,
+            user: String(deck.user),
+        };
+
         if (!deckTree) {
             // info of root deck
-            deckTree = {
-                type: 'deck',
-                id: deckId,
-                title: deck.title,
-                lanugage: deck.language,
-                theme: deck.theme,
-                allowMarkdown: deck.allowMarkdown,
-                user: String(deck.user),
+            deckTree = Object.assign(deckEntry, {
                 children: [],
-            };
+            });
+        } else {
+            // check for cycles!
+            if (_.find(deckTree.children, { type: 'deck', id: deckId })) {
+                // TODO for now just pretend it's not there
+                console.warn(`found cycle in deck tree ${deckTree.id}, deck node ${deckId}`);
+                return deckTree;
+            }
+
+            // else push the deck as well
+            deckTree.children.push(deckEntry);
         }
 
         for (let item of deck.contentItems) {
@@ -168,7 +189,7 @@ const self = module.exports = {
             } else {
                 // it's a deck
                 // call recursively for subdecks
-                await self.getFlatSlides(itemId, variantFilter, deckTree);
+                await self.getFlatItems(itemId, variantFilter, deckTree);
                 // deckTree will receive the rest of the slides
             }
         }
