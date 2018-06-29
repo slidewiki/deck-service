@@ -866,13 +866,14 @@ const self = module.exports = {
         // normalize the id
         targetId = util.toIdentifier(parentDeck);
 
-        // assign data from parent deck
-        Object.assign(payload, _.pick(parentDeck, [
+        // assign missing data from parent deck 
+        payload = Object.assign(_.pick(parentDeck, [
             'language',
             'license',
-        ]));
+        ]), payload);
+
         if (parentDeck.slideDimensions) {
-            payload.dimensions= parentDeck.slideDimensions;
+            payload.dimensions = parentDeck.slideDimensions;
         }
 
         // add it to database
