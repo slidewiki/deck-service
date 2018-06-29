@@ -85,7 +85,7 @@ describe('REST API deck tree', () => {
             });
             response.statusCode.should.equal(200);
 
-            response.result.should.have.keys('id', 'type', 'title');
+            response.result.should.have.keys('id', 'type', 'title', 'theme');
             response.result.type.should.equal('slide');
             response.result.title.should.equal(String(i + 1));
 
@@ -160,7 +160,7 @@ describe('REST API deck tree', () => {
             },
         });
         response.statusCode.should.equal(200);
-        response.result.should.have.keys('id', 'type', 'title');
+        response.result.should.have.keys('id', 'type', 'title', 'theme');
         let slideId = response.result.id;
 
         // read the deck tree

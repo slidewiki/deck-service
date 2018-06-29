@@ -888,6 +888,9 @@ const self = module.exports = {
             console.warn(`could not create thumbnail for slide ${newSlideId}, error was: ${err.message}`);
         });
 
+        // add theme to content item
+        newContentItem.theme = updatedDeckRevision.theme;
+
         // return the new content item
         return newContentItem;
     },

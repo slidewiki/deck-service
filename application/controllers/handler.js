@@ -215,13 +215,14 @@ let self = module.exports = {
                                 console.warn(`could not create thumbnail for updated slide ${newSlideId}, error was: ${err.message}`);
                             });
 
-                            reply(newSlide);
+                            newSlide.theme = slideRef.theme;
+                            return newSlide;
                         });
                     });
                 });
             });
 
-        }).catch((err) => {
+        }).then(reply).catch((err) => {
             if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
@@ -495,7 +496,7 @@ let self = module.exports = {
             }
 
             return treeDB.createSlide(newSlide, newDeckId, 0, newDeckId, userId)
-            .then((newContentItem) => co.rewriteID(inserted));
+            .then(() => co.rewriteID(inserted));
 
         }).then(reply).catch((err) => {
             if (err.isBoom) return reply(err);

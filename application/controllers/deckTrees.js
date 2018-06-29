@@ -250,7 +250,12 @@ const self = module.exports = {
                                         }
 
                                         // return the node data, same as the original
-                                        return { title: slideNode.slide.title, id: util.toIdentifier(newContentItem.ref), type: 'slide' };
+                                        return {
+                                            type: 'slide' ,
+                                            id: util.toIdentifier(newContentItem.ref),
+                                            title: slideNode.slide.title,
+                                            theme,
+                                        };
                                     });
 
                                 });
@@ -288,7 +293,12 @@ const self = module.exports = {
                         return treeDB.createSlide(newSlidePayload, target.parentId, target.position + 1, rootId, userId, addAction).then((newContentItem) => {
                             let newSlideId = util.toIdentifier(newContentItem.ref);
                             // return the node data, same as the original
-                            return { title: slide.title, id: newSlideId, type: 'slide' };
+                            return {
+                                type: 'slide',
+                                id: newSlideId,
+                                title: slide.title,
+                                theme: newContentItem.theme,
+                            };
                         });
                     });
                 }
@@ -314,15 +324,18 @@ const self = module.exports = {
 
                     // slide is now inserted, so we can create the thumbnail using the (direct) parent deck theme
                     let newSlideId = util.toIdentifier(newContentItem.ref);
-                    // TODO set this to proper value 
-                    let theme = 'default';
                     // don't wait for it before returning
-                    fileService.createThumbnail(newSlidePayload.content, newSlideId, theme).catch((err) => {
+                    fileService.createThumbnail(newSlidePayload.content, newSlideId, newContentItem.theme).catch((err) => {
                         console.warn(`could not create thumbnail for new slide ${newSlideId}: ${err.message || err}`);
                     });
 
                     // return the node
-                    return { title: newSlidePayload.title, id: newSlideId, type: 'slide' };
+                    return {
+                        type: 'slide',
+                        id: newSlideId,
+                        title: newSlidePayload.title,
+                        theme: newContentItem.theme,
+                    };
                 });
 
             }
