@@ -267,14 +267,14 @@ describe('REST API deck tree', () => {
         // read the translations
         response = await server.inject(`/deck/${deckId}/translations`);
         response.statusCode.should.equal(200);
-        response.result.should.have.deep.members([
+        response.result.should.include.deep.members([
             { language: 'el' },
         ]);
 
         // read the translations of the subdeck, should not have any new ones (no propagation)
         response = await server.inject(`/deck/${subdeckId}/translations`);
         response.statusCode.should.equal(200);
-        response.result.should.be.an('array').of.length(0);
+        response.result.should.be.an('array').of.length(1);
 
         // read the deck tree, should include both original and translation
         response = await server.inject(`/decktree/${deckId}`);
@@ -328,7 +328,7 @@ describe('REST API deck tree', () => {
         // read the translations of the subdeck
         response = await server.inject(`/deck/${subdeckId}/translations`);
         response.statusCode.should.equal(200);
-        response.result.should.have.deep.members([
+        response.result.should.include.deep.members([
             { language: 'el', title: 'Μια παρουσίαση στα ελληνικά' },
         ]);
 
@@ -426,9 +426,9 @@ describe('REST API deck tree', () => {
             stype: 'slide',
             sid: slideIds[0],
         }));
-        response.result.should.be.an('array').of.length(1);
-        response.result[0].should.have.property('language', 'el');
-        util.toIdentifier(response.result[0]).should.equal(translatedSlide.id);
+        response.result.should.be.an('array').of.length(2);
+        response.result[1].should.have.property('language', 'el');
+        util.toIdentifier(response.result[1]).should.equal(translatedSlide.id);
 
         // check usage of both slides
         response = await server.inject(`/slide/${slide.id}`);
@@ -481,9 +481,9 @@ describe('REST API deck tree', () => {
             stype: 'slide',
             sid: slideIds[0],
         }));
-        response.result.should.be.an('array').of.length(1);
-        response.result[0].should.have.property('language', 'el');
-        util.toIdentifier(response.result[0]).should.equal(translatedSlide.id);
+        response.result.should.be.an('array').of.length(2);
+        response.result[1].should.have.property('language', 'el');
+        util.toIdentifier(response.result[1]).should.equal(translatedSlide.id);
 
         // check usage of both slides
         response = await server.inject(`/slide/${slide.id}`);
@@ -616,9 +616,9 @@ describe('REST API deck tree', () => {
             stype: 'slide',
             sid: slideIds[0],
         }));
-        response.result.should.be.an('array').of.length(1);
-        response.result[0].should.have.property('language', 'el');
-        util.toIdentifier(response.result[0]).should.equal(translatedSlide.id);
+        response.result.should.be.an('array').of.length(2);
+        response.result[1].should.have.property('language', 'el');
+        util.toIdentifier(response.result[1]).should.equal(translatedSlide.id);
 
         let subdeck = util.parseIdentifier(subdeckId);
         // check usage of both slides

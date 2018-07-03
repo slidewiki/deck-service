@@ -2175,7 +2175,12 @@ let self = module.exports = {
         let deck = await self.getDeck(deckId);
         if (!deck) return;
 
-        return deck.variants || [];
+        // also put the original (non-variant) data in a separate object here
+        let originalData = Object.assign({
+            original: true,
+        }, _.pick(deck, 'title', 'description', 'language'));
+
+        return [originalData, ...(deck.variants || [])];
     },
 
     addDeckVariant: async function(deckId, variantData, userId, rootId) {

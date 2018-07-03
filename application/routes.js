@@ -957,8 +957,8 @@ module.exports = function(server) {
                 query: {
                     id: Joi.string().required(),
                     spath: Joi.string().empty(''),
-                    stype: Joi.string().default('slide'),
-                    sid: Joi.string().required(),
+                    stype: Joi.string().empty(''),
+                    sid: Joi.string().empty(''),
                 },
             },
             tags: ['api'],

@@ -1435,9 +1435,11 @@ let self = module.exports = {
         return deckDB.getDeck(rootDeckId).then((rootDeck) => {
             if (!rootDeck) throw boom.notFound();
 
-            // let's only worry about slides for now
-            if (request.query.stype !== 'slide') {
-                throw boom.badRequest('getting translations for a subdeck is not supported');
+            if (!request.query.sid || request.query.stype === 'deck') {
+                // TODO check if node exists
+
+                let deckId = request.query.sid || request.query.id;
+                return deckDB.getDeckVariants(deckId);
             }
 
             let slideId = request.query.sid;
@@ -1446,12 +1448,15 @@ let self = module.exports = {
                     throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootDeckId}`);
                 }
 
-                reply(slideNode.variants);
+                // also add the original slide in the response
+                return [Object.assign({
+                    original: true
+                }, _.pick(slideNode.slide, 'id', 'revision', 'language')),
+                ...slideNode.variants];
             });
 
-        }).catch((err) => {
+        }).then(reply).catch((err) => {
             if (err.isBoom) return reply(err);
-
             request.log('error', err);
             reply(boom.badImplementation());
         });
