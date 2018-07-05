@@ -202,13 +202,15 @@ const self = module.exports = {
         let rootId = request.payload.selector.id;
         let userId = request.auth.credentials.userid;
 
+        let nodeSpec = request.payload.nodeSpec;
+
         // parse the source node spec
         let source = {
-            kind: request.payload.nodeSpec.type,
-            rootId: request.payload.nodeSpec.root,
+            kind: nodeSpec.type,
+            rootId: nodeSpec.root,
         };
-        if (request.payload.nodeSpec.id && request.payload.nodeSpec.id !== '0') {
-            source.id = request.payload.nodeSpec.id;
+        if (nodeSpec.id && nodeSpec.id !== '0') {
+            source.id = nodeSpec.id;
         }
 
         // parse the create node target
@@ -315,7 +317,17 @@ const self = module.exports = {
                     'content',
                     'license',
                     'speakernotes',
+                ]), _.pick(nodeSpec.slide, [
+                    // override old root level options with new one under nodeSpec if available
+                    'title',
+                    'content',
+                    'markdown',
+                    'speakernotes',
+                    'language',
+                    'license',
+                    'dimensions',
                 ]));
+
                 return treeDB.createSlide(newSlidePayload, target.parentId, target.position + 1, rootId, userId).then((newContentItem) => {
                     if (!newContentItem) {
                         // could not find the target.parentId
@@ -356,15 +368,32 @@ const self = module.exports = {
             }
 
             // id is not specified, we need to make a new deck
-            let newDeckPayload = {
+            let newDeckPayload = Object.assign({
+                // defaults
                 title: 'New deck',
                 description: '',
-            };
+            }, _.pick(nodeSpec.deck, [
+                // override with nodeSpec payload if available
+                'title',
+                'description',
+                'language',
+                'license',
+                'theme',
+                'allowMarkdown',
+                'slideDimensions',
+            ]));
+
             return treeDB.createSubdeck(newDeckPayload, target.parentId, target.position + 1, rootId, userId).then((newContentItem) => {
                 if (!newContentItem) {
                     // could not find the target.parentId
                     throw boom.badData(`could not locate specified deck: ${target.parentId}`);
                 }
+
+                if (nodeSpec.deck && nodeSpec.deck.empty) {
+                    // skip adding a slide!
+                    return treeDB.getDeckTree(newContentItem.ref.id);
+                }
+
                 // this creates an empty subdeck, let's also add a sample slide
                 // init the payload from the optional slide data in the call
                 let newSlidePayload = Object.assign({
@@ -378,6 +407,15 @@ const self = module.exports = {
                     'content',
                     'license',
                     'speakernotes',
+                ]), _.pick(nodeSpec.slide, [
+                    // override old root level options with new one under nodeSpec if available
+                    'title',
+                    'content',
+                    'markdown',
+                    'speakernotes',
+                    'language',
+                    'license',
+                    'dimensions',
                 ]));
 
                 return treeDB.createSlide(newSlidePayload, util.toIdentifier(newContentItem.ref), 0, rootId, userId)

@@ -346,6 +346,7 @@ module.exports = function(server) {
                         })).default([])
                     }),
                     hidden: Joi.boolean().default(true),
+                    empty: Joi.boolean().default(false).description('Set this to true to skip adding a new slide under the new deck'),
                 }),
 
                 headers: Joi.object({
@@ -850,8 +851,33 @@ module.exports = function(server) {
                             id: Joi.string(),
                             type: Joi.string(),
                             root: Joi.string(),
+
+                            // if type is deck, both may be used if available, 
+                            // otherwise only `slide` payload
+                            deck: Joi.object().keys({
+                                title: Joi.string(),
+                                description: Joi.string().allow('').default(''),
+                                language: languageModel,
+                                license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                                theme: availableThemes,
+                                allowMarkdown: Joi.boolean(),
+                                slideDimensions: slideDimensions,
+                                empty: Joi.boolean().default(false).description('Set this to true to skip adding a new slide under the new deck'),
+                            }).options({ stripUnknown: true }),
+
+                            slide: Joi.object().keys({
+                                title: Joi.string(),
+                                content: Joi.string(),
+                                markdown: Joi.string(),
+                                speakernotes: Joi.string(),
+                                language: languageModel,
+                                license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
+                                dimensions: slideDimensions,
+                            }).options({ stripUnknown: true }),
+
                         })
                     ).single(),
+                    // TODO remove the following
                     content: Joi.string(),
                     title: Joi.string(),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),

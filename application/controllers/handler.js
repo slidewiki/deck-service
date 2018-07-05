@@ -474,6 +474,11 @@ let self = module.exports = {
             if (!inserted) throw boom.badData();
             let newDeckId = String(inserted._id) + '-1';
 
+            if (request.payload.empty) {
+                // skip creating a new slide
+                return co.rewriteID(inserted);
+            }
+
             // create a new slide inside the new deck
             let newSlide = Object.assign({
                 // defaults
