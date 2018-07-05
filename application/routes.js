@@ -27,8 +27,8 @@ apiModels.tag = require('./models/JoiModels/tag');
 apiModels.group = require('./models/JoiModels/group');
 
 // only support two-character language codes
-// TODO also add validation
-const languageModel = Joi.string().regex(/[a-z]{2}([_-][A-Z]{2})?/).max(2).truncate();
+// TODO also add validation: regex(/[a-z]{2}([_-][A-Z]{2})?/)
+const languageModel = Joi.string().max(2).truncate().lowercase().regex(/[a-z]{2}/);
 
 module.exports = function(server) {
 
