@@ -868,8 +868,8 @@ module.exports = function(server) {
                             slide: Joi.object().keys({
                                 title: Joi.string(),
                                 content: Joi.string(),
-                                markdown: Joi.string(),
-                                speakernotes: Joi.string(),
+                                markdown: Joi.string().allow([null, '']).empty([null, '']),
+                                speakernotes: Joi.string().allow([null, '']).empty([null, '']),
                                 language: languageModel,
                                 license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                                 dimensions: slideDimensions,
