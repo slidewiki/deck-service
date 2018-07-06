@@ -838,13 +838,13 @@ const self = module.exports = {
         targetId = util.toIdentifier(parentDeck);
 
         // assign data from parent deck
-        Object.assign(payload, _.pick(parentDeck, [
+        payload = Object.assign(_.pick(parentDeck, [
             'language',
             'license',
             'theme',
             'allowMarkdown',
             'slideDimensions',
-        ]));
+        ]), payload);
 
         // add it to database
         let newDeck = await deckDB.insert(payload, userId, true);
@@ -866,15 +866,16 @@ const self = module.exports = {
         // normalize the id
         targetId = util.toIdentifier(parentDeck);
 
-        // assign missing data from parent deck 
-        payload = Object.assign(_.pick(parentDeck, [
+        // assign missing data from parent deck
+        let defaults = _.pick(parentDeck, [
             'language',
             'license',
-        ]), payload);
-
+        ]);
         if (parentDeck.slideDimensions) {
-            payload.dimensions = parentDeck.slideDimensions;
+            defaults.dimensions = parentDeck.slideDimensions;
         }
+        // but override parent defaults with whatever is in payload
+        payload = Object.assign(defaults, payload);
 
         // add it to database
         let newSlide = await slideDB.insert(payload, userId);
