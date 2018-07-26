@@ -6,8 +6,6 @@ const boom = require('boom');
 const slideDB = require('../database/slideDatabase');
 const contributorsDB = require('../database/contributors');
 
-const userService = require('../services/user');
-
 let self = module.exports = {
 
     getContributors: function(request, reply) {
