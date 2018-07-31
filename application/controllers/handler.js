@@ -21,7 +21,6 @@ const boom = require('boom'),
 // TODO remove this from here after we've refactored all database-specific code into slide/deck database js files
 const ChangeLog = require('../lib/ChangeLog');
 
-const userService = require('../services/user');
 const tagService = require('../services/tag');
 const fileService = require('../services/file');
 
@@ -1655,15 +1654,12 @@ let self = module.exports = {
         deckDB.getAllRecent(limit, offset).then( (recentDecks) => {
             if(!recentDecks) return reply([]);
 
-            let userIds = new Set(), countForksIds = new Set();
-
-            // collect user ids and deck ids to count forks needed
+            let countForksIds = new Set();
+            // collect deck ids to count forks needed
             recentDecks.forEach( (deck) => {
-                userIds.add(deck.user);
                 countForksIds.add(deck._id);
             });
-
-            // count deck forks for the abouve deck ids
+            // count deck forks for the above deck ids
             let forkCounts = {};
             let forkCountsPromise = deckDB.countManyDeckForks([...countForksIds]).then( (forkCountsInfo) => {
                 forkCountsInfo.forEach( (forkCount) => {
@@ -1671,15 +1667,7 @@ let self = module.exports = {
                 });
             });
 
-            // fetch usernames for user ids needed
-            let usernames = {};
-            let userPromise = userService.fetchUserInfo([...userIds]).then( (userInfo) => {
-                userInfo.forEach( (u) => {
-                    usernames[u.id] = u.username;
-                });
-            });
-
-            return Promise.all([userPromise, forkCountsPromise]).then( () => {
+            return forkCountsPromise.then( () => {
 
                 recentDecks = recentDecks.map( (deck) => {
 
@@ -1695,7 +1683,6 @@ let self = module.exports = {
                         title: activeRevision.title,
                         description: deck.description,
                         user: deck.user,
-                        username: (usernames[deck.user]) ? usernames[deck.user] : 'Unknown user',
                         active: deck.active,
                         countRevisions: deck.revisions.length,
                         timestamp: deck.timestamp,
@@ -1728,15 +1715,12 @@ let self = module.exports = {
         deckDB.getAllFeatured(limit, offset).then( (featuredDecks) => {
             if(!featuredDecks) return reply([]);
 
-            let userIds = new Set(), countForksIds = new Set();
-
-            // collect user ids and deck ids to count forks needed
+            let countForksIds = new Set();
+            // collect deck ids to count forks needed
             featuredDecks.forEach( (deck) => {
-                userIds.add(deck.user);
                 countForksIds.add(deck._id);
             });
-
-            // count deck forks for the abouve deck ids
+            // count deck forks for the above deck ids
             let forkCounts = {};
             let forkCountsPromise = deckDB.countManyDeckForks([...countForksIds]).then( (forkCountsInfo) => {
                 forkCountsInfo.forEach( (forkCount) => {
@@ -1744,15 +1728,7 @@ let self = module.exports = {
                 });
             });
 
-            // fetch usernames for user ids needed
-            let usernames = {};
-            let userPromise = userService.fetchUserInfo([...userIds]).then( (userInfo) => {
-                userInfo.forEach( (u) => {
-                    usernames[u.id] = u.username;
-                });
-            });
-
-            return Promise.all([userPromise, forkCountsPromise]).then( () => {
+            return forkCountsPromise.then( () => {
                 featuredDecks = featuredDecks.map( (deck) => {
 
                     // get active revision
@@ -1767,7 +1743,6 @@ let self = module.exports = {
                         title: activeRevision.title,
                         description: deck.description,
                         user: deck.user,
-                        username: (usernames[deck.user]) ? usernames[deck.user] : 'Unknown user',
                         active: deck.active,
                         countRevisions: deck.revisions.length,
                         timestamp: deck.timestamp,
