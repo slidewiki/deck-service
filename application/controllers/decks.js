@@ -33,6 +33,10 @@ let self = module.exports = {
             });
         }
 
+        if (request.query.usergroup) {
+            query['editors.groups.id'] = request.query.usergroup;
+        }
+
         // the roles, status parameters have priviliged semantics:
         let roles = request.query.roles && request.query.roles.split(',') || [];
         let currentUser = request.auth.credentials && request.auth.credentials.userid;
