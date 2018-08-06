@@ -45,6 +45,7 @@ module.exports = function(server) {
                 }).unknown(),
                 query: {
                     user: Joi.number().integer().description('Return only decks owned by user with set id'),
+                    usergroup: Joi.number().integer().description('Return only decks owned or managed by the user group'),
                     rootsOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only root decks, i.e. decks that are not subdecks'),
                     idOnly: Joi.boolean().truthy('1').falsy('0', '').default(false).description('Return only deck ids, no metadata. Ignores paging, roles, status or authentication'),
                     roles: Joi.string().regex(/^(owner(,editor)?)$|^(editor(,owner)?)$/).empty('').description('A comma delimited list of roles (values: [owner, editor])'),
