@@ -32,7 +32,13 @@ let self = module.exports = {
         deckDB.get(deckId).then( (deck) => {
             if(!deck)   return reply(boom.notFound());
 
-            return groupDB.getDeckGroups(deckId, request.query.user, request.query.usergroup).then( (groups) => {
+            return groupDB.getDeckGroups(deckId, request.query.user, request.query.usergroup, request.query.countOnly).then( (groups) => {
+                
+                // return only the count of groups
+                if (request.query.countOnly) {
+                    return reply(groups);
+                }
+
                 return reply(groups.map( (group) => {
                     // remove contained deck ids from deck groups found
                     delete group.decks;
