@@ -13,7 +13,7 @@ module.exports = function() {
     });
 
     let groupsIndexes = helper.getCollection('groups').then((groups) => {
-    	return groups.createIndexes([
+        return groups.createIndexes([
             { key: {'user': 1} },
             { key: {'userGroup': 1} },
             { key: {'decks': 1} },
