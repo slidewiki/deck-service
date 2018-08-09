@@ -1589,7 +1589,8 @@ module.exports = function(server) {
                     usergroup: [
                         Joi.number().integer().description('a user group id'),
                         Joi.array().items(Joi.number().integer()).description('array of user group ids')
-                    ]
+                    ], 
+                    countOnly: Joi.boolean().truthy('1').falsy('0', ''),
                 }
             },
             tags: ['api'],

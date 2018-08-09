@@ -29,8 +29,7 @@ let self = module.exports = {
         }));
     },
 
-    getDeckGroups: function(deckId, userId, usergroup){
-
+    getDeckGroups: function(deckId, userId, usergroup, countOnly){
         // form conditions based on the filters given
         let conditions = [];
         if(userId){
@@ -52,13 +51,20 @@ let self = module.exports = {
             };
         }
 
-        return getGroupsCollection()
-        .then((groups) => groups.find({
+        let query = {
             $and: [
                 {decks: deckId}, 
                 queryConditions
             ]
-        }))
+        };
+
+        if (countOnly) {
+            return getGroupsCollection()
+            .then((groups) => groups.find(query).count());
+        }
+
+        return getGroupsCollection()
+        .then((groups) => groups.find(query))
         .then((stream) => stream.toArray());
     },
 
