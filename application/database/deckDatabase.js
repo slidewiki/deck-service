@@ -2499,7 +2499,8 @@ function convertToNewDeck(deck){
             contentItems: deck.contentItems || [],
             variants: deck.variants || [],
             theme: deck.theme,
-            allowMarkdown: deck.allowMarkdown
+            allowMarkdown: deck.allowMarkdown,
+            educationLevel: deck.educationLevel,
         }]
     };
 

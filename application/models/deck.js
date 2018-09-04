@@ -56,6 +56,10 @@ const trackedDeckRevisionProperties = {
         },
     },
 
+    educationLevel: {
+        type: 'string',
+    },
+
     variants: {
         type: 'array',
         items: {
