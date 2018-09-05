@@ -2469,11 +2469,34 @@ function convertToNewDeck(deck){
         // all new decks (or subdecks) are hidden by default unless overriden
         deck.hidden = true;
     }
+
+    // clean up nulls / undefined
+    let revision = _.omitBy({
+        id: 1,
+        usage: [],
+        title: deck.title,
+        timestamp: now.toISOString(),
+        lastUpdate: now.toISOString(),
+        user: deck.user,
+        language: deck.language,
+        parent: deck.parent_deck,
+        tags: deck.tags,
+        comment: deck.comment,
+        abstract: deck.abstract,
+        footer: deck.footer,
+        contentItems: deck.contentItems || [],
+        variants: deck.variants || [],
+        theme: deck.theme,
+        allowMarkdown: deck.allowMarkdown,
+        educationLevel: deck.educationLevel,
+    }, _.isNil);
+
     //should we have a default accessLevel?
-    const result = {
+    return _.omitBy({
         _id: deck._id,
         user: deck.user,
         hidden: deck.hidden,
+        origin: deck.origin,
         accessLevel: deck.accessLevel,
         editors: deck.editors,
         timestamp: now.toISOString(),
@@ -2482,37 +2505,11 @@ function convertToNewDeck(deck){
         lastUpdate: now.toISOString(),
         datasource: deck.datasource,
         license: deck.license,
+        slideDimensions: deck.slideDimensions,
         active: 1,
-        revisions: [{
-            id: 1,
-            usage: [],
-            title: deck.title,
-            timestamp: now.toISOString(),
-            lastUpdate: now.toISOString(),
-            user: deck.user,
-            language: deck.language,
-            parent: deck.parent_deck,
-            tags: deck.tags,
-            comment: deck.comment,
-            abstract: deck.abstract,
-            footer: deck.footer,
-            contentItems: deck.contentItems || [],
-            variants: deck.variants || [],
-            theme: deck.theme,
-            allowMarkdown: deck.allowMarkdown,
-            educationLevel: deck.educationLevel,
-        }]
-    };
+        revisions: [revision]
+    }, _.isNil);
 
-    if (deck.slideDimensions) {
-        result.slideDimensions = deck.slideDimensions;
-    }
-
-    if (deck.origin) {
-        result.origin = deck.origin;
-    }
-
-    return result;
 }
 
 function pushIfNotExist(editorsList, toBeInserted){
