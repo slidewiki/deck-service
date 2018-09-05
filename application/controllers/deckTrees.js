@@ -381,6 +381,7 @@ const self = module.exports = {
                 'theme',
                 'allowMarkdown',
                 'slideDimensions',
+                'educationLevel',
             ]));
 
             return treeDB.createSubdeck(newDeckPayload, target.parentId, target.position + 1, rootId, userId).then((newContentItem) => {
