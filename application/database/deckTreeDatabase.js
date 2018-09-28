@@ -119,6 +119,8 @@ const self = module.exports = {
     // NEW implementation, old should be deprecated
     getFlatSlides: async function(deckId, variantFilter) {
         let result = await self.getFlatItems(deckId, variantFilter);
+        if (!result) return;
+
         // remove the decks
         _.remove(result.children, { type: 'deck' });
         return result;
