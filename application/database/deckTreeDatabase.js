@@ -130,6 +130,12 @@ const self = module.exports = {
         let deck = await deckDB.getDeck(deckId, variantFilter);
         if (!deck) return; // not found
 
+        if (_.isEmpty(variantFilter)) {
+            // we request the deck tree in the primary language of its root
+            // we need to explicitly include that for subdecks so that it properly propagates
+            variantFilter = _.pick(deck, 'language');
+        }
+
         // make it canonical
         deckId = util.toIdentifier(deck);
 

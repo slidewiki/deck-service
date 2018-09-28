@@ -2875,23 +2875,20 @@ let self = module.exports = {
 
     // get first slide
     getFirstSlide: function(revision) {
-        // TODO two bugs in this code just by looking at it,
-        // (1) it assumes first contentItem is slide
-        // (2) it assumes there's at least one slide in contentItems, could be in subdecks
-        // (3) it keeps iteration even though it found it
-        let firstSlide;
-        for (let key in revision.contentItems) {
-            if (revision.contentItems[key].order === 1
-                && revision.contentItems[key].kind === 'slide') {
-                firstSlide = revision.contentItems[key].ref.id;
+        // TODO this code assumes there's at least one slide in contentItems, could be in subdecks
 
-                if (revision.contentItems[key].ref.revision) {
-                    firstSlide += '-' + revision.contentItems[key].ref.revision;
-                }
+        let firstSlideItem = revision.contentItems.find((item) => item.kind === 'slide');
+        if (!firstSlideItem) return;
+
+        // we need to pick the slide in the revision language
+        if (!_.isEmpty(firstSlideItem.variants)) {
+            let variant = firstSlideItem.variants.find((v) => v.language === revision.language);
+            if (variant) {
+                return util.toIdentifier(variant);
             }
         }
 
-        return firstSlide;
+        return util.toIdentifier(firstSlideItem.ref);
     },
 
     archiveDeck: async function(deckId, userId, reason='spam', comment) {
