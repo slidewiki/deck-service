@@ -21,12 +21,6 @@ const self = module.exports = {
         let deck = await deckDB.getDeck(deckId, variantFilter);
         if (!deck) return; // not found
 
-        if (_.isEmpty(variantFilter)) {
-            // we request the deck tree in the primary language of its root
-            // we need to explicitly include that for subdecks so that it properly propagates
-            variantFilter = _.pick(deck, 'language');
-        }
-
         // make it canonical
         deckId = util.toIdentifier(deck);
         let deckTree = {
@@ -42,18 +36,48 @@ const self = module.exports = {
             children: [],
         };
 
+        // we also push the current deck language (may not actually be the primary)
+        let selfVariant = _.pick(deckTree, 'language');
+        if (!_.find(deckTree.variants, selfVariant) ) {
+            deckTree.variants.push(selfVariant);
+        }
+
+        let primaryVariant = _.find(deckTree.variants, { original: true });
+        // we need to tag as 'original' the primary variant of the deck
+        if (!primaryVariant) {
+            // means we didn't include a filter or the filter did not match a variant
+            // also means the node has the primary version
+
+            // first try and locate that
+            primaryVariant = _.find(deckTree.variants, _.pick(deckTree, 'language'));
+            if (primaryVariant) {
+                // tag it and also include the title if not already there
+                Object.assign(primaryVariant, _.pick(deckTree, 'title'), { original: true });
+            } else {
+                primaryVariant = Object.assign({ original: true }, _.pick(deckTree, 'language', 'title'));
+                deckTree.variants.push(primaryVariant);
+            }
+
+        }
+
+        if (_.isEmpty(variantFilter)) {
+            // we request the deck tree in the primary language of its root
+            // we need to explicitly include that for subdecks so that it properly propagates
+            variantFilter = _.pick(deck, 'language');
+        }
+
         for (let item of deck.contentItems) {
             let itemId = util.toIdentifier(item.ref);
             if (item.kind === 'slide') {
-                if (!_.isEmpty(variantFilter)) {
-                    // fetch the correct slide reference
-                    let slideVariant = _.find(item.variants, variantFilter);
-                    if (slideVariant) {
-                        // set the correct variant itemId
-                        itemId = util.toIdentifier(slideVariant);
-                    }
+                // variantFilter is never empty here
+                // fetch the correct slide reference
+                // also try to fallback to the primary language if available
+                let slideVariant = _.find(item.variants, variantFilter) || _.find(item.variants, _.pick(primaryVariant, 'language'));
+                if (slideVariant) {
+                    // set the correct variant itemId
+                    itemId = util.toIdentifier(slideVariant);
                 }
-                // if no variantFilter, or no matching variant, item is the original slide
+                // if no matching variant, item is the original slide
 
                 let slide = await slideDB.getSlideRevision(itemId);
                 deckTree.children.push({
@@ -87,29 +111,6 @@ const self = module.exports = {
                     }
                 });
             }
-        }
-
-        // we also push the current deck language (may not actually be the primary)
-        let selfVariant = _.pick(deckTree, 'language');
-        if (!_.find(deckTree.variants, selfVariant) ) {
-            deckTree.variants.push(selfVariant);
-        }
-
-        // we need to tag as 'original' the primary variant of the deck
-        if (!_.find(deckTree.variants, { original: true })) {
-            // means we didn't include a filter or the filter did not match a variant
-            // also means the node has the primary version
-
-            // first try and locate that
-            let primaryVariant = _.find(deckTree.variants, _.pick(deckTree, 'language'));
-            if (primaryVariant) {
-                // tag it and also include the title if not already there
-                Object.assign(primaryVariant, _.pick(deckTree, 'title'), { original: true });
-            } else {
-                primaryVariant = Object.assign({ original: true }, _.pick(deckTree, 'language', 'title'));
-                deckTree.variants.push(primaryVariant);
-            }
-
         }
 
         return deckTree;
