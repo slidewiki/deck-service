@@ -70,16 +70,25 @@ const self = module.exports = {
             let itemId = util.toIdentifier(item.ref);
             if (item.kind === 'slide') {
                 // variantFilter is never empty here
-                // fetch the correct slide reference
-                // also try to fallback to the primary language if available
-                let slideVariant = _.find(item.variants, variantFilter) || _.find(item.variants, _.pick(primaryVariant, 'language'));
+                // try to locate the correct slide reference
+                let slideVariant = _.find(item.variants, variantFilter);
                 if (slideVariant) {
                     // set the correct variant itemId
                     itemId = util.toIdentifier(slideVariant);
                 }
-                // if no matching variant, item is the original slide
 
+                // if no matching variant, item could be the original slide
                 let slide = await slideDB.getSlideRevision(itemId);
+                // we need to check if the language matches the filter as well
+                // and fallback to the deck primary language if not
+                if (slide.language !== variantFilter.language && slide.language !== primaryVariant.language) {
+                    slideVariant = _.find(item.variants, _.pick(primaryVariant, 'language'));
+                    if (slideVariant) {
+                        itemId = util.toIdentifier(slideVariant);
+                        slide = await slideDB.getSlideRevision(itemId);
+                    }
+                } // else it matches, or it matches the primary variant, which we use for fallback anyway
+
                 deckTree.children.push({
                     type: 'slide',
                     id: itemId,
