@@ -394,12 +394,24 @@ let self = module.exports = {
     },
 
     // gets a single deck from the database, containing all revisions, unless a specific revision is specified in the id
-    getDeck: function(request, reply) {
+    getDeck: async function(request, reply) {
         let deckId = request.params.id;
         let variantFilter = _.pick(request.query, 'language');
-        deckDB.get(deckId, variantFilter).then((deck) => {
-            if (!deck) throw boom.notFound();
 
+        if (_.isEmpty(variantFilter) && request.query.root) {
+            let node = await treeDB.findDeckTreeNode(request.query.root, deckId, 'deck');
+            if (node) {
+                let rootDeck = await deckDB.getDeck(request.query.root);
+                variantFilter = _.pick(rootDeck, 'language');
+            } else {
+                throw boom.badData(`could not find deck: ${deckId} in deck tree: ${request.query.root}`);
+            }
+        }
+
+        let deck = await deckDB.get(deckId, variantFilter);
+        if (!deck) throw boom.notFound();
+
+        try {
             // TODO this is only until we remove the damned revisions array from response payload
             // the last is the selected one, or the latest one
             let [defaultRevision] = deck.revisions.slice(-1);
@@ -422,13 +434,13 @@ let self = module.exports = {
                 rev.firstSlide = deckDB.getFirstSlide(rev);
             });
 
-            return deck;
+            reply(deck);
 
-        }).then(reply).catch((err) => {
+        } catch (err) {
             if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
-        });
+        }
     },
 
     getDeckRevisions: function(request, reply) {

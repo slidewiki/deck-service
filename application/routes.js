@@ -123,6 +123,7 @@ module.exports = function(server) {
                 },
                 query: {
                     language: languageModel.empty(''),
+                    root: Joi.string().description('Identifier of root deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
