@@ -398,17 +398,18 @@ let self = module.exports = {
         let deckId = request.params.id;
         let variantFilter = _.pick(request.query, 'language');
 
-        if (_.isEmpty(variantFilter) && request.query.root) {
+        let fallbackFilter;
+        if (request.query.root && request.query.root !== deckId) {
             let node = await treeDB.findDeckTreeNode(request.query.root, deckId, 'deck');
             if (node) {
                 let rootDeck = await deckDB.getDeck(request.query.root);
-                variantFilter = _.pick(rootDeck, 'language');
+                fallbackFilter = _.pick(rootDeck, 'language');
             } else {
                 throw boom.badData(`could not find deck: ${deckId} in deck tree: ${request.query.root}`);
             }
         }
 
-        let deck = await deckDB.get(deckId, variantFilter);
+        let deck = await deckDB.get(deckId, variantFilter, fallbackFilter);
         if (!deck) throw boom.notFound();
 
         try {
