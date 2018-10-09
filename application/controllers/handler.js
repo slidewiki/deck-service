@@ -433,7 +433,7 @@ let self = module.exports = {
             // add first slide id-revision for all revisions
             for (let rev of deck.revisions) {
                 let deckRev = {
-                    id: deck.id,
+                    id: deck._id,
                     revision: rev.id,
                     language: rev.language,
                     contentItems: rev.contentItems,
