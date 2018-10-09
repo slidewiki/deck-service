@@ -81,6 +81,13 @@ const self = module.exports = {
             headers: headers
         }).then( (userProfile) => {
             return userProfile.groups.map( (group) => { return group._id; });
+        }).catch((err) => {
+            if (err.statusCode === 404) {
+                // unknown user, just return an empty list
+                return [];
+            } else {
+                throw err;
+            }
         });
     },
 };

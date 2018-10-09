@@ -633,10 +633,15 @@ let self = module.exports = {
         // pick the if of the root of the path
         let [{id: rootId}] = slideNode.path;
 
+        let variantFilter = _.pick(payload, 'language');
         // check if slideNode was matched against a variant slide
         let [{variant: slideVariant}] = slideNode.path.slice(-1);
-        // check if payload includes variant specifications (language)
-        let variantFilter = _.pick(payload, 'language');
+        // we need to make sure the language of the variant matches that of the payload
+        if (!_.isEmpty(variantFilter)) {
+            if (slideVariant && slideVariant.language !== variantFilter.language) {
+                slideVariant = null;
+            }
+        }
 
         if (!slideVariant && !_.isEmpty(variantFilter)) {
             // the slideNode was located using the primary slide id

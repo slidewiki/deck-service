@@ -97,7 +97,7 @@ let self = module.exports = {
     },
 
     // gets a specified deck and all of its revision, or only the given revision
-    get: async function(identifier, variantFilter) {
+    get: async function(identifier, variantFilter, fallbackFilter) {
         // TODO check why we allow invalid identifier as input here!!!
         let {id: deckId, revision: revisionId} = util.parseIdentifier(identifier) || {};
 
@@ -114,19 +114,24 @@ let self = module.exports = {
         }
 
         // translate all revisions
-        if (!_.isEmpty(variantFilter)) {
+        if (!_.isEmpty(variantFilter) || !_.isEmpty(fallbackFilter)) {
             for (let deckRevision of found.revisions) {
-                if (variantFilter.language === deckRevision.language) {
+                if (!_.isEmpty(variantFilter) && variantFilter.language === deckRevision.language) {
                     // skip it if the same language as requested
+                    continue;
+                } else if (!_.isEmpty(fallbackFilter) && fallbackFilter.language === deckRevision.language) {
+                    // if could not match variant, but can match default, skip it as well
                     continue;
                 }
 
                 // check if variant language exists
-                let variantData = _.find(deckRevision.variants, variantFilter);
-                if (variantData) {
-                    // TODO remove the variantData from variants ???
-                    // _.remove(deckRevision.variants, variantFilter);
+                let variantData = !_.isEmpty(variantFilter) && _.find(deckRevision.variants, variantFilter);
+                if (!variantData && !_.isEmpty(fallbackFilter)) {
+                    // if cannot match it, but fallbackFilter is provided, try again with that
+                    variantData = _.find(deckRevision.variants, fallbackFilter);
+                }
 
+                if (variantData) {
                     // put the original (non-variant) data in a separate object here
                     let originalData = _.pick(deckRevision, Object.keys(variantData));
                     originalData.original = true;
@@ -145,10 +150,10 @@ let self = module.exports = {
     // TODO
     // this could likely replace #get as it returns a more uniform data structure,
     // only with the requested revision data merged into a single object
-    getDeck: async function(identifier, variantFilter) {
+    getDeck: async function(identifier, variantFilter, fallbackFilter) {
         let {id, revision} = util.parseIdentifier(identifier) || {};
 
-        let deck = await self.get(id, variantFilter);
+        let deck = await self.get(id, variantFilter, fallbackFilter);
         if (!deck) return;
 
         let [latestRevision] = deck.revisions.slice(-1);
