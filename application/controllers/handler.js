@@ -431,9 +431,15 @@ let self = module.exports = {
             }
 
             // add first slide id-revision for all revisions
-            deck.revisions.forEach((rev) => {
-                rev.firstSlide = deckDB.getFirstSlide(rev);
-            });
+            for (let rev of deck.revisions) {
+                let deckRev = {
+                    id: deck.id,
+                    revision: rev.id,
+                    language: rev.language,
+                    contentItems: rev.contentItems,
+                };
+                rev.firstSlide = await treeDB.getFirstSlide(deckRev);
+            }
 
             reply(deck);
 
@@ -1659,12 +1665,13 @@ let self = module.exports = {
 
     },
 
-    //gets all recent decks
-    getAllRecent: (request, reply) => {
+    // gets all recent decks
+    getAllRecent: async function(request, reply) {
         let limit = parseInt(request.params.limit);
         let offset = parseInt(request.params.offset);
 
-        deckDB.getAllRecent(limit, offset).then( (recentDecks) => {
+        try {
+            let recentDecks = await deckDB.getAllRecent(limit, offset);
             if(!recentDecks) return reply([]);
 
             let countForksIds = new Set();
@@ -1674,58 +1681,61 @@ let self = module.exports = {
             });
             // count deck forks for the above deck ids
             let forkCounts = {};
-            let forkCountsPromise = deckDB.countManyDeckForks([...countForksIds]).then( (forkCountsInfo) => {
-                forkCountsInfo.forEach( (forkCount) => {
-                    forkCounts[forkCount._id] = forkCount.forkCount;
+            let forkCountsInfo = await deckDB.countManyDeckForks([...countForksIds]);
+            forkCountsInfo.forEach( (forkCount) => {
+                forkCounts[forkCount._id] = forkCount.forkCount;
+            });
+
+            let result = [];
+            for (let deck of recentDecks) {
+                // get active revision
+                let activeRevision = deck.revisions.find((rev) => (rev.id === deck.active));
+                if(!activeRevision) continue;
+
+                // get latest revision
+                let [latestRevision] = deck.revisions.slice(-1);
+
+                // this is needed for getFirstSlide to work
+                let activeDeckRev = {
+                    id: deck._id,
+                    revision: activeRevision.id,
+                    language: activeRevision.language,
+                    contentItems: activeRevision.contentItems,
+                };
+
+                result.push({
+                    _id: deck._id,
+                    title: activeRevision.title,
+                    description: deck.description,
+                    user: deck.user,
+                    active: deck.active,
+                    countRevisions: deck.revisions.length,
+                    timestamp: deck.timestamp,
+                    language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
+                    forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                    theme: activeRevision.theme,
+                    firstSlide: await treeDB.getFirstSlide(activeDeckRev),
+                    revisionId: activeRevision.id,
+                    latestRevisionId: latestRevision.id
                 });
-            });
+            }
 
-            return forkCountsPromise.then( () => {
+            reply(result);
 
-                recentDecks = recentDecks.map( (deck) => {
-
-                    // get active revision
-                    let activeRevision = deck.revisions.find((rev) => (rev.id === deck.active));
-                    if(!activeRevision) return null;
-
-                    // get latest revision
-                    let [latestRevision] = deck.revisions.slice(-1);
-
-                    return {
-                        _id: deck._id,
-                        title: activeRevision.title,
-                        description: deck.description,
-                        user: deck.user,
-                        active: deck.active,
-                        countRevisions: deck.revisions.length,
-                        timestamp: deck.timestamp,
-                        language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
-                        forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
-                        theme: activeRevision.theme,
-                        firstSlide: deckDB.getFirstSlide(activeRevision),
-                        revisionId: activeRevision.id,
-                        latestRevisionId: latestRevision.id
-                    };
-                }).filter( (deck) => { return deck != null; });
-
-                reply(recentDecks);
-
-            }).catch( (err) => {
-                request.log('error', err);
-                reply(boom.badImplementation());
-            });
-        }).catch( (err) => {
+        } catch (err) {
             request.log('error', err);
             reply(boom.badImplementation());
-        });
+        }
+
     },
 
-    //gets all featured decks
-    getAllFeatured: (request, reply) => {
+    // gets all featured decks
+    getAllFeatured: async function(request, reply) {
         let limit = parseInt(request.params.limit);
         let offset = parseInt(request.params.offset);
 
-        deckDB.getAllFeatured(limit, offset).then( (featuredDecks) => {
+        try {
+            let featuredDecks = await deckDB.getAllFeatured(limit, offset);
             if(!featuredDecks) return reply([]);
 
             let countForksIds = new Set();
@@ -1735,49 +1745,56 @@ let self = module.exports = {
             });
             // count deck forks for the above deck ids
             let forkCounts = {};
-            let forkCountsPromise = deckDB.countManyDeckForks([...countForksIds]).then( (forkCountsInfo) => {
-                forkCountsInfo.forEach( (forkCount) => {
-                    forkCounts[forkCount._id] = forkCount.forkCount;
-                });
+            let forkCountsInfo = await deckDB.countManyDeckForks([...countForksIds]);
+            forkCountsInfo.forEach( (forkCount) => {
+                forkCounts[forkCount._id] = forkCount.forkCount;
             });
 
-            return forkCountsPromise.then( () => {
-                featuredDecks = featuredDecks.map( (deck) => {
+            let result = [];
+            for (let deck of featuredDecks) {
+                // get active revision
+                let activeRevision = deck.revisions.find((rev) => (rev.id === deck.active));
+                if(!activeRevision) continue;
 
-                    // get active revision
-                    let activeRevision = deck.revisions.find((rev) => (rev.id === deck.active));
-                    if(!activeRevision) return null;
+                // get latest revision
+                let [latestRevision] = deck.revisions.slice(-1);
 
-                    // get latest revision
-                    let [latestRevision] = deck.revisions.slice(-1);
+                // this is needed for getFirstSlide to work
+                let activeDeckRev = {
+                    id: deck._id,
+                    revision: activeRevision.id,
+                    language: activeRevision.language,
+                    contentItems: activeRevision.contentItems,
+                };
 
-                    return {
-                        _id: deck._id,
-                        title: activeRevision.title,
-                        description: deck.description,
-                        user: deck.user,
-                        active: deck.active,
-                        countRevisions: deck.revisions.length,
-                        timestamp: deck.timestamp,
-                        language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
-                        forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
-                        theme: activeRevision.theme,
-                        firstSlide: deckDB.getFirstSlide(activeRevision),
-                        revisionId: activeRevision.id,
-                        latestRevisionId: latestRevision.id
-                    };
+                result.push({
+                    _id: deck._id,
+                    title: activeRevision.title,
+                    description: deck.description,
+                    user: deck.user,
+                    active: deck.active,
+                    countRevisions: deck.revisions.length,
+                    timestamp: deck.timestamp,
+                    language: (activeRevision.language) ? activeRevision.language.substring(0, 2) : 'en',
+                    forkCount: (forkCounts[deck._id]) ? forkCounts[deck._id] : 0,
+                    theme: activeRevision.theme,
+                    firstSlide: await treeDB.getFirstSlide(activeDeckRev),
+                    revisionId: activeRevision.id,
+                    latestRevisionId: latestRevision.id
                 });
+            }
 
-                reply(featuredDecks);
-            });
-        }).catch( (err) => {
+            reply(result);
+
+        } catch (err) {
             request.log('error', err);
             reply(boom.badImplementation());
-        });
+        }
+
     },
 
     //returns metadata about all decks a user owns
-    getAllDecks: (request, reply) => {
+    getAllDecks: async (request, reply) => {
         //TODO another API for user activity is needed
 
         //parse userid
@@ -1788,15 +1805,15 @@ let self = module.exports = {
             userid = validationResult.value;
         }
 
-        let decksPromise = deckDB.find('decks', {
+        let decks = await deckDB.find('decks', {
             user: userid,
             hidden: { $in: [false, null] },
         });
 
-        decksPromise.then((decks) => {
+        try {
             let result = [];
 
-            decks.forEach((deck) => {
+            for (let deck of decks) {
                 let metadata = {};
                 metadata._id = deck._id;
                 metadata.timestamp = deck.timestamp;
@@ -1831,17 +1848,24 @@ let self = module.exports = {
                 metadata.theme = revision.theme;
 
                 // get first slide
-                metadata.firstSlide = deckDB.getFirstSlide(revision);
+                let deckRev = {
+                    id: deck._id,
+                    revision: revision.id,
+                    language: revision.language,
+                    contentItems: revision.contentItems,
+                };
+                metadata.firstSlide = await treeDB.getFirstSlide(deckRev);
 
                 result.push(metadata);
-            });
+            }
 
-            return reply(result);
+            reply(result);
 
-        }).catch((err) => {
+        } catch(err) {
             request.log('error', err);
             reply(boom.badImplementation());
-        });
+        }
+
     },
 
     //counts the revisions of a given deck

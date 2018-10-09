@@ -2879,6 +2879,7 @@ let self = module.exports = {
     },
 
     // get first slide
+    // DEPRECATED
     getFirstSlide: function(revision) {
         // TODO this code assumes there's at least one slide in contentItems, could be in subdecks
 
