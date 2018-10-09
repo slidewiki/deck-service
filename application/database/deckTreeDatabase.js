@@ -125,6 +125,78 @@ const self = module.exports = {
         return deckTree;
     },
 
+    // get first slide
+    getFirstSlide: async function(deck) {
+        // test if first content item is a slide
+        if (deck.contentItems[0].kind === 'slide') {
+            let firstSlideItem = deck.contentItems[0];
+
+            // we need to pick the slide in the deck language
+            if (!_.isEmpty(firstSlideItem.variants)) {
+                let variant = firstSlideItem.variants.find((v) => v.language === deck.language);
+                if (variant) {
+                    return util.toIdentifier(variant);
+                }
+            }
+            return util.toIdentifier(firstSlideItem.ref);
+        }
+
+        // we have to do it properly: get the deck tree
+        // we need to pick the slide in the primary deck language if possible
+        return self._getFirstSlide(util.toIdentifier(deck), _.pick(deck, 'language'));
+    },
+
+    _getFirstSlide: async function(deckId, variantFilter) {
+        let deck = await deckDB.getDeck(deckId, variantFilter);
+        if (!deck) return; // not found
+
+        let language = deck.language;
+
+        let primaryVariant = _.find(deck.variants, { original: true });
+        // we need to tag as 'original' the primary variant of the deck
+        if (!primaryVariant) {
+            // means we didn't include a filter or the filter did not match a variant
+            // also means the node has the primary version
+            primaryVariant = { language };
+        }
+
+        if (_.isEmpty(variantFilter)) {
+            // we request the deck tree in the primary language of its root
+            // we need to explicitly include that for subdecks so that it properly propagates
+            variantFilter = { language };
+        }
+
+        for (let item of deck.contentItems) {
+            let itemId = util.toIdentifier(item.ref);
+            if (item.kind === 'slide') {
+                // variantFilter is never empty here
+                // try to locate the correct slide reference
+                let slideVariant = _.find(item.variants, variantFilter);
+                if (slideVariant) {
+                    // set the correct variant itemId
+                    itemId = util.toIdentifier(slideVariant);
+                }
+
+                // if no matching variant, item could be the original slide
+                let slide = await slideDB.getSlideRevision(itemId);
+                // we need to check if the language matches the filter as well
+                // and fallback to the deck primary language if not
+                if (slide.language !== variantFilter.language && slide.language !== primaryVariant.language) {
+                    slideVariant = _.find(item.variants, _.pick(primaryVariant, 'language'));
+                    if (slideVariant) {
+                        itemId = util.toIdentifier(slideVariant);
+                    }
+                } // else it matches, or it matches the primary variant, which we use for fallback anyway
+
+                // found the slide!
+                return itemId;
+            } else {
+                // it's a deck
+                return self._getFirstSlide(itemId, variantFilter);
+            }
+        }
+    },
+
     // returns a flattened structure of a deck's slides, and optionally its sub-decks
     // NEW implementation, old should be deprecated
     getFlatSlides: async function(deckId, variantFilter) {

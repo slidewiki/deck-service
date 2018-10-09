@@ -5,6 +5,7 @@ const _ = require('lodash');
 const boom = require('boom');
 
 const deckDB = require('../database/deckDatabase');
+const treeDB = require('../database/deckTreeDatabase');
 const groupDB = require('../database/groupsDatabase');
 const contributorsDB = require('../database/contributors');
 
@@ -169,92 +170,96 @@ let self = module.exports = {
 
     },
 
-    listGroupDecks: function(request, reply) {
+    listGroupDecks: async function(request, reply) {
         let groupId = request.params.id;
 
         // we need to also check visibility of decks listed
         let currentUser = request.auth.credentials && request.auth.credentials.userid;
-        groupDB.get(groupId).then((group) => {
+
+        try {
+            let group = await groupDB.get(groupId);
             if (!group) throw boom.notFound();
 
             let query = { _id: { $in: group.decks } };
             // check user permissions (currentUser can be empty here)
-            return groupDB.userPermissions(groupId, currentUser, request.auth.token).then((perms) => {
-                if (!perms.edit) {
-                    // only return public decks
-                    query.hidden = { $in: [false, null] };
-                }
+            let perms = await groupDB.userPermissions(groupId, currentUser, request.auth.token);
+            if (!perms.edit) {
+                // only return public decks
+                query.hidden = { $in: [false, null] };
+            }
 
-                // list the decks and forward the deck order for reordering
-                return deckDB.list(query).then((decks) => {
-                    // let's sort the decks (happens in-place)
-                    decks.sort((a, b) => {
-                        // order is the same as in the group.decks array
-                        return group.decks.indexOf(a._id) - group.decks.indexOf(b._id);
-                    });
-
-                    // let's also transform them
-                    reply(decks.map((d) => transform(d)));
-                });
-
+            // list the decks and forward the deck order for reordering
+            let decks = await deckDB.list(query);
+            // let's sort the decks (happens in-place)
+            decks.sort((a, b) => {
+                // order is the same as in the group.decks array
+                return group.decks.indexOf(a._id) - group.decks.indexOf(b._id);
             });
 
-        }).catch((err) => {
+            // let's also transform them
+            let transformed = [];
+            for (let d of decks) {
+                transformed.push(await transform(d));
+            }
+
+            reply(transformed);
+
+        } catch (err) {
             if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
-        });
+        }
 
     },
 
 };
 
-function countAndList(query, options){
+async function countAndList(query, options){
     options.countOnly = true;
-    return deckDB.list(query, options).then( (result) => {
+    let result = await deckDB.list(query, options);
 
-        delete options.countOnly;
-        let totalCount = (result.length === 0) ? 0 : result[0].totalCount;
+    delete options.countOnly;
+    let totalCount = (result.length === 0) ? 0 : result[0].totalCount;
 
-        return deckDB.list(query, options).then((decks) => {
-            let items = decks.map((deck) => {
-                return (options.idOnly) ? { _id: deck._id } : transform(deck);
-            });
+    let decks = await deckDB.list(query, options);
 
-            if (!options.pageSize) {
-                return items;
-            }
+    let items = [];
+    for (let deck of decks) {
+        items.push((options.idOnly) ? { _id: deck._id } : await transform(deck));
+    }
 
-            // form links for previous and next results
-            let links = {};
-            let page = options.page;
+    if (!options.pageSize) {
+        return items;
+    }
 
-            if(options.page > 1){
-                options.page = page - 1;
-                links.previous = `/decks?${querystring.stringify(options)}`;
-            }
+    // form links for previous and next results
+    let links = {};
+    let page = options.page;
 
-            if(options.page * options.pageSize < totalCount){
-                options.page = page + 1;
-                links.next = `/decks?${querystring.stringify(options)}`;
-            }
+    if (options.page > 1) {
+        options.page = page - 1;
+        links.previous = `/decks?${querystring.stringify(options)}`;
+    }
 
-            let response = {};
-            response._meta = {
-                page: page, 
-                pageSize: options.pageSize,
-                totalCount: totalCount,
-                sort: options.sort,
-                status: options.status,
-                links: links
-            };
-            response.items = items;
-            return response;
-        });
-    });
+    if (options.page * options.pageSize < totalCount) {
+        options.page = page + 1;
+        links.next = `/decks?${querystring.stringify(options)}`;
+    }
+
+    let response = {};
+    response._meta = {
+        page: page, 
+        pageSize: options.pageSize,
+        totalCount: totalCount,
+        sort: options.sort,
+        status: options.status,
+        links: links
+    };
+    response.items = items;
+    return response;
 }
 
-function transform(deck){
+async function transform(deck){
     let metadata = {};
     metadata._id = deck._id;
 
@@ -289,7 +294,13 @@ function transform(deck){
     metadata.allowMarkdown = revision.allowMarkdown;
 
     // get first slide
-    metadata.firstSlide = deckDB.getFirstSlide(revision);
+    let deckRev = {
+        id: deck._id,
+        revision: revision.id,
+        language: revision.language,
+        contentItems: revision.contentItems,
+    };
+    metadata.firstSlide = await treeDB.getFirstSlide(deckRev);
 
     return metadata;
 }
