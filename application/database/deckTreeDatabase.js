@@ -127,6 +127,9 @@ const self = module.exports = {
 
     // get first slide
     getFirstSlide: async function(deck) {
+        // test if there are any content items ata ll
+        if (!deck.contentItems.length) return;
+
         // test if first content item is a slide
         if (deck.contentItems[0].kind === 'slide') {
             let firstSlideItem = deck.contentItems[0];
