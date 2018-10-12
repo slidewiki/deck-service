@@ -17,12 +17,24 @@ const self = module.exports = {
 
     // recursive function that gets the decktree of a given deck and all of its sub-decks
     // NEW implementation, old should be deprecated
-    getDeckTree: async function(deckId, variantFilter) {
+    getDeckTree: async function(deckId, variantFilter, visited) {
         let deck = await deckDB.getDeck(deckId, variantFilter);
         if (!deck) return; // not found
 
         // make it canonical
         deckId = util.toIdentifier(deck);
+
+        // check for cycles!
+        if (_.isEmpty(visited)) {
+            // info of root deck
+            visited = [deckId];
+        } else if (visited.includes(deckId)) {
+            // TODO for now just pretend it's not there
+            return;
+        } else {
+            visited.push(deckId);
+        }
+
         let deckTree = {
             type: 'deck',
             id: deckId,
@@ -106,8 +118,8 @@ const self = module.exports = {
 
             } else {
                 // it's a deck
-                let innerTree = await self.getDeckTree(itemId, variantFilter);
-                // skip dangling deck references
+                let innerTree = await self.getDeckTree(itemId, variantFilter, visited);
+                // skip dangling deck references / cycles
                 if (!innerTree) continue;
 
                 deckTree.children.push(innerTree);
@@ -174,12 +186,15 @@ const self = module.exports = {
 
         // make it canonical
         deckId = util.toIdentifier(deck);
+
         // check for cycles!
         if (_.isEmpty(visited)) {
             // info of root deck
             visited = [deckId];
         } else if (visited.includes(deckId)) {
             return;
+        } else {
+            visited.push(deckId);
         }
 
         for (let item of deck.contentItems) {
