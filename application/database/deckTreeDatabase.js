@@ -320,12 +320,23 @@ const self = module.exports = {
     },
 
     // new implementation for decktree API with enrich flag
-    exportDeckTree: async function(deckId, path=[]) {
+    exportDeckTree: async function(deckId, path=[], visited) {
         let deck = await deckDB.getDeck(deckId);
         if (!deck) return; // not found
 
         // make it canonical
         deckId = util.toIdentifier(deck);
+
+        // check for cycles!
+        if (_.isEmpty(visited)) {
+            // info of root deck
+            visited = [deckId];
+        } else if (visited.includes(deckId)) {
+            // TODO for now just pretend it's not there
+            return;
+        } else {
+            visited.push(deckId);
+        }
 
         // build the path
         path.push(_.pick(deck, 'id', 'revision', 'hidden'));
@@ -368,7 +379,7 @@ const self = module.exports = {
 
             } else {
                 // it's a deck
-                let innerTree = await self.exportDeckTree(itemId, _.cloneDeep(path));
+                let innerTree = await self.exportDeckTree(itemId, _.cloneDeep(path), visited);
                 deckTree.contents.push(innerTree);
             }
         }
