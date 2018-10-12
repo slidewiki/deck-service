@@ -1040,6 +1040,8 @@ const self = module.exports = {
 
 async function exportSlide(slideId) {
     let slide = await slideDB.getSlideRevision(slideId);
+    if (!slide) return;
+
     let result = _.pick(slide, 'id', 'revision',
         'title', 'content', 'speakernotes',
         'timestamp', 'lastUpdate',
