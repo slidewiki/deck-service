@@ -107,6 +107,9 @@ const self = module.exports = {
             } else {
                 // it's a deck
                 let innerTree = await self.getDeckTree(itemId, variantFilter);
+                // skip dangling deck references
+                if (!innerTree) continue;
+
                 deckTree.children.push(innerTree);
 
                 // we also want to merge the variants information into the current node
@@ -149,7 +152,7 @@ const self = module.exports = {
         return self._getFirstSlide(util.toIdentifier(deck), _.pick(deck, 'language'));
     },
 
-    _getFirstSlide: async function(deckId, variantFilter) {
+    _getFirstSlide: async function(deckId, variantFilter, visited) {
         let deck = await deckDB.getDeck(deckId, variantFilter);
         if (!deck) return; // not found
 
@@ -167,6 +170,16 @@ const self = module.exports = {
             // we request the deck tree in the primary language of its root
             // we need to explicitly include that for subdecks so that it properly propagates
             variantFilter = { language };
+        }
+
+        // make it canonical
+        deckId = util.toIdentifier(deck);
+        // check for cycles!
+        if (_.isEmpty(visited)) {
+            // info of root deck
+            visited = [deckId];
+        } else if (visited.includes(deckId)) {
+            return;
         }
 
         for (let item of deck.contentItems) {
@@ -195,7 +208,8 @@ const self = module.exports = {
                 return itemId;
             } else {
                 // it's a deck
-                return self._getFirstSlide(itemId, variantFilter);
+                let subdeckSlide = self._getFirstSlide(itemId, variantFilter, visited);
+                if (subdeckSlide) return subdeckSlide;
             }
         }
     },
