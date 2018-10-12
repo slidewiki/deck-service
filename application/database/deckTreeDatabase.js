@@ -364,6 +364,9 @@ const self = module.exports = {
             let itemId = util.toIdentifier(item.ref);
             if (item.kind === 'slide') {
                 let slide = await exportSlide(itemId);
+                // skip dangling slide references
+                if (!slide) continue;
+
                 slide.path = path;
 
                 // also add the variants
@@ -380,6 +383,9 @@ const self = module.exports = {
             } else {
                 // it's a deck
                 let innerTree = await self.exportDeckTree(itemId, _.cloneDeep(path), visited);
+                // skip dangling deck references / cycles
+                if (!innerTree) continue;
+
                 deckTree.contents.push(innerTree);
             }
         }
