@@ -91,6 +91,9 @@ const self = module.exports = {
 
                 // if no matching variant, item could be the original slide
                 let slide = await slideDB.getSlideRevision(itemId);
+                // skip dangling slide references
+                if (!slide) continue;
+
                 // we need to check if the language matches the filter as well
                 // and fallback to the deck primary language if not
                 if (slide.language !== variantFilter.language && slide.language !== primaryVariant.language) {
