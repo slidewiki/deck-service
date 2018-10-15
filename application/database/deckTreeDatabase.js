@@ -277,6 +277,7 @@ const self = module.exports = {
                     theme: deck.theme,
                     allowMarkdown: deck.allowMarkdown,
                     user: String(slide.user),
+                    nextTransition: slide.nextTransition ? slide.nextTransition : 'none'
                 });
 
             } else {
