@@ -171,7 +171,7 @@ let self = module.exports = {
             'license',
             'speakernotes',
             'dimensions',
-            'nextTransition'
+            'transition'
         ]);
 
         // prepare a payload using currentSlide data with update payload

@@ -156,7 +156,7 @@ const slideRevision = {
             },
             required: ['width', 'height'],
         },
-        nextTransition: {
+        transition: {
             type: 'string'
         }
     },
