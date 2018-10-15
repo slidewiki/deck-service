@@ -617,6 +617,7 @@ module.exports = function(server) {
                     tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                     dimensions: slideDimensions,
+                    nextTransition: Joi.string().valid('none', 'concave', 'convex', 'fade', 'slide', 'zoom')
                 }).requiredKeys('content', 'root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -659,6 +660,7 @@ module.exports = function(server) {
                     language: languageModel,
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     dimensions: slideDimensions,
+                    nextTransition: Joi.string().valid('none', 'concave', 'convex', 'fade', 'slide', 'zoom'),
                     dataSources: Joi.array().items(Joi.object().keys({
                         type: Joi.string(),
                         title: Joi.string(),
