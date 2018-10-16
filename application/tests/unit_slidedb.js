@@ -333,27 +333,6 @@ describe('slideDatabase', () => {
             ]);
         });
 
-        it('should return contributors of an existing deck', () => {
-            let deck = {
-                'description': 'New Deck',
-                'language': 'en',
-                'translation': {
-                    'status': 'original'
-                },
-                'tags': [],
-                'title': 'New Deck',
-                'abstract': '',
-                'comment': '',
-                'footer': '',
-                'license': 'CC0'
-            };
-            let ins = deckdb.insert(deck, 1);
-            let res = ins.then((ins) => deckdb.getDeckContributors(ins._id+'-1'));
-            return Promise.all([
-                res.should.be.fulfilled.and.eventually.not.be.empty,
-            ]);
-        });
-
         it('should fork an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
