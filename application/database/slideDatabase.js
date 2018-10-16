@@ -171,7 +171,7 @@ let self = module.exports = {
             'license',
             'speakernotes',
             'dimensions',
-            'transition'
+            'transition',
         ]);
 
         // prepare a payload using currentSlide data with update payload
@@ -227,6 +227,7 @@ let self = module.exports = {
             'license',
             'speakernotes',
             'dimensions',
+            'transition',
             'language',
         ]);
 
@@ -787,6 +788,7 @@ let self = module.exports = {
             'license',
             'speakernotes',
             'dimensions',
+            'transition',
         ]);
         // assign extra variant data (if provided)
         Object.assign(newSlide, _.pick(variantData, [
@@ -916,6 +918,9 @@ function convertToNewSlide(slide) {
     };
     if (slide.dimensions) {
         result.revisions[0].dimensions = slide.dimensions;
+    }
+    if (slide.transition) {
+        result.revisions[0].transition = slide.transition;
     }
     return result;
 }

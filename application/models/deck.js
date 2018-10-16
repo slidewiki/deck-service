@@ -192,12 +192,6 @@ const deckRevision = {
             type: 'number',
             minimum: 0
         },
-        transition: {
-            type: 'object',
-            properties: {
-                default: objectid
-            }
-        },
         comment: {
             type: 'string'
         },

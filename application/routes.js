@@ -20,6 +20,8 @@ const slideDimensions = Joi.object().keys({
     height: Joi.number().integer().positive(),
 });
 
+const slideTransition = Joi.string().valid('none', 'concave', 'convex', 'fade', 'slide', 'zoom');
+
 // TODO better organize joi validation models
 const apiModels = {};
 
@@ -617,7 +619,7 @@ module.exports = function(server) {
                     tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                     dimensions: slideDimensions,
-                    transition: Joi.string().valid('none', 'concave', 'convex', 'fade', 'slide', 'zoom')
+                    transition: slideTransition,
                 }).requiredKeys('content', 'root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -660,7 +662,7 @@ module.exports = function(server) {
                     language: languageModel,
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     dimensions: slideDimensions,
-                    transition: Joi.string().valid('none', 'concave', 'convex', 'fade', 'slide', 'zoom'),
+                    transition: slideTransition,
                     dataSources: Joi.array().items(Joi.object().keys({
                         type: Joi.string(),
                         title: Joi.string(),
@@ -877,6 +879,7 @@ module.exports = function(server) {
                                 language: languageModel,
                                 license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                                 dimensions: slideDimensions,
+                                transition: slideTransition,
                             }).options({ stripUnknown: true }),
 
                         })
