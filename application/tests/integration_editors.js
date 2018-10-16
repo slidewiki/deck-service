@@ -71,7 +71,7 @@ describe('REST API editors', () => {
     let deckID; // id of the newly created deck
     
     context('when getting editors of a deck', () => {
-        it('it should reply all contributors and editors', () => {
+        it('it should reply all editors', () => {
             return server.inject({
                 method: 'POST',
                 url: '/deck/new',
@@ -92,10 +92,6 @@ describe('REST API editors', () => {
                 payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                 payload.editors.users.should.be.an('array').and.have.length(2);
                 payload.editors.groups.should.be.an('array').and.have.length(1);
-                payload.contributors.should.be.an('array').and.have.length(1);
-                payload.contributors[0].should.be.an('object').and.contain.keys('user');
-                payload.contributors[0].user.should.equal(1);
-                //payload.contributors[0].count.should.equal(1); // 'count' not used
             }).then(() => {
                 let opt = JSON.parse(JSON.stringify(options));
                 opt.url += deckID + '/editors';

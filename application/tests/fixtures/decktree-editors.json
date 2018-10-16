@@ -26,16 +26,6 @@
         "lastUpdate": "2017-01-23T11:36:54.526Z",
         "datasource": null,
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 9,
-            "count": 4
-          },
-          {
-            "user": 46,
-            "count": 8
-          }
-        ],
         "active": 12,
         "revisions": [
           {
@@ -1586,16 +1576,6 @@
         "lastUpdate": "2017-01-04T12:11:02.672Z",
         "datasource": null,
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 9,
-            "count": 1
-          },
-          {
-            "user": 46,
-            "count": 2
-          }
-        ],
         "active": 3,
         "revisions": [
           {
@@ -1897,12 +1877,6 @@
         "lastUpdate": "2016-10-04T10:48:13.650Z",
         "datasource": null,
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "active": 1,
         "revisions": [
           {
@@ -1996,12 +1970,6 @@
         "lastUpdate": "2016-10-04T10:48:25.797Z",
         "datasource": null,
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "active": 1,
         "revisions": [
           {
@@ -2043,20 +2011,6 @@
         "lastUpdate": "2017-01-04T12:11:02.733Z",
         "datasource": null,
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 2
-          },
-          {
-            "user": 9,
-            "count": 3
-          },
-          {
-            "user": 46,
-            "count": 3
-          }
-        ],
         "active": 8,
         "revisions": [
           {
@@ -2389,16 +2343,6 @@
         "lastUpdate": "2017-01-04T12:11:02.764Z",
         "datasource": null,
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          },
-          {
-            "user": 46,
-            "count": 1
-          }
-        ],
         "active": 2,
         "revisions": [
           {
@@ -2516,12 +2460,6 @@
         "lastUpdate": "2016-10-07T12:36:57.847Z",
         "datasource": null,
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 3,
-            "count": 1
-          }
-        ],
         "active": 1,
         "revisions": [
           {
@@ -2567,12 +2505,6 @@
         "lastUpdate": "2016-10-04T10:34:03.317Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 9,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -2644,12 +2576,6 @@
         "lastUpdate": "2016-10-31T12:20:33.368Z",
         "language": "EN",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 9,
-            "count": 2
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -2695,12 +2621,6 @@
         "lastUpdate": "2016-10-04T10:35:02.313Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -2736,12 +2656,6 @@
         "lastUpdate": "2016-10-04T10:35:33.350Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -2777,12 +2691,6 @@
         "lastUpdate": "2016-10-04T10:35:43.490Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -2854,12 +2762,6 @@
         "lastUpdate": "2016-10-04T10:36:01.018Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -2931,12 +2833,6 @@
         "lastUpdate": "2016-10-04T10:36:19.255Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3008,12 +2904,6 @@
         "lastUpdate": "2016-10-04T10:47:04.806Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3049,12 +2939,6 @@
         "lastUpdate": "2016-10-06T11:40:13.457Z",
         "language": "EN",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 2
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3100,12 +2984,6 @@
         "lastUpdate": "2016-10-04T10:47:33.948Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3141,12 +3019,6 @@
         "lastUpdate": "2016-10-04T10:47:39.862Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3182,12 +3054,6 @@
         "lastUpdate": "2016-10-04T10:47:54.450Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3259,12 +3125,6 @@
         "lastUpdate": "2016-10-04T10:48:13.654Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3292,12 +3152,6 @@
         "lastUpdate": "2016-10-04T10:48:25.799Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3325,16 +3179,6 @@
         "lastUpdate": "2016-10-07T10:07:54.392Z",
         "language": "EN",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          },
-          {
-            "user": 26,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3416,12 +3260,6 @@
         "lastUpdate": "2016-10-04T10:57:38.806Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3493,16 +3331,6 @@
         "lastUpdate": "2016-11-30T10:05:47.408Z",
         "language": "EN",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          },
-          {
-            "user": 9,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3586,12 +3414,6 @@
         "lastUpdate": "2016-10-04T11:02:12.368Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3663,12 +3485,6 @@
         "lastUpdate": "2016-10-04T13:33:14.836Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3740,20 +3556,6 @@
         "lastUpdate": "2016-12-23T11:41:32.349Z",
         "language": "EN",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          },
-          {
-            "user": 9,
-            "count": 3
-          },
-          {
-            "user": 46,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3855,12 +3657,6 @@
         "lastUpdate": "2016-10-06T08:51:08.203Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3892,12 +3688,6 @@
         "lastUpdate": "2016-10-07T09:53:07.074Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 10,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -3949,20 +3739,6 @@
         "lastUpdate": "2017-01-23T15:34:16.189Z",
         "language": "EN",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 26,
-            "count": 1
-          },
-          {
-            "user": 9,
-            "count": 1
-          },
-          {
-            "user": 46,
-            "count": 5
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -4117,12 +3893,6 @@
         "lastUpdate": "2016-10-07T12:36:57.859Z",
         "language": "en",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 3,
-            "count": 1
-          }
-        ],
         "description": null,
         "revisions": [
           {
@@ -4150,12 +3920,6 @@
         "lastUpdate": "2017-01-04T12:11:23.448Z",
         "language": "EN",
         "license": "CC0",
-        "contributors": [
-          {
-            "user": 46,
-            "count": 2
-          }
-        ],
         "description": null,
         "revisions": [
           {

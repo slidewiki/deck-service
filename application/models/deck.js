@@ -76,18 +76,6 @@ const trackedDeckRevisionProperties = {
 
 };
 
-const contributor = {
-    type: 'object',
-    properties: {
-        user: objectid,
-        count: {
-            type: 'integer',
-            minimum: 1
-        }
-    },
-    required: ['user']
-};
-
 //build schema
 const contentItem = {
     type: 'object',
@@ -349,12 +337,7 @@ const deck = {
             type: 'array',
             items: deckRevision
         },
-        contributors: {
-            type: 'array',
-            items: {
-                contributor
-            }
-        },
+
         active: {
             type: 'integer'
         },

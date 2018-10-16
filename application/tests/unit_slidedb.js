@@ -125,7 +125,7 @@ describe('slideDatabase', () => {
                 license: 'CC0',
             };
             let ins = db.insert(slide, 1);
-            let res = ins.then((ins) => db.replace(ins._id+'-1', slide2));
+            let res = ins.then((ins) => db.revise(ins._id+'-1', slide2, 1));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.include.all.keys('id', 'revision'),
@@ -174,13 +174,14 @@ describe('slideDatabase', () => {
                 language: 'en',
                 license: 'CC0',
             };
-            let ins = db.insert(slide, 1);
-            let res = ins.then((ins) => {ins.parent = ins._id+'-1'; return db._copy(ins, 0);});
+            let res = db.insert(slide, 1)
+            .then((ins) => db.getSlideRevision(ins._id+'-1'))
+            .then((original) => db.copy(original, '25-1', 1));
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.have.nested.property('ops[0]').that.includes.all.keys('_id', 'language'),
-                res.should.eventually.have.nested.property('ops[0].language', slide.language)
+                res.should.eventually.include.all.keys('_id', 'language'),
+                res.should.eventually.have.property('language', slide.language)
             ]);
         });
 
@@ -199,52 +200,6 @@ describe('slideDatabase', () => {
             ]);
         });
 
-        it.skip('should update usage of an existing slide', () => {
-            let slide = {
-                title: 'Dummy',
-                content: 'dummy',
-                language: 'en',
-                license: 'CC0',
-            };
-            //let ins = db.insert(slide);
-            let slide2 = {
-                title: 'Dummy',
-                content: 'dummy',
-                language: 'en',
-                license: 'CC0',
-            };
-            let ins = db.insert(slide, 1);
-            let ins2 = ins.then((ins) => db.replace(ins._id+'-1', slide2));
-            let res = ins2.then((ins2) => db.updateUsage(ins2.id+'-1','2', '25-1' ));
-            return Promise.all([
-                res.should.be.fulfilled.and.eventually.not.be.empty,
-                res.should.eventually.have.property('_id').that.is.a('number'),
-            ]);
-        });
-
-        it('should add to usage of an existing slide', () => {
-            let slide = {
-                title: 'Dummy',
-                content: 'dummy',
-                language: 'en',
-                license: 'CC0',
-            };
-            let ins = db.insert(slide, 1);
-            let res = ins.then((ins) => {
-                let itemToAdd = {
-                    ref: {
-                        id:ins._id,
-                        revision: 1
-                    },
-                    kind: 'slide'
-                };
-                db.addToUsage(itemToAdd, [25,1] );});
-            //res.then((data) => console.log('resolved', data));
-            return Promise.all([
-                res.should.be.fulfilled
-            ]);
-        });
-
         it('should return the decktree of an existing deck', () => {
             let deck = {
                 'description': 'New Deck',
@@ -260,7 +215,7 @@ describe('slideDatabase', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck, 1);
-            let res = ins.then((ins) => deckdb.getDeckTreeFromDB(ins._id+'-1'));
+            let res = ins.then((ins) => treedb.getDeckTree(ins._id+'-1'));
             //res.then((data) => console.log('resolved', data));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
@@ -371,31 +326,10 @@ describe('slideDatabase', () => {
                 'license': 'CC0'
             };
             let ins = deckdb.insert(deck, 1);
-            let res = ins.then((ins) => deckdb.getFlatSlides(ins._id+'-1', undefined));
+            let res = ins.then((ins) => treedb.getFlatSlides(ins._id+'-1'));
             return Promise.all([
                 res.should.be.fulfilled.and.eventually.not.be.empty,
                 res.should.eventually.have.property('title').that.is.not.empty,
-            ]);
-        });
-
-        it('should return contributors of an existing deck', () => {
-            let deck = {
-                'description': 'New Deck',
-                'language': 'en',
-                'translation': {
-                    'status': 'original'
-                },
-                'tags': [],
-                'title': 'New Deck',
-                'abstract': '',
-                'comment': '',
-                'footer': '',
-                'license': 'CC0'
-            };
-            let ins = deckdb.insert(deck, 1);
-            let res = ins.then((ins) => deckdb.getDeckContributors(ins._id+'-1'));
-            return Promise.all([
-                res.should.be.fulfilled.and.eventually.not.be.empty,
             ]);
         });
 

@@ -14,17 +14,7 @@ const objectid = {
     maxLength: 24,
     minLength: 1
 };
-const contributor = {
-    type: 'object',
-    properties: {
-        user: objectid,
-        count: {
-            type: 'integer',
-            minimum: 1
-        }
-    },
-    required: ['user']
-};
+
 const dataSource = {
     type: 'object',
     properties: {
@@ -246,12 +236,7 @@ const slide = {
             type: 'array',
             items: slideRevision
         },
-        contributors: {
-            type: 'array',
-            items: {
-                contributor
-            }
-        },
+
         //active: objectid,
         datasource: {
             type: 'string'
