@@ -44,8 +44,8 @@ describe('REST API deck tree', () => {
             },
         });
         response.statusCode.should.equal(200);
-        response.result.should.contain.keys('id', 'revisions');
-        response.result.revisions.should.be.an('array').of.length(1);
+        response.result.should.contain.keys('id', 'revision', 'revisionCount');
+        response.result.revisionCount.should.equal(1);
 
         deckId = response.result.id;
 
@@ -432,11 +432,11 @@ describe('REST API deck tree', () => {
 
         // check usage of both slides
         response = await server.inject(`/slide/${slide.id}`);
-        response.result.revisions[0].usage.should.have.deep.members([
+        response.result.usage.should.have.deep.members([
             { id: deckId, revision: 1 },
         ]);
         response = await server.inject(`/slide/${translatedSlide.id}`);
-        response.result.revisions[0].usage.should.have.deep.members([
+        response.result.usage.should.have.deep.members([
             { id: deckId, revision: 1 },
         ]);
     });
@@ -487,11 +487,11 @@ describe('REST API deck tree', () => {
 
         // check usage of both slides
         response = await server.inject(`/slide/${slide.id}`);
-        response.result.revisions[0].usage.should.have.deep.members([
+        response.result.usage.should.have.deep.members([
             { id: deckId, revision: 1 },
         ]);
         response = await server.inject(`/slide/${translatedSlide.id}`);
-        response.result.revisions[0].usage.should.have.deep.members([
+        response.result.usage.should.have.deep.members([
             { id: deckId, revision: 1 },
         ]);
     });
@@ -532,7 +532,7 @@ describe('REST API deck tree', () => {
 
         // check usage of the older translation
         response = await server.inject(`/slide/${translatedRef.id}-1`);
-        response.result.revisions[0].usage.should.be.an('array').of.length(0);
+        response.result.usage.should.be.an('array').of.length(0);
     });
 
     it('can rename the primary language of a deck tree slide translation', async () => {
@@ -571,7 +571,7 @@ describe('REST API deck tree', () => {
 
         // check usage of the older primary slide
         response = await server.inject(`/slide/${slideRef.id}-1`);
-        response.result.revisions[0].usage.should.be.an('array').of.length(0);
+        response.result.usage.should.be.an('array').of.length(0);
     });
 
     it('can move all translations of a deck tree slide into a subdeck', async () => {
@@ -623,11 +623,11 @@ describe('REST API deck tree', () => {
         let subdeck = util.parseIdentifier(subdeckId);
         // check usage of both slides
         response = await server.inject(`/slide/${slide.id}`);
-        response.result.revisions[0].usage.should.have.deep.members([
+        response.result.usage.should.have.deep.members([
             subdeck,
         ]);
         response = await server.inject(`/slide/${translatedSlide.id}`);
-        response.result.revisions[0].usage.should.have.deep.members([
+        response.result.usage.should.have.deep.members([
             subdeck,
         ]);
     });
@@ -649,7 +649,7 @@ describe('REST API deck tree', () => {
             },
         });
         response.statusCode.should.equal(200);
-        response.result.should.have.nested.property('revisions.0.language', 'en');
+        response.result.should.have.property('language', 'en');
 
         response = await server.inject(`/deck/${deckId}/translations`);
         response.statusCode.should.equal(200);

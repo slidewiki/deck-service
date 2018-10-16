@@ -209,7 +209,7 @@ describe('REST API attach', () => {
                     response = await server.inject(`/deck/${spanishDeckId}`);
                     response.should.have.property('statusCode', 200);
 
-                    otherSlides = response.result.revisions[0].contentItems.map((i) => i.ref);
+                    otherSlides = response.result.contentItems.map((i) => i.ref);
 
                     response = await server.inject({
                         method: 'POST',

@@ -58,7 +58,7 @@ describe('REST API contributors api', () => {
                     if (response.statusCode !== 200) {
                         throw new Error(`could not get deck:\n\t${response.payload}`);
                     }
-                    firstSlide = JSON.parse(response.payload).revisions[0].contentItems[0].ref;
+                    firstSlide = JSON.parse(response.payload).contentItems[0].ref;
                 });
             });
         });
@@ -501,9 +501,8 @@ describe('REST API contributors api', () => {
                             console.error(response.payload);
                             throw new Error(`could not update slide:\n\t${response.payload}`);
                         }
-                        // TODO change this WEIRD payload
                         let payload = JSON.parse(response.payload);
-                        slideId = `${payload._id}-${payload.revisions.slice(-1)[0].id}`;
+                        slideId = `${payload.id}-${payload.revision}`;
                     });
                 });
 
@@ -824,7 +823,7 @@ describe('REST API contributors api', () => {
                     url: '/deck/' + otherDeckId,
                 });
                 response.should.have.property('statusCode', 200);
-                otherSlides = response.result.revisions[0].contentItems.map((i) => i.ref);
+                otherSlides = response.result.contentItems.map((i) => i.ref);
 
                 // attach the deck
                 response = await server.inject({

@@ -2053,7 +2053,7 @@ let self = module.exports = {
             return deckTracker.applyChangeLog()
             .then(() => helper.getCollection('decks'))
             .then((col) => col.findOneAndReplace({ _id: deck.id }, existingDeck, { returnOriginal: false }) )
-            .then((updated) => updated.value);
+            .then(() => tags);
         });
 
     },

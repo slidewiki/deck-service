@@ -80,7 +80,7 @@ describe('REST API usage', () => {
                     if (response.statusCode !== 200) {
                         throw new Error(`could not get deck:\n\t${response.payload}`);
                     }
-                    firstSlide = JSON.parse(response.payload).revisions[0].contentItems[0].ref;
+                    firstSlide = JSON.parse(response.payload).contentItems[0].ref;
                 });
             });
         });
@@ -93,7 +93,7 @@ describe('REST API usage', () => {
                 response.statusCode.should.equal(200);
 
                 let payload = JSON.parse(response.payload);
-                payload.should.have.nested.property('revisions.0.usage').that.is.an('array').of.length(0);
+                payload.should.have.property('usage').that.is.an('array').of.length(0);
             });
         });
 
@@ -144,7 +144,7 @@ describe('REST API usage', () => {
                 response.statusCode.should.equal(200);
 
                 let payload = JSON.parse(response.payload);
-                payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
+                payload.should.have.property('usage').that.has.deep.members([
                     { id: deckId, revision: 1  },
                 ]);
             });
@@ -228,7 +228,7 @@ describe('REST API usage', () => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
+                    payload.should.have.property('usage').that.has.deep.members([
                         { id: deckId, revision: 1  },
                     ]);
                 });
@@ -300,7 +300,7 @@ describe('REST API usage', () => {
                             console.error(response.payload);
                             throw new Error(`could not rename slide:\n\t${response.payload}`);
                         }
-                        let newRevision = JSON.parse(response.payload).revisions[0].id;
+                        let newRevision = JSON.parse(response.payload).revision;
                         renamedSlideId = `${parseInt(slideId)}-${newRevision}`;
                     });
                 });
@@ -313,7 +313,7 @@ describe('REST API usage', () => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
+                        payload.should.have.property('usage').that.has.deep.members([
                             { id: deckId, revision: 1  },
                         ]);
                     });
@@ -370,7 +370,7 @@ describe('REST API usage', () => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.nested.property('revisions.0.usage').that.is.an('array').of.length(0);
+                        payload.should.have.property('usage').that.is.an('array').of.length(0);
                     });
                 });
 
@@ -449,7 +449,7 @@ describe('REST API usage', () => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
+                    payload.should.have.property('usage').that.has.deep.members([
                         { id: deckId, revision: 1  },
                     ]);
                 });
@@ -598,7 +598,7 @@ describe('REST API usage', () => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
+                        payload.should.have.property('usage').that.has.deep.members([
                             { id: deckId, revision: 1  },
                         ]);
                     });
@@ -688,7 +688,7 @@ describe('REST API usage', () => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
+                        payload.should.have.property('usage').that.has.deep.members([
                             { id: subdeckId, revision: 1  },
                         ]);
                     });
@@ -779,7 +779,7 @@ describe('REST API usage', () => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
+                        payload.should.have.property('usage').that.has.deep.members([
                             { id: deckId, revision: 1  },
                         ]);
                     });
@@ -866,7 +866,7 @@ describe('REST API usage', () => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
+                        payload.should.have.property('usage').that.has.deep.members([
                             { id: subdeckId, revision: 1  },
                         ]);
                     });
@@ -962,7 +962,7 @@ describe('REST API usage', () => {
                     url: '/deck/' + otherDeckId,
                 });
                 response.should.have.property('statusCode', 200);
-                otherSlides = response.result.revisions[0].contentItems.map((i) => i.ref);
+                otherSlides = response.result.contentItems.map((i) => i.ref);
 
                 // attach the deck
                 response = await server.inject({
@@ -994,8 +994,8 @@ describe('REST API usage', () => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.nested.property('revisions.0.usage').that.is.an('array');
-                    payload.revisions[0].usage.forEach((c) => c.should.not.have.property('id', deckId));
+                    payload.should.have.property('usage').that.is.an('array');
+                    payload.usage.forEach((c) => c.should.not.have.property('id', deckId));
                 });
             });
 
@@ -1020,8 +1020,8 @@ describe('REST API usage', () => {
                     response.statusCode.should.equal(200);
 
                     let payload = JSON.parse(response.payload);
-                    payload.should.have.nested.property('revisions.0.usage').that.is.an('array');
-                    payload.revisions[0].usage.should.have.deep.members([
+                    payload.should.have.property('usage').that.is.an('array');
+                    payload.usage.should.have.deep.members([
                         { id: deckId, revision: 1 },
                     ]);
                 });
@@ -1077,8 +1077,8 @@ describe('REST API usage', () => {
                             response.statusCode.should.equal(200);
 
                             let payload = JSON.parse(response.payload);
-                            payload.should.have.nested.property('revisions.0.usage').that.is.an('array');
-                            payload.revisions[0].usage.forEach((c) => c.should.not.have.property('id', deckId));
+                            payload.should.have.property('usage').that.is.an('array');
+                            payload.usage.forEach((c) => c.should.not.have.property('id', deckId));
                         })                        
                     ));
                 });
@@ -1107,8 +1107,8 @@ describe('REST API usage', () => {
                             response.statusCode.should.equal(200);
 
                             let payload = JSON.parse(response.payload);
-                            payload.should.have.nested.property('revisions.0.usage').that.is.an('array');
-                            payload.revisions[0].usage.should.have.deep.members([
+                            payload.should.have.property('usage').that.is.an('array');
+                            payload.usage.should.have.deep.members([
                                 { id: deckId, revision: 1 },
                             ]);
                         })                        
@@ -1153,6 +1153,20 @@ describe('REST API usage', () => {
                     });
                 });
 
+                it('usage of subdeck should be kept the same in older revision (DB)', () => {
+                    return server.inject({
+                        method: 'GET',
+                        url: `/deck/${subdeckId}-1`,
+                    }).then((response) => {
+                        response.statusCode.should.equal(200);
+
+                        let payload = JSON.parse(response.payload);
+                        payload.should.have.property('usage').that.has.deep.members([
+                            { id: deckId, revision: 1 },
+                        ]);
+                    });
+                });
+
                 it('usage of subdeck should be updated with new revision (DB)', () => {
                     return server.inject({
                         method: 'GET',
@@ -1161,10 +1175,7 @@ describe('REST API usage', () => {
                         response.statusCode.should.equal(200);
 
                         let payload = JSON.parse(response.payload);
-                        payload.should.have.nested.property('revisions.0.usage').that.has.deep.members([
-                            { id: deckId, revision: 1 },
-                        ]);
-                        payload.should.have.nested.property('revisions.1.usage').that.has.deep.members([
+                        payload.should.have.property('usage').that.has.deep.members([
                             { id: deckId, revision: 2 },
                         ]);
                     });

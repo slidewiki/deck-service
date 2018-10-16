@@ -178,7 +178,7 @@ describe('REST API new deck', () => {
                 payload._id.should.equal(parseInt(deckID));
                 payload.user.should.equal(2);
                 payload.license.should.equal('CC BY-SA');
-                payload.revisionId.should.equal(1);
+                payload.revision.should.equal(1);
                 payload.language.should.equal('en');
                 payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                 payload.editors.users.should.be.an('array').and.have.length(2);

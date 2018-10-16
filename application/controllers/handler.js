@@ -148,13 +148,10 @@ let self = module.exports = {
                             });
                         }
 
-                        // we must update all decks in the 'usage' attribute
-                        return slideDB.get(slideRef.id).then((newSlide) => {
-                            // prepare the newSlide response object
-                            newSlide.revisions = [_.find(newSlide.revisions, { id: slideRef.revision })];
-
-                            let content = newSlide.revisions[0].content;
-                            let newSlideId = util.toIdentifier(slideRef);
+                        // prepare the newSlide response object
+                        let newSlideId = util.toIdentifier(slideRef);
+                        return slideDB.getSlideRevision(newSlideId).then((newSlide) => {
+                            let content = newSlide.content;
                             // create thumbnail for the new slide revision
                             fileService.createThumbnail(content, newSlideId, slideRef.theme).catch((err) => {
                                 console.warn(`could not create thumbnail for updated slide ${newSlideId}, error was: ${err.message}`);

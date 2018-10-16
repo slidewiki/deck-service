@@ -92,13 +92,7 @@ describe('REST API tags', () => {
                     response.statusCode.should.equal(200);
                     response.payload.should.be.a('string');
                     let payload = JSON.parse(response.payload);
-                    payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'license', 'revisions');
-                    payload.user.should.equal(1);
-                    payload.revisions.should.be.an('array').and.have.length(1);
-                    let revision = payload.revisions[0];
-                    revision.should.be.an('object').and.contain.keys('timestamp', 'user', 'tags');
-                    revision.user.should.equal(1);
-                    revision.tags.should.be.an('array').and.have.length(1);
+                    payload.should.be.an('array').and.have.length(1);
                 });
             });
         });
