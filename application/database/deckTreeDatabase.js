@@ -621,7 +621,11 @@ const self = module.exports = {
             'theme',
             'slideDimensions',
             'allowMarkdown',
+            'educationLevel',
         ]);
+
+        // clean up null / undefined
+        newDeck = _.omitBy(newDeck, _.isNil);
 
         // assign origin metadata
         Object.assign(newDeck, {
@@ -765,6 +769,7 @@ const self = module.exports = {
             'theme',
             'allowMarkdown',
             'slideDimensions',
+            'educationLevel',
         ]), payload);
 
         // add it to database
