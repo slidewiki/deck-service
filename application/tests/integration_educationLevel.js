@@ -281,6 +281,34 @@ describe.only('REST API deck education level', () => {
             response.result.should.have.nested.property('revisions.0.educationLevel', '2');
         });
 
+        it('the deck educationLevel should be updateable to be left unspecified', async () => {
+            // read the deck
+            let response = await server.inject({
+                method: 'PUT',
+                url: `/deck/${deckId}`,
+                payload: {
+                    top_root_deck: String(deckId),
+                    title: 'The root for education level tests',
+                    license: 'CC BY-SA',
+                    educationLevel: null,
+                },
+                headers: {
+                    '----jwt----': authToken,
+                },
+            });
+            response.should.have.property('statusCode', 200);
+            response.result.should.have.nested.property('revisions.1.educationLevel', null);
+
+            // read the change in history
+            response = await server.inject({
+                method: 'GET',
+                url: `/deck/${deckId}/changes`,
+            });
+            response.should.have.property('statusCode', 200);
+            response.result.should.have.nested.property('0.values.educationLevel', null);
+            response.result.should.have.nested.property('0.oldValues.educationLevel', '1');
+        });
+
     });
 
 });

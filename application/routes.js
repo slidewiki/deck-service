@@ -350,7 +350,7 @@ module.exports = function(server) {
                         })).default([])
                     }),
                     hidden: Joi.boolean().default(true),
-                    educationLevel,
+                    educationLevel: educationLevel.allow(null),
                     empty: Joi.boolean().default(false).description('Set this to true to skip adding a new slide under the new deck'),
                 }),
 
@@ -395,7 +395,7 @@ module.exports = function(server) {
                     slideDimensions: slideDimensions,
                     new_revision: Joi.boolean(),
                     hidden: Joi.boolean(),
-                    educationLevel,
+                    educationLevel: educationLevel.allow(null),
                 }),
 
                 headers: Joi.object({
@@ -868,7 +868,7 @@ module.exports = function(server) {
                                 theme: availableThemes,
                                 allowMarkdown: Joi.boolean(),
                                 slideDimensions: slideDimensions,
-                                educationLevel,
+                                educationLevel: educationLevel.allow(null),
                                 empty: Joi.boolean().default(false).description('Set this to true to skip adding a new slide under the new deck'),
                             }).options({ stripUnknown: true }),
 

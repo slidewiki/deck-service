@@ -650,7 +650,7 @@ let self = module.exports = {
                     deckRevision.allowMarkdown = deck.allowMarkdown;
                 }
 
-                if (deck.educationLevel) {
+                if (deck.hasOwnProperty('educationLevel')) {
                     deckRevision.educationLevel = deck.educationLevel;
                 }
 
