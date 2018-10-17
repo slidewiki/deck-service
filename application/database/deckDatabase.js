@@ -650,6 +650,10 @@ let self = module.exports = {
                     deckRevision.allowMarkdown = deck.allowMarkdown;
                 }
 
+                if (deck.educationLevel) {
+                    deckRevision.educationLevel = deck.educationLevel;
+                }
+
                 if (deck.hasOwnProperty('hidden')) {
                     existingDeck.hidden = deck.hidden;
                 }

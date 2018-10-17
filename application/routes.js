@@ -20,6 +20,8 @@ const slideDimensions = Joi.object().keys({
     height: Joi.number().integer().positive(),
 });
 
+const educationLevel = Joi.string().regex(/^[0-9]{1,3}$/).description('The education level targeted by the deck using a code from ISCED 2011 standard');
+
 // TODO better organize joi validation models
 const apiModels = {};
 
@@ -348,7 +350,7 @@ module.exports = function(server) {
                         })).default([])
                     }),
                     hidden: Joi.boolean().default(true),
-                    educationLevel: Joi.string().regex(/^[0-9]{1,3}$/).description('The education level targeted by the deck using a code from ISCED 2011 standard'),
+                    educationLevel,
                     empty: Joi.boolean().default(false).description('Set this to true to skip adding a new slide under the new deck'),
                 }),
 
@@ -393,7 +395,7 @@ module.exports = function(server) {
                     slideDimensions: slideDimensions,
                     new_revision: Joi.boolean(),
                     hidden: Joi.boolean(),
-                    educationLevel: Joi.string().regex(/^[0-9]{1,3}$/).description('The education level targeted by the deck using a code from ISCED 2011 standard'),
+                    educationLevel,
                 }),
 
                 headers: Joi.object({
@@ -866,6 +868,7 @@ module.exports = function(server) {
                                 theme: availableThemes,
                                 allowMarkdown: Joi.boolean(),
                                 slideDimensions: slideDimensions,
+                                educationLevel,
                                 empty: Joi.boolean().default(false).description('Set this to true to skip adding a new slide under the new deck'),
                             }).options({ stripUnknown: true }),
 
