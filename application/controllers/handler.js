@@ -739,37 +739,28 @@ let self = module.exports = {
                 throw boom.badData('adding translations to a subdeck is not supported');
             }
 
-            // latest revision only!
-            return deckDB.getDeckVariants(rootDeckId).then((variants) => {
-                // check if the language is in deck variants
-                let variantFilter = _.pick(request.payload, 'language');
-                let existingVariant = _.find(variants, variantFilter);
-                if (!existingVariant) {
-                    throw boom.badData(`missing deck variant for ${Object.entries(variantFilter)} in deck ${rootDeckId}`);
+            // locate the node
+            let slideId = request.payload.selector.sid;
+            return slideDB.findSlideNode(rootDeckId, slideId).then((slideNode) => {
+                if (!slideNode) {
+                    throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootDeckId}`);
                 }
 
-                // locate the node
-                let slideId = request.payload.selector.sid;
-                return slideDB.findSlideNode(rootDeckId, slideId).then((slideNode) => {
-                    if (!slideNode) {
-                        throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootDeckId}`);
-                    }
+                // check if node variant exists already
+                let variantFilter = _.pick(request.payload, 'language');
+                if (_.find(slideNode.variants, variantFilter) ) {
+                    throw boom.badData(`variant for ${Object.entries(variantFilter)} already exists for slide: ${slideId} in deck tree: ${rootDeckId}`);
+                }
 
-                    // check if node variant exists already
-                    if (_.find(slideNode.variants, variantFilter) ) {
-                        throw boom.badData(`variant for ${Object.entries(variantFilter)} already exists for slide: ${slideId} in deck tree: ${rootDeckId}`);
-                    }
-
-                    return slideDB.addSlideNodeVariant(slideNode, request.payload, userId).then((newVariant) => {
-                        // also create a thumbnail
-                        let newSlideId = util.toIdentifier(newVariant);
-                        // content is the same as the primary slide
-                        fileService.createThumbnail(slideNode.slide.content, newSlideId, slideNode.parent.theme).catch((err) => {
-                            console.warn(`could not create thumbnail for new slide variant ${newSlideId}, error was: ${err.message}`);
-                        });
-
-                        return newVariant;
+                return slideDB.addSlideNodeVariant(slideNode, request.payload, userId).then((newVariant) => {
+                    // also create a thumbnail
+                    let newSlideId = util.toIdentifier(newVariant);
+                    // content is the same as the primary slide
+                    fileService.createThumbnail(slideNode.slide.content, newSlideId, slideNode.parent.theme).catch((err) => {
+                        console.warn(`could not create thumbnail for new slide variant ${newSlideId}, error was: ${err.message}`);
                     });
+
+                    return newVariant;
                 });
             });
 

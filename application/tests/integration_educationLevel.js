@@ -4,7 +4,7 @@
 const chai = require('chai');
 chai.should();
 
-describe.only('REST API deck education level', () => {
+describe('REST API deck education level', () => {
 
     const _ = require('lodash');
     const qs = require('querystring');
