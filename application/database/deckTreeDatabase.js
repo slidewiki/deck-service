@@ -44,7 +44,6 @@ const self = module.exports = {
             language: deck.language,
             theme: deck.theme,
             allowMarkdown: deck.allowMarkdown,
-            variants: deck.variants || [],
             children: [],
         };
 
@@ -52,6 +51,17 @@ const self = module.exports = {
             // we are root!
             rootVariants = deck.variants || [];
             Object.assign(deckTree, { variants: rootVariants });
+        } else {
+            // let's add what we have on the subdeck level to the root variants
+            _.each(deck.variants, (child) => {
+                // we only need the variant info from children (e.g. language)
+                // so no title or description or original (?)
+                let deckVariant = _.omit(child, 'title', 'description', 'original');
+                // we skip stuff we already have
+                if (!_.find(rootVariants, deckVariant) ) {
+                    rootVariants.push(deckVariant);
+                }
+            });
         }
 
         // we also push the current deck language (may not actually be the primary)
