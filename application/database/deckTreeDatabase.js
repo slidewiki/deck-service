@@ -17,7 +17,7 @@ const fileService = require('../services/file');
 const self = module.exports = {
 
     // recursive function that gets the decktree of a given deck and all of its sub-decks
-    getDeckTree: async function(deckId, variantFilter, visited) {
+    getDeckTree: async function(deckId, variantFilter, visited, rootVariants) {
         let deck = await deckDB.getDeck(deckId, variantFilter);
         if (!deck) return; // not found
 
@@ -48,26 +48,32 @@ const self = module.exports = {
             children: [],
         };
 
-        // we also push the current deck language (may not actually be the primary)
-        let selfVariant = _.pick(deckTree, 'language');
-        if (!_.find(deckTree.variants, selfVariant) ) {
-            deckTree.variants.push(selfVariant);
+        if (!rootVariants) {
+            // we are root!
+            rootVariants = deck.variants || [];
+            Object.assign(deckTree, { variants: rootVariants });
         }
 
-        let primaryVariant = _.find(deckTree.variants, { original: true });
+        // we also push the current deck language (may not actually be the primary)
+        let selfVariant = _.pick(deckTree, 'language');
+        if (!_.find(rootVariants, selfVariant) ) {
+            rootVariants.push(selfVariant);
+        }
+
+        let primaryVariant = _.find(rootVariants, { original: true });
         // we need to tag as 'original' the primary variant of the deck
         if (!primaryVariant) {
             // means we didn't include a filter or the filter did not match a variant
             // also means the node has the primary version
 
             // first try and locate that
-            primaryVariant = _.find(deckTree.variants, _.pick(deckTree, 'language'));
+            primaryVariant = _.find(rootVariants, _.pick(deckTree, 'language'));
             if (primaryVariant) {
                 // tag it and also include the title if not already there
                 Object.assign(primaryVariant, _.pick(deckTree, 'title'), { original: true });
             } else {
                 primaryVariant = Object.assign({ original: true }, _.pick(deckTree, 'language', 'title'));
-                deckTree.variants.push(primaryVariant);
+                rootVariants.push(primaryVariant);
             }
 
         }
@@ -116,29 +122,18 @@ const self = module.exports = {
                 // we collect language from slides as well as subdecks
                 let variantSpecs = [_.pick(slide, 'language'), ..._.map(item.variants, (v) => _.pick(v, 'language'))];
                 for (let variantSpec of variantSpecs) {
-                    if (!_.find(deckTree.variants, variantSpec) ) {
-                        deckTree.variants.push(variantSpec);
+                    if (!_.find(rootVariants, variantSpec) ) {
+                        rootVariants.push(variantSpec);
                     }
                 }
 
             } else {
                 // it's a deck
-                let innerTree = await self.getDeckTree(itemId, variantFilter, visited);
+                let innerTree = await self.getDeckTree(itemId, variantFilter, visited, rootVariants);
                 // skip dangling deck references / cycles
                 if (!innerTree) continue;
 
                 deckTree.children.push(innerTree);
-
-                // we also want to merge the variants information into the current node
-                innerTree.variants.forEach((child) => {
-                    // we only need the variant info from children (e.g. language)
-                    // so no title or description or original (?)
-                    let childVariant = _.omit(child, 'title', 'description', 'original');
-                    // we skip stuff we already have, or stuff the deck tree node mathches (language)
-                    if (!_.find([deckTree], childVariant) && !_.find(deckTree.variants, childVariant) ) {
-                        deckTree.variants.push(childVariant);
-                    }
-                });
             }
         }
 
