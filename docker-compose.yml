@@ -11,6 +11,7 @@ deckservice:
     - VIRTUAL_HOST=deckservice.experimental.slidewiki.org
     - LETSENCRYPT_HOST=deckservice.experimental.slidewiki.org
     - LETSENCRYPT_EMAIL=meissner@informatik.uni-leipzig.de
+    - URL_PLATFORM=https://platform.experimental.slidewiki.org
     - SERVICE_URL_FILE=https://fileservice.experimental.slidewiki.org
     - SERVICE_URL_TAG=https://tagservice.experimental.slidewiki.org
     - SERVICE_URL_USER=https://userservice.experimental.slidewiki.org

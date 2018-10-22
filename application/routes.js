@@ -981,6 +981,30 @@ module.exports = function(server) {
         }
     });
 
+    let cors;
+    if (process.env.URL_PLATFORM) {
+        // define the cors settings
+        cors = { origin: [] };
+        cors.origin.push(process.env.URL_PLATFORM);
+    }
+
+    server.route({
+        method: 'GET',
+        path: '/decktree/{id}/translations',
+        handler: deckTrees.getDeckTreeVariants,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'List the translations available for all deck tree nodes',
+            // needed for presentation rooms feature
+            cors,
+        },
+    });
+
     server.route({
         method: 'GET',
         path: '/decktree/node/translations',
