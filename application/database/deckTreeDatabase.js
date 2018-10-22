@@ -114,9 +114,11 @@ const self = module.exports = {
                 });
 
                 // we collect language from slides as well as subdecks
-                let variantSpec = _.pick(slide, 'language');
-                if (!_.find(deckTree.variants, variantSpec) ) {
-                    deckTree.variants.push(variantSpec);
+                let variantSpecs = [_.pick(slide, 'language'), ..._.map(item.variants, (v) => _.pick(v, 'language'))];
+                for (let variantSpec of variantSpecs) {
+                    if (!_.find(deckTree.variants, variantSpec) ) {
+                        deckTree.variants.push(variantSpec);
+                    }
                 }
 
             } else {
