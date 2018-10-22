@@ -119,15 +119,16 @@ let self = module.exports = {
                 if (!_.isEmpty(variantFilter) && variantFilter.language === deckRevision.language) {
                     // skip it if the same language as requested
                     continue;
-                } else if (!_.isEmpty(fallbackFilter) && fallbackFilter.language === deckRevision.language) {
-                    // if could not match variant, but can match default, skip it as well
-                    continue;
                 }
 
                 // check if variant language exists
                 let variantData = !_.isEmpty(variantFilter) && _.find(deckRevision.variants, variantFilter);
                 if (!variantData && !_.isEmpty(fallbackFilter)) {
                     // if cannot match it, but fallbackFilter is provided, try again with that
+                    if (fallbackFilter.language === deckRevision.language) {
+                        // skip it if fallback matched with default language
+                        continue;
+                    }
                     variantData = _.find(deckRevision.variants, fallbackFilter);
                 }
 
