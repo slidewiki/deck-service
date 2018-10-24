@@ -840,6 +840,24 @@ module.exports = function(server) {
     });
 
     server.route({
+        method: 'GET',
+        path: '/decktree/node',
+        handler: handlers.getDeckTreeNode,
+        config: {
+            validate: {
+                query: {
+                    id: Joi.string().required(),
+                    spath: Joi.string().empty(''),
+                    stype: Joi.string().empty(''),
+                    sid: Joi.string().empty(''),
+                },
+            },
+            tags: ['api'],
+            description: 'List the translations available for a deck tree node (slide or subdeck)',
+        },
+    });
+
+    server.route({
         method: 'POST',
         path: '/decktree/node/create',
         handler: deckTrees.createDeckTreeNode,

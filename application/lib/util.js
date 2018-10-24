@@ -66,20 +66,27 @@ let self = module.exports = {
         return `${ref.id}${revision}`;
     },
 
-    toPlatformPath: function(path) {
+    toPlatformPath: function(path, slide) {
         if (_.isEmpty(path)) return '';
 
         // first path part is always a deck
         let result = `/deck/${self.toIdentifier(path[0])}`;
+        if (path.length === 1) {
+            return result;
+        }
 
-        if (path.length > 1) {
-            // not just the root
+        if (slide) {
+            // add slide info to last part of path
             let [leaf] = path.slice(-1);
-            if (leaf.kind === 'slide') {
-                result += `/slide/${self.toIdentifier(leaf)}`;
-            } else {
-                result += `/deck/${self.toIdentifier(leaf)}`;
-            }
+            path = path.slice(0, -1).concat(Object.assign(leaf, { kind: 'slide' }, _.pick(slide, 'id', 'revision')));
+        }
+
+        // not just the root
+        let [leaf] = path.slice(-1);
+        if (leaf.kind === 'slide') {
+            result += `/slide/${self.toIdentifier(leaf)}`;
+        } else {
+            result += `/deck/${self.toIdentifier(leaf)}`;
         }
 
         return result + '/' + path.slice(1).map(formatPlatformPathPart).join(';');

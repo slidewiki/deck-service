@@ -699,10 +699,15 @@ let self = module.exports = {
             if (!rootDeck) throw boom.notFound();
 
             if (!request.query.sid || request.query.stype === 'deck') {
-                // TODO check if node exists
-
                 let deckId = request.query.sid || request.query.id;
-                return deckDB.getDeckVariants(deckId);
+
+                return deckDB.findPath(rootDeckId, deckId).then((path) => {
+                    if (_.isEmpty(path)) {
+                        throw boom.badData(`could not find deck: ${deckId} in deck tree: ${rootDeckId}`);
+                    }
+
+                    return deckDB.getDeckVariants(deckId);
+                });
             }
 
             let slideId = request.query.sid;
@@ -716,6 +721,58 @@ let self = module.exports = {
                     original: true
                 }, _.pick(slideNode.slide, 'id', 'revision', 'language')),
                 ...slideNode.variants];
+            });
+
+        }).then(reply).catch((err) => {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
+    getDeckTreeNode: function(request, reply) {
+        let rootDeckId = request.query.id;
+
+        // only doing this to return proper http error
+        return deckDB.getDeck(rootDeckId).then((rootDeck) => {
+            if (!rootDeck) throw boom.notFound();
+
+            if (!request.query.sid || request.query.stype === 'deck') {
+                let deckId = request.query.sid || request.query.id;
+
+                return deckDB.findPath(rootDeckId, deckId).then((path) => {
+                    if (_.isEmpty(path)) {
+                        throw boom.badData(`could not find deck: ${deckId} in deck tree: ${rootDeckId}`);
+                    }
+
+                    return deckDB.getDeckVariants(deckId).then((variants) => {
+                        // include node info alongside variants
+                        let [deckRef] = path.slice(-1);
+                        return Object.assign(deckRef, {
+                            path: util.toPlatformPath(path),
+                            variants,
+                        });
+                    });
+                });
+            }
+
+            let slideId = request.query.sid;
+            return slideDB.findSlideNode(rootDeckId, slideId).then((slideNode) => {
+                if (!slideNode) {
+                    throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootDeckId}`);
+                }
+
+                // include node info alongside variants
+                let slideRef = _.pick(slideNode.slide, 'id', 'revision');
+                return Object.assign(slideRef, _.pick(slideNode, 'index'), {
+                    path: util.toPlatformPath(slideNode.path, slideRef),
+                    // return all variants
+                    variants: [
+                        // also add the original slide in the response
+                        _.pick(slideNode.slide, 'id', 'revision', 'language'),
+                        ...slideNode.variants,
+                    ],
+                });
             });
 
         }).then(reply).catch((err) => {
