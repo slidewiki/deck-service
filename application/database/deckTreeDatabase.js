@@ -347,6 +347,103 @@ const self = module.exports = {
         });
     },
 
+    getDeckTreeVariants: async function(deckId, firstLevel=false, visited, rootVariants) {
+        let deck = await deckDB.getDeck(deckId);
+        if (!deck) return; // not found
+
+        // make it canonical
+        deckId = util.toIdentifier(deck);
+
+        // check for cycles!
+        if (_.isEmpty(visited)) {
+            // info of root deck
+            visited = [deckId];
+        } else if (visited.includes(deckId)) {
+            // TODO for now just pretend it's not there
+            return;
+        } else {
+            visited.push(deckId);
+        }
+
+        let deckTree = {
+            type: 'deck',
+            id: util.toIdentifier(deck),
+
+            variants: [],
+            children: [],
+        };
+
+        let selfVariant = _.pick(deck, 'language');
+        if (!rootVariants) {
+            // we are root!
+            rootVariants = _.map(deck.variants, (v) => _.pick(v, 'language'));
+
+            // we also push the current deck language (primary)
+            // we guard against bad data: check if it's there already
+            let primaryVariant = _.find(rootVariants, selfVariant);
+            if (primaryVariant) {
+                // tag it as original
+                Object.assign(primaryVariant, { original: true });
+            } else {
+                // add it
+                primaryVariant = Object.assign({ original: true }, selfVariant);
+                rootVariants.unshift(primaryVariant);
+            }
+
+            deckTree.variants = rootVariants;
+        } else {
+            // let's add what we have on the subdeck level to the root variants
+            _.map(deck.variants, (v) => _.pick(v, 'language')).concat(selfVariant).forEach((deckVariant) => {
+                // we skip stuff we already have
+                if (!_.find(rootVariants, deckVariant) ) {
+                    rootVariants.push(deckVariant);
+                }
+            });
+        }
+
+        for (let item of deck.contentItems) {
+            let itemId = util.toIdentifier(item.ref);
+            if (item.kind === 'slide') {
+                let slide = await slideDB.getSlideRevision(itemId);
+                // skip dangling slide references
+                if (!slide) continue;
+
+                let slideNode = {
+                    type: 'slide',
+                    // this is the canonical id of the slide, it (as any other variant id) can be used to fetch the slide node
+                    id: itemId,
+                    variants: _.map(item.variants, (v) => ({ id: util.toIdentifier(v), language: v.language })),
+                };
+
+                // add original as well
+                slideNode.variants.unshift({
+                    id: itemId,
+                    language: slide.language,
+                });
+
+                deckTree.children.push(slideNode);
+
+                // we collect language from slides as well as subdecks
+                let variantSpecs = [_.pick(slide, 'language'), ..._.map(item.variants, (v) => _.pick(v, 'language'))];
+                for (let variantSpec of variantSpecs) {
+                    if (!_.find(rootVariants, variantSpec) ) {
+                        rootVariants.push(variantSpec);
+                    }
+                }
+
+            } else if (!firstLevel) {
+                // it's a deck
+                let innerTree = await self.getDeckTreeVariants(itemId, true, visited, rootVariants);
+                // skip dangling deck references / cycles
+                if (!innerTree) continue;
+
+                deckTree.children.push(innerTree);
+            }
+        }
+
+        return deckTree;
+    },
+
     // new implementation for decktree API with enrich flag
     exportDeckTree: async function(deckId, variantFilter, firstLevel, deckTree=[]) {
         let deck = await deckDB.getDeck(deckId, variantFilter);
@@ -418,13 +515,11 @@ const self = module.exports = {
                     user: slide.user,
                 });
 
-            } else {
+            } else if (!firstLevel) {
                 // it's a deck
                 // call recursively for subdecks
-                if (!firstLevel) {
-                    await self.exportDeckTree(itemId, variantFilter, firstLevel, deckTree);
-                    // deckTree will receive the rest of the slides
-                }
+                await self.exportDeckTree(itemId, variantFilter, false, deckTree);
+                // deckTree will receive the rest of the slides
             }
         }
 
