@@ -1035,7 +1035,6 @@ module.exports = function(server) {
                     id: Joi.string(),
                 },
                 query: {
-                    language: languageModel.empty(''),
                     firstLevel: Joi.boolean().default(false),
                 }
             },

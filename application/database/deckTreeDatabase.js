@@ -445,84 +445,93 @@ const self = module.exports = {
     },
 
     // new implementation for decktree API with enrich flag
-    exportDeckTree: async function(deckId, variantFilter, firstLevel, deckTree=[]) {
-        let deck = await deckDB.getDeck(deckId, variantFilter);
-        if (!deck) return; // not found
+    exportDeckTree: async function(deckId, firstLevel, path=[], deckTree=[], visited=[]) {
+        let treeVariants = await self.getDeckTreeVariants(deckId, true);
 
-        if (_.isEmpty(variantFilter)) {
-            // we request the deck tree in the primary language of its root
-            // we need to explicitly include that for subdecks so that it properly propagates
-            variantFilter = _.pick(deck, 'language');
-        }
+        for (const variant of treeVariants.variants) {
+            let variantFilter = _.pick(variant, 'language');
+        
+            let deck = await deckDB.getDeck(deckId, variantFilter);
+            if (!deck) return; // not found
 
-        // make it canonical
-        deckId = util.toIdentifier(deck);
+            // make it canonical
+            deckId = util.toIdentifier(deck);
+            let identifier = `${deckId}_${variantFilter.language}`;
 
-        let deckEntry = {
-            type: 'deck',
-            id: deck.id,
-            revision: deck.revision,
-            hidden: deck.hidden,
-            title: deck.title,
-            description: deck.description,
-            timestamp: deck.timestamp, 
-            lastUpdate: deck.lastUpdate,
-            tags: _.map(deck.tags, 'tagName'),            
-            language: deck.language,
-            theme: deck.theme,
-            owner: deck.user,
-            contributors: _.map(await contributorsDB.getDeckContributors(deckId), 'id'),
-            children: [],
-        };
+            if (visited.includes(identifier)) return;
+            visited.push(identifier);
 
-        if (_.isEmpty(deckTree)) {
-            // info of root deck
-            deckTree.push(deckEntry);
-        } else {
-            // check for cycles!
-            if (_.find(deckTree.children, { type: 'deck', id: deckId })) {
-                // TODO for now just pretend it's not there
-                console.warn(`found cycle in deck tree ${deckTree.id}, deck node ${deckId}`);
-                return deckTree;
-            }
+            path.push(_.pick(deck, 'id', 'revision', 'hidden'));
 
-            // else push the deck as well
-            deckTree.push(deckEntry);
-        }
+            let deckEntry = {
+                type: 'deck',
+                id: deck.id,
+                revision: deck.revision,
+                hidden: deck.hidden,
+                title: deck.title,
+                description: deck.description,
+                timestamp: deck.timestamp, 
+                lastUpdate: deck.lastUpdate,
+                educationLevel: deck.educationLevel,
+                tags: _.map(deck.tags, 'tagName'),            
+                language: deck.language,
+                theme: deck.theme,
+                owner: deck.user,
+                contributors: _.map(await contributorsDB.getDeckContributors(deckId), 'id'),
+                path: _.uniqBy(path, 'id'),
+                forkGroup: await deckDB.computeForkGroup(deckId),
+                children: [],
+            };
 
-        for (let item of deck.contentItems) {
-            let itemId = util.toIdentifier(item.ref);
+            if (_.isEmpty(deckTree)) {
 
-            if (item.kind === 'slide') {
-                if (!_.isEmpty(variantFilter)) {
-                    // fetch the correct slide reference
-                    let slideVariant = _.find(item.variants, variantFilter);
-                    if (slideVariant) {
-                        // set the correct variant itemId
-                        itemId = util.toIdentifier(slideVariant);
-                    }
+                // info of root deck
+                deckTree.push(deckEntry);
+            } else {
+                // check for cycles!
+                if (_.find(deckTree.children, { type: 'deck', id: deckId })) {
+                    // TODO for now just pretend it's not there
+                    console.warn(`found cycle in deck tree ${deckTree.id}, deck node ${deckId}`);
+                    return deckTree;
                 }
-                // if no variantFilter, or no matching variant, item is the original slide
 
-                let slide = await slideDB.getSlideRevision(itemId);
-                deckEntry.children.push({
-                    type: 'slide',
-                    id: itemId,
-                    title: slide.title,
-                    content: slide.content,
-                    speakernotes: slide.speakernotes,
-                    language: slide.language,
-                    user: slide.user,
-                });
-
-            } else if (!firstLevel) {
-                // it's a deck
-                // call recursively for subdecks
-                await self.exportDeckTree(itemId, variantFilter, false, deckTree);
-                // deckTree will receive the rest of the slides
+                // else push the deck as well
+                deckTree.push(deckEntry);
             }
-        }
 
+            for (let item of deck.contentItems) {
+                let itemId = util.toIdentifier(item.ref);
+
+                if (item.kind === 'slide') {
+                    if (!_.isEmpty(variantFilter)) {
+                        // fetch the correct slide reference
+                        let slideVariant = _.find(item.variants, variantFilter);
+                        if (slideVariant) {
+                            // set the correct variant itemId
+                            itemId = util.toIdentifier(slideVariant);
+                        }
+                    }
+                    // if no variantFilter, or no matching variant, item is the original slide
+
+                    let slide = await slideDB.getSlideRevision(itemId);
+                    deckEntry.children.push({
+                        type: 'slide',
+                        id: itemId,
+                        title: slide.title,
+                        content: slide.content,
+                        speakernotes: slide.speakernotes,
+                        language: slide.language,
+                        user: slide.user,
+                    });
+
+                } else if (!firstLevel) {
+                    // it's a deck
+                    // call recursively for subdecks
+                    await self.exportDeckTree(itemId, false, _.cloneDeep(path), deckTree, visited);
+                    // deckTree will receive the rest of the slides
+                }
+            }            
+        }
         return deckTree;
     },
 
