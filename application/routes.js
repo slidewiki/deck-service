@@ -1034,6 +1034,10 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string(),
                 },
+                query: {
+                    language: languageModel.empty(''),
+                    firstLevel: Joi.boolean().default(false),
+                }
             },
             tags: ['api'],
             description: 'Retrieve full data for the entire deck tree and slides',
