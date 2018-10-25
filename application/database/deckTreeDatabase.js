@@ -475,6 +475,11 @@ const self = module.exports = {
                 educationLevel: deck.educationLevel,
                 tags: _.map(deck.tags, 'tagName'),            
                 language: deck.language,
+                variants: {
+                    original: deck.language,
+                    current: variantFilter.language,
+                    all: _.map(treeVariants.variants, 'language'),
+                },
                 theme: deck.theme,
                 owner: deck.user,
                 contributors: _.map(await contributorsDB.getDeckContributors(deckId), 'id'),
