@@ -485,6 +485,13 @@ const self = module.exports = {
                 contributors: _.map(await contributorsDB.getDeckContributors(deckId), 'id'),
                 path: _.uniqBy(path, 'id'),
                 forkGroup: await deckDB.computeForkGroup(deckId),
+                revisionCount: deck.revisionCount,
+                fistSlide: await self.getFirstSlide({ 
+                    id: deck.id, 
+                    revision: deck.revision, 
+                    language: variantFilter.language,
+                    contentItems: deck.contentItems, 
+                }),
                 children: [],
             };
 
