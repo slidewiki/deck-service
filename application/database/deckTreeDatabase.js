@@ -447,7 +447,9 @@ const self = module.exports = {
     // new implementation for decktree API with enrich flag
     exportDeckTree: async function(deckId, firstLevel, path=[], deckTree=[], visited=[]) {
         let treeVariants = await self.getDeckTreeVariants(deckId, true);
-
+        let originalVariant = _.find(treeVariants.variants, { original: true });
+        let originalLanguage = originalVariant.language;
+        
         for (const variant of treeVariants.variants) {
             let variantFilter = _.pick(variant, 'language');
         
@@ -476,7 +478,7 @@ const self = module.exports = {
                 tags: _.map(deck.tags, 'tagName'),            
                 language: deck.language,
                 variants: {
-                    original: deck.language,
+                    original: originalLanguage,
                     current: variantFilter.language,
                     all: _.map(treeVariants.variants, 'language'),
                 },
