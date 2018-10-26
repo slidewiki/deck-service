@@ -488,7 +488,7 @@ const self = module.exports = {
                 path: _.uniqBy(path, 'id'),
                 forkGroup: await deckDB.computeForkGroup(deckId),
                 revisionCount: deck.revisionCount,
-                fistSlide: await self.getFirstSlide({ 
+                firstSlide: await self.getFirstSlide({ 
                     id: deck.id, 
                     revision: deck.revision, 
                     language: variantFilter.language,
