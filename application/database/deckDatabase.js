@@ -2978,10 +2978,10 @@ let self = module.exports = {
 
             return self.getRevision(deckId).then( (revision) => {
 
-                path.push({id: deck._id, revision: deck.revision, hidden: deck.hidden});
+                path.push({id: deck.id, revision: deck.revision, hidden: deck.hidden});
 
                 let decktree = {
-                    id: deck._id, 
+                    id: deck.id, 
                     revisionId: deck.revision, 
                     latestRevisionId: deck.latestRevision, 
                     type: 'deck',
