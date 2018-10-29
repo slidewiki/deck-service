@@ -133,6 +133,48 @@ module.exports = function(server) {
         }
     });
 
+    // new route to eventually replace the PUT method
+    server.route({
+        method: 'PATCH',
+        path: '/deck/{id}',
+        handler: decks.updateDeck,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('Identifier of the deck (without revision)'),
+                },
+                payload: {
+                    user: Joi.number().integer().description('Identifier of the new deck owner').required(),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Update metadata of a deck',
+        },
+    });
+
+    server.route({
+        method: 'DELETE',
+        path: '/deck/{id}',
+        handler: decks.deleteDeck,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.number().integer().description('Identifier of the deck to delete'),
+                },
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Delete a deck',
+        },
+    });
+
     server.route({
         method: 'GET',
         path: '/legacy/{oldId}',

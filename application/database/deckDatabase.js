@@ -102,7 +102,7 @@ let self = module.exports = {
         let {id: deckId, revision: revisionId} = util.parseIdentifier(identifier) || {};
 
         let col = await helper.getCollection('decks');
-        let found = await col.findOne({ _id: deckId });
+        let found = await col.findOne({ _id: deckId, user: { $gt: 0 } });
         if (!found) return;
 
         if (revisionId) {
@@ -455,24 +455,25 @@ let self = module.exports = {
         return result.ops[0];
     },
 
-    // TODO only used for accessLevel tests right now, should be removed or properly integrated
-    // once a decision re: access level is made
-    _adminUpdate: function(id, deckPatch) {
-        return helper.connectToDatabase()
-        .then((db) => db.collection('decks'))
-        .then((col) => {
-            return col.findOne({_id: parseInt(id)})
-            .then((existingDeck) => {
-                if (!_.isEmpty(deckPatch.accessLevel)) {
-                    existingDeck.accessLevel = deckPatch.accessLevel;
-                }
+    // updates admin properties in patch object
+    adminUpdate: async function(deckId, patch) {
+        deckId = parseInt(deckId);
 
-                return col.findOneAndReplace({ _id: parseInt(id) }, existingDeck, { returnOriginal: false } )
-                .then((updated) => updated.value);
-            });
+        let decks = await helper.getCollection('decks');
+        let update = _.pick(patch, 'accessLevel', 'user');
 
-        });
+        if (update.user) {
+            // we also make it hidden:
+            // 1) when deleting in order to be removed from the search index automatically
+            // 2) when transferring owner, so that it doesn't display in the new owner's public decks right away
 
+            // TODO alert user they own a new deck
+            update.hidden = true;
+        }
+
+        return decks.findOneAndUpdate({ _id: deckId }, {
+            $set: update,
+        }, { returnOriginal: false }).then((result) => result.value);
     },
 
     // returns the new or existing request, with isNew set to true if it was new
