@@ -981,6 +981,7 @@ module.exports = function(server) {
                         stype: Joi.string(),
                         sid: Joi.string()
                     }),
+                    purge: Joi.boolean().default(false),
                 }).requiredKeys('selector'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')

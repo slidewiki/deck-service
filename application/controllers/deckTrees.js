@@ -522,19 +522,58 @@ const self = module.exports = {
 
     },
 
-    removeDeckTreeNode: function(request, reply) {
+    removeDeckTreeNode: async function(request, reply) {
         let userId = request.auth.credentials.userid;
         let rootId = request.payload.selector.id;
 
-        // determine the info for the node to remove
-        let node = parseNodeToRemove(request.payload.selector);
+        try {
+            // check permissions for root deck
+            let perms = await deckDB.userPermissions(rootId, userId);
+            if (!perms) throw boom.badData(`could not find deck tree ${rootId}`);
+            if (!perms.edit) throw boom.forbidden();
 
-        // just remove it!
-        return treeDB.removeDeckTreeNode(rootId, node, userId).then(reply).catch((err) => {
+            // determine the info for the node to remove
+            let node = parseNodeToRemove(request.payload.selector);
+            if (node.kind !== 'deck' || !request.payload.purge) {
+                // just remove it!
+                return reply(await treeDB.removeDeckTreeNode(rootId, node, userId));
+            }
+
+            // purging
+            // find the node from database
+            let treeNode = await treeDB.findDeckTreeNode(rootId, node.id, node.kind);
+            if (!treeNode) throw boom.badData(`could not find ${node.kind}: ${node.id} in deck tree: ${rootId}`);
+
+            let deckId = util.toIdentifier(treeNode.ref);
+
+            // check permissions for deck as well
+            perms = await deckDB.userPermissions(deckId, userId);
+            // perms should exist unless concurrent edits, let's own this error (5xx instead of 4xx)
+            if (!perms.admin) throw boom.forbidden(`cannot purge deck: ${deckId}, user ${userId} is not deck admin`);
+
+            let deck = await deckDB.getDeck(deckId);
+            // check if deck is used elsewhere
+            let otherUsage = _.reject(deck.usage, util.parseIdentifier(treeNode.parentId));
+            if (_.size(otherUsage)) {
+                throw boom.badData(`cannot purge deck: ${deckId} from deck tree: ${rootId}, as it is also used in decks [${otherUsage.map(util.toIdentifier).join(',')}]`);
+            } 
+
+            // also check if deck has subdecks
+            if (_.find(deck.contentItems, { kind: 'deck' })) {
+                throw boom.badData(`cannot purge deck: ${deckId}, as it has subdecks`);
+            }
+
+            // do the remove and then purge
+            let removed = await treeDB.removeDeckTreeNode(rootId, node, userId);
+            await deckDB.adminUpdate(deckId, { user: -1 });
+
+            reply(removed);
+
+        } catch (err) {
             if (err.isBoom) return reply(err);
             request.log('error', err);
             reply(boom.badImplementation());
-        });
+        }
     },
 
     exportDeckTree: function(request, reply) {
