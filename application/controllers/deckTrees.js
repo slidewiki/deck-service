@@ -538,7 +538,7 @@ const self = module.exports = {
     },
 
     exportDeckTree: function(request, reply) {
-        treeDB.exportDeckTree(request.params.id).then((deckTree) => {
+        treeDB.exportDeckTree(request.params.id, request.query.firstLevel).then((deckTree) => {
             if (!deckTree) throw boom.notFound();
             reply(deckTree);
         }).catch((err) => {
