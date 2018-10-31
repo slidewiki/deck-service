@@ -51,6 +51,18 @@ const trackedDeckRevisionProperties = {
                 tagName: {
                     type: 'string',
                 },
+                tagType: {
+                    oneOf: [
+                        {
+                            type: 'string',
+                            enum: [
+                                'topic',
+                                'slide',
+                            ],
+                        },
+                        { type: 'null' },
+                    ],
+                },
                 // TODO add other properties as well in sync with the tag-service
             },
         },
