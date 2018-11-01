@@ -20,6 +20,8 @@ const slideDimensions = Joi.object().keys({
     height: Joi.number().integer().positive(),
 });
 
+const slideTransition = Joi.string().valid('none', 'concave', 'convex', 'fade', 'slide', 'zoom');
+
 const educationLevel = Joi.string().regex(/^[0-9]{1,3}$/).description('The education level targeted by the deck using a code from ISCED 2011 standard');
 
 // TODO better organize joi validation models
@@ -624,6 +626,7 @@ module.exports = function(server) {
                     tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                     dimensions: slideDimensions,
+                    transition: slideTransition,
                 }).requiredKeys('content', 'root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -666,6 +669,7 @@ module.exports = function(server) {
                     language: languageModel,
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     dimensions: slideDimensions,
+                    transition: slideTransition,
                     dataSources: Joi.array().items(Joi.object().keys({
                         type: Joi.string(),
                         title: Joi.string(),
@@ -883,6 +887,7 @@ module.exports = function(server) {
                                 language: languageModel,
                                 license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                                 dimensions: slideDimensions,
+                                transition: slideTransition,
                             }).options({ stripUnknown: true }),
 
                         })

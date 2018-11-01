@@ -132,7 +132,6 @@ const slideRevision = {
         language: {
             type: 'string'
         },
-
         dimensions: {
             type: 'object',
             properties: {
@@ -147,7 +146,9 @@ const slideRevision = {
             },
             required: ['width', 'height'],
         },
-
+        transition: {
+            type: 'string'
+        }
     },
     required: ['id', 'user']
 };

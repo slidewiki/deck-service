@@ -283,6 +283,7 @@ const self = module.exports = {
                             'license',
                             'speakernotes',
                             'dimensions',
+                            'transition',
                             'language',
                         ]);
                         // assign metadata
@@ -326,6 +327,7 @@ const self = module.exports = {
                     'language',
                     'license',
                     'dimensions',
+                    'transition',
                 ]));
 
                 return treeDB.createSlide(newSlidePayload, target.parentId, target.position + 1, rootId, userId).then((newContentItem) => {
@@ -417,6 +419,7 @@ const self = module.exports = {
                     'language',
                     'license',
                     'dimensions',
+                    'transition',
                 ]));
 
                 return treeDB.createSlide(newSlidePayload, util.toIdentifier(newContentItem.ref), 0, rootId, userId)

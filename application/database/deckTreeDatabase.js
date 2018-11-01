@@ -316,6 +316,7 @@ const self = module.exports = {
                     theme: deck.theme,
                     allowMarkdown: deck.allowMarkdown,
                     user: String(slide.user),
+                    transition: slide.transition ? slide.transition : 'none'
                 });
 
             } else {
