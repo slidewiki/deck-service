@@ -51,9 +51,28 @@ const trackedDeckRevisionProperties = {
                 tagName: {
                     type: 'string',
                 },
+                tagType: {
+                    oneOf: [
+                        {
+                            type: 'string',
+                            enum: [
+                                'topic',
+                                'slide',
+                            ],
+                        },
+                        { type: 'null' },
+                    ],
+                },
                 // TODO add other properties as well in sync with the tag-service
             },
         },
+    },
+
+    educationLevel: {
+        oneOf: [
+            { type: 'string'},
+            { type: 'null' },
+        ],
     },
 
     variants: {
@@ -74,18 +93,6 @@ const trackedDeckRevisionProperties = {
         },
     },
 
-};
-
-const contributor = {
-    type: 'object',
-    properties: {
-        user: objectid,
-        count: {
-            type: 'integer',
-            minimum: 1
-        }
-    },
-    required: ['user']
 };
 
 //build schema
@@ -343,12 +350,7 @@ const deck = {
             type: 'array',
             items: deckRevision
         },
-        contributors: {
-            type: 'array',
-            items: {
-                contributor
-            }
-        },
+
         active: {
             type: 'integer'
         },

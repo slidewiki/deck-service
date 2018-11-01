@@ -22,6 +22,8 @@ const slideDimensions = Joi.object().keys({
 
 const slideTransition = Joi.string().valid('none', 'concave', 'convex', 'fade', 'slide', 'zoom');
 
+const educationLevel = Joi.string().regex(/^[0-9]{1,3}$/).description('The education level targeted by the deck using a code from ISCED 2011 standard');
+
 // TODO better organize joi validation models
 const apiModels = {};
 
@@ -350,6 +352,7 @@ module.exports = function(server) {
                         })).default([])
                     }),
                     hidden: Joi.boolean().default(true),
+                    educationLevel: educationLevel.allow(null),
                     empty: Joi.boolean().default(false).description('Set this to true to skip adding a new slide under the new deck'),
                 }),
 
@@ -394,6 +397,7 @@ module.exports = function(server) {
                     slideDimensions: slideDimensions,
                     new_revision: Joi.boolean(),
                     hidden: Joi.boolean(),
+                    educationLevel: educationLevel.allow(null),
                 }),
 
                 headers: Joi.object({
@@ -868,6 +872,7 @@ module.exports = function(server) {
                                 theme: availableThemes,
                                 allowMarkdown: Joi.boolean(),
                                 slideDimensions: slideDimensions,
+                                educationLevel: educationLevel.allow(null),
                                 empty: Joi.boolean().default(false).description('Set this to true to skip adding a new slide under the new deck'),
                             }).options({ stripUnknown: true }),
 
@@ -981,6 +986,30 @@ module.exports = function(server) {
         }
     });
 
+    let cors;
+    if (process.env.URL_PLATFORM) {
+        // define the cors settings
+        cors = { origin: [] };
+        cors.origin.push(process.env.URL_PLATFORM);
+    }
+
+    server.route({
+        method: 'GET',
+        path: '/decktree/{id}/translations',
+        handler: deckTrees.getDeckTreeVariants,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'List the translations available for all deck tree nodes',
+            // needed for presentation rooms feature
+            cors,
+        },
+    });
+
     server.route({
         method: 'GET',
         path: '/decktree/node/translations',
@@ -1034,6 +1063,9 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string(),
                 },
+                query: {
+                    firstLevel: Joi.boolean().default(false),
+                }
             },
             tags: ['api'],
             description: 'Retrieve full data for the entire deck tree and slides',

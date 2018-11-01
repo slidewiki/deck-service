@@ -107,16 +107,12 @@ describe('REST API new deck', () => {
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'revisions', 'id', 'editors', 'license', 'contributors');
+                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'revisions', 'id', 'editors', 'license');
                 payload.user.should.equal(1);
                 payload.license.should.equal('CC BY-SA');
                 payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                 payload.editors.users.should.be.an('array').and.have.length(0);
                 payload.editors.groups.should.be.an('array').and.have.length(0);
-                payload.contributors.should.be.an('array').and.have.length(1);
-                payload.contributors[0].should.be.an('object').and.contain.keys('user');
-                payload.contributors[0].user.should.equal(1);
-                //payload.contributors[0].count.should.equal(1); // 'count' not used
 
                 payload.revisions.should.be.an('array').and.have.length(1);
                 let revision = payload.revisions[0];
@@ -137,17 +133,13 @@ describe('REST API new deck', () => {
                 response.statusCode.should.equal(200);
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
-                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'revisions', 'id', 'editors', 'license', 'contributors');
+                payload.should.be.an('object').and.contain.keys('user', 'timestamp', 'revisions', 'id', 'editors', 'license');
                 payload.user.should.equal(2);
                 deckID = String(payload.id);
                 payload.license.should.equal('CC BY-SA');
                 payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                 payload.editors.users.should.be.an('array').and.have.length(2);
                 payload.editors.groups.should.be.an('array').and.have.length(1);
-                payload.contributors.should.be.an('array').and.have.length(1);
-                payload.contributors[0].should.be.an('object').and.contain.keys('user');
-                payload.contributors[0].user.should.equal(2);
-                //payload.contributors[0].count.should.equal(1); // 'count' not used
                 payload.should.have.a.nested.property('slideDimensions.width', 800);
                 payload.should.have.a.nested.property('slideDimensions.height', 400);
 
@@ -185,7 +177,7 @@ describe('REST API new deck', () => {
                 response.payload.should.be.a('string');
                 let payload = JSON.parse(response.payload);
                 payload.should.be.an('object').and.contain.keys(
-                    '_id', 'user', 'timestamp', 'license', 'revisions', 'editors', 'contributors', 'revisionId', 'language'
+                    '_id', 'user', 'timestamp', 'license', 'revisions', 'editors', 'revisionId', 'language'
                 );
                 payload._id.should.equal(parseInt(deckID));
                 payload.user.should.equal(2);
@@ -195,10 +187,6 @@ describe('REST API new deck', () => {
                 payload.editors.should.be.an('object').and.contain.keys('users', 'groups');
                 payload.editors.users.should.be.an('array').and.have.length(2);
                 payload.editors.groups.should.be.an('array').and.have.length(1);
-                payload.contributors.should.be.an('array').and.have.length(1);
-                payload.contributors[0].should.be.an('object').and.contain.keys('user');
-                payload.contributors[0].user.should.equal(2);
-                //payload.contributors[0].count.should.equal(2); // 'count' not used
                 payload.should.have.a.property('slideDimensions').that.is.an('object').and.contains.keys('width', 'height');
 
                 payload.revisions.should.be.an('array').and.have.length(1);
@@ -224,7 +212,7 @@ describe('REST API new deck', () => {
         });               
     });
     
-    context('when appending a deck to a deck', () => { //TODO //TODO check if editors/contributors, datasources, etc change
+    context('when appending a deck to a deck', () => { //TODO //TODO check if editors, datasources, etc change
         it('it should reply it', () => {
             let opt = JSON.parse(JSON.stringify(options));
             opt.url = '/decktree/node/create';

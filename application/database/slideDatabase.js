@@ -151,7 +151,7 @@ let self = module.exports = {
         return result.ops[0];
     },
 
-    // new method that simply creates a new slide revision based on another, plus changes in payload
+    // creates a new slide revision based on another, plus changes in payload
     // intended to be the basis for the implemenation of a lot of other methods
     revise: async function(slideId, payload, userId) {
         let slideRef = util.parseIdentifier(slideId);
@@ -190,15 +190,6 @@ let self = module.exports = {
             usage: [],
         });
 
-        // update contributors array
-        let contributors = slide.contributors || [];
-        let existingContributor = _.find(contributors, { user: userId });
-        if (existingContributor) {
-            existingContributor.count++;
-        } else {
-            contributors.push({ user: userId, count: 1 });
-        }
-
         let slides = await helper.getCollection('slides');
         let updatedSlide = await slides.findOneAndUpdate(
             { _id: slideRef.id },
@@ -206,7 +197,6 @@ let self = module.exports = {
                 $push: { revisions: newRevision },
                 $set: { 
                     lastUpdate: now,
-                    contributors,
                 },
             }
         );
@@ -239,140 +229,6 @@ let self = module.exports = {
         });
 
         return self.insert(newSlide, userId);
-    },
-
-    // DEPRECATED
-    _copy: function(slide, slideRevision){
-        return helper.connectToDatabase()
-        .then((db) => helper.getNextIncrementationValueForCollection(db, 'slides'))
-        .then((newId) => {
-            return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
-            .then((db2) => db2.collection('slides'))
-            .then((col) => {
-                slide._id = newId;
-                let revisionCopied = slide.revisions[slideRevision];
-                let now = new Date();
-                let timestamp = now.toISOString();
-                let parentArray = slide.parent.split('-');
-                if(parentArray.length > 1){
-                    revisionCopied.parent = {'id': parseInt(parentArray[0]), 'revision': parseInt(parentArray[1])};
-                }
-                else{
-                    revisionCopied.parent = slide.parent;
-                }
-                revisionCopied.usage = [];
-                revisionCopied.comment = slide.comment;
-                revisionCopied.id = 1;
-                revisionCopied.timestamp = timestamp;
-                slide.revisions = [revisionCopied];
-                slide.timestamp = timestamp;
-                delete slide.parent;
-                delete slide.comment;
-                try {
-                    return col.insertOne(slide);
-                } catch (e) {
-                    console.log('validation failed', e);
-                }
-                return;
-            });
-        });
-    },
-
-    replace: function(id, slide) {
-        return helper.getCollection('slides').then((col) => {
-            let idArray = String(id).split('-');
-            if(idArray.length > 1){
-                id = idArray[0];
-            }
-
-            // prepare the result id and revisions
-            let newSlideRef = { id: parseInt(id) };
-            return col.findOne({_id: newSlideRef.id })
-            .then((existingSlide) => {
-                const maxRevisionId = existingSlide.revisions.reduce((prev, curr) => {
-                    if (curr.id > prev)
-                        return curr.id;
-
-                    return prev;
-                }, 1);
-
-                newSlideRef.revision = maxRevisionId + 1;
-
-                let usageArray = existingSlide.revisions[idArray[1]-1].usage;
-                //we should remove the usage of the previous revision in the root deck
-                let previousUsageArray = JSON.parse(JSON.stringify(usageArray));
-                if(slide.root_deck){
-
-                    for(let i = 0; i < previousUsageArray.length; i++){
-                        if(previousUsageArray[i].id === parseInt(slide.root_deck.split('-')[0]) && previousUsageArray[i].revision === parseInt(slide.root_deck.split('-')[1])){
-                            previousUsageArray.splice(i,1);
-                            break;
-                        }
-                    }
-                }
-
-                //should empty usage array and keep only the new root deck revision
-                usageArray = [{'id':parseInt(slide.root_deck.split('-')[0]), 'revision': parseInt(slide.root_deck.split('-')[1])}];
-                let slideWithNewRevision = convertSlideWithNewRevision(slide, newSlideRef.revision, usageArray);
-                slideWithNewRevision.timestamp = existingSlide.timestamp;
-                slideWithNewRevision.license = existingSlide.license;
-                slideWithNewRevision.user = existingSlide.user;
-                if(existingSlide.hasOwnProperty('contributors')){
-                    let contributors = existingSlide.contributors;
-                    let existingUserContributorIndex = findWithAttr(contributors, 'user', slide.user);
-                    if(existingUserContributorIndex > -1)
-                        contributors[existingUserContributorIndex].count++;
-                    else{
-                        contributors.push({'user': slide.user, 'count': 1});
-                    }
-                    slideWithNewRevision.contributors = contributors;
-                }
-
-                if (!slideModel(slideWithNewRevision)) {
-                    throw new Error(JSON.stringify(slideModel.errors));
-                }
-
-                let new_revisions = existingSlide.revisions;
-                new_revisions[idArray[1]-1].usage = previousUsageArray;
-                new_revisions.push(slideWithNewRevision.revisions[0]);
-                slideWithNewRevision.revisions = new_revisions;
-
-                // update and return new ids if successful
-                return col.findOneAndUpdate({
-                    _id: newSlideRef.id
-                }, { $set: slideWithNewRevision }, { returnOriginal: false })
-                .then(() => newSlideRef);
-            });
-        });
-    },
-
-    // DEPRECATED
-    revert: function(slideId, revisionId, path, userId) {
-        return self.get(slideId).then((slide) => {
-            if (!slide) return;
-
-            // also check if revisionId we revert to exists
-            let revision = slide.revisions.find((r) => r.id === revisionId);
-            if (!revision) return;
-
-            // the parent of the slide is the second to last item of the path
-            // path has at least length 2, guaranteed
-            let [parentDeck] = path.slice(-2, -1);
-            let parentDeckId = util.toIdentifier(parentDeck);
-
-            let rootDeckId = util.toIdentifier(path[0]);
-
-            // update the content items of the parent deck to reflect the slide revert
-            return deckDB.updateContentItem(slide, revisionId, parentDeckId, 'slide', userId, rootDeckId)
-            .then(({oldRevision, updatedDeckRevision}) => {
-                // make old slide id canonical
-                let oldSlideRef = { id: slideId, revision: parseInt(oldRevision) };
-
-                // move the parent deck from the usage of the current slide revision to the new one
-                return usageDB.moveToUsage(parentDeck, { kind: 'slide', ref: oldSlideRef }, revisionId)
-                .then(() => slide);
-            });
-        });
     },
 
     saveDataSources: function(id, dataSources) {
@@ -449,34 +305,6 @@ let self = module.exports = {
             });
         });
     },
-
-    // DEPRECATED
-    addToUsage: function(itemToAdd, root_deck_path){
-        let itemId = itemToAdd.ref.id;
-        let itemRevision = itemToAdd.ref.revision;
-        let usageToPush = {id: parseInt(root_deck_path[0]), revision: parseInt(root_deck_path[1])};
-        if(itemToAdd.kind === 'slide'){
-            return helper.connectToDatabase()
-            .then((db) => db.collection('slides'))
-            .then((col2) => {
-                return col2.findOneAndUpdate(
-                    {_id: parseInt(itemId), 'revisions.id':itemRevision},
-                    {$push: {'revisions.$.usage': usageToPush}}
-                );
-            });
-        }
-        else{
-            return helper.connectToDatabase()
-            .then((db) => db.collection('decks'))
-            .then((col2) => {
-                return col2.findOneAndUpdate(
-                    {_id: parseInt(itemId), 'revisions.id':itemRevision},
-                    {$push: {'revisions.$.usage': usageToPush}}
-                );
-            });
-        }
-    },
-
 
     getTags(slideIdParam){
         let {slideId, revisionId} = splitSlideIdParam(slideIdParam);
@@ -892,7 +720,6 @@ function convertToNewSlide(slide) {
     // remove nils (undefined or nulls)
     slide = _.omitBy(slide, _.isNil);
 
-    let contributorsArray = [{'user': slide.user, 'count': 1}];
     const result = {
         _id: slide._id,
         user: slide.user,
@@ -900,7 +727,6 @@ function convertToNewSlide(slide) {
         lastUpdate: now.toISOString(),
         language: slide.language,
         license: slide.license,
-        contributors: contributorsArray,
         description: slide.description,
         revisions: [{
             id: 1,

@@ -4,6 +4,7 @@ const _ = require('lodash');
 const boom = require('boom');
 
 const util = require('../lib/util');
+const ChangeLog = require('../lib/ChangeLog');
 
 const helper = require('./helper');
 const deckDB = require('./deckDatabase');
@@ -16,8 +17,7 @@ const fileService = require('../services/file');
 const self = module.exports = {
 
     // recursive function that gets the decktree of a given deck and all of its sub-decks
-    // NEW implementation, old should be deprecated
-    getDeckTree: async function(deckId, variantFilter, visited) {
+    getDeckTree: async function(deckId, variantFilter, visited, rootVariants) {
         let deck = await deckDB.getDeck(deckId, variantFilter);
         if (!deck) return; // not found
 
@@ -44,30 +44,46 @@ const self = module.exports = {
             language: deck.language,
             theme: deck.theme,
             allowMarkdown: deck.allowMarkdown,
-            variants: deck.variants || [],
             children: [],
         };
 
-        // we also push the current deck language (may not actually be the primary)
-        let selfVariant = _.pick(deckTree, 'language');
-        if (!_.find(deckTree.variants, selfVariant) ) {
-            deckTree.variants.push(selfVariant);
+        if (!rootVariants) {
+            // we are root!
+            rootVariants = deck.variants || [];
+            Object.assign(deckTree, { variants: rootVariants });
+        } else {
+            // let's add what we have on the subdeck level to the root variants
+            _.each(deck.variants, (child) => {
+                // we only need the variant info from children (e.g. language)
+                // so no title or description or original (?)
+                let deckVariant = _.omit(child, 'title', 'description', 'original');
+                // we skip stuff we already have
+                if (!_.find(rootVariants, deckVariant) ) {
+                    rootVariants.push(deckVariant);
+                }
+            });
         }
 
-        let primaryVariant = _.find(deckTree.variants, { original: true });
+        // we also push the current deck language (may not actually be the primary)
+        let selfVariant = _.pick(deckTree, 'language');
+        if (!_.find(rootVariants, selfVariant) ) {
+            rootVariants.push(selfVariant);
+        }
+
+        let primaryVariant = _.find(rootVariants, { original: true });
         // we need to tag as 'original' the primary variant of the deck
         if (!primaryVariant) {
             // means we didn't include a filter or the filter did not match a variant
             // also means the node has the primary version
 
             // first try and locate that
-            primaryVariant = _.find(deckTree.variants, _.pick(deckTree, 'language'));
+            primaryVariant = _.find(rootVariants, _.pick(deckTree, 'language'));
             if (primaryVariant) {
                 // tag it and also include the title if not already there
                 Object.assign(primaryVariant, _.pick(deckTree, 'title'), { original: true });
             } else {
                 primaryVariant = Object.assign({ original: true }, _.pick(deckTree, 'language', 'title'));
-                deckTree.variants.push(primaryVariant);
+                rootVariants.push(primaryVariant);
             }
 
         }
@@ -114,29 +130,20 @@ const self = module.exports = {
                 });
 
                 // we collect language from slides as well as subdecks
-                let variantSpec = _.pick(slide, 'language');
-                if (!_.find(deckTree.variants, variantSpec) ) {
-                    deckTree.variants.push(variantSpec);
+                let variantSpecs = [_.pick(slide, 'language'), ..._.map(item.variants, (v) => _.pick(v, 'language'))];
+                for (let variantSpec of variantSpecs) {
+                    if (!_.find(rootVariants, variantSpec) ) {
+                        rootVariants.push(variantSpec);
+                    }
                 }
 
             } else {
                 // it's a deck
-                let innerTree = await self.getDeckTree(itemId, variantFilter, visited);
+                let innerTree = await self.getDeckTree(itemId, variantFilter, visited, rootVariants);
                 // skip dangling deck references / cycles
                 if (!innerTree) continue;
 
                 deckTree.children.push(innerTree);
-
-                // we also want to merge the variants information into the current node
-                innerTree.variants.forEach((child) => {
-                    // we only need the variant info from children (e.g. language)
-                    // so no title or description or original (?)
-                    let childVariant = _.omit(child, 'title', 'description', 'original');
-                    // we skip stuff we already have, or stuff the deck tree node mathches (language)
-                    if (!_.find([deckTree], childVariant) && !_.find(deckTree.variants, childVariant) ) {
-                        deckTree.variants.push(childVariant);
-                    }
-                });
             }
         }
 
@@ -232,8 +239,7 @@ const self = module.exports = {
         }
     },
 
-    // returns a flattened structure of a deck's slides, and optionally its sub-decks
-    // NEW implementation, old should be deprecated
+    // returns a flattened structure of a deck's slides
     getFlatSlides: async function(deckId, variantFilter) {
         let result = await self.getFlatItems(deckId, variantFilter);
         if (!result) return;
@@ -243,6 +249,7 @@ const self = module.exports = {
         return result;
     },
 
+    // returns a flattened structure of a deck's slides, and optionally its sub-decks
     getFlatItems: async function(deckId, variantFilter, deckTree) {
         let deck = await deckDB.getDeck(deckId, variantFilter);
         if (!deck) return; // not found
@@ -323,8 +330,25 @@ const self = module.exports = {
         return deckTree;
     },
 
-    // new implementation for decktree API with enrich flag
-    exportDeckTree: async function(deckId, path=[], visited) {
+    // fetches specified media-type files that are present inside the deck
+    getMedia: function(deckId, mediaType){
+        return self.getFlatSlides(deckId).then( (flatSlides) => {
+            if(!flatSlides) return;
+
+            // get media uris per slide as arrays
+            let media = flatSlides.children.map( (slide) => {
+                return util.findMedia(slide.content, mediaType);
+            });
+
+            // flatten arrays of media uris
+            let flatMedia = [].concat.apply([], media);
+
+            // return unique media uris
+            return [...new Set(flatMedia)];
+        });
+    },
+
+    getDeckTreeVariants: async function(deckId, firstLevel=false, visited, rootVariants) {
         let deck = await deckDB.getDeck(deckId);
         if (!deck) return; // not found
 
@@ -342,58 +366,187 @@ const self = module.exports = {
             visited.push(deckId);
         }
 
-        // build the path
-        path.push(_.pick(deck, 'id', 'revision', 'hidden'));
-
         let deckTree = {
             type: 'deck',
-            id: deck.id,
-            revision: deck.revision,
-            latestRevision: deck.latestRevision,
-            hidden: deck.hidden,
-            title: deck.title,
-            description: deck.description, 
-            variants: deck.variants,
-            timestamp: deck.timestamp, 
-            lastUpdate: deck.lastUpdate, 
-            language: deck.language,
-            owner: deck.user, 
-            tags: _.map(deck.tags, 'tagName'),
-            contributors: _.map(deck.contributors, 'user'),
-            path: path,
-            contents: [],
+            id: util.toIdentifier(deck),
+
+            variants: [],
+            children: [],
         };
+
+        let selfVariant = _.pick(deck, 'language');
+        if (!rootVariants) {
+            // we are root!
+            rootVariants = _.map(deck.variants, (v) => _.pick(v, 'language'));
+
+            // we also push the current deck language (primary)
+            // we guard against bad data: check if it's there already
+            let primaryVariant = _.find(rootVariants, selfVariant);
+            if (primaryVariant) {
+                // tag it as original
+                Object.assign(primaryVariant, { original: true });
+            } else {
+                // add it
+                primaryVariant = Object.assign({ original: true }, selfVariant);
+                rootVariants.unshift(primaryVariant);
+            }
+
+            deckTree.variants = rootVariants;
+        } else {
+            // let's add what we have on the subdeck level to the root variants
+            _.map(deck.variants, (v) => _.pick(v, 'language')).concat(selfVariant).forEach((deckVariant) => {
+                // we skip stuff we already have
+                if (!_.find(rootVariants, deckVariant) ) {
+                    rootVariants.push(deckVariant);
+                }
+            });
+        }
 
         for (let item of deck.contentItems) {
             let itemId = util.toIdentifier(item.ref);
             if (item.kind === 'slide') {
-                let slide = await exportSlide(itemId);
+                let slide = await slideDB.getSlideRevision(itemId);
                 // skip dangling slide references
                 if (!slide) continue;
 
-                slide.path = path;
+                let slideNode = {
+                    type: 'slide',
+                    // this is the canonical id of the slide, it (as any other variant id) can be used to fetch the slide node
+                    id: itemId,
+                    variants: _.map(item.variants, (v) => ({ id: util.toIdentifier(v), language: v.language })),
+                };
 
-                // also add the variants
-                slide.variants = [];
-                for (let slideVariant of (item.variants || [])) {
-                    let variantInfo = await exportSlide(util.toIdentifier(slideVariant));
-                    // also add any other variant data (language currently)
-                    Object.assign(variantInfo, slideVariant);
-                    slide.variants.push(variantInfo);
+                // add original as well
+                slideNode.variants.unshift({
+                    id: itemId,
+                    language: slide.language,
+                });
+
+                deckTree.children.push(slideNode);
+
+                // we collect language from slides as well as subdecks
+                let variantSpecs = [_.pick(slide, 'language'), ..._.map(item.variants, (v) => _.pick(v, 'language'))];
+                for (let variantSpec of variantSpecs) {
+                    if (!_.find(rootVariants, variantSpec) ) {
+                        rootVariants.push(variantSpec);
+                    }
                 }
 
-                deckTree.contents.push(slide);
-
-            } else {
+            } else if (!firstLevel) {
                 // it's a deck
-                let innerTree = await self.exportDeckTree(itemId, _.cloneDeep(path), visited);
+                let innerTree = await self.getDeckTreeVariants(itemId, false, visited, rootVariants);
                 // skip dangling deck references / cycles
                 if (!innerTree) continue;
 
-                deckTree.contents.push(innerTree);
+                deckTree.children.push(innerTree);
             }
         }
 
+        return deckTree;
+    },
+
+    // new implementation for decktree API with enrich flag
+    exportDeckTree: async function(deckId, firstLevel, path=[], deckTree=[], visited=[]) {
+        let treeVariants = await self.getDeckTreeVariants(deckId, true);
+        let originalVariant = _.find(treeVariants.variants, { original: true });
+        let originalLanguage = originalVariant.language;
+        
+        for (const variant of treeVariants.variants) {
+            let variantFilter = _.pick(variant, 'language');
+        
+            let deck = await deckDB.getDeck(deckId, variantFilter);
+            if (!deck) return; // not found
+
+            // make it canonical
+            deckId = util.toIdentifier(deck);
+            let identifier = `${deckId}_${variantFilter.language}`;
+
+            if (visited.includes(identifier)) return;
+            visited.push(identifier);
+
+            path.push(_.pick(deck, 'id', 'revision', 'hidden'));
+
+            let deckEntry = {
+                type: 'deck',
+                id: deck.id,
+                revision: deck.revision,
+                hidden: deck.hidden,
+                title: deck.title,
+                description: deck.description,
+                timestamp: deck.timestamp, 
+                lastUpdate: deck.lastUpdate,
+                educationLevel: deck.educationLevel,
+                tags: _.map(deck.tags, 'tagName'),            
+                language: deck.language,
+                variants: {
+                    original: originalLanguage,
+                    current: variantFilter.language,
+                    all: _.map(treeVariants.variants, 'language'),
+                },
+                theme: deck.theme,
+                owner: deck.user,
+                contributors: _.map(await contributorsDB.getDeckContributors(deckId), 'id'),
+                path: _.uniqBy(path, 'id'),
+                forkGroup: await deckDB.computeForkGroup(deckId),
+                revisionCount: deck.revisionCount,
+                firstSlide: await self.getFirstSlide({ 
+                    id: deck.id, 
+                    revision: deck.revision, 
+                    language: variantFilter.language,
+                    contentItems: deck.contentItems, 
+                }),
+                children: [],
+            };
+
+            if (_.isEmpty(deckTree)) {
+
+                // info of root deck
+                deckTree.push(deckEntry);
+            } else {
+                // check for cycles!
+                if (_.find(deckTree.children, { type: 'deck', id: deckId })) {
+                    // TODO for now just pretend it's not there
+                    console.warn(`found cycle in deck tree ${deckTree.id}, deck node ${deckId}`);
+                    return deckTree;
+                }
+
+                // else push the deck as well
+                deckTree.push(deckEntry);
+            }
+
+            for (let item of deck.contentItems) {
+                let itemId = util.toIdentifier(item.ref);
+
+                if (item.kind === 'slide') {
+                    if (!_.isEmpty(variantFilter)) {
+                        // fetch the correct slide reference
+                        let slideVariant = _.find(item.variants, variantFilter);
+                        if (slideVariant) {
+                            // set the correct variant itemId
+                            itemId = util.toIdentifier(slideVariant);
+                        }
+                    }
+                    // if no variantFilter, or no matching variant, item is the original slide
+
+                    let slide = await slideDB.getSlideRevision(itemId);
+                    deckEntry.children.push({
+                        type: 'slide',
+                        id: itemId,
+                        title: slide.title,
+                        content: slide.content,
+                        speakernotes: slide.speakernotes,
+                        language: slide.language,
+                        user: slide.user,
+                    });
+
+                } else if (!firstLevel) {
+                    // it's a deck
+                    // call recursively for subdecks
+                    await self.exportDeckTree(itemId, false, _.cloneDeep(path), deckTree, visited);
+                    // deckTree will receive the rest of the slides
+                }
+            }            
+        }
         return deckTree;
     },
 
@@ -434,245 +587,6 @@ const self = module.exports = {
             // TODO maybe remove this
             theme: slideNode.parent.theme,
         };
-    },
-
-    // we guard the copy deck revision tree method against abuse, by checking for change logs of one
-    // DEPRECATED
-    copyDeckTreeOld: async function(deckId, user, forAttach) {
-        let deck = util.parseIdentifier(deckId);
-        let existingDeck = await deckDB.get(deck.id);
-
-        let [latestRevision] = existingDeck.revisions.slice(-1);
-        if (deck.revision && latestRevision.id !== deck.revision) {
-            // we want to fork a read-only revision, all's well
-            return self._copyDeckTreeOld(deckId, user, forAttach);
-        } else {
-            // make the deck id canonical just in case
-            deck.revision = latestRevision.id;
-        }
-
-        // before we fork it, let's check if it's a fresh revision
-        let counts = await deckDB.getChangesCounts(deck.id);
-        if (counts[deck.revision] === 1) {
-            // we want to fork a fresh revision, let's fork the one before it
-            console.log(`forking ${deck.revision -1} instead of ${deck.revision} for deck ${deck.id}`);
-            return self._copyDeckTreeOld(util.toIdentifier({ id: deck.id, revision: deck.revision - 1 }), user, forAttach);
-        } else {
-            // unknown revision, old deck without changelog, or a revision with changes, just fork it!
-            return self._copyDeckTreeOld(deckId, user, forAttach);
-        }
-
-    },
-
-    // copies a given deck revision tree by copying all of its sub-decks into new decks
-    // forAttach is true when forking is done during deck attach process
-    // DEPRECATED
-    _copyDeckTreeOld: async function(deckId, user, forAttach) {
-        let res = await deckDB.getFlatDecks(deckId);
-
-        // we have a flat sub-deck structure
-        // push root deck into array
-        let flatDeckArray = [res.id];
-        for(let child of res.children){
-            flatDeckArray.push(child.id); // push next sub-deck into array
-        }
-        //init maps for new ids
-        let id_map = {}, id_noRev_map = {}, slide_id_map = {};
-        //reverse in order to iterate from bottom to top
-        flatDeckArray.reverse();
-
-        let new_decks = [];
-        // first we generate all the new ids for the copied decks, and hold them in a map for future reference
-        for (let next_deck of flatDeckArray) {
-            await helper.connectToDatabase()
-            .then((db) => helper.getNextIncrementationValueForCollection(db, 'decks'))
-            .then((newId) => {
-                id_map[next_deck] = newId+'-'+1;
-                id_noRev_map[next_deck.split('-')[0]] = newId;
-            });
-        }
-
-        // iterate the flat decktree and copy each deck, referring to the new ids in its content items and usage
-        for (let next_deck of flatDeckArray) {
-            let {id: nextId, revision: nextRevision} = util.parseIdentifier(next_deck);
-
-            let col = await helper.getCollection('decks');
-            let found = await col.findOne({_id: nextId});
-
-            let ind = _.findIndex(found.revisions, { id: nextRevision });
-            let contributorsArray = found.contributors;
-            //contributorsArray.push({'user': parseInt(user), 'count': 1});
-            let existingUserContributor = _.find(contributorsArray, { user: parseInt(user) });
-            if (existingUserContributor > -1)
-                existingUserContributor.count++;
-            else{
-                contributorsArray.push({user: parseInt(user), count: 1});
-            }
-
-            let copiedDeck = {
-                _id: id_noRev_map[found._id],
-                origin: {
-                    id: found._id,
-                    revision: found.revisions[ind].id,
-                    title: found.revisions[ind].title,
-                    user: found.user,
-                },
-                description: found.description,
-                language: found.revisions[ind].language,
-                license: found.license,
-                user: parseInt(user),
-                translated_from: found.translated_from,
-                contributors: contributorsArray,
-                active: 1,
-                // TODO revisit how we maintain this attribute
-                translations: found.translations || [],
-                // forked decks are created as hidden like they were new ones
-                hidden: true,
-            };
-            if (found.slideDimensions) {
-                copiedDeck.slideDimensions = found.slideDimensions;
-            }
-
-            let now = new Date();
-            let timestamp = now.toISOString();
-            copiedDeck.timestamp = timestamp;
-            copiedDeck.lastUpdate = timestamp;
-            if(found.hasOwnProperty('datasource')){
-                copiedDeck.datasource = found.datasource;
-            }
-            else{
-                copiedDeck.datasource = null;
-            }
-            //copiedDeck.parent = next_deck.split('-')[0]+'-'+next_deck.split('-')[1];
-            copiedDeck.revisions = [found.revisions[ind]];
-            copiedDeck.revisions[0].id = 1;
-            // own the revision as well!
-            copiedDeck.revisions[0].user = copiedDeck.user;
-
-            // renew creation date for fresh revision
-            copiedDeck.revisions[0].timestamp = timestamp;
-            copiedDeck.revisions[0].lastUpdate = timestamp;
-
-            // this points to the same deck, needs to be removed in forked decks
-            delete copiedDeck.revisions[0].originRevision;
-
-            // isFeatured needs to be removed in forked decks
-            delete copiedDeck.revisions[0].isFeatured;
-
-            let contentItemsMap = {};
-            let contentItemsToCopy = []; // TODO for now disable copying slides as well // copiedDeck.revisions[0].contentItems;
-            let copiedDeckId = util.toIdentifier({id: copiedDeck._id, revision: 1});
-
-            let slides = await helper.getCollection('slides');
-            for (let nextSlide of contentItemsToCopy) {
-                if (nextSlide.kind !== 'slide') continue;
-
-                // let's copy the slide
-                let slide = await slides.findOne({_id: nextSlide.ref.id});
-                let oldSlideId = slide._id;
-                let sourceRevision = _.find(slide.revisions, { id: nextSlide.ref.revision });
-                let newSlide = Object.assign({}, slide, sourceRevision, { id: slide._id, revision: sourceRevision.id });
-                let inserted = await slideDB.copy(newSlide, copiedDeckId, parseInt(user));
-
-                let newSlideId = inserted._id;
-                contentItemsMap[oldSlideId] = newSlideId;
-                slide_id_map[oldSlideId] = newSlideId;
-
-                // create the thumbnail
-                let copiedSlideId = `${newSlideId}-1`;
-                fileService.createThumbnail(inserted.revisions[0].content, copiedSlideId, copiedDeck.revisions[0].theme).catch((err) => {
-                    console.warn(`could not create thumbnail for translation ${copiedSlideId}, error was: ${err.message}`);
-                });
-
-                //console.log('contentItemsMap', contentItemsMap);
-                //console.log('copiedDeck', copiedDeck);
-                for(let i = 0; i < contentItemsToCopy.length; i++){
-                    if(contentItemsToCopy[i].ref.id === oldSlideId){
-                        contentItemsToCopy[i].ref.id = newSlideId;
-                        contentItemsToCopy[i].ref.revision = 1;
-                    }
-                }
-            }
-
-            // these should be run with or without a translation operation
-            for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                for(let j in id_map){
-                    if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].contentItems[i].ref.id === parseInt(j.split('-')[0])){
-                        copiedDeck.revisions[0].contentItems[i].ref.id = parseInt(id_map[j].split('-')[0]);
-                        copiedDeck.revisions[0].contentItems[i].ref.revision = parseInt(id_map[j].split('-')[1]);
-                    }
-                }
-            }
-            for(let i = 0; i < copiedDeck.revisions[0].usage.length; i++){
-                for(let j in id_map){
-                    if(id_map.hasOwnProperty(j) && copiedDeck.revisions[0].usage[i].id === parseInt(j.split('-')[0])){
-                        copiedDeck.revisions[0].usage[i].id = parseInt(id_map[j].split('-')[0]);
-                        copiedDeck.revisions[0].usage[i].revision = parseInt(id_map[j].split('-')[1]);
-                    }
-                }
-            }
-            for(let i = 0; i < copiedDeck.revisions[0].contentItems.length; i++){
-                let nextSlide = copiedDeck.revisions[0].contentItems[i];
-                //console.log('nextSlide', nextSlide);
-                if(nextSlide.kind === 'slide'){
-                    let root_deck_path = [copiedDeck._id, '1'];
-                    //console.log('outside root_deck_path', root_deck_path);
-                    //console.log('contentItemsMap', contentItemsMap);
-
-                    // TODO wait for it ???
-                    deckDB.addToUsage(nextSlide, root_deck_path);
-                }
-                else{
-                    continue;
-                }
-            }
-
-            new_decks.push(copiedDeck);
-            await col.insertOne(copiedDeck);
-        }
-
-        if (!forAttach) {
-            // if not attaching, we need to track stuff here
-            let rootDeckId = id_map[res.id];
-            // TODO wait for it ?
-            deckDB._trackDecksForked(rootDeckId, id_map, user, 'fork');
-        }
-
-        let forkResult = {'root_deck': id_map[res.id], 'id_map': id_map};
-
-        // after forking the deck and if the revision we forked is the latest,
-        // we create a new revision for the original deck;
-        // this way the fork points to a read-only revision
-        let deck = util.parseIdentifier(deckId);
-        let existingDeck = await deckDB.get(deck.id);
-
-        let [latestRevision] = existingDeck.revisions.slice(-1);
-        if (deck.revision && latestRevision.id !== deck.revision) {
-            // we forked a read-only revision, nothing to do here
-            return forkResult;
-        } else {
-            // make the deck id canonical just in case
-            deck.revision = latestRevision.id;
-        }
-
-        // this is an automatic revision, the user should be 'system'
-        // deck autorevision is created with same deck as root
-        let updatedDeck = await deckDB.createDeckRevision(deck.id, -1, deck.id);
-
-        // we need to update all parents of the deck to keep them updated
-        // with the latest revision we have just created now
-        let usage = await deckDB.getUsage(util.toIdentifier(deck));
-        // if a deck has no roots, itself is the root
-        console.log(`updating deck revision used for ${deck.id} in ${usage.length} parent decks`);
-
-        for (let parentDeck of usage) {
-            // citem, revertedRevId, root_deck, ckind, user, top_root_deck, parentOperations
-            let parentDeckId = util.toIdentifier(parentDeck);
-            await deckDB.updateContentItem(updatedDeck, '', parentDeckId, 'deck', -1, parentDeckId);
-        }
-
-        // return the same result
-        return forkResult;
     },
 
     // rootId is the id of the deck tree: its root deck id
@@ -797,7 +711,7 @@ const self = module.exports = {
         if (!forAttach) {
             // if not attaching, we need to track stuff here
             // TODO wait for it ?
-            await deckDB._trackDecksForked(rootDeckId, copiedIdsMap, userId, 'fork');
+            await _trackDecksForked(rootDeckId, copiedIdsMap, userId, 'fork');
         } // TODO ELSE ????
 
         if (reviseAfterCopy) {
@@ -843,7 +757,11 @@ const self = module.exports = {
             'theme',
             'slideDimensions',
             'allowMarkdown',
+            'educationLevel',
         ]);
+
+        // clean up null / undefined
+        newDeck = _.omitBy(newDeck, _.isNil);
 
         // assign origin metadata
         Object.assign(newDeck, {
@@ -966,7 +884,7 @@ const self = module.exports = {
         await deckDB.insertContentItem(newContentItem, targetPosition, targetId, userId);
 
         // track all created forks
-        await deckDB._trackDecksForked(targetRootId, forkResult.id_map, userId, 'attach').catch((err) => {
+        await _trackDecksForked(targetRootId, forkResult.id_map, userId, 'attach').catch((err) => {
             console.warn(`error tracking attach deck copy ${forkResult.root_node} to ${targetId}`);
         });
 
@@ -987,6 +905,7 @@ const self = module.exports = {
             'theme',
             'allowMarkdown',
             'slideDimensions',
+            'educationLevel',
         ]), payload);
 
         // add it to database
@@ -1054,6 +973,30 @@ async function exportSlide(slideId) {
     return Object.assign(result, {
         type: 'slide',
         owner: slide.user,
-        contributors: _.map(slide.contributors, 'user'),
+        contributors: _.map(await contributorsDB.getSlideContributors(slideId), 'id'),
     });
+}
+
+function _trackDecksForked(rootDeckId, forkIdsMap, userId, forkType='fork') {
+    // we reverse the array to track the root first, then the children in order
+    let newDeckIds = Object.keys(forkIdsMap).map((key) => forkIdsMap[key]).reverse();
+
+    let parentOperations = [];
+    // taken from https://stackoverflow.com/questions/30823653/is-node-js-native-promise-all-processing-in-parallel-or-sequentially/#30823708
+    // this starts with a promise that resolves to empty array,
+    // then takes each new deck id and applies the tracking and returns a new promise that resolves
+    // to the tracking results, that are picked up by the next iteration, etc...
+    return newDeckIds.reduce((p, newDeckId) => {
+        return p.then((deckChanges) => {
+            // if errored somewhere return nothing, chain will just end without doing the rest
+            if (!deckChanges) return;
+
+            // parent operations is only the ops for the forking of the first deck (the root of the fork tree)
+            // the first time this runs, deckChanges is empty!
+            if (_.isEmpty(parentOperations)) parentOperations.push(...deckChanges);
+            // we track everything as rooted to the deck_id
+            return ChangeLog.trackDeckForked(newDeckId, userId, rootDeckId, parentOperations, forkType);
+        });
+    }, Promise.resolve([]));
+
 }

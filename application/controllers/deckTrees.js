@@ -383,6 +383,7 @@ const self = module.exports = {
                 'theme',
                 'allowMarkdown',
                 'slideDimensions',
+                'educationLevel',
             ]));
 
             return treeDB.createSubdeck(newDeckPayload, target.parentId, target.position + 1, rootId, userId).then((newContentItem) => {
@@ -539,8 +540,19 @@ const self = module.exports = {
         });
     },
 
+    getDeckTreeVariants: function(request, reply) {
+        treeDB.getDeckTreeVariants(request.params.id).then((deckTree) => {
+            if (!deckTree) throw boom.notFound();
+            return deckTree;
+        }).then(reply).catch((err) => {
+            if(err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation());
+        });
+    },
+
     exportDeckTree: function(request, reply) {
-        treeDB.exportDeckTree(request.params.id).then((deckTree) => {
+        treeDB.exportDeckTree(request.params.id, request.query.firstLevel).then((deckTree) => {
             if (!deckTree) throw boom.notFound();
             reply(deckTree);
         }).catch((err) => {
