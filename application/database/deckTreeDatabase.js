@@ -433,7 +433,7 @@ const self = module.exports = {
 
             } else if (!firstLevel) {
                 // it's a deck
-                let innerTree = await self.getDeckTreeVariants(itemId, true, visited, rootVariants);
+                let innerTree = await self.getDeckTreeVariants(itemId, false, visited, rootVariants);
                 // skip dangling deck references / cycles
                 if (!innerTree) continue;
 
