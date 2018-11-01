@@ -569,6 +569,7 @@ const self = module.exports = {
                 ref: _.pick(pathLeaf, 'id', 'revision'),
                 parentId: util.toIdentifier(pathParent),
                 position: pathLeaf.index + 1,
+                path,
             };
         }
 
@@ -583,6 +584,7 @@ const self = module.exports = {
             variants: slideNode.variants,
             parentId: util.toIdentifier(slideNode.parent),
             position: slideNode.index + 1,
+            path: slideNode.path,
             // TODO maybe remove this
             theme: slideNode.parent.theme,
         };

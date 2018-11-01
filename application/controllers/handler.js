@@ -64,7 +64,7 @@ let self = module.exports = {
                 if (!_.isEmpty(path)) {
                     let { tags } = await deckDB.collect(path, [], ['tags']);
                     // could be duplicates
-                    slide.tags = _.uniqBy(tags, 'tagName');
+                    slide.pathTags = _.uniqBy(tags, 'tagName');
                 } else {
                     throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootId}`);
                 }
@@ -348,12 +348,17 @@ let self = module.exports = {
         let deckId = request.params.id;
         let variantFilter = _.pick(request.query, 'language');
 
-        let fallbackFilter;
+        let fallbackFilter, pathTags;
         if (request.query.root && request.query.root !== deckId) {
             let node = await treeDB.findDeckTreeNode(request.query.root, deckId, 'deck');
             if (node) {
                 let rootDeck = await deckDB.getDeck(request.query.root);
                 fallbackFilter = _.pick(rootDeck, 'language');
+
+                // also collect the tags
+                let { tags } = await deckDB.collect(node.path, [], ['tags']);
+                // could be duplicates
+                pathTags = _.uniqBy(tags, 'tagName');
             } else {
                 throw boom.badData(`could not find deck: ${deckId} in deck tree: ${request.query.root}`);
             }
@@ -389,6 +394,11 @@ let self = module.exports = {
                     contentItems: rev.contentItems,
                 };
                 rev.firstSlide = await treeDB.getFirstSlide(deckRev);
+            }
+
+            // also add the pathTags
+            if (pathTags) {
+                deck.pathTags = pathTags;
             }
 
             reply(deck);
