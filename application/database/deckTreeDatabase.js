@@ -475,7 +475,7 @@ const self = module.exports = {
                 timestamp: deck.timestamp, 
                 lastUpdate: deck.lastUpdate,
                 educationLevel: deck.educationLevel,
-                tags: _.map(deck.tags, 'tagName'),            
+                tags: _.map(deck.tags, (t) => _.pick(t, ['tagName', 'tagType'])),            
                 language: deck.language,
                 variants: {
                     original: originalLanguage,
