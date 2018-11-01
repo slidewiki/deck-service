@@ -552,7 +552,10 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string(),
+                },
+                query: {
+                    root: Joi.string().description('Identifier of root deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],

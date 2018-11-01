@@ -48,17 +48,34 @@ let self = module.exports = {
         });
     },
 
-    //gets a single slide with all of its revisions, unless revision is defined
-    getSlide: function(request, reply) {
-        slideDB.get(encodeURIComponent(request.params.id)).then((slide) => {
-            if (co.isEmpty(slide))
-                reply(boom.notFound());
-            else
-                reply(slide);
-        }).catch((error) => {
-            request.log('error', error);
+    // gets a single slide with all of its revisions, unless revision is defined
+    getSlide: async function(request, reply) {
+        let slideId = request.params.id;
+        let rootId = request.query.root;
+
+        try {
+            let slide = await slideDB.get(slideId);
+            if (!slide) {
+                throw boom.notFound();
+            }
+
+            if (rootId) {
+                let path = await deckDB.findPath(rootId, slideId, 'slide');
+                if (!_.isEmpty(path)) {
+                    let { tags } = await deckDB.collect(path, [], ['tags']);
+                    // could be duplicates
+                    slide.tags = _.uniqBy(tags, 'tagName');
+                } else {
+                    throw boom.badData(`could not find slide: ${slideId} in deck tree: ${rootId}`);
+                }
+            }
+
+            reply(slide);
+        } catch (err) {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
             reply(boom.badImplementation());
-        });
+        }
     },
 
     //Get All Slides from database
