@@ -246,10 +246,10 @@ let self = module.exports = {
             if (!deck) throw boom.notFound();
 
             // check if deck is not root
-            if (_.size(deck.usage)) throw boom.methodNotAllowed();
+            if (_.size(deck.usage)) throw boom.methodNotAllowed(`cannot delete deck ${deckId} as it is shared in other deck trees`);
 
             // also check if deck has subdecks
-            if (_.find(deck.contentItems, { kind: 'deck' })) throw boom.methodNotAllowed();
+            if (_.find(deck.contentItems, { kind: 'deck' })) throw boom.methodNotAllowed(`cannot delete deck ${deckId} as it includes subdecks`);
 
             let result = await deckDB.adminUpdate(deckId, { user: -1 });
             if (!result) throw boom.notFound();
