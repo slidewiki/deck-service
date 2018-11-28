@@ -398,6 +398,14 @@ module.exports = function(server) {
                     new_revision: Joi.boolean(),
                     hidden: Joi.boolean(),
                     educationLevel: educationLevel.allow(null),
+                    dataSources: Joi.array().items(Joi.object().keys({
+                        type: Joi.string(),
+                        title: Joi.string(),
+                        url: Joi.string().allow(''),
+                        comment: Joi.string().allow(''),
+                        authors: Joi.string().allow(''),
+                        year: Joi.string().allow('')
+                    })).default([])
                 }),
 
                 headers: Joi.object({
@@ -783,7 +791,7 @@ module.exports = function(server) {
     server.route({
         method: 'PUT',
         path: '/slide/{id}/datasources',
-        handler: handlers.saveDataSources,
+        handler: handlers.saveSlideDataSources,
         config: {
             validate: {
                 params: {
@@ -804,6 +812,33 @@ module.exports = function(server) {
             tags: ['api'],
             auth: 'jwt',
             description: 'Replace slide data sources'
+        }
+    });
+    
+    server.route({
+        method: 'PUT',
+        path: '/deck/{id}/datasources',
+        handler: handlers.saveDeckDataSources,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string()
+                },
+                payload: Joi.array().items(Joi.object().keys({
+                    type: Joi.string(),
+                    title: Joi.string(),
+                    url: Joi.string().allow(''),
+                    comment: Joi.string().allow(''),
+                    authors: Joi.string().allow(''),
+                    year: Joi.string().allow('')
+                })),
+                headers: Joi.object({
+                    '----jwt----': Joi.string().required().description('JWT header provided by /login')
+                }).unknown(),
+            },
+            tags: ['api'],
+            auth: 'jwt',
+            description: 'Replace deck data sources'
         }
     });
 

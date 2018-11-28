@@ -235,7 +235,7 @@ let self = module.exports = {
     },
 
     //saves the data sources of a slide in the database
-    saveDataSources: function(request, reply) {
+    saveSlideDataSources: function(request, reply) {
         let slideId = request.params.id;
 
         slideDB.get(slideId).then( (slide) => {
@@ -243,6 +243,21 @@ let self = module.exports = {
 
             return slideDB.saveDataSources(slideId, request.payload).then((replaced) => {
                 reply(replaced);
+            });
+        }).catch( (error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
+    
+    //saves the data sources of a deck in the database
+    saveDeckDataSources: function(request, reply) {
+        let deckId = request.params.id;
+        deckDB.get(deckId).then( (deck) => {
+            if(!deck) return reply(boom.notFound());
+
+            return deckDB.saveDataSources(deckId, request.payload).then((dataSources) => {
+                reply(dataSources);
             });
         }).catch( (error) => {
             request.log('error', error);
@@ -275,22 +290,44 @@ let self = module.exports = {
             // variant (translations) filter
             let variantFilter = _.pick(request.query, 'language');
 
-            let dataSources = [];
+            let dataSources =  [];
+            if (deckRevision.dataSources) {
+                deckRevision.dataSources.forEach((dataSource) => {                    
+                    dataSources.push(dataSource);
+                });
+            }
             let arrayOfSlideIds = [];
             let slideRevisionsMap = {};
 
-            return treeDB.getFlatSlides(request.params.id, variantFilter).then((deckTree) => {
-                deckTree.children.forEach((child) => {
-                    let idArray = child.id.split('-');
-                    const newSlideId = parseInt(idArray[0]);
-                    const newSlideRevisionId = parseInt(idArray[1]);
-                    if (!(newSlideId in slideRevisionsMap)) {
-                        arrayOfSlideIds.push(newSlideId);
-                        slideRevisionsMap[newSlideId] = newSlideRevisionId;
+            let arrayOfDeckIds = [];
+            let deckRevisionsMap = {};
+
+            return treeDB.getDeckTree(request.params.id, variantFilter).then((deckTree) => {
+                let children = deckTree.children;
+                for (let i = 0; i < children.length; i++) {
+                    let child = children[i];
+                    if (child.type === 'slide') {
+                        let idArray = child.id.split('-');
+                        const newSlideId = parseInt(idArray[0]);
+                        const newSlideRevisionId = parseInt(idArray[1]);
+                        if (!(newSlideId in slideRevisionsMap)) {
+                            arrayOfSlideIds.push(newSlideId);
+                            slideRevisionsMap[newSlideId] = newSlideRevisionId;
+                        }
+                    } else {
+                        let idArray = child.id.split('-');
+                        const newDeckId = parseInt(idArray[0]);
+                        const newDeckRevisionId = parseInt(idArray[1]);
+                        if (!(newDeckId in deckRevisionsMap)) {
+                            arrayOfDeckIds.push(newDeckId);
+                            deckRevisionsMap[newDeckId] = newDeckRevisionId;
+                        }
+                        
+                        children.concat(child.children);
                     }
-                });
+                }
             }).then(() => {
-                // get dataSources
+                // get dataSources for slides
                 return slideDB.getSelected({selectedIDs: arrayOfSlideIds})// get slides with ids in arrayOfSlideIds
                 .then((slides) => {
                     slides.forEach((slide) => {
@@ -318,19 +355,67 @@ let self = module.exports = {
                                     if (unique) {
                                         dataSource.sid = slideId + '-' + slideRevisionId;
                                         dataSource.stitle = slideRevisionTitle;
+                                        dataSource.stype = 'slide';
                                         dataSources.push(dataSource);
                                     }
                                 });
                             }
                         }
                     });
+                }).then(() => {
+                    if (arrayOfDeckIds.length > 0) {
+                        // get dataSources for decks
+                        return deckDB.getSelected({selectedIDs: arrayOfDeckIds})// get decks with ids in arrayOfDeckIds
+                        .then((decks) => {
+                            decks.forEach((deck) => {
+                                if (deck.revisions !== undefined && deck.revisions.length > 0 && deck.revisions[0] !== null) {
+                                    const deckId = deck._id;
+                                    const deckRevisionId = deckRevisionsMap[deckId];
+                                    let deckRevision = deck.revisions.find((revision) =>  String(revision.id) ===  String(deckRevisionId));
+                                    if (deckRevision !== undefined && deckRevision.dataSources !== null && deckRevision.dataSources !== undefined) {
+                                        const deckRevisionTitle = deckRevision.title;
+                                        deckRevision.dataSources.forEach((dataSource) => {
+                                            //check that the dataSource has not already been added to the array
+                                            let unique = true;
+                                            for (let i = 0; i < dataSources.length; i++) {
+                                                let dataSourceInArray = dataSources[i];
+                                                if (dataSourceInArray.type === dataSource.type &&
+                                                    dataSourceInArray.title === dataSource.title &&
+                                                    dataSourceInArray.url === dataSource.url &&
+                                                    dataSourceInArray.comment === dataSource.comment &&
+                                                    dataSourceInArray.authors === dataSource.authors)
+                                                {
+                                                    unique = false;
+                                                    break;
+                                                }
+                                            }
+                                            if (unique) {
+                                                dataSource.sid = deckId + '-' + deckRevisionId;// add info about the origin
+                                                dataSource.stitle = deckRevisionTitle;
+                                                dataSource.stype = 'deck';
+                                                dataSources.push(dataSource);
+                                            }
+                                        });
+                                    }
+                                }
+                            });
 
-                    let items = dataSources;
-                    let totalCount = items.length;
-                    if (request.query.countOnly) {
-                        items = [];
+                            let items = dataSources;
+                            let totalCount = items.length;
+                            if (request.query.countOnly) {
+                                items = [];
+                            }
+                            reply({ items, totalCount, revisionOwner: deckRevision.user });
+                        
+                        });
+                    } else {
+                        let items = dataSources;
+                        let totalCount = items.length;
+                        if (request.query.countOnly) {
+                            items = [];
+                        }
+                        reply({ items, totalCount, revisionOwner: deckRevision.user });
                     }
-                    reply({ items, totalCount, revisionOwner: deckRevision.user });
                 });
             });
 
