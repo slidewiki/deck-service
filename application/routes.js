@@ -20,6 +20,8 @@ const slideDimensions = Joi.object().keys({
     height: Joi.number().integer().positive(),
 });
 
+const slideTransition = Joi.string().valid('none', 'concave', 'convex', 'fade', 'slide', 'zoom');
+
 const educationLevel = Joi.string().regex(/^[0-9]{1,3}$/).description('The education level targeted by the deck using a code from ISCED 2011 standard');
 
 // TODO better organize joi validation models
@@ -594,7 +596,10 @@ module.exports = function(server) {
         config: {
             validate: {
                 params: {
-                    id: Joi.string()
+                    id: Joi.string(),
+                },
+                query: {
+                    root: Joi.string().description('Identifier of root deck in the form {id}-{revision}, revision is optional'),
                 },
             },
             tags: ['api'],
@@ -663,6 +668,7 @@ module.exports = function(server) {
                     tags: Joi.array().items(apiModels.tag).default([]),
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA').default('CC BY-SA'),
                     dimensions: slideDimensions,
+                    transition: slideTransition,
                 }).requiredKeys('content', 'root_deck'),
                 headers: Joi.object({
                     '----jwt----': Joi.string().required().description('JWT header provided by /login')
@@ -705,6 +711,7 @@ module.exports = function(server) {
                     language: languageModel,
                     license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                     dimensions: slideDimensions,
+                    transition: slideTransition,
                     dataSources: Joi.array().items(Joi.object().keys({
                         type: Joi.string(),
                         title: Joi.string(),
@@ -922,6 +929,7 @@ module.exports = function(server) {
                                 language: languageModel,
                                 license: Joi.string().valid('CC0', 'CC BY', 'CC BY-SA'),
                                 dimensions: slideDimensions,
+                                transition: slideTransition,
                             }).options({ stripUnknown: true }),
 
                         })
@@ -1024,6 +1032,30 @@ module.exports = function(server) {
         }
     });
 
+    let cors;
+    if (process.env.URL_PLATFORM) {
+        // define the cors settings
+        cors = { origin: [] };
+        cors.origin.push(process.env.URL_PLATFORM);
+    }
+
+    server.route({
+        method: 'GET',
+        path: '/decktree/{id}/translations',
+        handler: deckTrees.getDeckTreeVariants,
+        config: {
+            validate: {
+                params: {
+                    id: Joi.string().description('Identifier of deck in the form {id}-{revision}, revision is optional'),
+                },
+            },
+            tags: ['api'],
+            description: 'List the translations available for all deck tree nodes',
+            // needed for presentation rooms feature
+            cors,
+        },
+    });
+
     server.route({
         method: 'GET',
         path: '/decktree/node/translations',
@@ -1077,6 +1109,9 @@ module.exports = function(server) {
                 params: {
                     id: Joi.string(),
                 },
+                query: {
+                    firstLevel: Joi.boolean().default(false),
+                }
             },
             tags: ['api'],
             description: 'Retrieve full data for the entire deck tree and slides',

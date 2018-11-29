@@ -337,6 +337,58 @@ let self = module.exports = {
         .then((col) => col.count(query));
     },
 
+    // collects deck from all matching deck ids in list
+    collect: async function(path, deckProperties=[], revisionProperties=[]) {
+        let projection = {};
+        deckProperties.forEach((p) => {
+            projection[p] = 1;
+        });
+        projection['revisions.$'] = 1;
+        // revisionProperties.forEach((p) => {
+        //     projection[`revisions.${p}`] = 1;
+        // });
+
+        let results = [];
+        let decks = await helper.getCollection('decks');
+        for (let {id, revision} of path) {
+            if (!id) continue;
+
+            let result = await decks.findOne({ _id: id, 'revisions.id': revision }, { fields: projection });
+            if (result) {
+                // bring revision properties to top level
+                revisionProperties.forEach((p) => {
+                    result[p] = result.revisions[0][p];
+                });
+                // delete revisions
+                delete result.revisions;
+
+                results.push(result);
+            }
+        }
+
+        // init the arrays for collection
+        let collected = { id: [] };
+        deckProperties.forEach((p) => collected[p] = []);
+        revisionProperties.forEach((p) => collected[p] = []);
+
+        return results.reduce((collected, result) => {
+            // collect the ids
+            collected.id.push(result._id);
+
+            // collect the properites
+            [...deckProperties, revisionProperties].forEach((p) => {
+                let value = result[p];
+                if (_.isArray(value)) {
+                    collected[p].push(...value);
+                } else {
+                    collected[p].push(value);
+                }
+            });
+
+            return collected;
+        }, collected);
+    },
+
     // return a path array of deckId as it exists in the tree with rootDeckId as root
     // returns first occurence of targetId, or nothing if cannot find the path
     // if targetKind is deck, then the path includes that as last item
