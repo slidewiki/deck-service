@@ -290,9 +290,9 @@ let self = module.exports = {
             // variant (translations) filter
             let variantFilter = _.pick(request.query, 'language');
 
-            let dataSources =  [];
-            if (deckRevision.dataSources) {
-                deckRevision.dataSources.forEach((dataSource) => {                    
+            let dataSources = [];
+            if (deckRevision.dataSources) {//add deck datasources
+                deckRevision.dataSources.forEach((dataSource) => {
                     dataSources.push(dataSource);
                 });
             }
