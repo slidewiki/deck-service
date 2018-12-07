@@ -1871,6 +1871,8 @@ let self = module.exports = {
         let item = util.parseIdentifier(itemId);
         if (keepVisibleOnly && itemKind === 'deck' && item.revision) {
             return self.get(item.id).then((existingDeck) => {
+                if (!existingDeck) return [];
+
                 let [latestRevision] = existingDeck.revisions.slice(-1);
                 if (latestRevision.id === item.revision) {
                     return self._getRootDecks(itemId, itemKind, keepVisibleOnly);
