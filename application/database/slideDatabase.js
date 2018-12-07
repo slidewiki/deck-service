@@ -172,6 +172,7 @@ let self = module.exports = {
             'speakernotes',
             'dimensions',
             'transition',
+            'annotations'
         ]);
 
         // prepare a payload using currentSlide data with update payload
@@ -219,6 +220,7 @@ let self = module.exports = {
             'dimensions',
             'transition',
             'language',
+            'annotations'
         ]);
 
         // assign metadata
@@ -617,6 +619,7 @@ let self = module.exports = {
             'speakernotes',
             'dimensions',
             'transition',
+            'annotations',
         ]);
         // assign extra variant data (if provided)
         Object.assign(newSlide, _.pick(variantData, [
@@ -625,6 +628,7 @@ let self = module.exports = {
             'content',
             'markdown',
             'speakernotes',
+            'annotations',
         ]));
         // assign other data
         Object.assign(newSlide, {
@@ -740,6 +744,7 @@ function convertToNewSlide(slide) {
             parent: slide.parent_slide,
             tags: slide.tags,
             license: slide.license,
+            annotations: slide.annotations,
         }]
     };
     if (slide.dimensions) {
@@ -776,7 +781,8 @@ function convertSlideWithNewRevision(slide, newRevisionId, usageArray) {
             speakernotes: slide.speakernotes,
             tags: slide.tags,
             dataSources: slide.dataSources,
-            license: slide.license
+            license: slide.license,
+            annotations: slide.annotations,
         }]
     };
     if (slide.dimensions) {
