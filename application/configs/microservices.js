@@ -14,7 +14,4 @@ module.exports = {
         uri: (!co.isEmpty(process.env.SERVICE_URL_TAG)) ? process.env.SERVICE_URL_TAG : 'http://tagservice',
         disabled: (process.env.NODE_ENV === 'test'),
     },
-    'translation' :{
-        uri: (!co.isEmpty(process.env.SERVICE_URL_TRANSLATION)) ? process.env.SERVICE_URL_TRANSLATION : 'http://translationservice',
-    },
 };
