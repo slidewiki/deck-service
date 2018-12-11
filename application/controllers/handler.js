@@ -266,6 +266,23 @@ let self = module.exports = {
             reply(boom.badImplementation());
         });
     },
+    
+    getSlideAnnotations: function(request, reply) {
+        let slideId = request.params.id;
+        slideDB.get(slideId).then((slide) => {
+            if(!slide) return reply(boom.notFound());
+
+            let items = slide.revisions[0].annotations || [];
+            let totalCount = items.length;
+            if (request.query.countOnly) {
+                items = [];
+            }
+            reply({ items, totalCount, revisionOwner: slide.user });
+        }).catch((error) => {
+            request.log('error', error);
+            reply(boom.badImplementation());
+        });
+    },
 
     getDeckDataSources: function(request, reply) {
         deckDB.getRevision(request.params.id).then((deckRevision) => {
