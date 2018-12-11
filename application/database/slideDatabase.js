@@ -172,7 +172,7 @@ let self = module.exports = {
             'speakernotes',
             'dimensions',
             'transition',
-            'annotations'
+            'annotations',
         ]);
 
         // prepare a payload using currentSlide data with update payload
@@ -219,8 +219,8 @@ let self = module.exports = {
             'speakernotes',
             'dimensions',
             'transition',
+            'annotations',
             'language',
-            'annotations'
         ]);
 
         // assign metadata
@@ -628,6 +628,8 @@ let self = module.exports = {
             'content',
             'markdown',
             'speakernotes',
+            'dimensions',
+            'transition',
             'annotations',
         ]));
         // assign other data
