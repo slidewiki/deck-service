@@ -165,6 +165,31 @@ const editors = {
     }
 };
 
+const dataSource = {
+    type: 'object',
+    properties: {
+        type: {
+            type: 'string'
+        },
+        title: {
+            type: 'string'
+        },
+        url: {
+            type: 'string'
+        },
+        comment: {
+            type: 'string'
+        },
+        authors: {
+            type: 'string'
+        },
+        year: {
+            type: 'string'
+        }
+    },
+    required: ['type','title']
+};
+
 const deckRevision = {
     type: 'object',
     properties: _.merge({
@@ -246,12 +271,9 @@ const deckRevision = {
             type: 'array',
             items: contentItem
         },
-
-        dataSources: { //is filled out automatically from the slides
+        dataSources: {
             type: 'array',
-            items: {
-                type: 'string'
-            }
+            items: dataSource
         },
         usage: {
             type: 'array',

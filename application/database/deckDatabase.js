@@ -308,6 +308,14 @@ let self = module.exports = {
         }
 
     },
+    
+    getSelected: function(identifiers) {
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => col.find({ _id:  { $in : identifiers.selectedIDs }}))
+        .then((stream) => stream.sort({timestamp: -1}))
+        .then((stream) => stream.toArray());
+    },
 
     find: (collection, query) => {
         return helper.connectToDatabase()
@@ -708,6 +716,10 @@ let self = module.exports = {
 
                 if (deck.hasOwnProperty('hidden')) {
                     existingDeck.hidden = deck.hidden;
+                }
+                
+                if (deck.hasOwnProperty('dataSources')) {
+                    deckRevision.dataSources = deck.dataSources;
                 }
 
                 // lastUpdated update
@@ -2261,6 +2273,33 @@ let self = module.exports = {
         })();
 
         return Promise.all([removeDeckPromise, updateSlidesUsagePromise]);
+    },
+    
+    saveDataSources: function(id, dataSources) {
+        let {deckId, revisionId} = splitDeckIdParam(id);
+
+        return helper.connectToDatabase()
+        .then((db) => db.collection('decks'))
+        .then((col) => {
+            return col.findOne({_id: parseInt(deckId)})
+            .then((deck) => {
+
+                if(!deck) return;
+
+                if(revisionId === null){
+                    revisionId = getActiveRevision(deck);
+                }
+
+                if(!deck.revisions[revisionId]) return;
+                try {
+                    deck.revisions[revisionId].dataSources = dataSources;
+                    return col.save(deck).then(() => deck.revisions[revisionId].dataSources);
+                } catch (e) {
+                    console.log('saveDataSources failed', e);
+                }
+                return;
+            });
+        });
     },
 
     // moves the entire deck tree including all subdecks to the archive
