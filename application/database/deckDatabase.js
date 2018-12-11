@@ -7,7 +7,6 @@ const util = require('../lib/util');
 const ChangeLog = require('../lib/ChangeLog');
 
 const userService = require('../services/user');
-const translationService = require('../services/translation');
 const fileService = require('../services/file');
 
 const helper = require('./helper'),
@@ -1507,62 +1506,6 @@ let self = module.exports = {
             });
 
         });
-
-    },
-
-    updateTranslations(kind, translations_array){
-        if (kind === 'deck'){
-            return new Promise((resolve, reject) => {
-                async.each(translations_array, (translation, cbEach) => {
-                    return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
-                    .then((db2) => db2.collection('decks'))
-                    .then((col) => {
-                        return col.findOne({_id: parseInt(translation.deck_id)})
-                        .then((found) => {
-                            if (found){
-                                found.translations = translations_array;
-                                col.save(found);
-                                resolve();
-                            }else{
-                                console.log('Deck not found: ' + translation.deck_id);
-                                reject('Deck not found: ' + translation.deck_id);
-                            }
-
-                        })
-                        .catch(cbEach);
-                    });
-                }, (err) => {
-                    if (err) {
-                        return reject(err);
-                    }
-                });
-            });
-        }else{
-            return new Promise((resolve, reject) => {
-                async.each(translations_array, (translation, cbEach) => {
-                    return helper.connectToDatabase() //db connection have to be accessed again in order to work with more than one collection
-                    .then((db2) => db2.collection('slides'))
-                    .then((col) => {
-                        return col.findOne({_id: parseInt(translation.slide_id)})
-                        .then((found) => {
-                            if (found){
-                                found.translations = translations_array;
-                                col.save(found);
-                                resolve();
-                            }else{
-                                console.log('Slide not found: ' + translation.slide_id);
-                                reject('Slide not found: ' + translation.slide_id);
-                            }
-                        })
-                        .catch(cbEach);
-                    });
-                }, (err) => {
-                    if (err) {
-                        return reject(err);
-                    }
-                });
-            });
-        }
 
     },
 
