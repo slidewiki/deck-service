@@ -42,7 +42,7 @@
     "inert": "^4.2.0",
     "joi": "^10.6.0",
     "lodash": "^4.17.4",
-    "mongodb": "^2.2.28",
+    "mongodb": "^3.1.13",
     "progress": "^2.0.0",
     "querystring": "^0.2.0",
     "request": "^2.79.0",
