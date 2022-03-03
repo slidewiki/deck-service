@@ -71,12 +71,12 @@ describe('deckDatabase', function() {
                 .then((forkAllowed) => {
                     forkAllowed.should.equal(true);
                 }),
-                deckDB._adminUpdate('54', { accessLevel: 'private' })
+                deckDB.adminUpdate('54', { accessLevel: 'private' })
                 .then(() => deckDB.forkAllowed('54', userId))
                 .then((forkAllowed) => {
                     forkAllowed.should.equal(true);
                 }),
-                deckDB._adminUpdate('54', { accessLevel: 'restricted' })
+                deckDB.adminUpdate('54', { accessLevel: 'restricted' })
                 .then(() => deckDB.forkAllowed('54', userId))
                 .then((forkAllowed) => {
                     forkAllowed.should.equal(true);
@@ -95,7 +95,7 @@ describe('deckDatabase', function() {
 
         context.skip('if the deck is private', function() {
             beforeEach(function() {
-                return deckDB._adminUpdate('54', { accessLevel: 'private' });
+                return deckDB.adminUpdate('54', { accessLevel: 'private' });
             });
 
             it('should return false for some unauthorized user', function() {
@@ -111,7 +111,7 @@ describe('deckDatabase', function() {
 
         context.skip('if the deck is restricted', function() {
             beforeEach(function() {
-                return deckDB._adminUpdate('54', { accessLevel: 'restricted' });
+                return deckDB.adminUpdate('54', { accessLevel: 'restricted' });
             });
 
             it('should return true for some unauthorized user', function() {
@@ -155,7 +155,7 @@ describe('deckDatabase', function() {
 
         it.skip('should only include the owner and no groups for decks that are private', function() {
             // update first to private and recalculate
-            return deckDB._adminUpdate('54', { accessLevel: 'private' })
+            return deckDB.adminUpdate('54', { accessLevel: 'private' })
             .then(() => deckDB.getDeckUsersGroups('54'))
             .then((editors) => {
                 editors.users.should.have.members([ 46 ]);
@@ -166,7 +166,7 @@ describe('deckDatabase', function() {
 
         it.skip('should exactly include all explicitly authorized users and authorized groups for restricted decks', function() {
             // update first to restricted and recalculate
-            return deckDB._adminUpdate('54', { accessLevel: 'restricted' })
+            return deckDB.adminUpdate('54', { accessLevel: 'restricted' })
             .then(() => deckDB.getDeckUsersGroups('54'))
             .then((editors) => {
                 editors.users.should.have.members([ 4, 5 ]);

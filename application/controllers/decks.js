@@ -212,6 +212,58 @@ let self = module.exports = {
 
     },
 
+    // TODO support full deck updates
+    updateDeck: async function(request, reply) {
+        let userId = request.auth.credentials.userid;
+        let deckId = request.params.id;
+
+        try {
+            let perms = await deckDB.userPermissions(deckId, userId);
+            if (!perms) throw boom.notFound();
+            if (!perms.admin) throw boom.forbidden(`user:${userId} is not authorized to delete deck:${deckId}`);
+
+            await deckDB.adminUpdate(deckId, request.payload);
+
+            reply(await deckDB.getDeck(deckId));
+        } catch (err) {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation());
+        }
+
+    },
+
+    deleteDeck: async function(request, reply) {
+        let userId = request.auth.credentials.userid;
+        let deckId = request.params.id;
+
+        try {
+            let perms = await deckDB.userPermissions(deckId, userId);
+            if (!perms) throw boom.notFound();
+            if (!perms.admin) throw boom.forbidden(`user:${userId} is not authorized to delete deck:${deckId}`);
+
+            let deck = await deckDB.getDeck(deckId);
+            if (!deck) throw boom.notFound();
+
+            // check if deck is not root
+            if (_.size(deck.usage)) throw boom.methodNotAllowed(`cannot delete deck ${deckId} as it is shared in other deck trees`);
+
+            // also check if deck has subdecks
+            if (_.find(deck.contentItems, { kind: 'deck' })) throw boom.methodNotAllowed(`cannot delete deck ${deckId} as it includes subdecks`);
+
+            let result = await deckDB.adminUpdate(deckId, { user: -1 });
+            if (!result) throw boom.notFound();
+
+            // no content retured, it's a DELETE op
+            reply();
+        } catch (err) {
+            if (err.isBoom) return reply(err);
+            request.log('error', err);
+            reply(boom.badImplementation());
+        }
+
+    },
+
 };
 
 async function countAndList(query, options){
