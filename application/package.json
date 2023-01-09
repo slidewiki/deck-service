@@ -34,7 +34,7 @@
     "good-console": "^6.2.0",
     "good-squeeze": "^5.0.0",
     "hapi": "^16.4.0",
-    "hapi-auth-jwt2": "^7.2.4",
+    "hapi-auth-jwt2": "^10.4.0",
     "hapi-swagger": "^7.6.0",
     "he": "^1.1.0",
     "immutable": "^3.8.1",
